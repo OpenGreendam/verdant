@@ -250,13 +250,13 @@ impl IntoElement for Group {
         div()
             .flex()
             .flex_col()
-            .gap(px(6.0))
-            .mx(px(10.0))
-            .mt(px(14.0))
-            .child(div().px(px(4.0)).text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
+            .gap(px(8.0))
+            .mx(px(12.0))
+            .mt(px(18.0))
+            .child(div().px(px(2.0)).text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
             .child(div().flex().flex_col().rounded(px(12.0)).bg(th.card).overflow_hidden()
                 .children(self.rows.into_iter().enumerate().map(|(i, row)| {
-                    div().min_h(px(42.0)).px(px(12.0)).py(px(7.0)).flex().flex_col().justify_center().gap(px(6.0))
+                    div().min_h(px(50.0)).px(px(12.0)).py(px(8.0)).flex().flex_col().justify_center().gap(px(8.0))
                         .when(i > 0, |d| d.border_t_1().border_color(th.shade))
                         .child(row)
                 })))
@@ -638,7 +638,7 @@ impl Editor {
                     .aria_label(tip)
                     .aria_selected(active)
                     .relative()
-                    .size(px(28.0))
+                    .size(px(32.0))
                     .rounded(px(6.0))
                     .flex()
                     .items_center()
@@ -683,12 +683,12 @@ impl Editor {
         };
 
         let header = div()
-            .h(px(34.0))
+            .h(px(46.0))
             .flex_none()
-            .px(px(10.0))
+            .px(px(12.0))
             .flex()
             .items_center()
-            .gap(px(6.0))
+            .gap(px(8.0))
             .bg(th.surface)
             .border_b_1()
             .border_color(th.shade)
@@ -696,13 +696,13 @@ impl Editor {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
             .child(svg().path(icon(ic)).size(px(14.0)).text_color(th.accent))
-            .child(div().flex_1().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(th.text).child(title))
+            .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(title))
             .child(
                 div()
                     .id("close-right-dock")
                     .role(Role::Button)
                     .aria_label("收起右侧面板")
-                    .size(px(22.0))
+                    .size(px(28.0))
                     .rounded(px(4.0))
                     .flex()
                     .items_center()
@@ -1505,7 +1505,7 @@ impl Editor {
                 d.child(
                     generated_select_button(self, SelectId::PitchRangeCents, Arg::None, "pitch-range-select", cx)
                         .h(px(BAR_BTN_H))
-                        .w(px(78.0)),
+                        .w(px(104.0)),
                 )
             })
             .child(

@@ -23,11 +23,13 @@ use crate::theme::{Theme, with_alpha};
 pub const LAYOUT_PREFS_KEY: &str = "ui_layout";
 
 /// Design-system uniform row height tokens so horizontal toolbars/rows never stair-step.
-pub const TOP_BTN_H: f32 = 28.0;
-pub const BAR_BTN_H: f32 = 26.0;
-pub const PANEL_BTN_H: f32 = 28.0;
+/// libadwaita metrics: header bar buttons 32 px, toolbar controls 30 px,
+/// fields and buttons in panes 34 px.
+pub const TOP_BTN_H: f32 = 32.0;
+pub const BAR_BTN_H: f32 = 30.0;
+pub const PANEL_BTN_H: f32 = 34.0;
 pub const HDR_BTN_H: f32 = 22.0;
-pub const RIGHT_RAIL_W: f32 = 36.0;
+pub const RIGHT_RAIL_W: f32 = 44.0;
 
 pub fn route_display_name(route: Route) -> &'static str {
     match route {
@@ -116,8 +118,8 @@ pub struct LayoutPrefs {
 impl Default for LayoutPrefs {
     fn default() -> Self {
         Self {
-            inspector_width: 242.0,
-            right_dock_width: 292.0,
+            inspector_width: 300.0,
+            right_dock_width: 340.0,
             show_right_dock: true,
             right_dock_tab: RightDockTab::VoiceTimbre,
             arrange_height: 160.0,
@@ -132,8 +134,8 @@ impl Default for LayoutPrefs {
 impl LayoutPrefs {
     pub fn clamped(self) -> Self {
         Self {
-            inspector_width: if self.inspector_width.is_finite() { self.inspector_width.clamp(210.0, 420.0) } else { 242.0 },
-            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(244.0, 440.0) } else { 292.0 },
+            inspector_width: if self.inspector_width.is_finite() { self.inspector_width.clamp(260.0, 440.0) } else { 300.0 },
+            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, 480.0) } else { 340.0 },
             show_right_dock: self.show_right_dock,
             right_dock_tab: self.right_dock_tab,
             arrange_height: if self.arrange_height.is_finite() { self.arrange_height.clamp(92.0, 460.0) } else { 160.0 },
@@ -172,7 +174,7 @@ pub fn selectable_button(
         .aria_label(label.clone())
         .aria_selected(active)
         .h(px(BAR_BTN_H))
-        .px(px(8.0))
+        .px(px(11.0))
         .flex()
         .items_center()
         .justify_center()
@@ -180,7 +182,7 @@ pub fn selectable_button(
         .bg(if active { th.checked } else { th.control })
         .border_1()
         .border_color(if active { th.checked } else { th.control })
-        .text_xs()
+        .text_sm()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(th.text)
         .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
@@ -203,8 +205,8 @@ pub fn icon_selectable_button(
         .aria_label(label.clone())
         .aria_selected(active)
         .h(px(BAR_BTN_H))
-        .px(px(8.0))
-        .gap(px(5.0))
+        .px(px(11.0))
+        .gap(px(6.0))
         .flex()
         .items_center()
         .justify_center()
@@ -212,7 +214,7 @@ pub fn icon_selectable_button(
         .bg(if active { th.checked } else { th.control })
         .border_1()
         .border_color(if active { th.checked } else { th.control })
-        .text_xs()
+        .text_sm()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(fg)
         .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
@@ -234,15 +236,15 @@ pub fn select_button(
         .role(Role::Button)
         .aria_label(aria_name.into())
         .h(px(PANEL_BTN_H))
-        .px(px(8.0))
-        .gap(px(6.0))
+        .px(px(12.0))
+        .gap(px(8.0))
         .flex()
         .items_center()
         .rounded(px(6.0))
         .bg(th.control)
         .border_1()
         .border_color(th.control)
-        .text_xs()
+        .text_sm()
         .text_color(th.text)
         .hover(move |s| s.bg(th.control_pressed))
         .when_some(leading_icon, |d, ic| {
@@ -279,8 +281,9 @@ pub fn selectable_command_button(
     .aria_selected(active)
     .h(px(BAR_BTN_H))
     .py(px(0.0))
-    .px(px(8.0))
+    .px(px(11.0))
     .rounded(px(6.0))
+    .text_sm()
     .border_1()
     .border_color(if active { th.checked } else { th.control })
     .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
@@ -385,7 +388,9 @@ pub fn generated_select_button(
     .aria_label(spec.label)
     .h(px(PANEL_BTN_H))
     .py(px(0.0))
-    .gap(px(6.0))
+    .px(px(12.0))
+    .gap(px(8.0))
+    .text_sm()
     .rounded(px(6.0))
     .border_1()
     .border_color(th.control)
@@ -577,15 +582,17 @@ pub fn numeric_pill(
     let stepper = |btn_id: SharedString, direction: f64, symbol: &'static str, step_arg: Arg| {
         div()
             .id(btn_id)
-            .px(px(6.0))
+            .w(px(if compact { 24.0 } else { 30.0 }))
             .h_full()
+            .flex_none()
             .flex()
             .items_center()
             .justify_center()
-            .text_xs()
-            .text_color(th.text_secondary)
-            .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
-            .child(symbol)
+            .border_l_1()
+            .border_color(th.shade)
+            .text_color(th.text)
+            .hover(move |s| s.bg(th.control_pressed))
+            .child(svg().path(icon(symbol)).size(px(13.0)).text_color(th.text))
             .on_click(cx.listener(move |target, ev: &ClickEvent, _, cx| {
                 let cur = target.numeric_value(id, step_arg.clone());
                 if let Some(next) = spec.stepped(cur, direction, ev.modifiers().shift) {
@@ -737,35 +744,33 @@ pub fn numeric_pill(
         .border_1()
         .border_color(if scrubbing { th.accent } else { th.control })
         .overflow_hidden()
-        .child(stepper(dec_id, -1.0, "−", dec_arg))
+        // GtkSpinButton: the value (drag to scrub) then − and + on the right.
         .child(
             div()
                 .relative()
                 .h_full()
-                .px(px(6.0))
+                .px(px(if compact { 8.0 } else { 10.0 }))
                 .min_w(px(if compact { 76.0 } else { 64.0 }))
                 .flex_1()
                 .flex()
                 .items_center()
-                .justify_center()
-                .border_l_1()
-                .border_r_1()
-                .border_color(th.shade)
-                .text_xs()
+                .when(compact, |d| d.justify_center())
+                .text_sm()
                 .text_color(th.text)
                 .child(display_text)
                 .child(div().absolute().inset_0().child(center)),
         )
-        .child(stepper(inc_id, 1.0, "+", inc_arg));
+        .child(stepper(dec_id, -1.0, "minus", dec_arg))
+        .child(stepper(inc_id, 1.0, "plus", inc_arg));
 
     if compact {
         pill.flex().items_center().child(inner_box)
     } else {
         pill.flex()
             .items_center()
-            .gap(px(8.0))
+            .gap(px(12.0))
             .child(div().flex_1().min_w(px(56.0)).text_sm().text_color(th.text).child(zh_label))
-            .child(div().flex_shrink_0().w(px(128.0)).child(inner_box))
+            .child(div().flex_shrink_0().w(px(150.0)).child(inner_box))
     }
 }
 
@@ -1200,8 +1205,8 @@ mod tests {
         };
         custom.store(&mut prefs);
         let loaded = LayoutPrefs::from_prefs(&prefs);
-        assert_eq!(loaded.inspector_width, 420.0);
-        assert_eq!(loaded.right_dock_width, 244.0);
+        assert_eq!(loaded.inspector_width, 440.0);
+        assert_eq!(loaded.right_dock_width, 280.0);
         assert!(!loaded.show_right_dock);
         assert_eq!(loaded.right_dock_tab, RightDockTab::Dictionary);
         assert_eq!(loaded.arrange_height, 92.0);
