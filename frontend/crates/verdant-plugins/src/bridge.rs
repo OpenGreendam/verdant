@@ -28,6 +28,8 @@ pub struct RemoteInsert {
     seq: u64,
     at: usize,
     input: [Vec<f32>; 2],
+    key: [Vec<f32>; 2],
+    keyed: bool,
     output: [Vec<f32>; 2],
     output_ready: bool,
     events: Vec<ParamEvent>,
@@ -41,6 +43,8 @@ impl RemoteInsert {
         Self {
             ring, in_w, _out_r: out_r, state, name, seq: 0, at: 0,
             input: [vec![0.0; frames], vec![0.0; frames]],
+            key: [vec![0.0; frames], vec![0.0; frames]],
+            keyed: false,
             output: [vec![0.0; frames], vec![0.0; frames]],
             output_ready: true,
             events: vec![(0, 0, 0.0); MAX_PARAM_EVENTS], event_count: 0,
@@ -61,8 +65,16 @@ impl RemoteInsert {
     /// Admission includes the partial native quantum retained from prior calls.
     /// No quantum is published until this entire event slice has been checked.
     pub fn process_events(&mut self, left: &mut [f32], right: &mut [f32], events: &[ParamEvent]) -> bool {
+        self.process_keyed(left, right, None, events)
+    }
+
+    /// As `process_events`, plus a sidechain key aligned with `left`/`right`.
+    /// A quantum is keyed when any of its frames arrived with a key.
+    pub fn process_keyed(&mut self, left: &mut [f32], right: &mut [f32], key: Option<(&[f32], &[f32])>,
+        events: &[ParamEvent]) -> bool {
         let frames = left.len();
         if frames != right.len() || frames > MAX_BLOCK_FRAMES
+            || key.is_some_and(|(kl, kr)| kl.len() != frames || kr.len() != frames)
             || validate_event_quanta(events, frames, self.ring.max_frames(), self.at, self.event_count).is_err() {
             self.state.automation_fault.store(true, Ordering::Release);
             self.state.xruns.fetch_add(1, Ordering::Relaxed);
@@ -100,6 +112,14 @@ impl RemoteInsert {
             }
             self.input[0][range.clone()].copy_from_slice(&left[src.clone()]);
             self.input[1][range.clone()].copy_from_slice(&right[src.clone()]);
+            if let Some((kl, kr)) = key {
+                self.key[0][range.clone()].copy_from_slice(&kl[src.clone()]);
+                self.key[1][range.clone()].copy_from_slice(&kr[src.clone()]);
+                self.keyed = true;
+            } else if self.keyed {
+                self.key[0][range.clone()].fill(0.0);
+                self.key[1][range.clone()].fill(0.0);
+            }
             if !self.state.bypass.load(Ordering::Acquire) && self.output_ready {
                 left[src.clone()].copy_from_slice(&self.output[0][range.clone()]);
                 right[src].copy_from_slice(&self.output[1][range]);
@@ -113,7 +133,8 @@ impl RemoteInsert {
                 } else {
                     (&self.events[..self.event_count], 0)
                 };
-                if self.ring.try_write_input_rebased(self.seq, &self.input[0], &self.input[1], quantum_events, source_offset) {
+                let key = self.keyed.then_some((&self.key[0][..], &self.key[1][..]));
+                if self.ring.try_write_input_keyed(self.seq, &self.input[0], &self.input[1], key, quantum_events, source_offset) {
                     self.in_w.signal();
                 } else {
                     self.state.xruns.fetch_add(1, Ordering::Relaxed);
@@ -125,6 +146,7 @@ impl RemoteInsert {
                 self.seq += 1;
                 self.at = 0;
                 self.event_count = 0;
+                self.keyed = false;
             }
         }
         accepted
@@ -140,6 +162,11 @@ impl verdant_audio::Processor for RemoteInsert {
 
     fn process_automated(&mut self, left: &mut [f32], right: &mut [f32], events: &[(u32, u32, f64)]) -> bool {
         self.process_events(left, right, events)
+    }
+
+    fn process_keyed(&mut self, left: &mut [f32], right: &mut [f32], key: (&[f32], &[f32]),
+        events: &[(u32, u32, f64)]) -> bool {
+        RemoteInsert::process_keyed(self, left, right, Some(key), events)
     }
 }
 

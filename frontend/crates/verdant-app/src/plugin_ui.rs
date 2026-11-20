@@ -929,6 +929,20 @@ impl Editor {
         }
     }
 
+    /// Route `source`'s pre-insert signal to the insert's sidechain key.
+    pub fn set_insert_sidechain(&mut self, track: &TrackId, slot: usize, source: Option<TrackId>, cx: &mut Context<Self>) {
+        if !self.flush_insert_states(cx) { return; }
+        let mut specs = self.insert_specs(track);
+        let Some(spec) = specs.get_mut(slot) else { return };
+        let key = verdant_service::project_audio::SIDECHAIN_KEY;
+        match &source {
+            Some(id) if id != track => { spec.extra.insert(key.into(), serde_json::Value::String(id.as_str().into())); }
+            _ => { spec.extra.remove(key); }
+        }
+        let label = if source.is_some() { "设置侧链" } else { "关闭侧链" };
+        self.commit_inserts(track, specs, label, cx);
+    }
+
     pub fn add_insert(&mut self, track: &TrackId, format: &str, id: &str, cx: &mut Context<Self>) {
         self.add_insert_at(track, self.insert_specs(track).len(), format, id, cx);
     }

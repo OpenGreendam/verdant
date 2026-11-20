@@ -111,6 +111,17 @@ pub fn plugin_schedule(channel:&verdant_audio::automation_clock::ChannelAutomati
     if schedule.parameters.is_empty(){return Ok(None);}schedule.validate_density(256,4096).map_err(|e|e.to_string())?;Ok(Some(schedule))
 }
 
+/// `InsertSpec.extra` key naming the track whose pre-insert, pre-fader
+/// signal keys this insert.
+pub const SIDECHAIN_KEY:&str="sidechain";
+pub fn sidechain_source(spec:&verdant_plugins::InsertSpec)->Option<&str>{spec.extra.get(SIDECHAIN_KEY).and_then(serde_json::Value::as_str).filter(|id|!id.is_empty())}
+/// Resolve a keyed insert to an engine route. `delay` is the summed latency
+/// of the processors before it, so the key lines up with its audio input.
+pub fn sidechain_route(project:&Project,track:usize,spec:&verdant_plugins::InsertSpec,processor:usize,delay:u32)->Option<verdant_audio::engine::SidechainRoute>{
+    let source=sidechain_source(spec)?;let source=project.tracks.iter().position(|t|t.id.as_str()==source)?;
+    (source!=track&&source<verdant_audio::MAX_TRACKS&&track<verdant_audio::MAX_TRACKS).then_some(verdant_audio::engine::SidechainRoute{source:source as u16,track:track as u16,processor:processor as u16,delay})
+}
+
 #[derive(Clone)]
 pub struct NativeBinding{pub instance_id:String,pub processor:Option<usize>,pub bypass:bool,pub handle:Option<Arc<verdant_plugins::InsertHandle>>}
 pub struct NativeBindings{pub tracks:Vec<Vec<NativeBinding>>,pub master:Vec<NativeBinding>}
@@ -169,7 +180,21 @@ pub fn bind_native_automation(project:&Project,timeline:&mut Timeline,bindings:&
         native.push(bind_channel(&timeline.automation.tracks[index],&document,&AutomationOwner::Track{track_id:track.id.clone()},&format!("轨道 {} ",track.name),bound)?);
     }
     let master=bind_channel(&timeline.automation.master,&document,&AutomationOwner::Master,"主总线",&bindings.master)?;
-    timeline.native_automation=native;timeline.master_native_automation=master;Ok(())
+    timeline.native_automation=native;timeline.master_native_automation=master;
+    timeline.sidechains=realtime_sidechains(project,bindings);Ok(())
+}
+
+fn realtime_sidechains(project:&Project,bindings:&NativeBindings)->Vec<verdant_audio::engine::SidechainRoute>{
+    let mut routes=Vec::new();
+    for(index,track)in project.tracks.iter().enumerate(){
+        let bound=bindings.tracks.get(index).map(Vec::as_slice).unwrap_or(&[]);
+        for spec in verdant_plugins::project::read_inserts(&track.unknown){
+            let Some(binding)=bound.iter().find(|b|b.instance_id==spec.instance_id&&!b.bypass)else{continue};let Some(processor)=binding.processor else{continue};
+            let delay=bound.iter().filter(|b|b.processor.is_some_and(|p|p<processor)).filter_map(realtime_insert_latency).fold(0u32,u32::saturating_add);
+            routes.extend(sidechain_route(project,index,&spec,processor,delay));
+        }
+    }
+    routes
 }
 
 /// Prepare verified phrase PCM for playback and offline export. Apply the

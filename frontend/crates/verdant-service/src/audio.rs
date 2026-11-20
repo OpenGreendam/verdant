@@ -46,8 +46,12 @@ struct OfflineInsert{handle:InsertHandle,error:Arc<Mutex<Option<String>>>,latenc
 impl verdant_audio::Processor for OfflineInsert{
     fn name(&self)->&str{&self.handle.spec().name}
     fn process(&mut self,left:&mut[f32],right:&mut[f32]){let _=self.process_automated(left,right,&[]);}
-    fn process_automated(&mut self,left:&mut[f32],right:&mut[f32],events:&[(u32,u32,f64)])->bool{
-        let result=self.handle.process_offline_events(left,right,events).map_err(|e|e.to_string()).and_then(|()|{
+    fn process_automated(&mut self,left:&mut[f32],right:&mut[f32],events:&[(u32,u32,f64)])->bool{self.run(left,right,None,events)}
+    fn process_keyed(&mut self,left:&mut[f32],right:&mut[f32],key:(&[f32],&[f32]),events:&[(u32,u32,f64)])->bool{self.run(left,right,Some(key),events)}
+}
+impl OfflineInsert{
+    fn run(&mut self,left:&mut[f32],right:&mut[f32],key:Option<(&[f32],&[f32])>,events:&[(u32,u32,f64)])->bool{
+        let result=self.handle.process_offline_keyed(left,right,key,events).map_err(|e|e.to_string()).and_then(|()|{
             if self.handle.plugin_latency_samples()!=self.latency{return Err("插件在导出期间改变延迟，请重新导出".into());}
             if left.iter().chain(right.iter()).any(|v|!v.is_finite()){return Err("插件输出含非有限 PCM".into());}Ok(())
         });
@@ -114,9 +118,15 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
     let document=verdant_domain::automation::AutomationDocument::from_project(project).map_err(|e|e.to_string())?;
     let errors=Arc::new(Mutex::new(None));let mut chains=Vec::with_capacity(project.tracks.len());let mut schedules=Vec::with_capacity(project.tracks.len());let mut latencies=Vec::with_capacity(project.tracks.len());let mut ends=Vec::with_capacity(project.tracks.len());
     let target_slot=target.map(|id|project.tracks.iter().position(|t|&t.id==id).ok_or("导出轨道不存在")).transpose()?;
-    if let Some(slot)=target_slot{timeline.clips.retain(|c|c.track as usize==slot);timeline.stereo_clips.retain(|c|c.track as usize==slot);}
+    // A stem keeps its sidechain sources' material: they are muted below but
+    // still key the target's inserts.
+    if let Some(slot)=target_slot{
+        let keys:std::collections::BTreeSet<usize>=verdant_plugins::project::read_inserts(&project.tracks[slot].unknown).iter().filter_map(project_audio::sidechain_source).filter_map(|id|project.tracks.iter().position(|t|t.id.as_str()==id)).chain([slot]).collect();
+        timeline.clips.retain(|c|keys.contains(&(c.track as usize)));timeline.stereo_clips.retain(|c|keys.contains(&(c.track as usize)));
+    }
+    let mut sidechains=Vec::new();
     for(index,track)in project.tracks.iter().enumerate(){
-        let end=timeline.clips.iter().filter(|c|c.track as usize==index).map(|c|c.start+c.samples.len()as u64).chain(timeline.stereo_clips.iter().filter(|c|c.track as usize==index).map(|c|c.start+(c.samples.len()/2)as u64)).max().unwrap_or(0);
+        let end=if target_slot.is_some_and(|slot|slot!=index){0}else{timeline.clips.iter().filter(|c|c.track as usize==index).map(|c|c.start+c.samples.len()as u64).chain(timeline.stereo_clips.iter().filter(|c|c.track as usize==index).map(|c|c.start+(c.samples.len()/2)as u64)).max().unwrap_or(0)};
         let mut chain:Vec<ChainInput>=Vec::new();let mut native=Vec::new();let mut latency=0u32;let mut matched=std::collections::BTreeSet::new();
         if target_slot.is_none_or(|slot|slot==index)&&settings.options.effects{
             for spec in verdant_plugins::project::read_inserts(&track.unknown){
@@ -124,6 +134,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
                 let client=plugins.ok_or_else(||format!("轨道 {} 需要插件 {}，但宿主不可用",track.name,spec.name))?;
                 let handle=client.offline_insert(spec.clone()).map_err(|e|format!("插件 {}：{e}",spec.name))?;
                 let schedule=project_audio::plugin_schedule(&timeline.automation.tracks[index],&document,&verdant_domain::automation::AutomationOwner::Track{track_id:track.id.clone()},&spec.instance_id,&handle)?;
+                sidechains.extend(project_audio::sidechain_route(project,index,&spec,chain.len(),latency));
                 matched.insert(spec.instance_id.clone());let own=handle.plugin_latency_samples();latency=latency.checked_add(own).ok_or("插件延迟超出范围")?;
                 native.push(schedule);chain.push(ChainInput::New(Box::new(OfflineInsert{handle,error:errors.clone(),latency:own})));
             }
@@ -154,7 +165,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
     }
     let processed_end=length.checked_add(u64::from(latency)).ok_or("导出时钟溢出")?;
     if !master_chain.is_empty(){master_chain.push(Box::new(TailGate{position:0,end:processed_end}));master_native.push(None);}
-    timeline.length=processed_end;timeline.native_automation=schedules;timeline.master_native_automation=master_native;timeline.loop_range=None;timeline.metronome=None;
+    timeline.length=processed_end;timeline.native_automation=schedules;timeline.master_native_automation=master_native;timeline.loop_range=None;timeline.metronome=None;timeline.sidechains=sidechains;
     let tempo=TempoMap::new(&project.tempo_map,project.ppq).map_err(|e|e.to_string())?;
     let(start,end)=if let Some((a,z))=settings.range_ticks{let start=tempo.sample_at(a,RATE).max(0)as u64;let end=tempo.sample_at(z,RATE).max(0)as u64;if end<=start{return Err("导出时间范围为空".into());}(start,end)}else{(0,length)};
     // An explicit range may include silence after the last source. Effects

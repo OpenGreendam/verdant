@@ -129,7 +129,8 @@ impl HostedPlugin for Gain {
 // `verdant_plugins::builtin_dsp`, shared with the editor's curves.
 // ---------------------------------------------------------------------------
 
-use verdant_plugins::builtin_dsp::{self as dsp, CompParams, CompProcessor, EqParams, EqProcessor};
+use verdant_plugins::builtin_dsp::{self as dsp, CompProcessor, DeesserProcessor, DelayProcessor, EqParams, EqProcessor,
+    GateProcessor, LimiterProcessor, ReverbProcessor, SaturationProcessor, TableEffect};
 
 /// What a built-in effect provides to the generic host adapter.
 pub trait Effect {
@@ -137,24 +138,32 @@ pub trait Effect {
     fn descs(&self) -> Vec<ParamDesc>;
     fn index_of(id: &str) -> Option<usize>;
     fn set_index(&mut self, index: usize, value: f64) -> Result<(), String>;
-    fn run(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]);
+    fn run(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]);
     fn set_sample_rate(&mut self, sample_rate: f64);
+    fn latency(&self) -> u32 { 0 }
+    /// Latency-defining parameters are not offered for automation.
+    fn automatable(&self, _index: usize) -> bool { true }
 }
 
 impl Effect for EqProcessor {
     fn descs(&self) -> Vec<ParamDesc> { self.params.descs() }
     fn index_of(id: &str) -> Option<usize> { EqParams::index_of(id) }
     fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> { EqProcessor::set_index(self, index, value) }
-    fn run(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) { self.process(in_l, in_r, out_l, out_r) }
+    fn run(&mut self, in_l: &[f32], in_r: &[f32], _key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) { self.process(in_l, in_r, out_l, out_r) }
     fn set_sample_rate(&mut self, sample_rate: f64) { EqProcessor::set_sample_rate(self, sample_rate) }
 }
 
-impl Effect for CompProcessor {
-    fn descs(&self) -> Vec<ParamDesc> { self.params.descs() }
-    fn index_of(id: &str) -> Option<usize> { CompParams::index_of(id) }
-    fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> { CompProcessor::set_index(self, index, value) }
-    fn run(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) { self.process(in_l, in_r, out_l, out_r) }
-    fn set_sample_rate(&mut self, sample_rate: f64) { CompProcessor::set_sample_rate(self, sample_rate) }
+/// Adapter for every table-driven effect.
+pub struct Table<T: TableEffect>(pub T);
+
+impl<T: TableEffect> Effect for Table<T> {
+    fn descs(&self) -> Vec<ParamDesc> { self.0.descs() }
+    fn index_of(id: &str) -> Option<usize> { dsp::table_index(T::SPECS, id) }
+    fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> { self.0.set_index(index, value) }
+    fn run(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) { self.0.process(in_l, in_r, key, out_l, out_r) }
+    fn set_sample_rate(&mut self, sample_rate: f64) { self.0.set_sample_rate(sample_rate) }
+    fn latency(&self) -> u32 { self.0.latency() }
+    fn automatable(&self, index: usize) -> bool { T::SPECS.get(index).is_some_and(|s| s.automatable) }
 }
 
 /// Generic host adapter: parameters by id, automation by stable index,
@@ -172,30 +181,13 @@ impl<E: Effect> Builtin<E> {
         Self { fx, validation_descs }
     }
 
-    /// Check a whole set of (index, value) writes before applying any.
-    fn validate(&self, writes: impl IntoIterator<Item = (usize, f64)>) -> Result<(), String> {
-        for (index, value) in writes {
-            let d = self.validation_descs.get(index).ok_or("unknown builtin parameter")?;
-            if !value.is_finite() || !(d.min..=d.max).contains(&value) {
-                return Err(format!("{} outside {}…{}", d.id, d.min, d.max));
-            }
-        }
-        Ok(())
-    }
-}
-
-impl<E: Effect> HostedPlugin for Builtin<E> {
-    fn process(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) -> Result<(), String> {
-        if in_l.len() != in_r.len() || in_l.len() != out_l.len() || in_l.len() != out_r.len() {
-            return Err("invalid builtin block".into());
-        }
-        self.fx.run(in_l, in_r, out_l, out_r);
-        Ok(())
-    }
-
-    fn process_events(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32],
+    fn process_with(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32],
         events: &[ParamEvent]) -> Result<(), String> {
-        if events.is_empty() { return self.process(in_l, in_r, out_l, out_r); }
+        if events.is_empty() {
+            if in_l.len() != in_r.len() || in_l.len() != out_l.len() || in_l.len() != out_r.len() { return Err("invalid builtin block".into()); }
+            self.fx.run(in_l, in_r, key, out_l, out_r);
+            return Ok(());
+        }
         if in_l.len() != in_r.len() || in_l.len() != out_l.len() || in_l.len() != out_r.len()
             || events.len() > verdant_plugins::MAX_PARAM_EVENTS {
             return Err("invalid builtin automation block".into());
@@ -215,14 +207,49 @@ impl<E: Effect> HostedPlugin for Builtin<E> {
                 next += 1;
             }
             let end = events.get(next).map_or(in_l.len(), |e| e.1 as usize);
-            self.fx.run(&in_l[start..end], &in_r[start..end], &mut out_l[start..end], &mut out_r[start..end]);
+            let key = key.map(|(kl, kr)| (&kl[start..end], &kr[start..end]));
+            self.fx.run(&in_l[start..end], &in_r[start..end], key, &mut out_l[start..end], &mut out_r[start..end]);
             start = end;
         }
         Ok(())
     }
 
+    /// Check a whole set of (index, value) writes before applying any.
+    fn validate(&self, writes: impl IntoIterator<Item = (usize, f64)>) -> Result<(), String> {
+        for (index, value) in writes {
+            let d = self.validation_descs.get(index).ok_or("unknown builtin parameter")?;
+            if !value.is_finite() || !(d.min..=d.max).contains(&value) {
+                return Err(format!("{} outside {}…{}", d.id, d.min, d.max));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<E: Effect> HostedPlugin for Builtin<E> {
+    fn process(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) -> Result<(), String> {
+        if in_l.len() != in_r.len() || in_l.len() != out_l.len() || in_l.len() != out_r.len() {
+            return Err("invalid builtin block".into());
+        }
+        self.fx.run(in_l, in_r, None, out_l, out_r);
+        Ok(())
+    }
+
+    fn process_events(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32],
+        events: &[ParamEvent]) -> Result<(), String> {
+        self.process_with(in_l, in_r, None, out_l, out_r, events)
+    }
+
+    fn process_keyed(&mut self, in_l: &[f32], in_r: &[f32], key: (&[f32], &[f32]), out_l: &mut [f32], out_r: &mut [f32],
+        events: &[ParamEvent]) -> Result<(), String> {
+        if key.0.len() != in_l.len() || key.1.len() != in_l.len() { return Err("invalid builtin sidechain block".into()); }
+        self.process_with(in_l, in_r, Some(key), out_l, out_r, events)
+    }
+
+    fn latency(&mut self) -> u64 { self.fx.latency() as u64 }
+
     fn automation_params(&mut self) -> Result<Vec<AutomationParam>, String> {
-        self.fx.descs().into_iter().enumerate().map(|(i, d)| {
+        self.fx.descs().into_iter().enumerate().filter(|(i, _)| self.fx.automatable(*i)).map(|(i, d)| {
             let target = ParamTarget::from_desc(i as u32, &d).map_err(|e| e.to_string())?;
             Ok(AutomationParam { id: d.id, target })
         }).collect()
@@ -258,7 +285,13 @@ impl<E: Effect> HostedPlugin for Builtin<E> {
 pub fn effect(id: &str, sample_rate: f64) -> Option<Box<dyn HostedPlugin>> {
     match id {
         dsp::EQ_ID => Some(Box::new(Builtin::new(EqProcessor::new(sample_rate)))),
-        dsp::COMPRESSOR_ID => Some(Box::new(Builtin::new(CompProcessor::new(sample_rate)))),
+        dsp::COMPRESSOR_ID => Some(Box::new(Builtin::new(Table(CompProcessor::new(sample_rate))))),
+        dsp::GATE_ID => Some(Box::new(Builtin::new(Table(GateProcessor::new(sample_rate))))),
+        dsp::DEESSER_ID => Some(Box::new(Builtin::new(Table(DeesserProcessor::new(sample_rate))))),
+        dsp::LIMITER_ID => Some(Box::new(Builtin::new(Table(LimiterProcessor::new(sample_rate))))),
+        dsp::REVERB_ID => Some(Box::new(Builtin::new(Table(ReverbProcessor::new(sample_rate))))),
+        dsp::DELAY_ID => Some(Box::new(Builtin::new(Table(DelayProcessor::new(sample_rate))))),
+        dsp::SATURATION_ID => Some(Box::new(Builtin::new(Table(SaturationProcessor::new(sample_rate))))),
         _ => None,
     }
 }
@@ -375,7 +408,7 @@ mod tests {
     fn builtin_effect_validation_rejects_entire_automation_block() {
         let effects: [Box<dyn HostedPlugin>; 2] = [
             Box::new(Builtin::new(EqProcessor::new(48_000.0))),
-            Box::new(Builtin::new(CompProcessor::new(48_000.0))),
+            Box::new(Builtin::new(Table(CompProcessor::new(48_000.0)))),
         ];
         for mut fx in effects {
             let before = fx.params().unwrap();
@@ -429,5 +462,30 @@ mod tests {
         assert_eq!(comp.params().unwrap()[1].value, 8.0);
         assert!(effect("verdant.builtin.unknown", 48_000.0).is_none());
         assert_eq!(effect_descriptors().len(), dsp::EFFECT_IDS.len());
+    }
+
+    #[test]
+    fn keyed_builtins_hear_the_sidechain_and_report_latency() {
+        let mut comp = effect(dsp::COMPRESSOR_ID, 48_000.0).unwrap();
+        for (id, v) in [("threshold", -30.0), ("ratio", 10.0), ("knee", 0.0)] { comp.set_param(id, v).unwrap(); }
+        let n = 24_000;
+        let music: Vec<f32> = (0..n).map(|i| 0.02 * (i as f32 * 0.03).sin()).collect();
+        let kick: Vec<f32> = (0..n).map(|i| (i as f32 * 0.008).sin()).collect();
+        let (mut l, mut r) = (vec![0.0; n], vec![0.0; n]);
+        comp.process_keyed(&music, &music, (&kick, &kick), &mut l, &mut r, &[]).unwrap();
+        let energy = |x: &[f32]| x[12_000..].iter().map(|v| v * v).sum::<f32>();
+        assert!(energy(&l) < energy(&music) * 0.1, "the key ducks the music");
+        assert_eq!(comp.latency(), 0);
+        comp.set_param("lookahead", 5.0).unwrap();
+        assert_eq!(comp.latency(), 240);
+        assert!(!comp.automation_params().unwrap().iter().any(|p| p.id == "lookahead"));
+        for id in dsp::EFFECT_IDS {
+            let mut fx = effect(id, 48_000.0).unwrap();
+            let state = fx.state().unwrap();
+            fx.set_state(&state).unwrap();
+            let (mut l, mut r) = ([0.0; 64], [0.0; 64]);
+            fx.process(&[0.1; 64], &[0.1; 64], &mut l, &mut r).unwrap();
+            assert!(l.iter().chain(&r).all(|v| v.is_finite()), "{id}");
+        }
     }
 }

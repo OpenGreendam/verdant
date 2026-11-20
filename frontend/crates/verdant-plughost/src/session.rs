@@ -43,6 +43,8 @@ pub fn run_host(channel_arg: &str, output: ProtocolOutput) -> Result<()> {
         done: 0,
         in_l: vec![0.0; 1],
         in_r: vec![0.0; 1],
+        key_l: vec![0.0; 1],
+        key_r: vec![0.0; 1],
         out_l: vec![0.0; 1],
         out_r: vec![0.0; 1],
         parameter_events: vec![(0, 0, 0.0); MAX_PARAM_EVENTS],
@@ -75,6 +77,9 @@ struct Session {
     /// Preallocated block buffers, grown once to ring capacity.
     in_l: Vec<f32>,
     in_r: Vec<f32>,
+    /// Sidechain key planes of the current input block.
+    key_l: Vec<f32>,
+    key_r: Vec<f32>,
     out_l: Vec<f32>,
     out_r: Vec<f32>,
     /// Native events are copied only from a claimed slot into reused storage.
@@ -97,6 +102,8 @@ impl Session {
         for b in [
             &mut self.in_l,
             &mut self.in_r,
+            &mut self.key_l,
+            &mut self.key_r,
             &mut self.out_l,
             &mut self.out_r,
         ] {
@@ -185,8 +192,8 @@ impl Session {
             if self.ring.in_seq() <= seq || produced >= MAX_BLOCKS_PER_PASS {
                 break;
             }
-            let (n, event_count) = self.ring.read_input_events(seq,
-                &mut self.in_l, &mut self.in_r, &mut self.parameter_events)?;
+            let (n, event_count, keyed) = self.ring.read_input_keyed(seq, &mut self.in_l, &mut self.in_r,
+                Some((&mut self.key_l, &mut self.key_r)), &mut self.parameter_events)?;
             if n == 0 {
                 // Published seq but unreadable slot — drop the block rather
                 // than stall the pipe.
@@ -207,7 +214,8 @@ impl Session {
                                 .map_err(|_| AutomationError::UnknownParameter)?;
                             self.automation[index].target.event(offset, value)?;
                         }
-                        p.process_events(il, ir, ol, orr, events).map_err(PluginError::Host)?;
+                        if keyed { p.process_keyed(il, ir, (&self.key_l[..n], &self.key_r[..n]), ol, orr, events) }
+                        else { p.process_events(il, ir, ol, orr, events) }.map_err(PluginError::Host)?;
                     }
                     None => {
                         return Err(PluginError::Host("audio submitted before instantiation".into()));

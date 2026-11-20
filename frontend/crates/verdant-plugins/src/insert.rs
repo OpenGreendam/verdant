@@ -425,6 +425,15 @@ impl InsertHandle {
     /// playback. All event offsets/densities are checked before the first write.
     /// This owned offline path may wait; the live Processor never does.
     pub fn process_offline_events(&mut self, l: &mut [f32], r: &mut [f32], events: &[ParamEvent]) -> Result<()> {
+        self.process_offline_keyed(l, r, None, events)
+    }
+
+    /// As `process_offline_events`, with an aligned sidechain key.
+    pub fn process_offline_keyed(&mut self, l: &mut [f32], r: &mut [f32], key: Option<(&[f32], &[f32])>,
+        events: &[ParamEvent]) -> Result<()> {
+        if key.is_some_and(|(kl, kr)| kl.len() != l.len() || kr.len() != l.len()) {
+            return Err(PluginError::Host("offline sidechain length differs".into()));
+        }
         if !self.offline || self.processor_taken.load(Ordering::Acquire) {
             return Err(PluginError::Host("offline processing requires an export-owned host".into()));
         }
@@ -442,8 +451,9 @@ impl InsertHandle {
             while next_event < events.len() && (events[next_event].1 as usize) < offset + ls.len() {
                 next_event += 1;
             }
+            let chunk = key.map(|(kl, kr)| (&kl[offset..offset + ls.len()], &kr[offset..offset + ls.len()]));
             if self.ring.status() != STATUS_OK
-                || !self.ring.try_write_input_rebased(seq, ls, rs, &events[first..next_event], offset as u32) {
+                || !self.ring.try_write_input_keyed(seq, ls, rs, chunk, &events[first..next_event], offset as u32) {
                 return Err(AutomationError::TransportUnavailable.into());
             }
             self.in_w.signal();

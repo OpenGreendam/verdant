@@ -1785,7 +1785,7 @@ impl Editor {
                     .into_any_element(),
             ),
             Bottom::Table => Some(div().flex_1().min_h_0().child(crate::table::note_table(self, entity.clone(), window, cx)).into_any_element()),
-            Bottom::Devices => Some(div().flex_1().min_h_0().child(crate::devices::device_view(self, &entity, cx)).into_any_element()),
+            Bottom::Devices => Some(div().flex_1().min_h_0().child(crate::devices::device_view(self, &entity, window, cx)).into_any_element()),
             Bottom::Hidden => None,
         };
 

@@ -135,6 +135,10 @@ pub enum MenuAction {
     BypassInsert { track: TrackId, slot: usize },
     RemoveInsert { track: TrackId, slot: usize },
     OpenInsertEditor { track: TrackId, slot: usize },
+    /// Route another track's signal to an insert's sidechain (`None` = off).
+    SetSidechain { track: TrackId, slot: usize, source: Option<TrackId> },
+    /// Set parameters of a track insert as one undo step.
+    SetInsertParams { track: TrackId, slot: usize, values: Vec<(String, f64)> },
     RescanPlugins,
     /// Select an audio device by name (empty = system default, `None` text →
     /// silent clock is never offered here; `--silent-audio` starts it).
@@ -338,6 +342,8 @@ pub struct Editor {
     pub device_band: usize,
     /// The saved insert state each cached parameter list was read against.
     pub device_param_state: HashMap<verdant_plugins::InsertKey, String>,
+    /// Curve/handle animations of device editors after parameter changes.
+    pub device_anim: HashMap<verdant_plugins::InsertKey, crate::devices::DeviceAnim>,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -543,6 +549,7 @@ impl Editor {
             device_drag: None,
             device_band: 2,
             device_param_state: HashMap::new(),
+            device_anim: HashMap::new(),
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,
@@ -1430,6 +1437,8 @@ impl Editor {
             MenuAction::BypassInsert { track, slot } => self.toggle_insert_bypass(&track, slot, cx),
             MenuAction::RemoveInsert { track, slot } => self.remove_insert(&track, slot, cx),
             MenuAction::OpenInsertEditor { track, slot } => self.open_insert_editor(&track, slot, cx),
+            MenuAction::SetSidechain { track, slot, source } => self.set_insert_sidechain(&track, slot, source, cx),
+            MenuAction::SetInsertParams { track, slot, values } => self.set_track_insert_params(track, slot, values, cx),
             MenuAction::RescanPlugins => self.rescan_plugins(cx),
             MenuAction::AddMasterInsert { format, id } => self.add_master_insert(&format, &id, cx),
             MenuAction::ChooseDevice(name) => self.choose_device(&name),

@@ -18,6 +18,7 @@ icons!(
     "square",
     "minus",
     "menu",
+    "git-merge",
     "copy",
     "skip-back",
     "repeat",
