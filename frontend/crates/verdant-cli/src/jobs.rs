@@ -1005,15 +1005,22 @@ fn check_path_components(path: &Path, mut check: impl FnMut(&Path) -> io::Result
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "expected an absolute path"));
     }
     let mut current = PathBuf::new();
-    for component in path.components() {
+    let mut components = path.components().peekable();
+    while let Some(component) = components.next() {
         match component {
             Component::ParentDir | Component::CurDir => {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, "path contains traversal components"));
             }
             Component::Prefix(prefix) => {
-                // A bare verbatim disk prefix (\\?\C:) is not a directory.
-                // Check the full drive/share root, including UNC paths whose
-                // root separator is implicit in their component sequence.
+                // Windows treats a verbatim drive prefix as absolute even
+                // when the caller omitted the root separator.
+                #[cfg(windows)]
+                if matches!(prefix.kind(), std::path::Prefix::Disk(_) | std::path::Prefix::VerbatimDisk(_))
+                    && !matches!(components.peek(), Some(Component::RootDir))
+                {
+                    return Err(io::Error::new(io::ErrorKind::InvalidInput, "expected an explicit drive root"));
+                }
+                // UNC prefixes can have an implicit root separator.
                 current.push(prefix.as_os_str());
                 current.push(Component::RootDir.as_os_str());
             }
@@ -1162,7 +1169,7 @@ mod windows_path_tests {
     #[test]
     fn rejects_ambiguous_roots_and_traversal() {
         for path in [r"C:", r"C:workspace", r"\\?\C:", r"\workspace", "workspace"] {
-            let error = check_path_components(Path::new(path), |_| panic!("must reject before checking metadata"))
+            let error = check_path_components(Path::new(path), |_| panic!("must reject {path} before checking metadata"))
                 .unwrap_err();
             assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{path}");
         }
