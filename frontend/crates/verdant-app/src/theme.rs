@@ -438,37 +438,6 @@ pub fn system_ui_font(available: &[String]) -> String {
     ".SystemUIFont".into()
 }
 
-/// A real fixed-pitch face for numeric readouts. The generic name
-/// "monospace" is not resolved by every text backend; an unresolved family
-/// falls back to the proportional UI face and makes running digits jitter.
-pub fn system_mono_font(available: &[String]) -> String {
-    let has = |n: &str| available.iter().any(|a| a == n);
-    let preferred: &[&str] = if cfg!(target_os = "macos") {
-        &["SF Mono", "Menlo", "Monaco"]
-    } else if cfg!(target_os = "windows") {
-        &["Cascadia Mono", "Consolas", "Courier New"]
-    } else {
-        &[]
-    };
-    if let Some(f) = preferred.iter().find(|f| has(f)) {
-        return (*f).into();
-    }
-    if !cfg!(any(target_os = "macos", target_os = "windows")) {
-        if let Ok(out) = std::process::Command::new("fc-match").args(["-f", "%{family[0]}", "monospace"]).output() {
-            let fam = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !fam.is_empty() && has(&fam) {
-                return fam;
-            }
-        }
-    }
-    for f in ["JetBrains Mono", "DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono", "Menlo", "Consolas"] {
-        if has(f) {
-            return f.into();
-        }
-    }
-    "monospace".into()
-}
-
 /// Tabular (equal-advance) figures, for faces that default to proportional digits.
 pub fn tabular_figures() -> gpui::FontFeatures {
     gpui::FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)]))

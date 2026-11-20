@@ -40,8 +40,7 @@ impl PlaybackViews {
             observe(&editor, cx);
             ClockDriver { editor: editor.clone(), transport: None, follow_frame: None }
         });
-        let mono: gpui::SharedString = crate::theme::system_mono_font(&cx.text_system().all_font_names()).into();
-        let lcd = cx.new(|cx| { observe(&editor, cx); LcdView { editor: editor.clone(), mono } });
+        let lcd = cx.new(|cx| { observe(&editor, cx); LcdView { editor: editor.clone() } });
         let mut meter = |slot, vertical| cx.new(|cx| { observe(&editor, cx); MeterView { editor: editor.clone(), slot, vertical } });
         let meters = (0..verdant_audio::MAX_TRACKS).map(|i| meter(Some(i), true)).collect();
         let header_meters = (0..verdant_audio::MAX_TRACKS).map(|i| meter(Some(i), false)).collect();
@@ -318,7 +317,7 @@ fn lcd_position(frame: u64, sample_rate: u32, tempo: &TempoMap, meter: &MeterMap
     }
 }
 
-pub struct LcdView { editor: WeakEntity<Editor>, mono: gpui::SharedString }
+pub struct LcdView { editor: WeakEntity<Editor> }
 
 /// Keep the LCD's four one-based fields aligned with the ruler's meter map.
 pub(crate) fn position_label(meter: &verdant_domain::MeterMap, tick: f64) -> String {
@@ -352,8 +351,11 @@ impl Render for LcdView {
         let compact = ed.width_class == crate::ui_controls::WidthClass::Phone;
         // Every readout uses a fixed-pitch face with tabular figures and a
         // fixed-width, centred column, so running digits never shift.
-        div().size_full().flex().items_center().gap(px(6.0)).px(px(8.0)).rounded(px(9.0)).bg(th.lcd)
-            .font_family(self.mono.clone()).font_features(crate::theme::tabular_figures())
+        // Adwaita numeric display: the UI face with tabular figures on a quiet
+        // rounded fill (no inset "LCD" box); fixed-width columns keep running
+        // digits from shifting.
+        div().size_full().flex().items_center().gap(px(10.0)).pl(px(12.0)).pr(px(4.0)).rounded(px(8.0)).bg(th.control)
+            .font_family(ui_font.clone()).font_features(crate::theme::tabular_figures())
             .child(div().id("lcd-position").flex_1()
                 .on_mouse_down(gpui::MouseButton::Right, {
                     let editor = editor.clone();
@@ -376,17 +378,15 @@ impl Render for LcdView {
                     })
                 }).min_w_0().h_full().flex().flex_col().items_center().justify_center()
                 .aria_label(format!("播放位置，小节:拍:细分:刻度 {}，时间 {}", position.musical, position.time))
-                .child(div().text_size(px(14.0)).line_height(px(17.0)).whitespace_nowrap().child(position.musical))
-                .child(div().text_size(px(11.0)).line_height(px(13.0)).whitespace_nowrap().text_color(th.text_secondary).child(position.time)))
-            .when(!compact, |d| d.child(div().w(px(1.0)).h(px(22.0)).flex_none().bg(th.shade))
-            .child(div().w(px(66.0)).h_full().flex_none().flex().flex_col().items_center().justify_center()
-                .text_size(px(11.0)).line_height(px(14.0)).whitespace_nowrap()
-                .child(format!("{:.1} BPM", position.bpm))
-                .child(div().text_color(th.text_secondary).child(position.signature))))
+                .child(div().text_size(px(15.0)).line_height(px(18.0)).font_weight(gpui::FontWeight::SEMIBOLD).whitespace_nowrap().child(position.musical))
+                .child(div().text_size(px(11.5)).line_height(px(14.0)).whitespace_nowrap().text_color(th.text_secondary).child(position.time)))
+            .when(!compact, |d| d.child(div().w(px(56.0)).h_full().flex_none().flex().flex_col().items_center().justify_center()
+                .whitespace_nowrap()
+                .child(div().text_size(px(13.0)).line_height(px(16.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(format!("{:.1}", position.bpm)))
+                .child(div().text_size(px(11.0)).line_height(px(14.0)).text_color(th.text_secondary).child(format!("BPM · {}", position.signature)))))
             .when(!compact, |d| d.child(div().id("transport-follow").role(Role::Button).aria_label("跟随播放头").aria_selected(follow)
-                .flex_none().px(px(5.0)).py(px(5.0)).rounded(px(4.0)).text_size(px(11.0))
-                .font_family(ui_font)
-                .bg(if follow { th.checked } else { th.lcd })
+                .flex_none().h(px(28.0)).px(px(8.0)).flex().items_center().rounded(px(6.0)).text_size(px(12.0))
+                .when(follow, |d| d.bg(th.checked))
                 .text_color(if follow { th.text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.checked } else { th.hover }))
                 .child("跟随")
                 .on_click(move |_, _, cx| editor.update(cx, toggle_follow)))).into_any_element()

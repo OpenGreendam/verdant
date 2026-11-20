@@ -215,6 +215,14 @@ pub fn a11y_listener(
     }
 }
 
+/// The 46 px top bar every pane shares, so pane dividers line up.
+pub(crate) const PANE_HEADER_H: f32 = 46.0;
+
+pub(crate) fn pane_header(th: Theme) -> Div {
+    div().h(px(PANE_HEADER_H)).flex_none().w_full().min_w_0().px(px(8.0)).flex().items_center().gap(px(6.0))
+        .bg(th.surface).border_b_1().border_color(th.shade)
+}
+
 /// libadwaita preferences group (AdwPreferencesGroup): a heading over a
 /// boxed list. Each child becomes a row of the rounded card, with a hairline
 /// between rows. Builder methods mirror `Div`, so call sites read the same.
@@ -471,7 +479,7 @@ impl Editor {
         let rename_id = track.id.clone();
         let auto_open = self.automation_ui.expanded_tracks.contains(&track.id);
 
-        let mut track_section = section("当前轨道与声库", th)
+        let mut track_section = section("声库与语言", th)
             .child(
                 div()
                     .flex()
@@ -494,7 +502,7 @@ impl Editor {
             track_section = track_section.child(row("当前声源", voice.display_name.clone(), th));
         }
 
-        let mix_section = section("本轨混音与自动化", th)
+        let mix_section = section("混音", th)
             .child(numeric_field(self, Num::TrackGainDb, Arg::Track(track.id.clone()), "track-gain", cx))
             .child(numeric_field(self, Num::TrackPan, Arg::Track(track.id.clone()), "track-pan", cx))
             .child(
@@ -538,6 +546,7 @@ impl Editor {
                     ),
             );
 
+        let title = if self.session.selection.is_empty() && self.integrations.selected_clip.is_none() { "轨道" } else { "选择" };
         div()
             .id("inspector")
             .w(px(self.layout.inspector_width))
@@ -546,6 +555,7 @@ impl Editor {
             .flex()
             .flex_col()
             .bg(th.surface)
+            .child(pane_header(th).px(px(16.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
             .child(
                 div()
                     .id("left-panel-scroll")
@@ -1245,7 +1255,7 @@ impl Editor {
 
         div()
             .id("editor-header-scroll")
-            .h(px(34.0))
+            .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
@@ -1288,7 +1298,7 @@ impl Editor {
         let caps = self.scheduler.capabilities.as_ref();
         let mut tabs = div()
             .id("lane-tabs-scroll")
-            .h(px(32.0))
+            .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
@@ -1338,7 +1348,7 @@ impl Editor {
         let th = self.theme;
         div()
             .id("curve-toolbar-scroll")
-            .h(px(32.0))
+            .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
@@ -1478,24 +1488,19 @@ impl Editor {
             .flex_col()
             .min_h_0()
             .size_full()
+            // Pane header (AdwToolbarView top bar): its bottom line meets the
+            // inspector's and the dock's.
+            .child(pane_header(th)
+                .child(crate::ui_controls::flat_icon_command_button(self, Cmd::AddTrack, "plus", "添加轨道", "add-track", false, cx).h(px(32.0)))
+                .child(crate::ui_controls::flat_icon_command_button(self, Cmd::FitArrange, "maximize-2", "显示全部", "fit-arrange", false, cx).h(px(32.0)))
+                .child(div().flex_1())
+                .child(div().text_sm().text_color(th.text_secondary).child(format!("{} 条轨道", self.project().tracks.len()))))
             .child(
                 div()
                     .h(px(RULER_H))
                     .flex_none()
                     .flex()
-                    .child(
-                        div()
-                            .w(px(crate::arrange::HEADER_W))
-                            .px(px(6.0))
-                            .flex()
-                            .items_center()
-                            .gap(px(4.0))
-                            .bg(th.surface)
-                            .border_b_1()
-                            .border_color(th.shade)
-                            .child(icon_command_button(self, Cmd::AddTrack, Arg::None, "plus", "轨道", "add-track", false, cx).h(px(21.0)).px(px(6.0)))
-                            .child(icon_command_button(self, Cmd::FitArrange, Arg::None, "maximize-2", "全局", "fit-arrange", false, cx).h(px(21.0)).px(px(6.0))),
-                    )
+                    .child(div().w(px(crate::arrange::HEADER_W)).bg(th.surface).border_b_1().border_r_1().border_color(th.shade))
                     .child(
                         div()
                             .flex_1()
