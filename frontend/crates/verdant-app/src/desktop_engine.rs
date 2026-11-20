@@ -57,7 +57,7 @@ mod tests {
     }
 
     #[test]
-    fn original_choice_is_verified_atomic_and_preserves_language() {
+    fn original_singer_choice_is_verified_atomic_and_clears_previous_language() {
         let mut project = Project::new_empty();
         project.tracks[0].unknown.insert("voice_language".into(), serde_json::json!({"language":"ja"}));
         let original = project.clone();
@@ -68,7 +68,7 @@ mod tests {
         store.apply(store.revision(), batch).unwrap();
         assert_eq!(store.undo_depth(), 1);
         assert_eq!(adapter::desktop_route(store.project(), &store.project().tracks[0], Some(&caps)), Route::C0);
-        assert_eq!(store.project().tracks[0].unknown["voice_language"], original.tracks[0].unknown["voice_language"]);
+        assert!(!store.project().tracks[0].unknown.contains_key("voice_language"));
         store.undo().unwrap();
         assert_eq!(store.project().tracks, original.tracks);
         let mut unverified = caps.clone();

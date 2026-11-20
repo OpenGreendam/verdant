@@ -297,7 +297,7 @@ fn nondefault_project_render_preferences_are_reported_without_warning_on_default
     assert!(!default_report.has_losses(), "ordinary default score should not receive generic loss warnings");
     assert!(!default_report.issues.iter().any(|i| i.path == "/render_preferences"));
     assert_eq!(imported(&default_file).unwrap().project.render_preferences, p.render_preferences);
-    for route in ["C1", "verdant-voice"] {
+    for route in ["C0", "C1"] {
         p.render_preferences.route = route.into();
         let before = serde_json::to_value(&p.render_preferences).unwrap();
         let (out, report) = exported(&p);
