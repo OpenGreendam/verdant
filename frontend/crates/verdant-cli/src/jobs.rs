@@ -991,15 +991,36 @@ fn open_lock(path: &Path) -> Result<File, CliError> {
 
 #[cfg(not(unix))]
 fn reject_symlinks(path: &Path) -> io::Result<()> {
-    let mut current = PathBuf::new();
-    for component in path.components() {
-        if matches!(component, Component::ParentDir | Component::CurDir) {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "path contains traversal components"));
-        }
-        current.push(component.as_os_str());
-        if fs::symlink_metadata(&current)?.file_type().is_symlink() {
+    check_path_components(path, |current| {
+        if fs::symlink_metadata(current)?.file_type().is_symlink() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "path must not contain symlinks"));
         }
+        Ok(())
+    })
+}
+
+#[cfg(not(unix))]
+fn check_path_components(path: &Path, mut check: impl FnMut(&Path) -> io::Result<()>) -> io::Result<()> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "expected an absolute path"));
+    }
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir | Component::CurDir => {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "path contains traversal components"));
+            }
+            Component::Prefix(prefix) => {
+                // A bare verbatim disk prefix (\\?\C:) is not a directory.
+                // Check the full drive/share root, including UNC paths whose
+                // root separator is implicit in their component sequence.
+                current.push(prefix.as_os_str());
+                current.push(Component::RootDir.as_os_str());
+            }
+            Component::RootDir if !current.as_os_str().is_empty() => continue,
+            _ => current.push(component.as_os_str()),
+        }
+        check(&current)?;
     }
     Ok(())
 }
@@ -1106,3 +1127,75 @@ fn invalid_receipt(id: &str, message: impl Into<String>) -> CliError {
 fn invalid(message: impl Into<String>) -> CliError { CliError::new("INVALID_ARGUMENT", message) }
 fn internal(error: impl std::fmt::Display) -> CliError { CliError::new("INTERNAL_ERROR", error.to_string()) }
 fn io_error(error: io::Error) -> CliError { CliError::new("IO_ERROR", error.to_string()) }
+
+#[cfg(all(test, windows))]
+mod windows_path_tests {
+    use super::*;
+
+    #[test]
+    fn checks_complete_drive_and_share_roots_before_descendants() {
+        for (root, separator) in [
+            (r"C:\", ""),
+            (r"\\?\C:\", ""),
+            (r"\\server\share", "\\"),
+            (r"\\server\share\", ""),
+            (r"\\?\UNC\server\share", "\\"),
+            (r"\\?\UNC\server\share\", ""),
+            (r"\\?\Volume{00000000-0000-0000-0000-000000000000}\", ""),
+        ] {
+            let rooted = format!("{root}{separator}");
+            for suffix in ["", r"workspace", r"workspace\receipt.json"] {
+                let input = if suffix.is_empty() { root.to_owned() } else { format!("{rooted}{suffix}") };
+                let mut checked = Vec::new();
+                check_path_components(Path::new(&input), |path| {
+                    checked.push(path.as_os_str().to_owned());
+                    Ok(())
+                }).unwrap();
+                let mut expected = vec![std::ffi::OsString::from(&rooted)];
+                if !suffix.is_empty() { expected.push(format!("{rooted}workspace").into()); }
+                if suffix.ends_with("receipt.json") { expected.push(format!("{rooted}{suffix}").into()); }
+                assert_eq!(checked, expected, "{input}");
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_ambiguous_roots_and_traversal() {
+        for path in [r"C:", r"C:workspace", r"\\?\C:", r"\workspace", "workspace"] {
+            let error = check_path_components(Path::new(path), |_| panic!("must reject before checking metadata"))
+                .unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{path}");
+        }
+        for path in [r"C:\workspace\..\receipt.json", r"\\?\C:\workspace\.\receipt.json",
+            r"\\?\UNC\server\share\workspace\..\receipt.json"]
+        {
+            let error = check_path_components(Path::new(path), |_| Ok(())).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{path}");
+        }
+    }
+
+    #[test]
+    fn root_check_failure_stops_the_walk() {
+        let mut checked = 0;
+        let error = check_path_components(Path::new(r"\\?\C:\workspace\receipt.json"), |_| {
+            checked += 1;
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "root denied"))
+        }).unwrap_err();
+        assert_eq!(checked, 1);
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn canonical_workspace_can_create_and_reopen_its_index_lock() {
+        let directory = tempfile::tempdir().unwrap();
+        let workspace = directory.path().canonicalize().unwrap();
+        reject_symlinks(&workspace).unwrap();
+        let params = json!({"workspace":workspace.to_str().unwrap()});
+        let store = Store::open(&params, true).unwrap().unwrap();
+        let lock_path = store.root.join("index.lock");
+        assert!(!lock_path.exists());
+        drop(store.index_lock().unwrap());
+        assert!(lock_path.is_file());
+        drop(store.index_lock().unwrap());
+    }
+}
