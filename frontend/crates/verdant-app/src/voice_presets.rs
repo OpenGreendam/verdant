@@ -132,6 +132,7 @@ impl Editor {
 mod tests {
     use super::*;
     use serde_json::json;
+    use verdant_backend::{voices::PACKAGE_FILES, wire::FileStatus};
     use verdant_domain::{ProjectStore, Track};
 
     #[test]
@@ -140,28 +141,18 @@ mod tests {
         project.tracks[0].voice_ref = Some("local".into());
         project.tracks.push(Track::new("Other", "blue"));
         let track = project.tracks[0].id.clone();
-        let caps: Capabilities = serde_json::from_value(json!({"voices":{"version":1,"voices":{
+        let mut caps: Capabilities = serde_json::from_value(json!({"voices":{"version":1,"voices":{
             "local":{"display_name":"Local", "available":true, "cache_identity":"admitted-source",
                 "voice_package":{"name":"verdant-voice","version":"0.1.0"},
                 "source_sha256":{"token":"a".repeat(64),"model":"b".repeat(64)},
-                "languages":{"zh":"native","ja":"approximate"},
-                "files":{"voice_source_manifest":{"available":true,"sha256":"a".repeat(64)},
-                    "voice_source_admission":{"available":true,"sha256":"a".repeat(64)},
-                    "bank_json":{"available":true,"sha256":"c".repeat(64)},
-                    "bank_tensors":{"available":true,"sha256":"c".repeat(64)},
-                    "bank_topology":{"available":true,"sha256":"c".repeat(64)},
-                    "bank_token":{"available":true,"sha256":"c".repeat(64)},
-                    "source_controller":{"available":true,"sha256":"c".repeat(64)},
-                    "source_decoder":{"available":true,"sha256":"c".repeat(64)},
-                    "source_rights":{"available":true,"sha256":"c".repeat(64)},
-                    "source_export":{"available":true,"sha256":"c".repeat(64)},
-                    "source_contracts":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_manifest":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_context_controller":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_local_controller":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_decoder":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_phone_table":{"available":true,"sha256":"c".repeat(64)}}}
+                "languages":{"zh":"native","ja":"approximate"}}
         }}})).unwrap();
+        let files = &mut caps.voices.as_mut().unwrap().voices.get_mut("local").unwrap().files;
+        let manifest = FileStatus { available: true, sha256: Some("c".repeat(64)) };
+        for (role, _) in PACKAGE_FILES {
+            files.insert((*role).into(), manifest.clone());
+        }
+        files.insert("voice_source_admission".into(), manifest);
         let before = project.clone();
         let mut store = ProjectStore::new(project);
         let batch = language_choice_batch(store.project(), &track, Some("ja"), &caps).unwrap();
