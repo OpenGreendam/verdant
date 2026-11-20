@@ -1,0 +1,43 @@
+{
+  "schema": "verdant-cfinal-contracts/1",
+  "sample_rate": 16000,
+  "hop_samples": 80,
+  "sample_interpolation": "integer-sample-grid-v1",
+  "frame_origin": "center=(index+0.5)*80/16000; cells are half-open",
+  "waveform_samples": "T*80 exactly, float32, no output peak normalization",
+  "controller_abi": "cfinal-controller-v1",
+  "controller_inputs": {
+    "latent25": {"dtype": "float32", "shape": [1,"T",25], "meaning": "24 final corrected native LSF radians, then native log gain; training-normalized inside graph"},
+    "phone_ids": {"dtype": "int64", "shape": [1,"T",3], "meaning": "native L,C,R phone IDs in 0..255; 0 absent boundary; 2 explicit short pause; never language-remapped"},
+    "states": {"dtype": "int64", "shape": [1,"T"], "meaning": "-1 explicit rest, otherwise original five-state index 0..4"},
+    "languages": {"dtype": "int64", "shape": [1,"T"], "meaning": "authored/source language:0 unknown,1 zh,2 en,3 ja; NOT original HMM C_Language enumeration"},
+    "prosody": {"dtype": "float32", "shape": [1,"T",8], "columns": ["ln(f0_hz/300) in voiced cells, otherwise0", "voiced:1 periodic permitted,0 UV", "phone position in[0,1] at frame center", "state position in[0,1] at frame center", "ln(phone duration seconds/0.3)", "ln(state duration seconds/0.06)", "authored natural-log amplitude gain:0 neutral", "authored brightness dB/12:0 neutral"], "rest_policy": "all8slots zero for states=-1; durations are positive for active cells; all values finite"},
+    "hidden_in": {"dtype": "float32", "shape": [2,1,128], "meaning": "causal GRU state; zero only at utterance start or explicit reset"}
+  },
+  "controller_outputs": {
+    "harmonic_logits": {"dtype": "float32", "shape": [1,"T",129], "meaning": "log harmonic envelope at linearly spaced absolute-Hz bins0..8000; not harmonic-number bins"},
+    "noise_log_gains": {"dtype": "float32", "shape": [1,"T",65], "meaning": "natural-log amplitude gain at linearly spaced noise bins0..8000"},
+    "log_amplitude": {"dtype": "float32", "shape": [1,"T",1], "meaning": "natural-log sum of oscillator amplitudes before Nyquist taper"},
+    "hidden_out": {"dtype": "float32", "shape": [2,1,128]}
+  },
+  "decoder_abi": "cfinal-decoder-v1",
+  "decoder_inputs": {
+    "harmonic_logits": {"dtype": "float32", "shape": [1,"T",129]},
+    "noise_log_gains": {"dtype": "float32", "shape": [1,"T",65]},
+    "log_amplitude": {"dtype": "float32", "shape": [1,"T",1]},
+    "f0_hz": {"dtype": "float32", "shape": [1,"T"], "meaning": "35..2000 in voiced cells, exactly0 in UV/rest; silent phase clock=300Hz"},
+    "voiced": {"dtype": "bool", "shape": [1,"T"], "meaning": "periodic permitted; no interpolation of this discrete mask"},
+    "active": {"dtype": "bool", "shape": [1,"T"], "meaning": "false only for authored rest/padding; both branches exactly zero there"},
+    "white_noise": {"dtype": "float32", "shape": [1,"80T"], "meaning": "explicit independent white-noise samples; no RandomNormal node, no target residual"},
+    "phase_in": {"dtype": "float64", "shape": [1], "meaning": "initial oscillator cycles, modulo1"}
+  },
+  "decoder_outputs": {
+    "waveform": {"dtype": "float32", "shape": [1,"80T"]},
+    "periodic": {"dtype": "float32", "shape": [1,"80T"]},
+    "noise": {"dtype": "float32", "shape": [1,"80T"]},
+    "phase_out": {"dtype": "float64", "shape": [1]}
+  },
+  "decoder_parameters": {"harmonics":256,"harmonic_bins":129,"noise_bands":65,"noise_dft":256,"noise_hop":80,"nyquist_pass_hz":7200,"nyquist_stop_hz":7680,"uv_inside_fade_samples":40},
+  "bounded_host": {"core_frames":64,"context_frames_each_side":4,"controller_state":"carried causally; never reset at note/chunk boundaries","filter_state":"overlap by explicit original frame/sample context; discard context only after synthesis","phase_state":"global exclusive integral, corrected for each block's local context-edge interpolation","noise_state":"global sample-indexed SplitMix64/Box-Muller, explicit tensors in parity fixtures","online_streaming_claim":false},
+  "prohibited_substitutions": ["no reference waveform or fitted oracle arrays at normal inference", "no fallback to HMM DSP or C1 when CFinal fails", "no per-output peak normalization", "no claim that preserved HMM assets are a learned neural model"]
+}

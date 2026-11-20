@@ -1,0 +1,19 @@
+{
+  "worker_sha256": "06a3aadbfbc3719796630cca59e77e817239a91818190f32d9bcd19766529c34",
+  "checks": {
+    "capabilities_received": true,
+    "real_C0_render_and_published_hash": true,
+    "completed_revision": 1,
+    "immutable_job_id": true,
+    "unsupported_C0_continuous_control_rejected": true,
+    "real_child_started_before_cancel": true,
+    "cancelled_terminal": true,
+    "observed_child_pids_before_cancel": [
+      15
+    ],
+    "observed_children_exited": true,
+    "clean_shutdown": true,
+    "one_terminal_per_accepted_job": true
+  },
+  "scope": "Real C0 plus stdio lifecycle and cancellation; no GPUI UI or full neural re-run claimed."
+}

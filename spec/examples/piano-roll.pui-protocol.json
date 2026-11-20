@@ -1,0 +1,147 @@
+{
+  "schema": "greendam-pui-protocol/0.1",
+  "status": "proposed_design_not_upstream_api",
+  "component": "Greendam.PianoRoll.MoveSelection",
+  "scope": "minimal move/cancel vertical slice, not a complete piano-roll implementation",
+  "props": {
+    "project": {
+      "type": "ProjectProjection",
+      "ownership": "read_only_domain"
+    },
+    "viewport": {
+      "type": "Viewport",
+      "ownership": "read_only_session"
+    }
+  },
+  "state": {
+    "gesture": {
+      "type": "enum",
+      "values": [
+        "idle",
+        "armed",
+        "dragging"
+      ],
+      "default": "idle",
+      "owner": "EditorSession"
+    },
+    "base_revision": {
+      "type": "Option<Revision>",
+      "default": null,
+      "owner": "EditorSession"
+    },
+    "preview": {
+      "type": "Option<MovePreview>",
+      "default": null,
+      "owner": "EditorSession"
+    }
+  },
+  "events": {
+    "PointerDown": {
+      "note_id": "NoteId",
+      "position": "MusicPoint"
+    },
+    "PointerMove": {
+      "position": "MusicPoint"
+    },
+    "PointerUp": {},
+    "Cancel": {
+      "reason": "enum:escape|focus_lost|pointer_cancel"
+    }
+  },
+  "expose": {
+    "commands": [
+      "Greendam.MoveNotes"
+    ],
+    "feedback": [
+      "selection_preview",
+      "gesture_active",
+      "diagnostic"
+    ]
+  },
+  "required_host_capabilities": [
+    "pointer.music_coordinates",
+    "pointer.logical_capture",
+    "focus.loss_notification",
+    "canvas.note_projection",
+    "keyboard.cancel",
+    "domain.transaction_dispatch"
+  ],
+  "interaction_contracts": [
+    "T01",
+    "T02"
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "event": "PointerDown",
+      "guard": "hit_selected_note",
+      "to": "armed",
+      "effects": [
+        "Session.BeginMoveGesture",
+        "Host.CapturePointer"
+      ]
+    },
+    {
+      "from": [
+        "armed",
+        "dragging"
+      ],
+      "event": "PointerMove",
+      "guard": "pointer_threshold_crossed",
+      "to": "dragging",
+      "effects": [
+        "Session.UpdateMovePreview"
+      ]
+    },
+    {
+      "from": "dragging",
+      "event": "PointerUp",
+      "guard": "base_revision_matches_and_delta_nonzero",
+      "to": "idle",
+      "effects": [
+        "Domain.CommitMoveNotes",
+        "Session.ClearMovePreview",
+        "Host.ReleasePointer"
+      ]
+    },
+    {
+      "from": [
+        "armed",
+        "dragging"
+      ],
+      "event": "Cancel",
+      "to": "idle",
+      "effects": [
+        "Session.ClearMovePreview",
+        "Host.ReleasePointer"
+      ]
+    },
+    {
+      "from": "armed",
+      "event": "PointerUp",
+      "to": "idle",
+      "effects": [
+        "Session.ClearMovePreview",
+        "Host.ReleasePointer"
+      ]
+    },
+    {
+      "from": "dragging",
+      "event": "PointerUp",
+      "guard": "not_base_revision_matches_and_delta_nonzero",
+      "to": "idle",
+      "effects": [
+        "Session.ReportConflictIfStale",
+        "Session.ClearMovePreview",
+        "Host.ReleasePointer"
+      ]
+    }
+  ],
+  "unmatched_event_policy": "active gesture consumes unmatched pointer events without domain mutation; idle delegates other input",
+  "compile_policy": {
+    "arbitrary_javascript": "error",
+    "unknown_capability": "error",
+    "domain_mutation_from_projection": "error",
+    "runtime_interpreter": false
+  }
+}

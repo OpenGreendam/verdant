@@ -1,0 +1,42 @@
+[package]
+name = "verdant-plugins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Process-isolated external effects host client: scanning, control protocol, shared-memory RT bridge (RemoteInsert). See docs/PLUGIN-HOST.md."
+
+[features]
+default = ["client"]
+client = ["dep:verdant-audio"]
+
+[[example]]
+name = "external_plugin_proof"
+required-features = ["client"]
+
+[dependencies]
+verdant-audio = { path = "../verdant-audio", optional = true, default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+base64 = "0.22"
+hex.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.60", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_System_WindowsProgramming",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Console",
+    "Win32_System_Pipes",
+    "Win32_Storage_FileSystem",
+] }

@@ -1,0 +1,11 @@
+{
+  "segments": [
+    {
+      "vowel": "a",
+      "context_mode": "english-proxy",
+      "duration_seconds": 0.35,
+      "f0_hz": 300,
+      "voiced": true
+    }
+  ]
+}

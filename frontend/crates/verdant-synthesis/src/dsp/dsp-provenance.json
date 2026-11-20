@@ -1,0 +1,87 @@
+{
+  "schema": "verdant-rust-dsp-source-port/1",
+  "baseline_commit": "ce1ce6c",
+  "frozen_oracle_root": "/build/verdant-python-oracle-20261116",
+  "oracle_versions": {
+    "numpy": "2.3.5",
+    "scipy": "1.17.0"
+  },
+  "sources": [
+    {
+      "path": "native/greendam_native/dsp.py",
+      "sha256": "35c3e0dc8b75dfeba8377e132ef0e0dc4992e5fc35a70ecd9e1b42560ef29011"
+    },
+    {
+      "path": "native/greendam_native/excitation.py",
+      "sha256": "de4ea2025a4bf7c112efeabe385bd19d5899aa11de99673450fdb0860765e132"
+    },
+    {
+      "path": "native/greendam_native/phonetic_source.py",
+      "sha256": "72ae09d395001cc469fa715da1e328acc67375bac37aa5f4dc1e4557d24e5b35"
+    },
+    {
+      "path": "native/greendam_native/harmonic_balance.py",
+      "sha256": "7b3491b2ed6263c760afae80e87276fe19e397217dd8eac3ca1c81c5a18cf981"
+    },
+    {
+      "path": "native/greendam_native/relative_gain.py",
+      "sha256": "c8412ab6f6d82385cc40470a2ef425e41426ca55529cc5bdf7a831510915b881"
+    },
+    {
+      "path": "native/verdant_acoustics/lpc.py",
+      "sha256": "70c7ddd1bcc14579f75b927bf86e3ab8634763ef5d6220a847c0cfc7c6259130"
+    },
+    {
+      "path": "native/greendam_native/phoneme_inventory.json",
+      "sha256": "ec8b6d7d741bc4a08b4b7f68fa18981fc0e5770aedf24f270b5b2c0c1c7ce4cd"
+    }
+  ],
+  "production_runtime": "Rust only; no Python subprocess, imported NumPy or Python-directory asset dependency",
+  "public_entrypoints": {
+    "dsp::synthesize_run": "RunParameters, options, u64 seed -> raw/ramped AudioResult",
+    "dsp::calibrate_run": "after reference-derived phonetic contact correction: relative gain, then one reference-based 0.65 normalization",
+    "dsp::excitation::bandlimited_excitation": "Rosenberg/impulse analytic Fourier table, 6-point interpolation, supplied oversample (native default8), centered 128*L+1 Kaiser8.6 decimation FIR",
+    "dsp::rng::NumpyPcg64": "unspawned u64 SeedSequence + PCG64 + float64 Ziggurat; source hashes and license in numpy-rng-provenance.json",
+    "dsp::lpc": "LSF->LPC, step-down PARCOR, strict inverse LSF, maximum pole radius, continuous lattice",
+    "dsp::phonetic_source": "123-ID audited lookup and periodic/noise/brightness envelopes",
+    "dsp::harmonic_balance": "full-band H1-share prediction, bounded H2/H3 gains and per-segment gates",
+    "dsp::relative_gain": "bounded whole-run median-centered model gain; disabled/zero/constant paths preserve sample bits"
+  },
+  "numeric_artifacts": {
+    "lpc_coefficients": {
+      "shape": "[frames,25]",
+      "dtype": "float64"
+    },
+    "parcor_coefficients": {
+      "shape": "[frames,24]",
+      "dtype": "float64"
+    },
+    "calibration_reference_waveform": {
+      "shape": "[samples]",
+      "dtype": "float64",
+      "role": "private transient; calibrate_run removes it before native NPZ publication"
+    },
+    "unchanged_inputs": "RunParameters frame arrays, authored segment identities, controls, source context and timeline provenance are borrowed and never modified"
+  },
+  "numerical_methods": {
+    "pole_and_inverse_lsf_roots": "independent Laguerre root solve with complex deflation, polishing against original polynomial and scale-relative residual admission; roots/PARCOR never clipped or projected",
+    "relative_gain_extreme_scalars": "exponent-scaled finite f64 bounded controls preserve longdouble saturation behavior; active control parity needs numerical comparison rather than a blanket bit-exact claim",
+    "sum_reductions": "NumPy2.3.5 eight-lane pairwise, 128-element block ordering for source RMS, 1024-bin response energy and Gaussian normalization",
+    "fft": "rustfft inverse tables, original coefficient support and interpolation; parent measures waveform/PCM differences against pinned NumPy FFT"
+  },
+  "continuation": {
+    "wire_marker": "Segment.continuation_of: original nucleus anchor index",
+    "run_marker": "source_continuation_links:[{segment_index,continuation_of}]",
+    "admission": "explicit adjacent original-anchor links only, same audited vowel phone/phonemic length/continuous run; invalid links rejected",
+    "source_scope": "private source envelope + harmonic-boundary grouping; published segment_index and per-note F0/DYN ownership retained",
+    "ordinary_scores": "absence of marker follows original per-segment masks exactly"
+  },
+  "implementation_worker_execution": "No builds, tests, formatters, linters, native/browser instances or package installations were run by this implementation worker.",
+  "parent_validation_gates": [
+    "Pinned NumPy seed state/raw/uniform/standard_normal equality, including rejection/tails and full-run chunk boundaries",
+    "cargo test --locked -p verdant-synthesis dsp::tests",
+    "Full-array native DSP oracle parity for legacy/phonetic, impulse/Rosenberg, UV/voiced transitions, active/neutral harmonic control, all gain modes and consonant reference calibration",
+    "Default/noise/bypass PCM equality and protected-envelope bit equality against the pinned oracle; report truthful floating tolerance for active transforms",
+    "Raw and modern real-model full native render, contiguous120-second scope, source continuation with per-note DYN/F0 and no repeated envelope attack"
+  ]
+}

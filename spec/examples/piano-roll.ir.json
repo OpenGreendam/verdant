@@ -1,0 +1,229 @@
+{
+  "schema": "greendam-ui-ir/0.1",
+  "status": "proposed_normal_form_not_generated_by_existing_compiler",
+  "id": "Greendam.PianoRoll.MoveSelection",
+  "source": {
+    "file": "piano-roll.pui-protocol.json",
+    "pointer": "/"
+  },
+  "host_profile": "greendam-gpui-desktop-v0",
+  "state_owners": {
+    "project": "domain",
+    "gesture": "session",
+    "viewport": "session",
+    "audio_position": "audio_engine"
+  },
+  "events": {
+    "PointerDown": {
+      "note_id": "NoteId",
+      "position": "MusicPoint"
+    },
+    "PointerMove": {
+      "position": "MusicPoint"
+    },
+    "PointerUp": {},
+    "Cancel": {
+      "reason": "CancelReason"
+    }
+  },
+  "symbols": {
+    "hit_selected_note": {
+      "kind": "pure_domain_function",
+      "returns": "bool"
+    },
+    "pointer_threshold_crossed": {
+      "kind": "pure_session_function",
+      "returns": "bool"
+    },
+    "base_revision_matches_and_delta_nonzero": {
+      "kind": "pure_domain_function",
+      "returns": "bool"
+    }
+  },
+  "states": [
+    "idle",
+    "armed",
+    "dragging"
+  ],
+  "initial_state": "idle",
+  "transitions": [
+    {
+      "id": "move.begin",
+      "from": [
+        "idle"
+      ],
+      "event": "PointerDown",
+      "guard": {
+        "op": "call_pure",
+        "symbol": "hit_selected_note"
+      },
+      "next": "armed",
+      "effects": [
+        {
+          "domain": "session",
+          "op": "BeginMoveGesture"
+        },
+        {
+          "domain": "host",
+          "op": "CapturePointer"
+        }
+      ],
+      "consume": true,
+      "source_pointer": "/transitions/0"
+    },
+    {
+      "id": "move.preview",
+      "from": [
+        "armed",
+        "dragging"
+      ],
+      "event": "PointerMove",
+      "guard": {
+        "op": "call_pure",
+        "symbol": "pointer_threshold_crossed"
+      },
+      "next": "dragging",
+      "effects": [
+        {
+          "domain": "session",
+          "op": "UpdateMovePreview"
+        }
+      ],
+      "consume": true,
+      "source_pointer": "/transitions/1"
+    },
+    {
+      "id": "move.commit",
+      "from": [
+        "dragging"
+      ],
+      "event": "PointerUp",
+      "guard": {
+        "op": "call_pure",
+        "symbol": "base_revision_matches_and_delta_nonzero"
+      },
+      "next": "idle",
+      "effects": [
+        {
+          "domain": "domain",
+          "op": "CommitMoveNotes"
+        },
+        {
+          "domain": "session",
+          "op": "ClearMovePreview"
+        },
+        {
+          "domain": "host",
+          "op": "ReleasePointer"
+        }
+      ],
+      "consume": true,
+      "source_pointer": "/transitions/2"
+    },
+    {
+      "id": "move.cancel",
+      "from": [
+        "armed",
+        "dragging"
+      ],
+      "event": "Cancel",
+      "guard": {
+        "op": "literal",
+        "value": true
+      },
+      "next": "idle",
+      "effects": [
+        {
+          "domain": "session",
+          "op": "ClearMovePreview"
+        },
+        {
+          "domain": "host",
+          "op": "ReleasePointer"
+        }
+      ],
+      "consume": true,
+      "source_pointer": "/transitions/3"
+    },
+    {
+      "id": "move.click_release",
+      "from": [
+        "armed"
+      ],
+      "event": "PointerUp",
+      "guard": {
+        "op": "literal",
+        "value": true
+      },
+      "next": "idle",
+      "effects": [
+        {
+          "domain": "session",
+          "op": "ClearMovePreview"
+        },
+        {
+          "domain": "host",
+          "op": "ReleasePointer"
+        }
+      ],
+      "consume": true,
+      "source_pointer": "/transitions/4"
+    },
+    {
+      "id": "move.noop_or_stale_release",
+      "from": [
+        "dragging"
+      ],
+      "event": "PointerUp",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "call_pure",
+          "symbol": "base_revision_matches_and_delta_nonzero"
+        }
+      },
+      "next": "idle",
+      "effects": [
+        {
+          "domain": "session",
+          "op": "ReportConflictIfStale"
+        },
+        {
+          "domain": "session",
+          "op": "ClearMovePreview"
+        },
+        {
+          "domain": "host",
+          "op": "ReleasePointer"
+        }
+      ],
+      "consume": true,
+      "source_pointer": "/transitions/5"
+    }
+  ],
+  "required_obligations": [
+    "pointer.music_coordinates",
+    "pointer.logical_capture",
+    "focus.loss_notification",
+    "canvas.note_projection",
+    "keyboard.cancel",
+    "domain.transaction_dispatch"
+  ],
+  "projection": {
+    "primitive": "GreendamNoteCanvas",
+    "reads": [
+      "project",
+      "viewport",
+      "gesture.preview"
+    ],
+    "writes": [],
+    "identity_key": "NoteId"
+  },
+  "contracts": [
+    "T01",
+    "T02"
+  ],
+  "support_report_status": "not_evaluated_until_compiler_and_host_implementation_exist",
+  "pure_call_binding": "Each declared pure symbol receives the immutable typed event+props+session context; it may not read ambient state. Rust trait implementation and total-function tests are required.",
+  "default_behavior": "No domain effect; consume unmatched pointer events only while owning an active gesture, otherwise delegate."
+}

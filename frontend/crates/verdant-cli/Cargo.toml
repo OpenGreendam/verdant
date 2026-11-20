@@ -1,0 +1,30 @@
+[package]
+name = "verdant-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+semver.workspace = true
+sha2.workspace = true
+hex.workspace = true
+uuid.workspace = true
+zip.workspace = true
+tempfile = "3"
+url = "2"
+verdant-backend = { path = "../verdant-backend" }
+verdant-domain = { path = "../verdant-domain" }
+verdant-exchange = { path = "../verdant-exchange" }
+verdant-import = { path = "../verdant-import" }
+verdant-media = { path = "../verdant-media" }
+verdant-plugins = { path = "../verdant-plugins" }
+verdant-service = { path = "../verdant-service" }
+verdant-voice = { path = "../verdant-voice" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+rustix = { version = "1", features = ["fs"] }

@@ -1,0 +1,83 @@
+{
+  "format": "greendam-project",
+  "version": "0.1",
+  "status": "proposed_project_format_example",
+  "project_id": "dc446039-31ca-4495-b33b-a4cc21df6803",
+  "revision": 7,
+  "ppq": 960,
+  "tempo_map": [
+    {
+      "tick": 0,
+      "micro_bpm": 120000000
+    }
+  ],
+  "time_signatures": [
+    {
+      "tick": 0,
+      "numerator": 4,
+      "denominator": 4
+    }
+  ],
+  "voice_refs": {
+    "voice-sn": {
+      "name": "sn",
+      "display_name": "楠楠候选",
+      "vid": 10008,
+      "historical_identity_confirmed": false,
+      "token_sha256": "821b7cd9e7b489077dd55bf581ba90e1dffd3816c6fedcedc320744b498deead",
+      "model_sha256": "213aa67a5b92fc311d524da6d9868f87df584b00e2eb9a0b9fb46822602353ff"
+    }
+  },
+  "tracks": [
+    {
+      "id": "642f3c73-bfd5-4b06-ab7c-807a689126f0",
+      "name": "主声部",
+      "voice_ref": "voice-sn",
+      "monophonic": true,
+      "notes": [
+        {
+          "id": "f0705d0b-b6f4-496f-92ef-1af27c5f2169",
+          "start_tick": 0,
+          "duration_tick": 480,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "发",
+          "pronunciation": {
+            "pinyin": "fa1",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "limited-explicit-pinyin-native-0.2"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "b2c544a4-e12c-4274-96b7-9bf362769114",
+          "start_tick": 480,
+          "duration_tick": 480,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "撒",
+          "pronunciation": {
+            "pinyin": "sa1",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "limited-explicit-pinyin-native-0.2"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        }
+      ]
+    }
+  ],
+  "render_preferences": {
+    "protocol": "ogd-worker/1",
+    "route": "C0",
+    "native_seed": 10008
+  },
+  "extensions": {}
+}

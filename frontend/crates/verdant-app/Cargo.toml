@@ -1,0 +1,33 @@
+[package]
+name = "verdant-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Verdant 翠绿 — GPUI singing-voice editor."
+
+[[bin]]
+name = "verdant"
+path = "src/main.rs"
+
+[dependencies]
+gpui.workspace = true
+gpui_platform.workspace = true
+verdant-domain = { path = "../verdant-domain" }
+verdant-session = { path = "../verdant-session" }
+verdant-backend = { path = "../verdant-backend" }
+verdant-service = { path = "../verdant-service" }
+verdant-audio = { path = "../verdant-audio" }
+verdant-plugins = { path = "../verdant-plugins" }
+verdant-import = { path = "../verdant-import" }
+verdant-exchange = { path = "../verdant-exchange" }
+verdant-midi = { path = "../verdant-midi" }
+verdant-media = { path = "../verdant-media" }
+verdant-pitch-gesture-surface = { package = "generated-gpui-f3fdabc574a223d49207e44a2417a77e", path = "../../proto-ui/generated/pitch-gesture-surface" }
+serde.workspace = true
+serde_json.workspace = true
+semver.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+unicode-segmentation = "1"
+async-channel = "2"
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }

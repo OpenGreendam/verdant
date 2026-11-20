@@ -1,0 +1,28 @@
+{
+  "schema": "cfinal-neighbor-encoding-fixtures/1",
+  "valid": [
+    {"name": "ma-final-keeps-named-onset", "features": {"L_SM": "m", "C_Phone": 3, "C_YM": "a", "R_Phone": 0}, "phones": [53, 3, 0], "legacy": [0, 3, 0]},
+    {"name": "mandarin-rimes-on-both-sides", "features": {"L_YM": "a", "C_Phone": 53, "C_SM": "m", "R_YM": "a"}, "phones": [3, 53, 3], "legacy": [0, 53, 0]},
+    {"name": "english-stop-vowel-nasal", "features": {"L_Stop": "b", "C_Phone": 174, "C_Vowel": "aa", "R_Nasal": "m"}, "phones": [201, 174, 217], "legacy": [0, 174, 0]},
+    {"name": "english-nasal-vowel-fricative", "features": {"L_Nasal": "m", "C_Phone": 192, "C_Vowel": "iy", "R_Fric": "s"}, "phones": [217, 192, 226], "legacy": [0, 192, 0]},
+    {"name": "english-vowel-stop-vowel", "features": {"L_Vowel": "aa", "C_Phone": 228, "C_Stop": "t", "R_Vowel": "iy"}, "phones": [174, 228, 192], "legacy": [0, 228, 0]},
+    {"name": "consistent-user-override", "features": {"L_Phone": "58", "L_SM": "s", "C_Phone": 3, "R_Phone": "2", "R_SilSp": "sp"}, "phones": [58, 3, 2], "legacy": [58, 3, 2]},
+    {"name": "distinct-absent-and-short-pause", "features": {"L_SilSp": "XX", "C_Phone": 3, "R_SilSp": "sp"}, "phones": [0, 3, 2], "legacy": [0, 3, 0]},
+    {"name": "distinct-silence-and-absence", "features": {"L_SilSp": "sil", "C_Phone": 3, "R_Phone": 0}, "phones": [1, 3, 0], "legacy": [0, 3, 0]},
+    {"name": "unspecified-is-not-guessed", "features": {"C_Phone": 3}, "phones": [0, 3, 0], "legacy": [0, 3, 0]},
+    {"name": "linked-original-nodes", "features": {"C_Phone": 3, "OriginalHierarchy": {"schema_version": "ogd-explicit-original-hierarchy/1", "current_index": 1, "nodes": [{"phone": 53, "left_level": 5, "right_level": 0}, {"phone": 3, "left_level": 0, "right_level": 0}, {"phone": 58, "left_level": 0, "right_level": 5}]}}, "phones": [53, 3, 58], "legacy": [0, 3, 0]},
+    {"name": "named-current-without-numeric-field", "features": {"L_SM": "m", "C_YM": "a", "R_SilSp": "sp"}, "phones": [53, 3, 2]}
+  ],
+  "invalid": [
+    {"name": "conflicting-numeric-and-named-override", "features": {"L_Phone": 54, "L_SM": "m", "C_Phone": 3}},
+    {"name": "unresolvable-group-not-absence", "features": {"L_SM": "sonorant", "C_Phone": 3}},
+    {"name": "boolean-group-is-not-identity", "features": {"L_SM": true, "C_Phone": 3}},
+    {"name": "invalid-declared-silence", "features": {"L_SilSp": "unknown", "C_Phone": 3}},
+    {"name": "invalid-silence-does-not-borrow-numeric", "features": {"L_Phone": 53, "L_SilSp": "unknown", "C_Phone": 3}},
+    {"name": "named-invalid-does-not-borrow-numeric", "features": {"L_Phone": 53, "L_SM": "unrecognized", "C_Phone": 3}},
+    {"name": "conflicting-languages-in-one-neighbor", "features": {"L_SM": "m", "L_Nasal": "m", "C_Phone": 3}},
+    {"name": "invalid-numeric-neighbor", "features": {"L_Phone": 999, "C_Phone": 3}},
+    {"name": "no-current-phone", "features": {"L_SM": "m"}},
+    {"name": "linked-override-conflict", "features": {"L_Phone": 58, "C_Phone": 3, "OriginalHierarchy": {"schema_version": "ogd-explicit-original-hierarchy/1", "current_index": 1, "nodes": [{"phone": 53, "left_level": 5, "right_level": 0}, {"phone": 3, "left_level": 0, "right_level": 5}]}}}
+  ]
+}

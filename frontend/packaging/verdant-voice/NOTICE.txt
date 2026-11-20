@@ -1,0 +1,18 @@
+Verdant Voice 0.1.0 ONNX base — attribution
+
+Voice identity: 童声 01 / 楠楠 (VID 10008), identified by OpenGreendam project
+maintainers with the built-in girl voice of an early Chinese reading-software
+package. That voice is the original source of the derivative known as
+「绿坝1号音源」, which 荼荼丸 produced in June 2009 with a +25% pitch shift for
+《绿坝绿坝☆河蟹你全家feveR.》; this package uses the unshifted original. The
+acoustic reference bank contains data derived from that source. Project ONNX
+controllers and decoder are the frozen Verdant R13B/R12B graphs used by the R14
+reference strategy.
+
+See the Verdant NOTICE.md for full runtime and research attribution.
+https://github.com/OpenGreendam/verdant/blob/main/NOTICE.md
+https://github.com/OpenGreendam/docs/blob/main/MODEL-FORMAT-AND-RELEASE.md
+
+The inherited rights.json records the original local-use qualification of the
+source bank. AUTHORIZATION.json records the later release-owner statement for
+the complete hash-bound runtime package.

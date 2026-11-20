@@ -1,0 +1,27 @@
+[package]
+name = "verdant-test-worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+description = "Explicit opt-in ogd-worker/1 protocol fixture with synthetic formant tones and fault injection."
+
+[features]
+default = []
+protocol-fixture = []
+
+[[bin]]
+name = "verdant-test-worker"
+path = "src/main.rs"
+required-features = ["protocol-fixture"]
+test = false
+bench = false
+
+[dependencies]
+verdant-backend = { path = "../verdant-backend", default-features = false }
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+uuid.workspace = true
+zip.workspace = true

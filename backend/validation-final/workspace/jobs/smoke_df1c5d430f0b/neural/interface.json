@@ -1,0 +1,58 @@
+{
+  "sample_rate": 44100,
+  "hop_size": 512,
+  "fft_size": 2048,
+  "window_size": 2048,
+  "window": "periodic Hann",
+  "mel_bins": 128,
+  "mel_fmin": 40,
+  "mel_fmax": 16000,
+  "mel_scale": "Slaney",
+  "mel_normalization": "Slaney",
+  "mel_base": "e",
+  "mel_power": 1,
+  "mel_floor_before_log": 1e-05,
+  "stft_center": false,
+  "reflect_padding_each_side": 768,
+  "frame_times": "(frame_index + 0.5) * 512 / 44100 seconds",
+  "unvoiced_encoding_for_model": "f0=0",
+  "uv_convention_in_npz": "True means unvoiced",
+  "actual_mel_shape": [
+    1,
+    31,
+    128
+  ],
+  "actual_f0_shape": [
+    1,
+    31
+  ],
+  "inputs": [
+    {
+      "name": "mel",
+      "shape": [
+        1,
+        "n_frames",
+        128
+      ],
+      "type": "tensor(float)"
+    },
+    {
+      "name": "f0",
+      "shape": [
+        1,
+        "n_frames"
+      ],
+      "type": "tensor(float)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "waveform",
+      "shape": [
+        1,
+        "n_samples"
+      ],
+      "type": "tensor(float)"
+    }
+  ]
+}

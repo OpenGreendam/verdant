@@ -1,0 +1,332 @@
+{
+  "schema": "greendam-contract-traces/0.1",
+  "status": "proposed_test_vectors_not_executed",
+  "fixture_ids_are_aliases": true,
+  "cases": [
+    {
+      "id": "T01",
+      "title": "group move creates one transaction",
+      "initial": {
+        "revision": 7,
+        "notes": [
+          {
+            "id": "n1",
+            "start_tick": 960,
+            "duration_tick": 480,
+            "midi_note": 60
+          },
+          {
+            "id": "n2",
+            "start_tick": 1440,
+            "duration_tick": 480,
+            "midi_note": 64
+          }
+        ],
+        "selection": [
+          "n1",
+          "n2"
+        ],
+        "gesture": "idle",
+        "undo_depth": 0
+      },
+      "events": [
+        {
+          "type": "PointerDown",
+          "note_id": "n1",
+          "music_tick": 1000,
+          "pitch": 60,
+          "screen": [
+            100,
+            100
+          ]
+        },
+        {
+          "type": "PointerMove",
+          "music_tick": 1120,
+          "pitch": 61,
+          "screen": [
+            160,
+            80
+          ]
+        },
+        {
+          "type": "PointerMove",
+          "music_tick": 1240,
+          "pitch": 62,
+          "screen": [
+            220,
+            60
+          ]
+        },
+        {
+          "type": "PointerUp"
+        }
+      ],
+      "assertions": {
+        "revision_during_moves": 7,
+        "final_revision": 8,
+        "domain_command_count": 1,
+        "domain_command": {
+          "name": "MoveNotes",
+          "note_ids": [
+            "n1",
+            "n2"
+          ],
+          "delta_tick": 240,
+          "delta_semitones": 2
+        },
+        "final_notes": [
+          {
+            "id": "n1",
+            "start_tick": 1200,
+            "duration_tick": 480,
+            "midi_note": 62
+          },
+          {
+            "id": "n2",
+            "start_tick": 1680,
+            "duration_tick": 480,
+            "midi_note": 66
+          }
+        ],
+        "undo_depth": 1,
+        "gesture": "idle",
+        "pointer_captured": false
+      },
+      "evidence": "not_executed"
+    },
+    {
+      "id": "T02",
+      "title": "escape rolls back preview",
+      "initial": {
+        "revision": 7,
+        "notes": [
+          {
+            "id": "n1",
+            "start_tick": 960,
+            "duration_tick": 480,
+            "midi_note": 60
+          }
+        ],
+        "selection": [
+          "n1"
+        ],
+        "gesture": "idle"
+      },
+      "events": [
+        {
+          "type": "PointerDown",
+          "note_id": "n1",
+          "music_tick": 1000,
+          "pitch": 60,
+          "screen": [
+            100,
+            100
+          ]
+        },
+        {
+          "type": "PointerMove",
+          "music_tick": 1240,
+          "pitch": 62,
+          "screen": [
+            220,
+            60
+          ]
+        },
+        {
+          "type": "Cancel",
+          "reason": "escape"
+        }
+      ],
+      "assertions": {
+        "final_revision": 7,
+        "domain_command_count": 0,
+        "notes_unchanged": true,
+        "gesture": "idle",
+        "pointer_captured": false,
+        "autoscroll_active": false
+      },
+      "evidence": "not_executed"
+    },
+    {
+      "id": "T05",
+      "title": "IME marked text does not become project edits or transport actions",
+      "initial": {
+        "revision": 7,
+        "note_id": "n1",
+        "lyric": "",
+        "ime_active": false
+      },
+      "events": [
+        {
+          "type": "ImeBegin"
+        },
+        {
+          "type": "ImeReplaceAndMark",
+          "text": "绿",
+          "selection_utf16": [
+            1,
+            1
+          ]
+        },
+        {
+          "type": "Key",
+          "key": "Space",
+          "ime_consumes": true
+        },
+        {
+          "type": "ImeReplaceAndMark",
+          "text": "绿坝",
+          "selection_utf16": [
+            2,
+            2
+          ]
+        },
+        {
+          "type": "ImeCommit",
+          "text": "绿坝"
+        }
+      ],
+      "assertions": {
+        "final_revision": 8,
+        "domain_commands": [
+          {
+            "name": "SetLyric",
+            "note_id": "n1",
+            "text": "绿坝"
+          }
+        ],
+        "transport_command_count": 0,
+        "undo_depth_delta": 1,
+        "marked_range": null
+      },
+      "evidence": "not_executed"
+    },
+    {
+      "id": "T08",
+      "title": "stale completion may cache but cannot bind",
+      "initial": {
+        "project_revision": 9,
+        "pending": {
+          "job_id": "job_old",
+          "revision": 8
+        },
+        "playable_binding": null
+      },
+      "events": [
+        {
+          "type": "BackendEvent",
+          "record": {
+            "protocol": "ogd-worker/1",
+            "event": "completed",
+            "request_id": "req_old",
+            "job_id": "job_old",
+            "revision": 8,
+            "artifacts": []
+          }
+        }
+      ],
+      "assertions": {
+        "may_record_history": true,
+        "playable_binding": null,
+        "project_revision": 9,
+        "must_not_overwrite_project": true
+      },
+      "evidence": "not_executed; artifact-empty record tests state policy only, not a valid audio cache"
+    },
+    {
+      "id": "T09",
+      "title": "cancel acknowledgement is not terminal",
+      "initial": {
+        "job_id": "job1",
+        "state": "running",
+        "project_revision": 8
+      },
+      "events": [
+        {
+          "type": "CancelRequested",
+          "request_id": "cancel1"
+        },
+        {
+          "type": "BackendEvent",
+          "record": {
+            "protocol": "ogd-worker/1",
+            "event": "cancel_ack",
+            "request_id": "cancel1",
+            "job_id": "job1",
+            "active_match": true,
+            "previous_terminal": null
+          }
+        },
+        {
+          "type": "BackendEvent",
+          "record": {
+            "protocol": "ogd-worker/1",
+            "event": "cancelled",
+            "request_id": "render1",
+            "job_id": "job1",
+            "revision": 8,
+            "partial_outputs_valid": false
+          }
+        }
+      ],
+      "assertions": {
+        "state_after_ack": "cancel_requested",
+        "final_state": "cancelled",
+        "terminal_count": 1,
+        "load_partial_audio": false
+      },
+      "evidence": "not_executed"
+    },
+    {
+      "id": "T10",
+      "title": "C0 continuous pitch fails preflight",
+      "initial": {
+        "route": "C0",
+        "capabilities": {
+          "continuous_f0_control": false
+        },
+        "pitch_curve": [
+          {
+            "tick": 0,
+            "millicents": 0
+          },
+          {
+            "tick": 480,
+            "millicents": 50000
+          }
+        ]
+      },
+      "events": [
+        {
+          "type": "RenderRequested"
+        }
+      ],
+      "assertions": {
+        "backend_request_count": 0,
+        "diagnostic": "E_RENDER_CAPABILITY",
+        "must_not_silently_split_or_ignore_curve": true
+      },
+      "evidence": "not_executed"
+    },
+    {
+      "id": "T14",
+      "title": "unsupported runtime JS produces a compiler error",
+      "initial": {
+        "source_expression_kind": "arbitrary_js_closure",
+        "host_profile": "greendam-gpui-desktop-v0"
+      },
+      "events": [
+        {
+          "type": "CompileRequested"
+        }
+      ],
+      "assertions": {
+        "error_code": "E_DYNAMIC_JS",
+        "generated_runnable_artifact": false,
+        "source_span_required": true
+      },
+      "evidence": "not_executed"
+    }
+  ]
+}

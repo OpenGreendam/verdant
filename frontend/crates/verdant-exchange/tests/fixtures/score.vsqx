@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vsq4 xmlns="http://www.yamaha.co.jp/vocaloid/schema/vsq4/" xmlns:ext="urn:verdant:test">
+  <vender>Yamaha Corporation</vender><version>4.0.0.3</version>
+  <vVoiceTable><vVoice><bs>1</bs><pc>0</pc><id>BNGW7FG7E5TRSNC3</id><name>KAITO_V3_English</name><vPrm><bre>0</bre><bri>0</bri><cle>0</cle><gen>0</gen><ope>0</ope></vPrm></vVoice></vVoiceTable>
+  <mixer><masterUnit><oDev>0</oDev><rLvl>0</rLvl><vol>0</vol></masterUnit><vsUnit><tNo>5</tNo><iGin>0</iGin><sLvl>-898</sLvl><sEnable>0</sEnable><m>0</m><s>1</s><pan>32</pan><vol>-120</vol></vsUnit><monoUnit><iGin>0</iGin><sLvl>-898</sLvl><sEnable>0</sEnable><m>0</m><s>0</s><pan>64</pan><vol>0</vol></monoUnit><stUnit><iGin>0</iGin><m>0</m><s>0</s><vol>0</vol></stUnit></mixer>
+  <masterTrack><seqName>Exchange &amp; XML</seqName><comment></comment><resolution>960</resolution><preMeasure>1</preMeasure><timeSig><m>0</m><nu>3</nu><de>4</de></timeSig><timeSig><m>2</m><nu>5</nu><de>8</de></timeSig><tempo><t>0</t><v>12345</v></tempo><tempo><t>6000</t><v>15000</v></tempo></masterTrack>
+  <vsTrack><tNo>5</tNo><name>Lead &amp; harmony</name><comment></comment><vsPart><t>2880</t><playTime>960</playTime><name>Authored part</name><comment></comment><sPlug><id>ACA9C502-A04B-42b5-B2EB-5CEA36D16FCE</id><name>VOCALOID2 Compatible Style</name><version>3.0.0.1</version></sPlug><pStyle><v id="accent">50</v></pStyle><singer><t>0</t><bs>1</bs><pc>0</pc></singer><cc><t>0</t><v id="S">2</v></cc><cc><t>0</t><v id="P">0</v></cc><cc><t>240</t><v id="P">4096</v></cc><cc><t>900</t><v id="P">0</v></cc><note><t>120</t><dur>480</dur><n>60</n><v>91</v><y>a &amp; &lt;b&gt;</y><p lock="1">a I</p><nStyle><v id="accent">42</v></nStyle><ext:note ext:flag="yes">kept &amp; editable</ext:note></note><ext:part>source-extension</ext:part></vsPart></vsTrack>
+  <monoTrack></monoTrack><stTrack></stTrack><ext:root ext:flag="yes">extra</ext:root>
+</vsq4>

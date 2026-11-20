@@ -1,0 +1,8 @@
+{
+  "protocol": "ogd-worker/1",
+  "event": "cancelled",
+  "job_id": "cancel_b2dd25a8108e",
+  "revision": 3,
+  "partial_outputs_valid": false,
+  "job_directory": "jobs/cancel_b2dd25a8108e"
+}

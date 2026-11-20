@@ -1,0 +1,48 @@
+{
+  "source_license_files": [
+    {
+      "label": "Proto-UI",
+      "source": "https://raw.githubusercontent.com/Proto-UI/Proto-UI/35195a6e6f1ba6a7d800da0029f2683013abd18b/LICENSE",
+      "path": "LICENSE",
+      "commit": "35195a6e6f1ba6a7d800da0029f2683013abd18b",
+      "file": "Proto-UI-LICENSE.txt",
+      "bytes": 1078,
+      "sha256": "7b6e3e65736b51f976b8443bca2cc9796e010b1e8a4dfff7316240681e0ebf66"
+    },
+    {
+      "label": "GPUI",
+      "source": "https://raw.githubusercontent.com/zed-industries/zed/48741fd17d0dec28be6ad664b0a06dc7202086be/crates/gpui/LICENSE-APACHE",
+      "path": "crates/gpui/LICENSE-APACHE",
+      "commit": "48741fd17d0dec28be6ad664b0a06dc7202086be",
+      "file": "GPUI-crates-gpui-LICENSE-APACHE.txt",
+      "bytes": 20,
+      "sha256": "9cff568488e9d56aae60f162404acdb15d8533a0202cf01f6eb0843b264f20ff"
+    },
+    {
+      "label": "GPUI",
+      "source": "https://raw.githubusercontent.com/zed-industries/zed/48741fd17d0dec28be6ad664b0a06dc7202086be/LICENSE-APACHE",
+      "path": "LICENSE-APACHE",
+      "commit": "48741fd17d0dec28be6ad664b0a06dc7202086be",
+      "file": "GPUI-LICENSE-APACHE.txt",
+      "bytes": 10768,
+      "sha256": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a"
+    }
+  ],
+  "failed_candidate_paths": [
+    {
+      "label": "Proto-UI",
+      "path": "LICENSE-MIT",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "label": "GPUI",
+      "path": "crates/gpui/LICENSE",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "label": "Zed-root",
+      "path": "LICENSE",
+      "error": "HTTP Error 404: Not Found"
+    }
+  ]
+}

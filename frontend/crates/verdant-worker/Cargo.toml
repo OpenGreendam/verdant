@@ -1,0 +1,24 @@
+[package]
+name = "verdant-worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+uuid.workspace = true
+zip.workspace = true
+# Job children set PR_SET_PDEATHSIG so an abruptly killed worker cannot leave a
+# render running against an archived job directory.
+libc = "0.2"
+verdant-backend = { path = "../verdant-backend" }
+verdant-synthesis = { path = "../verdant-synthesis" }
+
+[build-dependencies]
+sha2.workspace = true

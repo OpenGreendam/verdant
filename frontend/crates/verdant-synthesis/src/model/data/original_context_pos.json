@@ -1,0 +1,628 @@
+{
+  "schema_version": "ogd-original-explicit-pos-predicates/1",
+  "source_module_sha256": "7df53909f3df01dac69ae4e898a141835b8b3da7cf81663ac4d1104896cc0e63",
+  "restored_memory_sha256": "33cd79038d04a8855d6139caacada29f1c7eba71abf685269dae41fda369b6ed",
+  "scope": "Explicit original ASCII POS labels only. Text-to-POS prediction is not recovered. C_POS==j has duplicate unequal original registrations and remains unknown.",
+  "groups": {
+    "1": [
+      "g",
+      "h",
+      "k",
+      "x"
+    ],
+    "2": [
+      "i",
+      "j",
+      "l",
+      "sg"
+    ],
+    "3": [
+      "g",
+      "h",
+      "i",
+      "j",
+      "k",
+      "l",
+      "x",
+      "sg"
+    ],
+    "4": [
+      "a",
+      "v",
+      "z"
+    ],
+    "5": [
+      "f",
+      "m",
+      "n",
+      "ng",
+      "ngp",
+      "q",
+      "r",
+      "s",
+      "t"
+    ],
+    "6": [
+      "b",
+      "d"
+    ],
+    "7": [
+      "a",
+      "b",
+      "d",
+      "f",
+      "m",
+      "n",
+      "ng",
+      "ngp",
+      "q",
+      "r",
+      "s",
+      "t",
+      "v",
+      "z"
+    ],
+    "8": [
+      "w"
+    ],
+    "9": [
+      "c",
+      "p",
+      "u",
+      "y"
+    ],
+    "10": [
+      "e",
+      "o"
+    ],
+    "11": [
+      "c",
+      "e",
+      "o",
+      "p",
+      "u",
+      "y"
+    ]
+  },
+  "questions": {
+    "C_POS==a": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registrations": [
+        {
+          "tag": "a",
+          "rhs": 1,
+          "registration_rva": 191590
+        }
+      ]
+    },
+    "C_POS==b": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 2,
+      "registrations": [
+        {
+          "tag": "b",
+          "rhs": 2,
+          "registration_rva": 191637
+        }
+      ]
+    },
+    "C_POS==c": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 3,
+      "registrations": [
+        {
+          "tag": "c",
+          "rhs": 3,
+          "registration_rva": 191684
+        }
+      ]
+    },
+    "C_POS==d": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 4,
+      "registrations": [
+        {
+          "tag": "d",
+          "rhs": 4,
+          "registration_rva": 191731
+        }
+      ]
+    },
+    "C_POS==e": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 5,
+      "registrations": [
+        {
+          "tag": "e",
+          "rhs": 5,
+          "registration_rva": 191778
+        }
+      ]
+    },
+    "C_POS==f": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 6,
+      "registrations": [
+        {
+          "tag": "f",
+          "rhs": 6,
+          "registration_rva": 191825
+        }
+      ]
+    },
+    "C_POS==h": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 7,
+      "registrations": [
+        {
+          "tag": "g",
+          "rhs": 7,
+          "registration_rva": 191872
+        }
+      ]
+    },
+    "C_POS==i": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 8,
+      "registrations": [
+        {
+          "tag": "h",
+          "rhs": 8,
+          "registration_rva": 191919
+        }
+      ]
+    },
+    "C_POS==j": {
+      "kind": "pos_ambiguous",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 9,
+      "registrations": [
+        {
+          "tag": "i",
+          "rhs": 9,
+          "registration_rva": 191966
+        },
+        {
+          "tag": "j",
+          "rhs": 10,
+          "registration_rva": 192013
+        }
+      ]
+    },
+    "C_POS==k": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 11,
+      "registrations": [
+        {
+          "tag": "k",
+          "rhs": 11,
+          "registration_rva": 192060
+        }
+      ]
+    },
+    "C_POS==l": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 12,
+      "registrations": [
+        {
+          "tag": "l",
+          "rhs": 12,
+          "registration_rva": 192107
+        }
+      ]
+    },
+    "C_POS==m": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 13,
+      "registrations": [
+        {
+          "tag": "m",
+          "rhs": 13,
+          "registration_rva": 192154
+        }
+      ]
+    },
+    "C_POS==n": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 14,
+      "registrations": [
+        {
+          "tag": "n",
+          "rhs": 14,
+          "registration_rva": 192201
+        }
+      ]
+    },
+    "C_POS==ng": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 27,
+      "registrations": [
+        {
+          "tag": "ng",
+          "rhs": 27,
+          "registration_rva": 192248
+        }
+      ]
+    },
+    "C_POS==ngp": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 28,
+      "registrations": [
+        {
+          "tag": "ngp",
+          "rhs": 28,
+          "registration_rva": 192295
+        }
+      ]
+    },
+    "C_POS==o": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 15,
+      "registrations": [
+        {
+          "tag": "o",
+          "rhs": 15,
+          "registration_rva": 192342
+        }
+      ]
+    },
+    "C_POS==p": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 16,
+      "registrations": [
+        {
+          "tag": "p",
+          "rhs": 16,
+          "registration_rva": 192389
+        }
+      ]
+    },
+    "C_POS==q": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 17,
+      "registrations": [
+        {
+          "tag": "q",
+          "rhs": 17,
+          "registration_rva": 192436
+        }
+      ]
+    },
+    "C_POS==r": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 18,
+      "registrations": [
+        {
+          "tag": "r",
+          "rhs": 18,
+          "registration_rva": 192483
+        }
+      ]
+    },
+    "C_POS==s": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 19,
+      "registrations": [
+        {
+          "tag": "s",
+          "rhs": 19,
+          "registration_rva": 192530
+        }
+      ]
+    },
+    "C_POS==sg": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 29,
+      "registrations": [
+        {
+          "tag": "sg",
+          "rhs": 29,
+          "registration_rva": 192577
+        }
+      ]
+    },
+    "C_POS==t": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 20,
+      "registrations": [
+        {
+          "tag": "t",
+          "rhs": 20,
+          "registration_rva": 192624
+        }
+      ]
+    },
+    "C_POS==u": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 21,
+      "registrations": [
+        {
+          "tag": "u",
+          "rhs": 21,
+          "registration_rva": 192671
+        }
+      ]
+    },
+    "C_POS==v": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 22,
+      "registrations": [
+        {
+          "tag": "v",
+          "rhs": 22,
+          "registration_rva": 192718
+        }
+      ]
+    },
+    "C_POS==w": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 23,
+      "registrations": [
+        {
+          "tag": "w",
+          "rhs": 23,
+          "registration_rva": 192765
+        }
+      ]
+    },
+    "C_POS==x": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 24,
+      "registrations": [
+        {
+          "tag": "x",
+          "rhs": 24,
+          "registration_rva": 192812
+        }
+      ]
+    },
+    "C_POS==y": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 25,
+      "registrations": [
+        {
+          "tag": "y",
+          "rhs": 25,
+          "registration_rva": 192859
+        }
+      ]
+    },
+    "C_POS==z": {
+      "kind": "pos_literal",
+      "function_rva": 78032,
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 26,
+      "registrations": [
+        {
+          "tag": "z",
+          "rhs": 26,
+          "registration_rva": 192906
+        }
+      ]
+    },
+    "C_POS=O1": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 1,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 192953
+    },
+    "C_POS=O2": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 2,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 192989
+    },
+    "C_POS=Other": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 3,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193025
+    },
+    "C_POS=R1": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 4,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193061
+    },
+    "C_POS=R2": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 5,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193097
+    },
+    "C_POS=R3": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 6,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193133
+    },
+    "C_POS=Real": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 7,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193169
+    },
+    "C_POS=Symble": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 8,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193205
+    },
+    "C_POS=V1": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 9,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193241
+    },
+    "C_POS=V2": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 10,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193277
+    },
+    "C_POS=Virtual": {
+      "kind": "pos_group",
+      "function_rva": 114544,
+      "argument1": 11,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "rhs": 1,
+      "registration_rva": 193313
+    }
+  },
+  "literal_registration_count": 29,
+  "duplicate_literal_registrations": {
+    "C_POS==j": [
+      {
+        "tag": "i",
+        "rhs": 9,
+        "registration_rva": 191966
+      },
+      {
+        "tag": "j",
+        "rhs": 10,
+        "registration_rva": 192013
+      }
+    ]
+  }
+}

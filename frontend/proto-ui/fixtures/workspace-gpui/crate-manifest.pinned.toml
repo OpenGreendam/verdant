@@ -1,0 +1,17 @@
+[package]
+name = "generated-gpui-0123456789abcdef0123456789abcdef"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "generated_gpui_component"
+path = "Component.rs"
+
+[dependencies]
+proto-ui-gpui-native = { version = "=0.2.0", path = ".proto-ui/gpui-native" }
+gpui = { git = "https://github.com/zed-industries/zed", rev = "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+gpui = { git = "https://github.com/zed-industries/zed", rev = "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8", features = ["test-support"] }

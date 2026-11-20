@@ -1,0 +1,2825 @@
+{
+  "phones": {
+    "10": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        12,
+        25
+      ],
+      "name": "en"
+    },
+    "11": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        14,
+        25
+      ],
+      "name": "eng"
+    },
+    "12": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        17,
+        30
+      ],
+      "name": "er"
+    },
+    "13": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        21,
+        26
+      ],
+      "name": "i"
+    },
+    "14": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        3,
+        26
+      ],
+      "name": "ia"
+    },
+    "15": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        11,
+        26
+      ],
+      "name": "ian"
+    },
+    "16": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        13,
+        26
+      ],
+      "name": "iang"
+    },
+    "17": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        19,
+        26
+      ],
+      "name": "iao"
+    },
+    "174": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        70,
+        74,
+        77,
+        83,
+        85,
+        89
+      ],
+      "name": "aa"
+    },
+    "175": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        69,
+        73,
+        82,
+        83,
+        85,
+        89
+      ],
+      "name": "ae"
+    },
+    "176": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        54,
+        69,
+        74,
+        77,
+        82,
+        83,
+        85,
+        91
+      ],
+      "name": "ah"
+    },
+    "177": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        55,
+        70,
+        74,
+        76,
+        83,
+        84,
+        90
+      ],
+      "name": "ao"
+    },
+    "178": {
+      "first_class": 44,
+      "groups": [
+        44,
+        53,
+        51,
+        68
+      ],
+      "name": "ar"
+    },
+    "179": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        69,
+        76,
+        78,
+        79,
+        83,
+        85,
+        89
+      ],
+      "name": "aw"
+    },
+    "18": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        16,
+        26
+      ],
+      "name": "ie"
+    },
+    "180": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        68,
+        75,
+        77,
+        82,
+        85,
+        86,
+        89,
+        91
+      ],
+      "name": "ax"
+    },
+    "181": {
+      "first_class": 44,
+      "groups": [
+        44,
+        74,
+        78,
+        79,
+        82,
+        85,
+        86
+      ],
+      "name": "axr"
+    },
+    "182": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        53,
+        70,
+        77,
+        78,
+        80,
+        83,
+        85,
+        89
+      ],
+      "name": "ay"
+    },
+    "183": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        54,
+        68,
+        73,
+        77,
+        82,
+        85,
+        88
+      ],
+      "name": "eh"
+    },
+    "184": {
+      "first_class": 44,
+      "groups": [
+        44,
+        76,
+        78,
+        82,
+        85,
+        91
+      ],
+      "name": "el"
+    },
+    "185": {
+      "first_class": 44,
+      "groups": [
+        44,
+        76,
+        78,
+        82,
+        85,
+        91
+      ],
+      "name": "em"
+    },
+    "186": {
+      "first_class": 44,
+      "groups": [
+        44,
+        76,
+        78,
+        82,
+        85,
+        91
+      ],
+      "name": "en"
+    },
+    "187": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        56,
+        74,
+        78,
+        79,
+        82,
+        85,
+        89
+      ],
+      "name": "er"
+    },
+    "188": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        53,
+        68,
+        73,
+        77,
+        78,
+        79,
+        80,
+        82,
+        85,
+        88
+      ],
+      "name": "ey"
+    },
+    "189": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        54,
+        67,
+        77,
+        81,
+        85,
+        87
+      ],
+      "name": "ih"
+    },
+    "19": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        9,
+        29
+      ],
+      "name": "ii"
+    },
+    "190": {
+      "first_class": 44,
+      "groups": [
+        44,
+        54,
+        67,
+        51
+      ],
+      "name": "ir"
+    },
+    "191": {
+      "first_class": 44,
+      "groups": [
+        44,
+        77,
+        81,
+        86,
+        87
+      ],
+      "name": "ix"
+    },
+    "192": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        53,
+        67,
+        76,
+        81,
+        85,
+        87
+      ],
+      "name": "iy"
+    },
+    "193": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        72
+      ],
+      "name": "oo"
+    },
+    "194": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        55,
+        72,
+        75,
+        76,
+        82,
+        84,
+        90
+      ],
+      "name": "ow"
+    },
+    "195": {
+      "first_class": 44,
+      "groups": [
+        44
+      ],
+      "name": "ox"
+    },
+    "196": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        53,
+        72,
+        77,
+        78,
+        80,
+        83,
+        84,
+        90
+      ],
+      "name": "oy"
+    },
+    "197": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        54,
+        71,
+        75,
+        77,
+        81,
+        84,
+        91
+      ],
+      "name": "uh"
+    },
+    "198": {
+      "first_class": 44,
+      "groups": [
+        44,
+        55,
+        52,
+        71
+      ],
+      "name": "ur"
+    },
+    "199": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        55,
+        71,
+        75,
+        76,
+        81,
+        84,
+        91
+      ],
+      "name": "uw"
+    },
+    "20": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        10,
+        30
+      ],
+      "name": "iii"
+    },
+    "200": {
+      "first_class": 44,
+      "groups": [
+        44
+      ],
+      "name": "ux"
+    },
+    "201": {
+      "first_class": 45,
+      "groups": [
+        45,
+        48
+      ],
+      "name": "b"
+    },
+    "202": {
+      "first_class": 45,
+      "groups": [
+        45,
+        48
+      ],
+      "name": "bcl"
+    },
+    "203": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        57,
+        62
+      ],
+      "name": "ch"
+    },
+    "204": {
+      "first_class": 45,
+      "groups": [
+        45,
+        49,
+        61,
+        66
+      ],
+      "name": "d"
+    },
+    "205": {
+      "first_class": 45,
+      "groups": [
+        45,
+        49,
+        61
+      ],
+      "name": "dcl"
+    },
+    "206": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        60,
+        65
+      ],
+      "name": "dh"
+    },
+    "207": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        60
+      ],
+      "name": "dx"
+    },
+    "208": {
+      "first_class": 47,
+      "groups": [
+        47,
+        48,
+        59,
+        64
+      ],
+      "name": "f"
+    },
+    "209": {
+      "first_class": 45,
+      "groups": [
+        45,
+        50
+      ],
+      "name": "g"
+    },
+    "21": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        12,
+        26
+      ],
+      "name": "in"
+    },
+    "210": {
+      "first_class": 45,
+      "groups": [
+        45,
+        50
+      ],
+      "name": "gcl"
+    },
+    "211": {
+      "first_class": 47,
+      "groups": [
+        47,
+        85
+      ],
+      "name": "hh"
+    },
+    "212": {
+      "first_class": 47,
+      "groups": [
+        47
+      ],
+      "name": "hsharp"
+    },
+    "213": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        57,
+        62
+      ],
+      "name": "jh"
+    },
+    "214": {
+      "first_class": 45,
+      "groups": [
+        45,
+        50
+      ],
+      "name": "k"
+    },
+    "215": {
+      "first_class": 45,
+      "groups": [
+        45,
+        50
+      ],
+      "name": "kcl"
+    },
+    "216": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        85
+      ],
+      "name": "l"
+    },
+    "217": {
+      "first_class": 46,
+      "groups": [
+        46
+      ],
+      "name": "m"
+    },
+    "218": {
+      "first_class": 46,
+      "groups": [
+        46
+      ],
+      "name": "n"
+    },
+    "219": {
+      "first_class": 46,
+      "groups": [
+        46
+      ],
+      "name": "ng"
+    },
+    "22": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        14,
+        26
+      ],
+      "name": "ing"
+    },
+    "220": {
+      "first_class": 46,
+      "groups": [
+        46
+      ],
+      "name": "nx"
+    },
+    "221": {
+      "first_class": 45,
+      "groups": [
+        45,
+        48
+      ],
+      "name": "p"
+    },
+    "222": {
+      "first_class": 45,
+      "groups": [
+        45,
+        48
+      ],
+      "name": "pau"
+    },
+    "223": {
+      "first_class": 45,
+      "groups": [
+        45,
+        48
+      ],
+      "name": "pcl"
+    },
+    "224": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        56,
+        85
+      ],
+      "name": "r"
+    },
+    "225": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        56
+      ],
+      "name": "rx"
+    },
+    "226": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        58,
+        63
+      ],
+      "name": "s"
+    },
+    "227": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        58,
+        63
+      ],
+      "name": "sh"
+    },
+    "228": {
+      "first_class": 45,
+      "groups": [
+        45,
+        49,
+        61,
+        66
+      ],
+      "name": "t"
+    },
+    "229": {
+      "first_class": 45,
+      "groups": [
+        45,
+        49,
+        61
+      ],
+      "name": "tcl"
+    },
+    "23": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2
+      ],
+      "name": "io"
+    },
+    "230": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        60,
+        65
+      ],
+      "name": "th"
+    },
+    "231": {
+      "first_class": 47,
+      "groups": [
+        47,
+        48,
+        59,
+        64
+      ],
+      "name": "v"
+    },
+    "232": {
+      "first_class": 44,
+      "groups": [
+        44,
+        52,
+        55,
+        71,
+        84
+      ],
+      "name": "w"
+    },
+    "233": {
+      "first_class": 44,
+      "groups": [
+        44,
+        51,
+        53,
+        67,
+        85
+      ],
+      "name": "y"
+    },
+    "234": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        57,
+        62
+      ],
+      "name": "z"
+    },
+    "235": {
+      "first_class": 47,
+      "groups": [
+        47,
+        49,
+        57,
+        62
+      ],
+      "name": "zh"
+    },
+    "24": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        14,
+        26
+      ],
+      "name": "iong"
+    },
+    "25": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        20,
+        26
+      ],
+      "name": "iou"
+    },
+    "26": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        15,
+        24
+      ],
+      "name": "o"
+    },
+    "27": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        14,
+        24
+      ],
+      "name": "ong"
+    },
+    "28": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        20,
+        24
+      ],
+      "name": "ou"
+    },
+    "29": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        18,
+        27
+      ],
+      "name": "u"
+    },
+    "3": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        3,
+        23
+      ],
+      "name": "a"
+    },
+    "30": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        3,
+        27
+      ],
+      "name": "ua"
+    },
+    "31": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        22,
+        27
+      ],
+      "name": "uai"
+    },
+    "32": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        11,
+        27
+      ],
+      "name": "uan"
+    },
+    "33": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        13,
+        27
+      ],
+      "name": "uang"
+    },
+    "34": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        7,
+        27
+      ],
+      "name": "uei"
+    },
+    "35": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        12,
+        27
+      ],
+      "name": "uen"
+    },
+    "36": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        14,
+        27
+      ],
+      "name": "ueng"
+    },
+    "37": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2
+      ],
+      "name": "un"
+    },
+    "38": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        15,
+        27
+      ],
+      "name": "uo"
+    },
+    "39": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        8,
+        28
+      ],
+      "name": "v"
+    },
+    "4": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        22,
+        23
+      ],
+      "name": "ai"
+    },
+    "40": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        11,
+        28
+      ],
+      "name": "van"
+    },
+    "41": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        16,
+        28
+      ],
+      "name": "ve"
+    },
+    "42": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        12,
+        28
+      ],
+      "name": "vn"
+    },
+    "43": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        38
+      ],
+      "name": "b"
+    },
+    "44": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        35
+      ],
+      "name": "c"
+    },
+    "45": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        37
+      ],
+      "name": "ch"
+    },
+    "46": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        39
+      ],
+      "name": "d"
+    },
+    "47": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        38
+      ],
+      "name": "f"
+    },
+    "48": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        40
+      ],
+      "name": "g"
+    },
+    "49": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        40
+      ],
+      "name": "h"
+    },
+    "5": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        11,
+        23
+      ],
+      "name": "an"
+    },
+    "50": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        36
+      ],
+      "name": "j"
+    },
+    "51": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        40
+      ],
+      "name": "k"
+    },
+    "52": {
+      "first_class": 1,
+      "groups": [
+        1,
+        31,
+        34,
+        43
+      ],
+      "name": "l"
+    },
+    "53": {
+      "first_class": 1,
+      "groups": [
+        1,
+        31,
+        34,
+        41
+      ],
+      "name": "m"
+    },
+    "54": {
+      "first_class": 1,
+      "groups": [
+        1,
+        31,
+        34,
+        42
+      ],
+      "name": "n"
+    },
+    "55": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        38
+      ],
+      "name": "p"
+    },
+    "56": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        36
+      ],
+      "name": "q"
+    },
+    "57": {
+      "first_class": 1,
+      "groups": [
+        1,
+        31,
+        32,
+        37
+      ],
+      "name": "r"
+    },
+    "58": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        35
+      ],
+      "name": "s"
+    },
+    "59": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        37
+      ],
+      "name": "sh"
+    },
+    "6": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        6,
+        13,
+        23
+      ],
+      "name": "ang"
+    },
+    "60": {
+      "first_class": 31,
+      "groups": [
+        31,
+        33,
+        39
+      ],
+      "name": "t"
+    },
+    "61": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        36
+      ],
+      "name": "x"
+    },
+    "62": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        35
+      ],
+      "name": "z"
+    },
+    "63": {
+      "first_class": 31,
+      "groups": [
+        31,
+        32,
+        37
+      ],
+      "name": "zh"
+    },
+    "7": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        19,
+        23
+      ],
+      "name": "ao"
+    },
+    "8": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        4,
+        16,
+        25
+      ],
+      "name": "e"
+    },
+    "9": {
+      "first_class": 1,
+      "groups": [
+        1,
+        2,
+        5,
+        7,
+        25
+      ],
+      "name": "ei"
+    }
+  },
+  "preserved_registration_anomaly": "C_Vowel==eh compares original phone ID 176 (ah), as shipped; do not silently rewrite the source fact.",
+  "questions": {
+    "C_Back": {
+      "argument1": 52,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 189963,
+      "rhs": 1
+    },
+    "C_Dental": {
+      "argument1": 49,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 189999,
+      "rhs": 1
+    },
+    "C_EN": {
+      "argument1": 3,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64320,
+      "kind": "language",
+      "registration_rva": 190035,
+      "rhs": 1
+    },
+    "C_Fric": {
+      "argument1": 47,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 190071,
+      "rhs": 1
+    },
+    "C_Fric==ch": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190107,
+      "rhs": 203
+    },
+    "C_Fric==dh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190145,
+      "rhs": 206
+    },
+    "C_Fric==f": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190183,
+      "rhs": 208
+    },
+    "C_Fric==hh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190221,
+      "rhs": 211
+    },
+    "C_Fric==jh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190259,
+      "rhs": 213
+    },
+    "C_Fric==s": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190297,
+      "rhs": 226
+    },
+    "C_Fric==sh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190335,
+      "rhs": 227
+    },
+    "C_Fric==th": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190373,
+      "rhs": 230
+    },
+    "C_Fric==v": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190411,
+      "rhs": 231
+    },
+    "C_Fric==z": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190449,
+      "rhs": 234
+    },
+    "C_Fric==zh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 190487,
+      "rhs": 235
+    },
+    "C_Front": {
+      "argument1": 51,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 190525,
+      "rhs": 1
+    },
+    "C_Labial": {
+      "argument1": 48,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 191300,
+      "rhs": 1
+    },
+    "C_Nasal": {
+      "argument1": 46,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 191336,
+      "rhs": 1
+    },
+    "C_Nasal==m": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 191372,
+      "rhs": 217
+    },
+    "C_Nasal==n": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 191410,
+      "rhs": 218
+    },
+    "C_Nasal==ng": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 191448,
+      "rhs": 219
+    },
+    "C_SM": {
+      "argument1": 31,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 194958,
+      "rhs": 1
+    },
+    "C_SM==b": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 194994,
+      "rhs": 43
+    },
+    "C_SM==c": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195029,
+      "rhs": 44
+    },
+    "C_SM==ch": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195064,
+      "rhs": 45
+    },
+    "C_SM==d": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195099,
+      "rhs": 46
+    },
+    "C_SM==f": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195134,
+      "rhs": 47
+    },
+    "C_SM==g": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195169,
+      "rhs": 48
+    },
+    "C_SM==h": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195204,
+      "rhs": 49
+    },
+    "C_SM==j": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195239,
+      "rhs": 50
+    },
+    "C_SM==k": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195274,
+      "rhs": 51
+    },
+    "C_SM==p": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195309,
+      "rhs": 55
+    },
+    "C_SM==q": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195344,
+      "rhs": 56
+    },
+    "C_SM==r": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195379,
+      "rhs": 57
+    },
+    "C_SM==s": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195414,
+      "rhs": 58
+    },
+    "C_SM==sh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195449,
+      "rhs": 59
+    },
+    "C_SM==t": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195484,
+      "rhs": 60
+    },
+    "C_SM==x": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195519,
+      "rhs": 61
+    },
+    "C_SM==z": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195554,
+      "rhs": 62
+    },
+    "C_SM==zh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 195589,
+      "rhs": 63
+    },
+    "C_SM=LS1": {
+      "argument1": 32,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195624,
+      "rhs": 1
+    },
+    "C_SM=LS2": {
+      "argument1": 33,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195660,
+      "rhs": 1
+    },
+    "C_SM=LS3": {
+      "argument1": 34,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195696,
+      "rhs": 1
+    },
+    "C_SM=LT1": {
+      "argument1": 35,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195732,
+      "rhs": 1
+    },
+    "C_SM=LT2": {
+      "argument1": 36,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195768,
+      "rhs": 1
+    },
+    "C_SM=LT3": {
+      "argument1": 37,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195804,
+      "rhs": 1
+    },
+    "C_SM=LT4": {
+      "argument1": 38,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195840,
+      "rhs": 1
+    },
+    "C_SM=LT5": {
+      "argument1": 39,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195876,
+      "rhs": 1
+    },
+    "C_SM=LT6": {
+      "argument1": 40,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195912,
+      "rhs": 1
+    },
+    "C_SM=LT7": {
+      "argument1": 41,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195948,
+      "rhs": 1
+    },
+    "C_SM=LT8": {
+      "argument1": 42,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 195984,
+      "rhs": 1
+    },
+    "C_SM=LT9": {
+      "argument1": 43,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 196020,
+      "rhs": 1
+    },
+    "C_SilSp": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64816,
+      "kind": "silence",
+      "registration_rva": 196056,
+      "rhs": 1
+    },
+    "C_SilSp==sil": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196091,
+      "rhs": 1
+    },
+    "C_SilSp==sp": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196126,
+      "rhs": 2
+    },
+    "C_Stop": {
+      "argument1": 45,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 196161,
+      "rhs": 1
+    },
+    "C_Stop==b": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196197,
+      "rhs": 201
+    },
+    "C_Stop==d": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196235,
+      "rhs": 204
+    },
+    "C_Stop==g": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196273,
+      "rhs": 209
+    },
+    "C_Stop==k": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196311,
+      "rhs": 214
+    },
+    "C_Stop==p": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196349,
+      "rhs": 221
+    },
+    "C_Stop==t": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 196387,
+      "rhs": 228
+    },
+    "C_Tone<=1": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 4,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196529,
+      "rhs": 1
+    },
+    "C_Tone<=2": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 4,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196567,
+      "rhs": 2
+    },
+    "C_Tone==0": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196605,
+      "rhs": 0
+    },
+    "C_Tone==1": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196641,
+      "rhs": 1
+    },
+    "C_Tone==12": {
+      "argument1": 1,
+      "argument2": 2,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196678,
+      "rhs": 1
+    },
+    "C_Tone==14": {
+      "argument1": 1,
+      "argument2": 4,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196715,
+      "rhs": 1
+    },
+    "C_Tone==2": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196752,
+      "rhs": 2
+    },
+    "C_Tone==3": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196789,
+      "rhs": 3
+    },
+    "C_Tone==4": {
+      "argument1": -1,
+      "argument2": -1,
+      "comparison_mode": 0,
+      "function_rva": 64896,
+      "kind": "tone",
+      "registration_rva": 196826,
+      "rhs": 4
+    },
+    "C_ULS1": {
+      "argument1": 57,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 196863,
+      "rhs": 1
+    },
+    "C_ULS2": {
+      "argument1": 58,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 196899,
+      "rhs": 1
+    },
+    "C_ULS3": {
+      "argument1": 59,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 196935,
+      "rhs": 1
+    },
+    "C_ULS4": {
+      "argument1": 60,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 196971,
+      "rhs": 1
+    },
+    "C_ULS5": {
+      "argument1": 61,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197007,
+      "rhs": 1
+    },
+    "C_VLS1": {
+      "argument1": 53,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197043,
+      "rhs": 1
+    },
+    "C_VLS2": {
+      "argument1": 54,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197079,
+      "rhs": 1
+    },
+    "C_VLS3": {
+      "argument1": 55,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197115,
+      "rhs": 1
+    },
+    "C_VLS4": {
+      "argument1": 56,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197151,
+      "rhs": 1
+    },
+    "C_Velar": {
+      "argument1": 50,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197187,
+      "rhs": 1
+    },
+    "C_Voiced": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64384,
+      "kind": "mandarin_voiced",
+      "registration_rva": 197223,
+      "rhs": 1
+    },
+    "C_Vowel": {
+      "argument1": 44,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 197258,
+      "rhs": 1
+    },
+    "C_Vowel==aa": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197294,
+      "rhs": 174
+    },
+    "C_Vowel==ae": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197332,
+      "rhs": 175
+    },
+    "C_Vowel==ah": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197370,
+      "rhs": 176
+    },
+    "C_Vowel==ao": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197408,
+      "rhs": 177
+    },
+    "C_Vowel==aw": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197446,
+      "rhs": 179
+    },
+    "C_Vowel==ax": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197484,
+      "rhs": 180
+    },
+    "C_Vowel==ay": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197522,
+      "rhs": 182
+    },
+    "C_Vowel==eh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197560,
+      "rhs": 176
+    },
+    "C_Vowel==er": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197598,
+      "rhs": 187
+    },
+    "C_Vowel==ey": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197636,
+      "rhs": 188
+    },
+    "C_Vowel==ih": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197674,
+      "rhs": 189
+    },
+    "C_Vowel==iy": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197712,
+      "rhs": 192
+    },
+    "C_Vowel==l": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197750,
+      "rhs": 216
+    },
+    "C_Vowel==oo": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197788,
+      "rhs": 193
+    },
+    "C_Vowel==ow": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197826,
+      "rhs": 194
+    },
+    "C_Vowel==oy": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197864,
+      "rhs": 196
+    },
+    "C_Vowel==r": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197902,
+      "rhs": 224
+    },
+    "C_Vowel==uh": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197940,
+      "rhs": 197
+    },
+    "C_Vowel==uw": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 197978,
+      "rhs": 199
+    },
+    "C_Vowel==w": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198016,
+      "rhs": 232
+    },
+    "C_Vowel==y": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198054,
+      "rhs": 233
+    },
+    "C_YM": {
+      "argument1": 2,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 198092,
+      "rhs": 1
+    },
+    "C_YM==a": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198128,
+      "rhs": 3
+    },
+    "C_YM==ai": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198163,
+      "rhs": 4
+    },
+    "C_YM==an": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198198,
+      "rhs": 5
+    },
+    "C_YM==ang": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198233,
+      "rhs": 6
+    },
+    "C_YM==ao": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198268,
+      "rhs": 7
+    },
+    "C_YM==e": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198303,
+      "rhs": 8
+    },
+    "C_YM==ei": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198338,
+      "rhs": 9
+    },
+    "C_YM==en": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198373,
+      "rhs": 10
+    },
+    "C_YM==eng": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198408,
+      "rhs": 11
+    },
+    "C_YM==er": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198443,
+      "rhs": 12
+    },
+    "C_YM==i": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198478,
+      "rhs": 13
+    },
+    "C_YM==ia": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198513,
+      "rhs": 14
+    },
+    "C_YM==ian": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198548,
+      "rhs": 15
+    },
+    "C_YM==iang": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198583,
+      "rhs": 16
+    },
+    "C_YM==iao": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198618,
+      "rhs": 17
+    },
+    "C_YM==ie": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198653,
+      "rhs": 18
+    },
+    "C_YM==ii": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198688,
+      "rhs": 19
+    },
+    "C_YM==iii": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198723,
+      "rhs": 20
+    },
+    "C_YM==in": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198758,
+      "rhs": 21
+    },
+    "C_YM==ing": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198793,
+      "rhs": 22
+    },
+    "C_YM==iong": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198828,
+      "rhs": 24
+    },
+    "C_YM==iou": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198863,
+      "rhs": 25
+    },
+    "C_YM==o": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198898,
+      "rhs": 26
+    },
+    "C_YM==ong": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198933,
+      "rhs": 27
+    },
+    "C_YM==ou": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 198968,
+      "rhs": 28
+    },
+    "C_YM==ua": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199003,
+      "rhs": 30
+    },
+    "C_YM==uai": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199038,
+      "rhs": 31
+    },
+    "C_YM==uan": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199073,
+      "rhs": 32
+    },
+    "C_YM==uang": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199108,
+      "rhs": 33
+    },
+    "C_YM==uei": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199143,
+      "rhs": 34
+    },
+    "C_YM==uen": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199178,
+      "rhs": 35
+    },
+    "C_YM==ueng": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199213,
+      "rhs": 36
+    },
+    "C_YM==uo": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199248,
+      "rhs": 38
+    },
+    "C_YM==v": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199283,
+      "rhs": 39
+    },
+    "C_YM==van": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199318,
+      "rhs": 40
+    },
+    "C_YM==ve": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199353,
+      "rhs": 41
+    },
+    "C_YM==vn": {
+      "argument1": 0,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64512,
+      "kind": "phone_id",
+      "registration_rva": 199388,
+      "rhs": 42
+    },
+    "C_YM=LS1": {
+      "argument1": 3,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199423,
+      "rhs": 1
+    },
+    "C_YM=LS2": {
+      "argument1": 4,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199459,
+      "rhs": 1
+    },
+    "C_YM=LS3": {
+      "argument1": 5,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199495,
+      "rhs": 1
+    },
+    "C_YM=LS4": {
+      "argument1": 6,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199531,
+      "rhs": 1
+    },
+    "C_YM=LT10": {
+      "argument1": 7,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199567,
+      "rhs": 1
+    },
+    "C_YM=LT11": {
+      "argument1": 8,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199603,
+      "rhs": 1
+    },
+    "C_YM=LT12": {
+      "argument1": 9,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199639,
+      "rhs": 1
+    },
+    "C_YM=LT13": {
+      "argument1": 10,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199675,
+      "rhs": 1
+    },
+    "C_YM=LT14": {
+      "argument1": 11,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199711,
+      "rhs": 1
+    },
+    "C_YM=LT15": {
+      "argument1": 12,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199747,
+      "rhs": 1
+    },
+    "C_YM=LT16": {
+      "argument1": 13,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199783,
+      "rhs": 1
+    },
+    "C_YM=LT17": {
+      "argument1": 14,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199819,
+      "rhs": 1
+    },
+    "C_YM=LT2": {
+      "argument1": 15,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199855,
+      "rhs": 1
+    },
+    "C_YM=LT3": {
+      "argument1": 16,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199891,
+      "rhs": 1
+    },
+    "C_YM=LT4": {
+      "argument1": 17,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199927,
+      "rhs": 1
+    },
+    "C_YM=LT5": {
+      "argument1": 18,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199963,
+      "rhs": 1
+    },
+    "C_YM=LT6": {
+      "argument1": 19,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 199999,
+      "rhs": 1
+    },
+    "C_YM=LT7": {
+      "argument1": 20,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200035,
+      "rhs": 1
+    },
+    "C_YM=LT8": {
+      "argument1": 21,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200071,
+      "rhs": 1
+    },
+    "C_YM=LT9": {
+      "argument1": 22,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200107,
+      "rhs": 1
+    },
+    "C_YM=RS1": {
+      "argument1": 23,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200143,
+      "rhs": 1
+    },
+    "C_YM=RS2": {
+      "argument1": 24,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200179,
+      "rhs": 1
+    },
+    "C_YM=RS3": {
+      "argument1": 25,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200215,
+      "rhs": 1
+    },
+    "C_YM=RS4": {
+      "argument1": 26,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200251,
+      "rhs": 1
+    },
+    "C_YM=RS5": {
+      "argument1": 27,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200287,
+      "rhs": 1
+    },
+    "C_YM=RS6": {
+      "argument1": 28,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200323,
+      "rhs": 1
+    },
+    "C_YM=RS8": {
+      "argument1": 30,
+      "argument2": 0,
+      "comparison_mode": 0,
+      "function_rva": 64576,
+      "kind": "phone_group",
+      "registration_rva": 200359,
+      "rhs": 1
+    }
+  },
+  "registration_zero_rva": 171989,
+  "restored_memory_sha256": "33cd79038d04a8855d6139caacada29f1c7eba71abf685269dae41fda369b6ed",
+  "schema_version": "ogd-original-current-context/1",
+  "scope": "Current Mandarin/English phone and explicit current tone only. No inferred adjacent phones, text frontend, prosody, or original tree traversal.",
+  "source_module_sha256": "7df53909f3df01dac69ae4e898a141835b8b3da7cf81663ac4d1104896cc0e63"
+}

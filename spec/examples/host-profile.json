@@ -1,0 +1,83 @@
+{
+  "schema": "greendam-host-profile/0.1",
+  "status": "proposed_project_compiler_profile_not_upstream_api",
+  "id": "greendam-gpui-desktop-v0",
+  "target": "Rust GPUI desktop Linux",
+  "gpui_commit": "48741fd17d0dec28be6ad664b0a06dc7202086be",
+  "proto_ui_commit": "35195a6e6f1ba6a7d800da0029f2683013abd18b",
+  "runtime_javascript": false,
+  "codegen": "static Rust types, transition handlers, projections and host trait calls",
+  "required_capabilities": [
+    {
+      "id": "pointer.music_coordinates",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "pointer.logical_capture",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "focus.loss_notification",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "canvas.note_projection",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "keyboard.cancel",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "domain.transaction_dispatch",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "text.ime_utf16",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "accessibility.stable_identity",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    },
+    {
+      "id": "audio.prepared_pcm_control",
+      "upstream_mechanism": "GPUI/native Rust integration point where applicable",
+      "project_implementation": "not_implemented",
+      "conformance": "not_executed"
+    }
+  ],
+  "unsupported_requires_compile_error": [
+    "arbitrary_js_closure",
+    "dom_node_access",
+    "css_selector_query",
+    "react_hook",
+    "audio_rt.python_or_onnx",
+    "unbounded_state_iteration"
+  ],
+  "allowed_degradation": [],
+  "gpui_commit_status": "independent API audit candidate; phase P0 must choose upstream reuse pin or explicit migration",
+  "existing_upstream_adapter": {
+    "proto_ui_commit": "35195a6e6f1ba6a7d800da0029f2683013abd18b",
+    "gpui_dependency_pin": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
+    "status": "real experimental Adapter workspace with unpublished in-repository TS Runtime peer (package.json private=true; public source); not a finished native Compiler",
+    "reuse_policy": "prefer existing Rust host/protocol/style where contracts match; do not ship TS peer as Compiler output",
+    "project_port_or_compatibility_verified": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "verdant-voice-release-authorization/1",
+  "issuer": "OpenGreendam/verdant release owner",
+  "date": "2026-11-20",
+  "statement": "你就默认 onnx 打包基座版全部许可就行",
+  "package": "Verdant Voice 0.1.0 ONNX base",
+  "permission": "redistribute-bundled-runtime",
+  "scope": "The ONNX graphs, acoustic reference bank and metadata in the accompanying SHA-256 inventory, as part of the Verdant 0.1.0 runtime. The inventory excludes any original installer, standalone sn16k.bin, recording dataset and unrelated research artifacts.",
+  "basis": "Release-owner authorization statement",
+  "third_party_verification": "The release-owner record is the authorization basis. Independent confirmation by upstream rights holders is not represented."
+}

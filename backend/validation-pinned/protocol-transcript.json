@@ -1,0 +1,417 @@
+[
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "ready",
+      "session_id": "893947fc-1ac6-4772-b02b-99d053236cf2",
+      "workspace": "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-pinned/workspace"
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "cap",
+      "op": "capabilities"
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "capabilities",
+      "capabilities": {
+        "engine": "OpenGreendam experimental worker",
+        "protocol": "ogd-worker/1",
+        "native_version": "0.2.0",
+        "routes": [
+          "C0",
+          "C1",
+          "A"
+        ],
+        "max_active_jobs": 1,
+        "max_phrase_seconds": 30.0,
+        "audio_device_required_for_render": false,
+        "wine_required": false,
+        "dependency_mode": "pinned_linux_runners",
+        "native_score": {
+          "inventory": [
+            "a",
+            "ai",
+            "an",
+            "ang",
+            "ao",
+            "e",
+            "ei",
+            "en",
+            "eng",
+            "ba",
+            "pa",
+            "da",
+            "ta",
+            "ga",
+            "ka",
+            "fa",
+            "ha",
+            "za",
+            "ca",
+            "sa",
+            "zha",
+            "cha",
+            "sha",
+            "ra"
+          ],
+          "inventory_note": "explicit pinyin sequencing helper; no general Hanzi frontend",
+          "english_vowel_proxies": [
+            "a",
+            "i",
+            "u",
+            "e",
+            "o"
+          ],
+          "f0": "constant per segment or model-derived",
+          "explicit_f0_hz_range": [
+            35,
+            1000
+          ],
+          "continuous_f0_control": false,
+          "coarticulation_recovered": false
+        },
+        "neural": {
+          "provided_control_track": true,
+          "shift_semitones_accepted": [
+            -12,
+            12
+          ],
+          "short_sample_verified_shifts": [
+            -6,
+            -3,
+            0,
+            3,
+            6
+          ],
+          "streaming": false,
+          "sample_rate": 44100
+        },
+        "candidate_voice": {
+          "name": "sn",
+          "display_name": "楠楠候选",
+          "vid": 10008,
+          "historical_identity_confirmed": false
+        },
+        "files": {
+          "token": {
+            "available": true,
+            "sha256": "821b7cd9e7b489077dd55bf581ba90e1dffd3816c6fedcedc320744b498deead"
+          },
+          "model": {
+            "available": true,
+            "sha256": "213aa67a5b92fc311d524da6d9868f87df584b00e2eb9a0b9fb46822602353ff"
+          },
+          "vocoder": {
+            "available": true,
+            "sha256": "b297c0c790dbcfe6b2123d87cc20bf8718969f91ffa3170a198c8fb53686155d"
+          }
+        },
+        "progress": "real stage boundaries only; no fabricated percentage",
+        "frontend": "UI/Compiler/GPUI implementation is specified separately and is not shipped by this worker"
+      },
+      "request_id": "cap"
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "render",
+      "op": "render",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1,
+      "route": "C0",
+      "payload": {
+        "kind": "native_score",
+        "score": {
+          "segments": [
+            {
+              "vowel": "a",
+              "context_mode": "english-proxy",
+              "duration_seconds": 0.35,
+              "f0_hz": 300,
+              "voiced": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "accepted",
+      "job_directory": "jobs/smoke_bdf61aaacf75",
+      "request_id": "render",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "progress",
+      "stage": "native",
+      "progress_kind": "stage_boundary",
+      "fraction": null,
+      "request_id": "render",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "progress",
+      "stage": "native",
+      "phase": "process_started",
+      "progress_kind": "stage_boundary",
+      "fraction": null,
+      "request_id": "render",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "completed",
+      "artifacts": [
+        {
+          "path": "jobs/smoke_bdf61aaacf75/commands.json",
+          "bytes": 862,
+          "sha256": "4e3e4763ab416302a2e326b0610b1d6c8fc7e6a7088bee3306aa079bafd83585"
+        },
+        {
+          "path": "jobs/smoke_bdf61aaacf75/native.json",
+          "bytes": 77421,
+          "sha256": "13bd1b3e8791d969b8714267ec130fd554c685855ef9130b37053c9b479c7d12"
+        },
+        {
+          "path": "jobs/smoke_bdf61aaacf75/native.npz",
+          "bytes": 68484,
+          "sha256": "478293664f2541314be0b6832539164eea80e7b8619db64af9b276206c61f859"
+        },
+        {
+          "path": "jobs/smoke_bdf61aaacf75/native.wav",
+          "bytes": 11244,
+          "sha256": "91f89d20119211bff6875bd72a2f95b2f34d7434f4cfc6ddc53a8aaa5a97aabb"
+        },
+        {
+          "path": "jobs/smoke_bdf61aaacf75/request.json",
+          "bytes": 414,
+          "sha256": "1b2748a4a2616ce5e742711bee72419e741e9dc16bb971060e0baac4431b5d99"
+        },
+        {
+          "path": "jobs/smoke_bdf61aaacf75/score.json",
+          "bytes": 168,
+          "sha256": "8abcc38b8838ad1a6d5d18520d4a85e90ab596eab69fec152517500b67ce3834"
+        }
+      ],
+      "elapsed_seconds": 1.469118700000763,
+      "identity_status": "unconfirmed_sn_candidate",
+      "job_directory": "jobs/smoke_bdf61aaacf75",
+      "request_id": "render",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "duplicate",
+      "op": "render",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1,
+      "route": "C0",
+      "payload": {
+        "kind": "native_score",
+        "score": {
+          "segments": [
+            {
+              "vowel": "a",
+              "context_mode": "english-proxy",
+              "duration_seconds": 0.35,
+              "f0_hz": 300,
+              "voiced": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "rejected",
+      "code": "DUPLICATE_JOB",
+      "message": "Use a fresh job_id; archived jobs are immutable",
+      "request_id": "duplicate",
+      "job_id": "smoke_bdf61aaacf75",
+      "revision": 1
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "unsupported",
+      "op": "render",
+      "job_id": "bad_5d644c53",
+      "revision": 2,
+      "route": "C0",
+      "payload": {
+        "kind": "native_score",
+        "score": {
+          "segments": [
+            {
+              "vowel": "a",
+              "context_mode": "english-proxy",
+              "duration_seconds": 0.35,
+              "f0_hz": 300,
+              "voiced": true
+            }
+          ]
+        },
+        "control_track": {}
+      }
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "rejected",
+      "code": "INVALID_REQUEST",
+      "message": "C0 bridge currently supports per-segment F0; continuous control/shift matrix requires C1",
+      "request_id": "unsupported",
+      "job_id": "bad_5d644c53",
+      "revision": 2
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "long",
+      "op": "render",
+      "job_id": "cancel_c81499c50d6f",
+      "revision": 3,
+      "route": "C0",
+      "payload": {
+        "kind": "native_score",
+        "score": {
+          "segments": [
+            {
+              "vowel": "a",
+              "context_mode": "english-proxy",
+              "duration_seconds": 15,
+              "f0_hz": 300,
+              "voiced": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "accepted",
+      "job_directory": "jobs/cancel_c81499c50d6f",
+      "request_id": "long",
+      "job_id": "cancel_c81499c50d6f",
+      "revision": 3
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "progress",
+      "stage": "native",
+      "progress_kind": "stage_boundary",
+      "fraction": null,
+      "request_id": "long",
+      "job_id": "cancel_c81499c50d6f",
+      "revision": 3
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "progress",
+      "stage": "native",
+      "phase": "process_started",
+      "progress_kind": "stage_boundary",
+      "fraction": null,
+      "request_id": "long",
+      "job_id": "cancel_c81499c50d6f",
+      "revision": 3
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "cancel",
+      "op": "cancel",
+      "job_id": "cancel_c81499c50d6f"
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "cancel_ack",
+      "active_match": true,
+      "previous_terminal": null,
+      "request_id": "cancel",
+      "job_id": "cancel_c81499c50d6f"
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "cancelled",
+      "partial_outputs_valid": false,
+      "job_directory": "jobs/cancel_c81499c50d6f",
+      "request_id": "long",
+      "job_id": "cancel_c81499c50d6f",
+      "revision": 3
+    }
+  },
+  {
+    "direction": "in",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "request_id": "stop",
+      "op": "shutdown"
+    }
+  },
+  {
+    "direction": "out",
+    "message": {
+      "protocol": "ogd-worker/1",
+      "event": "shutdown",
+      "request_id": "stop"
+    }
+  }
+]

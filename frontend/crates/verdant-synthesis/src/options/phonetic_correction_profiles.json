@@ -1,0 +1,51 @@
+{
+  "schema": "verdant-phonetic-correction-profiles/1",
+  "method": "articulatory-v1",
+  "status": "experimental source-relative acoustic transformations; not a trained Japanese voice or universal IPA realization",
+  "parameter_provenance": "Dimensionless warp anchors, blend weights and contact settings are explicit Verdant prototype parameters. They are not measurements of Japanese child speech and are not constants taken from a paper.",
+  "vowel_recipes": [
+    {
+      "id": "ja-high-back-centralization",
+      "language": "ja",
+      "target": "ɯ",
+      "native_key": "zh:u",
+      "mechanism": "low-resonance-normalized-frequency-warp",
+      "source_scale_multiples": [0.0, 1.6, 3.0, 4.8, 8.5],
+      "target_scale_multiples": [0.0, 1.6, 3.45, 5.5, 8.5],
+      "phonetic_intent": "Raise the middle portion of the source envelope while preserving its low resonance and upper spectrum. This is a centralization candidate; it does not recover lip compression or establish a target F2."
+    },
+    {
+      "id": "ja-close-mid-from-open-mid",
+      "language": "ja",
+      "target": "e",
+      "native_key": "en:eh",
+      "mechanism": "low-resonance-normalized-frequency-warp",
+      "source_scale_multiples": [0.0, 0.45, 1.0, 1.8, 3.0],
+      "target_scale_multiples": [0.0, 0.45, 0.86, 1.8, 3.0],
+      "phonetic_intent": "Lower the source's low-resonance neighborhood toward a closer vowel while retaining its higher envelope. The setting is a prototype relative adjustment, not an exact Japanese formant target."
+    }
+  ],
+  "spectral_edge_seconds": 0.012,
+  "tap": {
+    "id": "ja-single-contact",
+    "language": "ja",
+    "targets": ["ɾ", "ɾʲ"],
+    "native_key": "en:dx",
+    "maximum_contact_seconds": 0.014,
+    "maximum_duration_fraction": 0.30,
+    "depth_db": 14.0,
+    "existing_notch_ratio": 0.90,
+    "phonetic_intent": "Retain the English tap model and add at most one short, smooth constriction only if the rendered source lacks a clear energy dip. This does not assert that every Japanese rhotic is a canonical alveolar tap."
+  },
+  "palatalization": {
+    "id": "existing-palatal-gesture",
+    "language": "ja",
+    "target_suffix": "ʲ",
+    "additional_targets": ["ɲ"],
+    "helper_native_key": "en:y",
+    "maximum_transition_seconds": 0.020,
+    "base_mix": 0.30,
+    "following_nucleus_mix": 0.22,
+    "phonetic_intent": "Spread the already allocated palatal helper's own spectral gesture into the base consonant and following vowel. No phone or duration is added; a separate /j/ approximation is not claimed to be a fully recovered palatal consonant."
+  }
+}

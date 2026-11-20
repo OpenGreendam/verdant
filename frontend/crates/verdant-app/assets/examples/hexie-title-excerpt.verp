@@ -1,0 +1,204 @@
+{
+  "format": "greendam-project",
+  "version": "0.1",
+  "project_id": "verdant-example-hexie-title-excerpt-v1",
+  "revision": 0,
+  "ppq": 480,
+  "tempo_map": [
+    {
+      "tick": 0,
+      "micro_bpm": 160000000
+    }
+  ],
+  "time_signatures": [
+    {
+      "tick": 0,
+      "numerator": 4,
+      "denominator": 4
+    }
+  ],
+  "voice_refs": {
+    "voice-sn": {
+      "name": "sn",
+      "display_name": "童声01（楠楠）",
+      "vid": 10008,
+      "historical_identity_confirmed": true
+    }
+  },
+  "tracks": [
+    {
+      "id": "hexie-excerpt-lead",
+      "name": "河蟹你全家 · 短句节选",
+      "voice_ref": "voice-sn",
+      "monophonic": true,
+      "notes": [
+        {
+          "id": "hexie-excerpt-note-1",
+          "start_tick": 0,
+          "duration_tick": 480,
+          "midi_note": 65,
+          "detune_millicents": 0,
+          "lyric": "绿",
+          "pronunciation": {
+            "pinyin": "lv4",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-2",
+          "start_tick": 480,
+          "duration_tick": 480,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "坝",
+          "pronunciation": {
+            "pinyin": "ba4",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-3",
+          "start_tick": 960,
+          "duration_tick": 480,
+          "midi_note": 65,
+          "detune_millicents": 0,
+          "lyric": "绿",
+          "pronunciation": {
+            "pinyin": "lv4",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-4",
+          "start_tick": 1440,
+          "duration_tick": 480,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "坝",
+          "pronunciation": {
+            "pinyin": "ba4",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-5",
+          "start_tick": 1920,
+          "duration_tick": 240,
+          "midi_note": 67,
+          "detune_millicents": 0,
+          "lyric": "把",
+          "pronunciation": {
+            "pinyin": "ba3",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-6",
+          "start_tick": 2160,
+          "duration_tick": 240,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "你",
+          "pronunciation": {
+            "pinyin": "ni3",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-7",
+          "start_tick": 2400,
+          "duration_tick": 480,
+          "midi_note": 70,
+          "detune_millicents": 0,
+          "lyric": "萌",
+          "pronunciation": {
+            "pinyin": "meng2",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        },
+        {
+          "id": "hexie-excerpt-note-8",
+          "start_tick": 2880,
+          "duration_tick": 480,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "杀",
+          "pronunciation": {
+            "pinyin": "sha1",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": "hanzi-pinyin-data0.11"
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        }
+      ],
+      "color": "teal"
+    }
+  ],
+  "render_preferences": {
+    "protocol": "ogd-worker/1",
+    "route": "verdant-voice",
+    "native_seed": 10008
+  },
+  "extensions": {
+    "verdant_builtin_example": {
+      "schema": "verdant-builtin-example/1",
+      "id": "hexie-title-excerpt",
+      "title": "河蟹你全家 · 短句节选",
+      "attribution": "原曲《ルカルカ★ナイトフィーバー》/ samfree（SAM）；中文填词：荼荼丸",
+      "source_url": "https://www.bilibili.com/video/BV1xx411c7BF/",
+      "reference_url": "https://elielin.hatenablog.com/entry/20090624/p1",
+      "material_scope": "原版短句的近似音高与节拍整理，非官方谱；仅含8字短节选，不含原录音/伴奏/全曲谱。原作品权利保留，软件代码许可不扩及引用歌曲。",
+      "transcription_source_span_seconds": [
+        49.9,
+        52.65
+      ],
+      "alignment_note": "限定短句内的既有 DIO / Harvest 特征支持主要音高；第二音的共同稳定证据较短，局部起音仍有不确定性。节拍按160 BPM整理。CTC p18 仅为粗定位，不作为精确歌词边界。"
+    }
+  }
+}

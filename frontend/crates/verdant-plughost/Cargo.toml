@@ -1,0 +1,73 @@
+[package]
+name = "verdant-plughost"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Out-of-process CLAP/VST3/AU effect host for Verdant (see docs/PLUGIN-HOST.md). One child per insert."
+
+[features]
+default = ["clap", "vst3", "au"]
+clap = ["dep:clack-host", "dep:clack-extensions"]
+vst3 = ["dep:vst3-host"]
+# `au` only has effect on macOS (system AudioToolbox framework + AppKit).
+au = []
+
+[dependencies]
+verdant-plugins = { path = "../verdant-plugins", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+hex.workspace = true
+base64 = "0.22"
+
+# CLAP hosting via the clack project (MIT OR Apache-2.0).
+clack-host = { version = "0.2", optional = true }
+clack-extensions = { version = "0.2", optional = true, features = [
+    "clack-host",
+    "params",
+    "state",
+    "latency",
+    "tail",
+    "gui",
+    "log",
+    "audio-ports",
+    "timer",
+    "posix-fd",
+    "render",
+] }
+
+# VST3 hosting (MIT); we run it inside our own child process for isolation.
+vst3-host = { version = "0.11", optional = true, default-features = false }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Native parent windows for plugin editors on X11.
+x11rb = { version = "0.13", features = ["xinput"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.60", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std", "NSString", "NSObject", "NSGeometry", "NSRunLoop", "NSDate", "NSBundle", "NSURL",
+] }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std", "NSApplication", "NSWindow", "NSView", "NSResponder", "NSEvent", "NSGraphics", "NSRunningApplication",
+] }
+
+[dev-dependencies]
+tempfile = "3"

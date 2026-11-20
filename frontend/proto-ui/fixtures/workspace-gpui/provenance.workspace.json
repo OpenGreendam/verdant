@@ -1,0 +1,27 @@
+{
+  "source": {
+    "file": "pitch-gesture-surface.proto.ts",
+    "exportName": "default",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "irVersion": 7,
+  "backend": "gpui-source-v1",
+  "profile": "gpui-source-v1",
+  "dependencies": [
+    {
+      "name": "gpui",
+      "version": "workspace",
+      "role": "target"
+    },
+    {
+      "name": "serde",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "role": "host-bridge"
+    }
+  ]
+}

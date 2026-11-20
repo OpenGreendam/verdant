@@ -1,0 +1,26 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "proto-ui/generated/pitch-gesture-surface"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+rust-version = "1.98"
+
+[workspace.dependencies]
+# P0 decision (see frontend/P0-DECISIONS.md): GPUI pinned to the API snapshot
+# that SPEC.md independently audited (S05-S14) and host-profile.json names.
+gpui = { git = "https://github.com/cyjin-yl/z3rm", rev = "e5f2f9db75e97613232b5c1946333e61fa3828ab" }
+gpui_platform = { git = "https://github.com/cyjin-yl/z3rm", rev = "e5f2f9db75e97613232b5c1946333e61fa3828ab", features = ["font-kit", "x11", "wayland"] }
+serde = { version = "1", features = ["derive", "rc"] }
+semver = "1"
+# Preserve binary64 values when reading scores, model metadata and numerical receipts.
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+sha2 = "0.10"
+hex = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+anyhow = "1"
+zip = { version = "6", default-features = false, features = ["deflate"] }

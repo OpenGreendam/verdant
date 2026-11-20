@@ -1,0 +1,12 @@
+/dist/
+/.ci/
+/release-assets/
+__pycache__/
+*.py[cod]
+/models/
+/research/python-oracle/environment/venvs/
+/research/python-oracle/environment/runtime-cache/
+/research/python-oracle/environment/runtime-view/
+/research/python-oracle/environment/rebuilt-wheels/
+/research/python-oracle/environment/wheelhouse/
+/research/python-oracle/environment/sources/*.tar.gz

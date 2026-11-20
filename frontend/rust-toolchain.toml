@@ -1,0 +1,5 @@
+[toolchain]
+# Match the toolchain of the pinned GPUI / Zed source commit.
+channel = "1.98.1"
+profile = "minimal"
+components = ["rustfmt"]

@@ -1,0 +1,16 @@
+{
+  "files": {
+    "wav": "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation/workspace/jobs/smoke_1a6a33f16257/native.wav",
+    "npz": "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation/workspace/jobs/smoke_1a6a33f16257/native.npz",
+    "json": "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation/workspace/jobs/smoke_1a6a33f16257/native.json"
+  },
+  "metrics": {
+    "duration_seconds": 0.35,
+    "samples": 5600,
+    "frames": 70,
+    "peak": 0.65,
+    "rms": 0.23970179171657596,
+    "nonfinite_samples": 0,
+    "clipped_samples": 0
+  }
+}

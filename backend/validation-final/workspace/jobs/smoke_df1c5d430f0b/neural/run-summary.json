@@ -1,0 +1,118 @@
+{
+  "route": "C1",
+  "experiment": "Native synthesis/control trajectory -> PC-NSF-HiFiGAN; no new voice training",
+  "created_utc": "2026-11-13T06:44:36.323216+00:00",
+  "provenance_label": "sn candidate; approximate frontend/excitation; exact historical identity unconfirmed",
+  "runner_sha256": "290e347cc032f76d56942ecdb7da8808d533cbdcce35e86ed1686a96633c7bca",
+  "source_metadata": {
+    "original_name": "native.json",
+    "local_copy": "source_metadata.json",
+    "sha256": "13bd1b3e8791d969b8714267ec130fd554c685855ef9130b37053c9b479c7d12"
+  },
+  "source_input_name": "native.wav",
+  "source_input_sha256": "91f89d20119211bff6875bd72a2f95b2f34d7434f4cfc6ddc53a8aaa5a97aabb",
+  "source_sample_rate": 16000,
+  "source_channels": 1,
+  "source_total_samples_per_channel": 5600,
+  "selected_start_seconds": 0.0,
+  "selected_end_seconds": 0.35,
+  "resampling": "scipy.signal.resample_poly",
+  "prepared_sample_rate": 44100,
+  "prepared_samples": 15435,
+  "right_zero_padding_samples": 437,
+  "prepared_reference_wav": "reference_44100.wav",
+  "model_sha256": "b297c0c790dbcfe6b2123d87cc20bf8718969f91ffa3170a198c8fb53686155d",
+  "model_release": "pc-nsf-hifigan-44.1k-hop512-128bin-2025.02",
+  "backend": "ONNX Runtime CPUExecutionProvider",
+  "threads": 3,
+  "seed_requested": 20261113,
+  "input_pitch_method": "provided_control_track",
+  "output_pitch_method": "dio",
+  "input_f0_source": {
+    "kind": "provided_control_track",
+    "source_name": "native.npz",
+    "sha256": "478293664f2541314be0b6832539164eea80e7b8619db64af9b276206c61f859",
+    "source_frame_count": 70,
+    "source_time_range_seconds": [
+      0.0025,
+      0.3475
+    ],
+    "source_voiced_frames": 70,
+    "interpolation": "linear Hz within each contiguous voiced segment; nearest-neighbor V/UV; endpoint hold",
+    "time_origin": "original input waveform before any --start/--duration crop",
+    "uv_convention": "True means unvoiced",
+    "local_copy": "source_f0_track.npz"
+  },
+  "pitch_extractor": "WORLD via pyworld",
+  "pitch_floor_hz": 60,
+  "pitch_ceiling_hz": 1600,
+  "feature_seconds": 0.3803685269995185,
+  "session_load_seconds": 0.26355760200021905,
+  "total_seconds": 0.8802648439996119,
+  "interface": "interface.json",
+  "input_features": "input_features.npz",
+  "runs": [
+    {
+      "semitones": 0.0,
+      "f0_multiplier": 1.0,
+      "mel_changed": false,
+      "input_shapes": {
+        "mel": [
+          1,
+          31,
+          128
+        ],
+        "f0": [
+          1,
+          31
+        ]
+      },
+      "raw_output_shape": [
+        1,
+        15872
+      ],
+      "output_duration_seconds": 0.35,
+      "inference_seconds": 0.16739948599933996,
+      "inference_real_time_factor": 0.4782842457123999,
+      "f0_evaluation_seconds": 0.008903936999558937,
+      "target_voiced_f0_min_hz": 300.0,
+      "target_voiced_f0_max_hz": 300.0,
+      "peak_absolute": 0.5393911600112915,
+      "rms": 0.19514224641040206,
+      "samples_outside_pcm_full_scale": 0,
+      "wav": "pc_zero_semitones.wav",
+      "wav_sha256": "fc4a324cf75f15de5482cf033a455fe6951a2531cc7dfbc11a91d29d5ca01303",
+      "npz": "pc_zero_semitones.npz",
+      "npz_sha256": "82743d8b94e4d737bafc8ed9d90b81db13d5d283261932283f28820dcd5052cd",
+      "f0_following": {
+        "reference_voiced_frames": 31,
+        "stable_reference_voiced_frames": 29,
+        "joint_stable_voiced_frames": 29,
+        "stable_voiced_recall": 1.0,
+        "output_voiced_fraction_on_reference_unvoiced": null,
+        "median_signed_cents": -0.8613933086373068,
+        "median_absolute_cents": 1.8216061325936592,
+        "p95_absolute_cents": 24.64860711440072,
+        "rmse_cents": 9.772363500323518,
+        "fraction_absolute_error_over_50_cents": 0.0,
+        "fraction_absolute_error_over_100_cents": 0.0
+      }
+    }
+  ],
+  "packages": {
+    "onnxruntime": "1.23.2",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "librosa": "0.11.0",
+    "soundfile": "0.13.1",
+    "pyworld": "0.3.5"
+  },
+  "limitations": [
+    "Neural output does not establish original voice fidelity or improve quality by definition.",
+    "F0 error is against the supplied/estimated contour, not annotated ground truth.",
+    "Output evaluation uses an audio pitch estimator that can make octave and voicing errors.",
+    "A 16 kHz source remains bandwidth-limited when resampled; neural high frequencies are generated.",
+    "Holding the full mel spectrogram fixed while changing F0 is an intentional model capability test; formants are not independently ground-truthed.",
+    "A requested ONNX random seed does not promise bitwise equivalence to the original PyTorch or another runtime version."
+  ]
+}

@@ -1,0 +1,72 @@
+#!/bin/sh
+# Rust production gate, run in the development container.
+# Dependency acquisition precedes offline build, test, and packaging.
+set -eu
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+: "${VERDANT_ONNXRUNTIME_LIBRARY:?Set the native ONNX Runtime 1.23.2 library for package validation}"
+: "${VERDANT_ONNXRUNTIME_WHEEL:?Set the pinned ONNX Runtime 1.23.2 wheel for packaging}"
+cd "$repo/frontend"
+# Proto UI compiler producer: the authored unit is compiled by the pinned
+# upstream Proto UI compiler, and the published artifacts must match a fresh
+# compilation byte for byte. Validated retained output allows a missing
+# upstream checkout to skip regeneration; a different upstream revision, a
+# changed authored source or artifact drift fails the gate.
+proto_ui_producer="$repo/frontend/proto-ui/tools/build-proto-ui.mjs"
+proto_ui_rules="$repo/frontend/proto-ui/tools/check-proto-ui-rules.mjs"
+if command -v node >/dev/null 2>&1; then
+    node "$proto_ui_rules"
+    set +e
+    node "$proto_ui_producer" --check
+    proto_ui_status=$?
+    set -e
+    case "$proto_ui_status" in
+        0) ;;
+        10) printf 'SKIP proto-ui compiler check: the pinned upstream checkout is absent.\n' ;;
+        *) printf 'proto-ui compiler check failed with status %s.\n' "$proto_ui_status" >&2
+           exit "$proto_ui_status" ;;
+    esac
+else
+    printf 'Proto UI artifact validation requires node.\n' >&2
+    exit 5
+fi
+# A cold CI cache must be populated explicitly before offline compilation.
+# Pre-provisioned disconnected containers may set CARGO_NET_OFFLINE=true.
+cargo fetch --locked
+cargo build --offline --locked --workspace --features verdant-test-worker/protocol-fixture
+worker_target=$(CDPATH= cd -- "${CARGO_TARGET_DIR:-target}" && pwd)
+reject_package_target() {
+    printf 'Refusing package cleanup in a root or source directory: %s\n' "$worker_target" >&2
+    exit 2
+}
+case "$worker_target" in ""|/) reject_package_target;; esac
+case "$repo/" in "$worker_target/"*) reject_package_target;; esac
+case "$worker_target/" in
+    "$repo/frontend/target/"*) ;;
+    "$repo/frontend/"*|"$repo/backend/"*|"$repo/tools/"*|"$repo/docs/"*|\
+    "$repo/neural/"*|"$repo/research/"*|"$repo/spec/"*|"$repo/.github/"*|"$repo/.git/"*)
+        reject_package_target;;
+esac
+export VERDANT_WORKER_BINARY="$worker_target/debug/verdant-worker"
+export VERDANT_TEST_WORKER_BINARY="$worker_target/debug/verdant-test-worker"
+cargo test --offline --locked --workspace --features verdant-test-worker/protocol-fixture
+# CI caches the target directory and uploads package-smoke.*. Remove only
+# these generated smoke outputs so an older cached package cannot be uploaded
+# alongside the payload checked in this run. rm removes links without following
+# them; unrelated target entries and their contents are retained.
+for previous_package in "$worker_target"/package-smoke.*; do
+    if [ -d "$previous_package" ] || [ -L "$previous_package" ]; then
+        rm -rf -- "$previous_package"
+    fi
+done
+package_output=$(mktemp -d "$worker_target/package-smoke.XXXXXX")
+source_selection=$(mktemp -d "$worker_target/source-selection.XXXXXX")/selection.json
+release="$worker_target/debug/verdant-release"
+selection_sha=$("$release" select-source --repo "$repo" --output "$source_selection" | jq -er .sha256)
+source_commit=$(git -C "$repo" rev-parse HEAD)
+SOURCE_DATE_EPOCH=$(git -C "$repo" show -s --format=%ct HEAD)
+export SOURCE_DATE_EPOCH
+"$release" package --repo "$repo" --binaries "$worker_target/debug" --output "$package_output" \
+    --source-selection "$source_selection" --source-selection-sha256 "$selection_sha" \
+    --onnxruntime-wheel "$VERDANT_ONNXRUNTIME_WHEEL"
+"$release" check --check "$package_output" --require-package --expected-source-commit "$source_commit" \
+    --expected-source-selection-sha256 "$selection_sha"

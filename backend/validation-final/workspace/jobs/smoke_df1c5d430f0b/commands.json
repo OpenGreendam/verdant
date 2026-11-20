@@ -1,0 +1,55 @@
+[
+  {
+    "stage": "native",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/environment/run_linux.py",
+      "native",
+      "--token",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/models/sn16k.tkn",
+      "--model",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/models/sn16k.bin",
+      "render",
+      "--score",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-final/workspace/jobs/smoke_df1c5d430f0b/score.json",
+      "--output",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-final/workspace/jobs/smoke_df1c5d430f0b/native",
+      "--seed",
+      "10008"
+    ],
+    "cwd": "/workspace/scratch/7f0bd070960e/greendam-reproduction",
+    "pid": 8
+  },
+  {
+    "stage": "neural",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/environment/run_linux.py",
+      "neural",
+      "--input",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-final/workspace/jobs/smoke_df1c5d430f0b/native.wav",
+      "--model",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/neural/models/onnx/pc_nsf_hifigan_44.1k_hop512_128bin_2025.02.onnx",
+      "--route",
+      "C1",
+      "--name",
+      "smoke_df1c5d430f0b",
+      "--output-dir",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-final/workspace/jobs/smoke_df1c5d430f0b/neural",
+      "--provenance-label",
+      "sn candidate; approximate frontend/excitation; exact historical identity unconfirmed",
+      "--threads",
+      "3",
+      "--seed",
+      "20261113",
+      "--shifts",
+      "0",
+      "--f0-track",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-final/workspace/jobs/smoke_df1c5d430f0b/native.npz",
+      "--source-metadata",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation-final/workspace/jobs/smoke_df1c5d430f0b/native.json"
+    ],
+    "cwd": "/workspace/scratch/7f0bd070960e/greendam-reproduction",
+    "pid": 13
+  }
+]

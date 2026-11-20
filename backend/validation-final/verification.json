@@ -1,0 +1,21 @@
+{
+  "worker_sha256": "136f28956388be375d2df978698b6b8841990ca6e2ebb85591521a6c8fd66e2d",
+  "checks": {
+    "dependency_mode": "pinned_linux_runners",
+    "capabilities_received": true,
+    "real_C0_render_and_published_hash": true,
+    "real_C1_render_and_published_hash": true,
+    "completed_revision": 1,
+    "immutable_job_id": true,
+    "unsupported_C0_continuous_control_rejected": true,
+    "real_child_started_before_cancel": true,
+    "cancelled_terminal": true,
+    "observed_child_pids_before_cancel": [
+      23
+    ],
+    "observed_children_exited": true,
+    "clean_shutdown": true,
+    "one_terminal_per_accepted_job": true
+  },
+  "scope": "Real C0, optional one C1, stdio lifecycle and cancellation; no GPUI UI or full neural matrix re-run claimed."
+}

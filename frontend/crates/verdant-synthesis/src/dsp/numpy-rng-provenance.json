@@ -1,0 +1,78 @@
+{
+  "numpy_version": "2.3.5",
+  "oracle_pin": "environment/requirements-native-pins.txt and requirements-native.lock",
+  "generator": "SeedSequence(default pool_size=4, unspawned nonnegative uint64 entropy), PCG64 XSL-RR 128/64, float64 Ziggurat",
+  "source_ref": "https://github.com/numpy/numpy/tree/v2.3.5",
+  "sources": [
+    {
+      "path": "numpy/random/bit_generator.pyx",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/bit_generator.pyx",
+      "sha256": "1e2e991c929c318b9a424e2e8ec3f92525c6478c382b59731f3a83e1a7306821",
+      "bytes": 24292
+    },
+    {
+      "path": "numpy/random/_pcg64.pyx",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/_pcg64.pyx",
+      "sha256": "b57fb542a52d65a485546f56b2bca15c458c44dd34159dcf8417aa20acdb9afc",
+      "bytes": 18827
+    },
+    {
+      "path": "numpy/random/src/pcg64/pcg64.h",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/src/pcg64/pcg64.h",
+      "sha256": "2ce9cc9366a9993cfd786a1ee63eaad35d8761c0ff9744ee5508192156f33d4a",
+      "bytes": 13310
+    },
+    {
+      "path": "numpy/random/src/pcg64/pcg64.c",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/src/pcg64/pcg64.c",
+      "sha256": "21fdfe42947deb332cc2aaa870b44136d4ae23db4bdd19ef5ba7ffed4dc92718",
+      "bytes": 7616
+    },
+    {
+      "path": "numpy/random/src/distributions/distributions.c",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/src/distributions/distributions.c",
+      "sha256": "d1bd4b618bc9e4a447efa0651c3dfeb2d186b10bd8057eab0397b40529451f47",
+      "bytes": 48773
+    },
+    {
+      "path": "numpy/random/src/distributions/ziggurat_constants.h",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/src/distributions/ziggurat_constants.h",
+      "sha256": "9f8b114014b8475777e88c6af80e126654fe0753693d6eabba365d3c4051236c",
+      "bytes": 74983
+    },
+    {
+      "path": "LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/LICENSE.txt",
+      "sha256": "1be1df33863f97a7bc1c4d67980bd6c69c9a6fef0a5ee76e6ad6cb91e56e8491",
+      "bytes": 1543
+    },
+    {
+      "path": "numpy/_core/src/umath/loops_utils.h.src",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/_core/src/umath/loops_utils.h.src",
+      "sha256": "ed85d5b99f0b457cb7a316bf8c4acb884034bbbb81a89c5cedb62be80bf7c4f8",
+      "bytes": 8001
+    }
+  ],
+  "table_transcription": "ki_double, wi_double, fi_double and normal tail constants copied literally from pinned header; float and exponential tables omitted because no production caller uses them",
+  "runtime_dependencies": "Rust u128 wrapping arithmetic and platform f64 log1p/exp; no Python or NumPy runtime",
+  "validation_status": "not executed by implementation worker; parent owns pinned-oracle parity",
+  "reference_vectors": [
+    {
+      "path": "numpy/random/tests/data/pcg64-testset-1.csv",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/tests/data/pcg64-testset-1.csv",
+      "sha256": "c41d340e99271944d30b10ebf4be9a368f47b3eb1fcc431b5124b8b75d534df1",
+      "bytes": 23839
+    },
+    {
+      "path": "numpy/random/tests/data/pcg64-testset-2.csv",
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/tests/data/pcg64-testset-2.csv",
+      "sha256": "3537734cabc6d94eff5b253f228414b4ccd4de412f0c7dfd0a09d1e95ce14e4c",
+      "bytes": 23845
+    }
+  ],
+  "seed_sequence_reference_test": {
+    "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/tests/test_seed_sequence.py",
+    "sha256": "d256f82d1a1f6edff01cef82b3f775870a7559c5a33a6c47f8e78f917493e5b7"
+  },
+  "reduction_contract": "NumPy float64 eight-accumulator pairwise reduction, 128-element blocks, compressed voiced samples in original sample order"
+}

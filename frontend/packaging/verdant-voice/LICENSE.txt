@@ -1,0 +1,11 @@
+Verdant Voice 0.1.0 ONNX base
+
+The OpenGreendam/verdant release owner authorized distribution of the exact
+runtime files identified by role and SHA-256 in the accompanying bundle policy
+as part of the Verdant runtime. See AUTHORIZATION.json for the statement and
+BUNDLE-POLICY.json in the parent resource directory for the file inventory.
+
+Verdant source is licensed under AGPL-3.0-or-later. Third-party rights and
+notices retain their original scope. This package grant covers the listed
+runtime files and does not grant a separate license over installers, raw
+model files outside this package, recordings or other research artifacts.

@@ -1,0 +1,40 @@
+name: dsh-plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+          cache-dependency-path: plugins/dsh/package-lock.json
+      - name: Typecheck and pack the plugin
+        working-directory: plugins/dsh
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm pack --pack-destination "$RUNNER_TEMP"
+          tar -tf "$RUNNER_TEMP/verdant-dsh-0.1.0.tgz"
+      - name: Import the installed tarball outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          install_dir=$(mktemp -d "$RUNNER_TEMP/verdant-dsh-install.XXXXXX")
+          cd "$install_dir"
+          npm install --prefer-offline --ignore-scripts --no-audit --no-fund "$RUNNER_TEMP/verdant-dsh-0.1.0.tgz"
+          node --input-type=module -e 'const plugin = await import("verdant-dsh"); if (plugin.name !== "verdant" || typeof plugin.apply !== "function" || !plugin.Config) throw new Error("missing Verdant plugin exports")'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-plugin
+          path: ${{ runner.temp }}/verdant-dsh-0.1.0.tgz
+          if-no-files-found: error

@@ -1,0 +1,91 @@
+{
+  "protocol": "ogd-worker/1",
+  "event": "completed",
+  "job_id": "smoke_df1c5d430f0b",
+  "revision": 1,
+  "artifacts": [
+    {
+      "path": "jobs/smoke_df1c5d430f0b/commands.json",
+      "bytes": 2230,
+      "sha256": "c5cb3c2fc0adb317f910e2ac3712b8547807de25196ed2c038ec93b9c092e076"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/native.json",
+      "bytes": 77421,
+      "sha256": "13bd1b3e8791d969b8714267ec130fd554c685855ef9130b37053c9b479c7d12"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/native.npz",
+      "bytes": 68484,
+      "sha256": "478293664f2541314be0b6832539164eea80e7b8619db64af9b276206c61f859"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/native.wav",
+      "bytes": 11244,
+      "sha256": "91f89d20119211bff6875bd72a2f95b2f34d7434f4cfc6ddc53a8aaa5a97aabb"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/input_features.npz",
+      "bytes": 72050,
+      "sha256": "e062465403c97a70ce15ac8cce609fcd2c7e348bcbe15890a97c05cc4cedff64"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/interface.json",
+      "bytes": 1025,
+      "sha256": "d5d627e5cc852f37f7fe1c39151f882baf02c96c94e680f812edbd15cc0b6440"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/matrix-progress.json",
+      "bytes": 1547,
+      "sha256": "30e1d4612a758f7a78f55668b19d7e8b2b082a6b201063a381e4e06d46190699"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/pc_zero_semitones.npz",
+      "bytes": 131239,
+      "sha256": "82743d8b94e4d737bafc8ed9d90b81db13d5d283261932283f28820dcd5052cd"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/pc_zero_semitones.wav",
+      "bytes": 30914,
+      "sha256": "fc4a324cf75f15de5482cf033a455fe6951a2531cc7dfbc11a91d29d5ca01303"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/reference_44100.wav",
+      "bytes": 61820,
+      "sha256": "b9a0b9108c9249ce7d5b09529f79b9a673e03e6c68f8fc7b675032b0fa3b48f4"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/run-summary.json",
+      "bytes": 4644,
+      "sha256": "056f7dbe1b08cf692dd5cf782094b3a1791dbdd55952fdbe79c0502d0404bb42"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/source_f0_track.npz",
+      "bytes": 68484,
+      "sha256": "478293664f2541314be0b6832539164eea80e7b8619db64af9b276206c61f859"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/source_input.wav",
+      "bytes": 11244,
+      "sha256": "91f89d20119211bff6875bd72a2f95b2f34d7434f4cfc6ddc53a8aaa5a97aabb"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/neural/source_metadata.json",
+      "bytes": 77421,
+      "sha256": "13bd1b3e8791d969b8714267ec130fd554c685855ef9130b37053c9b479c7d12"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/request.json",
+      "bytes": 414,
+      "sha256": "3962d354dfbc2116f17eb238a2f488174b049c0425e14200d2247ac131635ddb"
+    },
+    {
+      "path": "jobs/smoke_df1c5d430f0b/score.json",
+      "bytes": 168,
+      "sha256": "8abcc38b8838ad1a6d5d18520d4a85e90ab596eab69fec152517500b67ce3834"
+    }
+  ],
+  "elapsed_seconds": 3.4106306670000777,
+  "identity_status": "unconfirmed_sn_candidate",
+  "job_directory": "jobs/smoke_df1c5d430f0b"
+}

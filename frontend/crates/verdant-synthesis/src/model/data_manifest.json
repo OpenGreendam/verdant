@@ -1,0 +1,45 @@
+{
+  "schema_version": "verdant-rust-model-source-embeds/1",
+  "oracle_source_baseline": "ce1ce6c",
+  "policy": "Source predicate tables only. No original or derived voice-model bytes.",
+  "path_policy": "path records the historical origin at oracle_source_baseline; embedded_path records the current repository member.",
+  "files": {
+    "original_context_profile.json": {
+      "path": "native/greendam_native/original_context_profile.json",
+      "embedded_path": "frontend/crates/verdant-synthesis/src/model/data/original_context_profile.json",
+      "bytes": 52480,
+      "sha256": "9b5226ef835cde71a989858d06ee4b5618d4ae5d93f1ec50f420d106157b8373"
+    },
+    "original_context_extensions.json": {
+      "path": "native/greendam_native/original_context_extensions.json",
+      "embedded_path": "frontend/crates/verdant-synthesis/src/model/data/original_context_extensions.json",
+      "bytes": 97294,
+      "sha256": "beee047f3dfc2e100ab05066fe4b6bf443304406bc935e6e83212a18da44407e"
+    },
+    "original_context_hierarchy.json": {
+      "path": "native/greendam_native/original_context_hierarchy.json",
+      "embedded_path": "frontend/crates/verdant-synthesis/src/model/data/original_context_hierarchy.json",
+      "bytes": 147585,
+      "sha256": "671b5b69b17ae1e14ddda3c876ff4d00e323c6807cc68e198e9a32fa78d78803"
+    },
+    "original_context_pos.json": {
+      "path": "native/greendam_native/original_context_pos.json",
+      "embedded_path": "frontend/crates/verdant-synthesis/src/model/data/original_context_pos.json",
+      "bytes": 12455,
+      "sha256": "6b0143aea0cb70fbc9e01f24a26d14f7e105c28b36a83af2fd3692d9841fbd70"
+    },
+    "phoneme_inventory.json": {
+      "path": "native/greendam_native/phoneme_inventory.json",
+      "embedded_path": "frontend/crates/verdant-backend/src/data/phoneme_inventory.json",
+      "bytes": 139317,
+      "sha256": "ec8b6d7d741bc4a08b4b7f68fa18981fc0e5770aedf24f270b5b2c0c1c7ce4cd"
+    }
+  },
+  "original_source_module_sha256": "7df53909f3df01dac69ae4e898a141835b8b3da7cf81663ac4d1104896cc0e63",
+  "original_restored_memory_sha256": "33cd79038d04a8855d6139caacada29f1c7eba71abf685269dae41fda369b6ed",
+  "converter_source": {
+    "path": "tools/voice_model.py",
+    "path_role": "Historical converter source identity at oracle_source_baseline; not a current runtime dependency.",
+    "sha256": "73a9e022215048cc1768ee8a5f27cfd29f7b33ab1ec589ee916b9fb8c10b5443"
+  }
+}

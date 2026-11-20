@@ -1,0 +1,25 @@
+{
+  "protocol": "ogd-worker/1",
+  "request_id": "render-request-1",
+  "op": "render",
+  "job_id": "frontend_example_phrase_001",
+  "revision": 7,
+  "route": "C0",
+  "payload": {
+    "kind": "native_score",
+    "native_seed": 10008,
+    "score": {
+      "title": "Actual worker wire example: explicit aa diagnostic",
+      "segments": [
+        {
+          "label": "a via English aa proxy",
+          "vowel": "a",
+          "context_mode": "english-proxy",
+          "duration_seconds": 0.4,
+          "f0_hz": 300,
+          "voiced": true
+        }
+      ]
+    }
+  }
+}

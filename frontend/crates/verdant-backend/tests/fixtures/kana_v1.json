@@ -1,0 +1,1116 @@
+{
+  "schema_version": "verdant-kana-parity/1",
+  "cases": [
+    {
+      "text": "さくら",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "s",
+          "a",
+          ".",
+          "k",
+          "ɯ",
+          ".",
+          "ɾ",
+          "a"
+        ],
+        "canonical_ipa": "s a . k ɯ . ɾ a",
+        "original_input": "さくら",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "さ",
+            "phones": [
+              "s",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "く",
+            "phones": [
+              "k",
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ら",
+            "phones": [
+              "ɾ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "サクラ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "s",
+          "a",
+          ".",
+          "k",
+          "ɯ",
+          ".",
+          "ɾ",
+          "a"
+        ],
+        "canonical_ipa": "s a . k ɯ . ɾ a",
+        "original_input": "サクラ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "さ",
+            "phones": [
+              "s",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "く",
+            "phones": [
+              "k",
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ら",
+            "phones": [
+              "ɾ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "ｻｸﾗ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "s",
+          "a",
+          ".",
+          "k",
+          "ɯ",
+          ".",
+          "ɾ",
+          "a"
+        ],
+        "canonical_ipa": "s a . k ɯ . ɾ a",
+        "original_input": "ｻｸﾗ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "さ",
+            "phones": [
+              "s",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "く",
+            "phones": [
+              "k",
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ら",
+            "phones": [
+              "ɾ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "キャー",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "kʲ",
+          "aː"
+        ],
+        "canonical_ipa": "kʲ aː",
+        "original_input": "キャー",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "きゃー",
+            "phones": [
+              "kʲ",
+              "aː"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "きゃー",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "kʲ",
+          "aː"
+        ],
+        "canonical_ipa": "kʲ aː",
+        "original_input": "きゃー",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "きゃー",
+            "phones": [
+              "kʲ",
+              "aː"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "ガッコー",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "ɡ",
+          "a",
+          ".",
+          "kː",
+          "oː"
+        ],
+        "canonical_ipa": "ɡ a . kː oː",
+        "original_input": "ガッコー",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "が",
+            "phones": [
+              "ɡ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "っこー",
+            "phones": [
+              "kː",
+              "oː"
+            ],
+            "mora_count": 3,
+            "word_index": 0,
+            "assumptions": [
+              "Small tsu adds one mora and canonical consonant length; whole-phone stretching does not guarantee a correct geminate closure/release.",
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "ガッコー",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "ɡ",
+          "a",
+          ".",
+          "kː",
+          "oː"
+        ],
+        "canonical_ipa": "ɡ a . kː oː",
+        "original_input": "ガッコー",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "が",
+            "phones": [
+              "ɡ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "っこー",
+            "phones": [
+              "kː",
+              "oː"
+            ],
+            "mora_count": 3,
+            "word_index": 0,
+            "assumptions": [
+              "Small tsu adds one mora and canonical consonant length; whole-phone stretching does not guarantee a correct geminate closure/release.",
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "ｶﾞｯｺｰ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "ɡ",
+          "a",
+          ".",
+          "kː",
+          "oː"
+        ],
+        "canonical_ipa": "ɡ a . kː oː",
+        "original_input": "ｶﾞｯｺｰ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "が",
+            "phones": [
+              "ɡ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "っこー",
+            "phones": [
+              "kː",
+              "oː"
+            ],
+            "mora_count": 3,
+            "word_index": 0,
+            "assumptions": [
+              "Small tsu adds one mora and canonical consonant length; whole-phone stretching does not guarantee a correct geminate closure/release.",
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "パ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "p",
+          "a"
+        ],
+        "canonical_ipa": "p a",
+        "original_input": "パ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "ぱ",
+            "phones": [
+              "p",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "ﾊﾟ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "p",
+          "a"
+        ],
+        "canonical_ipa": "p a",
+        "original_input": "ﾊﾟ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "ぱ",
+            "phones": [
+              "p",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "がっこう",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "ɡ",
+          "a",
+          ".",
+          "kː",
+          "o",
+          ".",
+          "ɯ"
+        ],
+        "canonical_ipa": "ɡ a . kː o . ɯ",
+        "original_input": "がっこう",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "が",
+            "phones": [
+              "ɡ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "っこ",
+            "phones": [
+              "kː",
+              "o"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Small tsu adds one mora and canonical consonant length; whole-phone stretching does not guarantee a correct geminate closure/release."
+            ]
+          },
+          {
+            "kana": "う",
+            "phones": [
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "がっこう",
+      "long_vowels": "common",
+      "expected": {
+        "tokens": [
+          "ɡ",
+          "a",
+          ".",
+          "kː",
+          "oː"
+        ],
+        "canonical_ipa": "ɡ a . kː oː",
+        "original_input": "がっこう",
+        "long_vowel_policy": "common",
+        "moras": [
+          {
+            "kana": "が",
+            "phones": [
+              "ɡ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "っこう",
+            "phones": [
+              "kː",
+              "oː"
+            ],
+            "mora_count": 3,
+            "word_index": 0,
+            "assumptions": [
+              "Small tsu adds one mora and canonical consonant length; whole-phone stretching does not guarantee a correct geminate closure/release.",
+              "Author-selected common long-vowel spelling rule applied; lexical exceptions and hidden word boundaries are not inferred."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "せんせい",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "s",
+          "e",
+          ".",
+          "ɴ",
+          ".",
+          "s",
+          "e",
+          ".",
+          "i"
+        ],
+        "canonical_ipa": "s e . ɴ . s e . i",
+        "original_input": "せんせい",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "せ",
+            "phones": [
+              "s",
+              "e"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ん",
+            "phones": [
+              "ɴ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "せ",
+            "phones": [
+              "s",
+              "e"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "い",
+            "phones": [
+              "i"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "せんせい",
+      "long_vowels": "common",
+      "expected": {
+        "tokens": [
+          "s",
+          "e",
+          ".",
+          "ɴ",
+          ".",
+          "s",
+          "eː"
+        ],
+        "canonical_ipa": "s e . ɴ . s eː",
+        "original_input": "せんせい",
+        "long_vowel_policy": "common",
+        "moras": [
+          {
+            "kana": "せ",
+            "phones": [
+              "s",
+              "e"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ん",
+            "phones": [
+              "ɴ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "せい",
+            "phones": [
+              "s",
+              "eː"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Author-selected common long-vowel spelling rule applied; lexical exceptions and hidden word boundaries are not inferred."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "こ う",
+      "long_vowels": "common",
+      "expected": {
+        "tokens": [
+          "k",
+          "o",
+          ".",
+          "ɯ"
+        ],
+        "canonical_ipa": "k o . ɯ",
+        "original_input": "こ う",
+        "long_vowel_policy": "common",
+        "moras": [
+          {
+            "kana": "こ",
+            "phones": [
+              "k",
+              "o"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "う",
+            "phones": [
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 1,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "おお",
+      "long_vowels": "common",
+      "expected": {
+        "tokens": [
+          "oː"
+        ],
+        "canonical_ipa": "oː",
+        "original_input": "おお",
+        "long_vowel_policy": "common",
+        "moras": [
+          {
+            "kana": "おお",
+            "phones": [
+              "oː"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Author-selected common long-vowel spelling rule applied; lexical exceptions and hidden word boundaries are not inferred."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "ヱビス",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "e",
+          ".",
+          "bʲ",
+          "i",
+          ".",
+          "s",
+          "ɯ"
+        ],
+        "canonical_ipa": "e . bʲ i . s ɯ",
+        "original_input": "ヱビス",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "ゑ",
+            "phones": [
+              "e"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "び",
+            "phones": [
+              "bʲ",
+              "i"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "す",
+            "phones": [
+              "s",
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "ヰ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "i"
+        ],
+        "canonical_ipa": "i",
+        "original_input": "ヰ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "ゐ",
+            "phones": [
+              "i"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "ヴァイオリン",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "v",
+          "a",
+          ".",
+          "i",
+          ".",
+          "o",
+          ".",
+          "ɾʲ",
+          "i",
+          ".",
+          "ɴ"
+        ],
+        "canonical_ipa": "v a . i . o . ɾʲ i . ɴ",
+        "original_input": "ヴァイオリン",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "ゔぁ",
+            "phones": [
+              "v",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "い",
+            "phones": [
+              "i"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "お",
+            "phones": [
+              "o"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "り",
+            "phones": [
+              "ɾʲ",
+              "i"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ん",
+            "phones": [
+              "ɴ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "ヴ",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "v",
+          "ɯ"
+        ],
+        "canonical_ipa": "v ɯ",
+        "original_input": "ヴ",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "ゔ",
+            "phones": [
+              "v",
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "しんよう",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "ɕ",
+          "i",
+          ".",
+          "ɴ",
+          ".",
+          "j",
+          "o",
+          ".",
+          "ɯ"
+        ],
+        "canonical_ipa": "ɕ i . ɴ . j o . ɯ",
+        "original_input": "しんよう",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "し",
+            "phones": [
+              "ɕ",
+              "i"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ん",
+            "phones": [
+              "ɴ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "よ",
+            "phones": [
+              "j",
+              "o"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "う",
+            "phones": [
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "コンピューター",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "k",
+          "o",
+          ".",
+          "ɴ",
+          ".",
+          "pʲ",
+          "ɯː",
+          ".",
+          "t",
+          "aː"
+        ],
+        "canonical_ipa": "k o . ɴ . pʲ ɯː . t aː",
+        "original_input": "コンピューター",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "こ",
+            "phones": [
+              "k",
+              "o"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ん",
+            "phones": [
+              "ɴ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ぴゅー",
+            "phones": [
+              "pʲ",
+              "ɯː"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          },
+          {
+            "kana": "たー",
+            "phones": [
+              "t",
+              "aː"
+            ],
+            "mora_count": 2,
+            "word_index": 0,
+            "assumptions": [
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "text": "はへを",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "h",
+          "a",
+          ".",
+          "h",
+          "e",
+          ".",
+          "o"
+        ],
+        "canonical_ipa": "h a . h e . o",
+        "original_input": "はへを",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "は",
+            "phones": [
+              "h",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "へ",
+            "phones": [
+              "h",
+              "e"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "を",
+            "phones": [
+              "o"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          }
+        ]
+      }
+    },
+    {
+      "text": "さくら、キャー。",
+      "long_vowels": "explicit",
+      "expected": {
+        "tokens": [
+          "s",
+          "a",
+          ".",
+          "k",
+          "ɯ",
+          ".",
+          "ɾ",
+          "a",
+          ".",
+          "kʲ",
+          "aː"
+        ],
+        "canonical_ipa": "s a . k ɯ . ɾ a . kʲ aː",
+        "original_input": "さくら、キャー。",
+        "long_vowel_policy": "explicit",
+        "moras": [
+          {
+            "kana": "さ",
+            "phones": [
+              "s",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "く",
+            "phones": [
+              "k",
+              "ɯ"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "ら",
+            "phones": [
+              "ɾ",
+              "a"
+            ],
+            "mora_count": 1,
+            "word_index": 0,
+            "assumptions": []
+          },
+          {
+            "kana": "きゃー",
+            "phones": [
+              "kʲ",
+              "aː"
+            ],
+            "mora_count": 2,
+            "word_index": 1,
+            "assumptions": [
+              "Written long mark preserved as canonical vowel length and an additional mora."
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "text": "",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": " ",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "。",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "学校",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "sakura",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "さくらschool",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "ー",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "あっ",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "っっか",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "っあ",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "んー",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "あーー",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "きゃっ",
+      "long_vowels": "explicit"
+    },
+    {
+      "text": "かな",
+      "long_vowels": "guess"
+    }
+  ]
+}

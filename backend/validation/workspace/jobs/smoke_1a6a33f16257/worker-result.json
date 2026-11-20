@@ -1,0 +1,41 @@
+{
+  "protocol": "ogd-worker/1",
+  "event": "completed",
+  "job_id": "smoke_1a6a33f16257",
+  "revision": 1,
+  "artifacts": [
+    {
+      "path": "jobs/smoke_1a6a33f16257/commands.json",
+      "bytes": 817,
+      "sha256": "ed09163dd1c38f8f5b8420ea4b8395bd93aa7bf2846743421c0d7f0873e27f13"
+    },
+    {
+      "path": "jobs/smoke_1a6a33f16257/native.json",
+      "bytes": 77421,
+      "sha256": "13bd1b3e8791d969b8714267ec130fd554c685855ef9130b37053c9b479c7d12"
+    },
+    {
+      "path": "jobs/smoke_1a6a33f16257/native.npz",
+      "bytes": 68484,
+      "sha256": "478293664f2541314be0b6832539164eea80e7b8619db64af9b276206c61f859"
+    },
+    {
+      "path": "jobs/smoke_1a6a33f16257/native.wav",
+      "bytes": 11244,
+      "sha256": "91f89d20119211bff6875bd72a2f95b2f34d7434f4cfc6ddc53a8aaa5a97aabb"
+    },
+    {
+      "path": "jobs/smoke_1a6a33f16257/request.json",
+      "bytes": 414,
+      "sha256": "b369b1204f27c402b34a336faf70c463f30f2e8b164c6ab5ceb2377bd4341e56"
+    },
+    {
+      "path": "jobs/smoke_1a6a33f16257/score.json",
+      "bytes": 168,
+      "sha256": "8abcc38b8838ad1a6d5d18520d4a85e90ab596eab69fec152517500b67ce3834"
+    }
+  ],
+  "elapsed_seconds": 1.308717436999359,
+  "identity_status": "unconfirmed_sn_candidate",
+  "job_directory": "jobs/smoke_1a6a33f16257"
+}

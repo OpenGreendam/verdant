@@ -1,0 +1,22 @@
+{
+  "protocol": "ogd-worker/1",
+  "request_id": "render",
+  "op": "render",
+  "job_id": "smoke_1a6a33f16257",
+  "revision": 1,
+  "route": "C0",
+  "payload": {
+    "kind": "native_score",
+    "score": {
+      "segments": [
+        {
+          "vowel": "a",
+          "context_mode": "english-proxy",
+          "duration_seconds": 0.35,
+          "f0_hz": 300,
+          "voiced": true
+        }
+      ]
+    }
+  }
+}

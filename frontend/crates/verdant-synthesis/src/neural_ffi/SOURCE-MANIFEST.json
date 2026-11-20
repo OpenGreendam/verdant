@@ -1,0 +1,153 @@
+{
+  "schema": "verdant-native-neural-source/1",
+  "scope": "Historical C1/A source inventory. Verdant Voice still uses the pinned ONNX Runtime C API. The WORLD sources and vocoder model identity are retained as provenance for historical renders.",
+  "world": {
+    "package": "pyworld",
+    "version": "0.3.5",
+    "source_subtree": "lib/World",
+    "license": "world/LICENSE.txt",
+    "application_linkage": "Rust calls the vendored WORLD extern C API directly; no authored C++ wrapper",
+    "compiled_sources": [
+      "world/src/dio.cpp",
+      "world/src/harvest.cpp",
+      "world/src/stonemask.cpp",
+      "world/src/common.cpp",
+      "world/src/fft.cpp",
+      "world/src/matlabfunctions.cpp"
+    ]
+  },
+  "onnxruntime": {
+    "version": "1.23.2",
+    "api_version": 23,
+    "license": "onnxruntime/LICENSE",
+    "runtime_linkage": "dynamic native C API; separately packaged library",
+    "application_bindings": "ort_abi.rs owns sessions, tensors and runs in Rust; build.rs derives minimal declarations and enum values from the pinned header",
+    "abi_assertions": "target-compiled C offset, function-pointer-width and enum-layout assertions plus Rust repr(C) offset assertions; no native wrapper functions",
+    "notices": "onnxruntime/ThirdPartyNotices.txt"
+  },
+  "model": {
+    "sha256": "b297c0c790dbcfe6b2123d87cc20bf8718969f91ffa3170a198c8fb53686155d",
+    "bytes": 56616643,
+    "graph_nodes": 272,
+    "stochastic_nodes": 0,
+    "local_functions": 0,
+    "nested_graphs": 0,
+    "modified": false
+  },
+  "files": [
+    {
+      "path": "world/LICENSE.txt",
+      "source": "pyworld-0.3.5/lib/World/LICENSE.txt",
+      "bytes": 2808,
+      "sha256": "6921ef0a65a931509b4055075fd847d7257c4094609075dd0615e8e997215f7e"
+    },
+    {
+      "path": "world/src/dio.cpp",
+      "source": "pyworld-0.3.5/lib/World/src/dio.cpp",
+      "bytes": 28107,
+      "sha256": "38449de8a16c6ac6405b7289ed2e8adac9400885d53d181639ebd063366756da"
+    },
+    {
+      "path": "world/src/harvest.cpp",
+      "source": "pyworld-0.3.5/lib/World/src/harvest.cpp",
+      "bytes": 52328,
+      "sha256": "e9e80047a9d9ed3ff8521b966985c0b912ac09415565da1cc821319dc454975e"
+    },
+    {
+      "path": "world/src/stonemask.cpp",
+      "source": "pyworld-0.3.5/lib/World/src/stonemask.cpp",
+      "bytes": 9465,
+      "sha256": "de68ab826ff94176bfa89b5caf7ba46a6a0497eaaf1957e2e942245b7b663e76"
+    },
+    {
+      "path": "world/src/common.cpp",
+      "source": "pyworld-0.3.5/lib/World/src/common.cpp",
+      "bytes": 9032,
+      "sha256": "ef4a982d103bfd4c0efe6f1e6fa1192809e07ac39289f29951f3d95f1af8ca51"
+    },
+    {
+      "path": "world/src/fft.cpp",
+      "source": "pyworld-0.3.5/lib/World/src/fft.cpp",
+      "bytes": 60885,
+      "sha256": "7a580cc02a0b040bf39de9a841f18b527a711093309ef408c08271abed6eec62"
+    },
+    {
+      "path": "world/src/matlabfunctions.cpp",
+      "source": "pyworld-0.3.5/lib/World/src/matlabfunctions.cpp",
+      "bytes": 9648,
+      "sha256": "250d4cdc31b64cb3bda3a0c988d3853a09e66dd85f15f167161948d938662a4c"
+    },
+    {
+      "path": "world/src/world/constantnumbers.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/constantnumbers.h",
+      "bytes": 1763,
+      "sha256": "ed3d3aec8d0e019db68b3845198bb2c87eedd1cd26a694a830bd57f4d26ba323"
+    },
+    {
+      "path": "world/src/world/fft.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/fft.h",
+      "bytes": 1275,
+      "sha256": "ac321b81dea5e8118933ecc66d2d9cbfb7721da52892a64d8a4f2e18a65829d6"
+    },
+    {
+      "path": "world/src/world/common.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/common.h",
+      "bytes": 4890,
+      "sha256": "7a761e7d92a3dff74141f73a0bb36ea7af543f314638e4d53be21dfd3d6924d1"
+    },
+    {
+      "path": "world/src/world/matlabfunctions.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/matlabfunctions.h",
+      "bytes": 6719,
+      "sha256": "192a6be8cf749c147a7b5119b14ad50c5ddbddba9d6c810fbdf64f0dd7dc2af4"
+    },
+    {
+      "path": "world/src/world/macrodefinitions.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/macrodefinitions.h",
+      "bytes": 4636,
+      "sha256": "6d5417f864a4a4d95b470e72e3cb0114e8c96ba33cc189341e83a9f345e664f0"
+    },
+    {
+      "path": "world/src/world/stonemask.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/stonemask.h",
+      "bytes": 1149,
+      "sha256": "e98a951d7443b81ed0062434a6656efd812011beb57a94c0492c13471698a7fc"
+    },
+    {
+      "path": "world/src/world/dio.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/dio.h",
+      "bytes": 2327,
+      "sha256": "e5a433f4454250f9e3a9c60dc40de65caea0cb26ad4073b87c739773a22d1ddd"
+    },
+    {
+      "path": "world/src/world/harvest.h",
+      "source": "pyworld-0.3.5/lib/World/src/world/harvest.h",
+      "bytes": 2253,
+      "sha256": "1ab55206a28236b96e8bdd0f18ddd0ec45ad874217b876ab4a9a2699619e3de2"
+    },
+    {
+      "path": "onnxruntime/onnxruntime_c_api.h",
+      "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/include/onnxruntime/core/session/onnxruntime_c_api.h",
+      "bytes": 332350,
+      "sha256": "71125e66180a991d65c9bdbad4aa20daaa1f7a48c7a5c0fa5f18f250ac839a02"
+    },
+    {
+      "path": "onnxruntime/onnxruntime_ep_c_api.h",
+      "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/include/onnxruntime/core/session/onnxruntime_ep_c_api.h",
+      "bytes": 45129,
+      "sha256": "b92778f50c36ecdf53d0344e0129a78b306afed653f81bba8a9597e3e6e9546f"
+    },
+    {
+      "path": "onnxruntime/LICENSE",
+      "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/LICENSE",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "onnxruntime/ThirdPartyNotices.txt",
+      "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/ThirdPartyNotices.txt",
+      "bytes": 326866,
+      "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
+    }
+  ]
+}

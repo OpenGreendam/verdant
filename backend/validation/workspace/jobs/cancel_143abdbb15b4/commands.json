@@ -1,0 +1,21 @@
+[
+  {
+    "stage": "native",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/native/render_native.py",
+      "--token",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/models/sn16k.tkn",
+      "--model",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/models/sn16k.bin",
+      "render",
+      "--score",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation/workspace/jobs/cancel_143abdbb15b4/score.json",
+      "--output",
+      "/workspace/scratch/7f0bd070960e/greendam-reproduction/backend/validation/workspace/jobs/cancel_143abdbb15b4/native",
+      "--seed",
+      "10008"
+    ],
+    "cwd": "/workspace/scratch/7f0bd070960e/greendam-reproduction"
+  }
+]

@@ -1,0 +1,192 @@
+{
+  "schema": "verdant-release-artifact-policy/1",
+  "name": "verdant-voice",
+  "version": "0.1.0",
+  "compatible_app_version": "0.1.0",
+  "authorization_status": "granted",
+  "files": [
+    {
+      "role": "voice_source_manifest",
+      "path": "voice-source.json",
+      "bytes": 1682,
+      "sha256": "79fa423ca3bd52fe08a72a106ec491e8d9a02106b5560af22c9a4cd848df108d"
+    },
+    {
+      "role": "bank_json",
+      "path": "bank.json",
+      "bytes": 5042,
+      "sha256": "6f8d730c012ae85ab5fede883aba288f653607eda4fc88ffb16c2481ca748e93"
+    },
+    {
+      "role": "bank_tensors",
+      "path": "bank.safetensors",
+      "bytes": 8471592,
+      "sha256": "ee82bee1f05799ca73ba3d1212711f8757e2a9f61bfe8b6a7bf0ee4940ded70d"
+    },
+    {
+      "role": "bank_topology",
+      "path": "topology.json",
+      "bytes": 291313,
+      "sha256": "3cd5478c716e0896debacd44dcba1e4a748657d09536ea6b12f5918750f8fe55"
+    },
+    {
+      "role": "bank_token",
+      "path": "source.tkn",
+      "bytes": 326581,
+      "sha256": "821b7cd9e7b489077dd55bf581ba90e1dffd3816c6fedcedc320744b498deead"
+    },
+    {
+      "role": "source_controller",
+      "path": "controller.onnx",
+      "bytes": 987488,
+      "sha256": "f54818427cedbb92c2edf310bd765abfe7919d8c90c4a02e4daf2056b865d965"
+    },
+    {
+      "role": "source_decoder",
+      "path": "decoder.onnx",
+      "bytes": 599687,
+      "sha256": "6a44fd9751d993bd40da3cfa72090e0a28778fb61850eed0038ab0cd0d56b6c4"
+    },
+    {
+      "role": "source_rights",
+      "path": "rights.json",
+      "bytes": 626,
+      "sha256": "9a4e1ccef118fc97b85a1a17fe3de242459d46e453bd0b187eabeff36653a4da"
+    },
+    {
+      "role": "source_export",
+      "path": "export.json",
+      "bytes": 11383,
+      "sha256": "320bc4eb97731636ff70cb63b91fdcb2dcaa4bd4ded1838af2b51f9193c3f917"
+    },
+    {
+      "role": "source_contracts",
+      "path": "contracts.json",
+      "bytes": 7650,
+      "sha256": "906e949f75d932686557e4d519ce416143a76311ccb5597f66cfab8d11b477f2"
+    },
+    {
+      "role": "verdant_voice_manifest",
+      "path": "verdant-voice/manifest.json",
+      "bytes": 252,
+      "sha256": "a2121befa0d2340746f083c12e6b335c932b46a5890ccf0aaaccb13b1e21af91"
+    },
+    {
+      "role": "verdant_voice_context_controller",
+      "path": "verdant-voice/context-controller.onnx",
+      "bytes": 1034923,
+      "sha256": "fdc875f178a323a00949d12f7be4b045e31fe8b2aeef66a13589c6e53f8598b7"
+    },
+    {
+      "role": "verdant_voice_local_controller",
+      "path": "verdant-voice/local-controller.onnx",
+      "bytes": 1029887,
+      "sha256": "08342dcb3d0dd53fb5e07fa3ad00d6a395bc00cbf1101d893fa9b125490b7ae6"
+    },
+    {
+      "role": "verdant_voice_decoder",
+      "path": "verdant-voice/decoder-48k.onnx",
+      "bytes": 6000910,
+      "sha256": "8b6b7c584d1d2b0cd8550e38e3d303c24614e9a60f3689aea9320ad671f38412"
+    },
+    {
+      "role": "verdant_voice_phone_table",
+      "path": "verdant-voice/native-phone-table.json",
+      "bytes": 11099,
+      "sha256": "77b7075bd954c3afd7d9e629f1fcb5816f5fd84580cffaf3175974d8cd3f5e60"
+    },
+    {
+      "role": "license:onnx-base",
+      "path": "LICENSE.txt",
+      "bytes": 636,
+      "sha256": "6dcffdfc6cca9225c565bfd8aae2205f19552fc389a8c2942b5fbf81f7761f4a"
+    },
+    {
+      "role": "notice:onnx-base",
+      "path": "NOTICE.txt",
+      "bytes": 1038,
+      "sha256": "7e2d15f2ef2caf38d95fe2c41af0eae1ed44ca4df8b19b590ac5306f45bdd226"
+    },
+    {
+      "role": "authorization:onnx-base",
+      "path": "AUTHORIZATION.json",
+      "bytes": 770,
+      "sha256": "96b2b340b2f53fcce5c75108239730666463a30be99db9770a6537c5e16ee138"
+    }
+  ],
+  "grants": [
+    {
+      "id": "release-owner-onnx-base-0.1.0",
+      "release_authority": "OpenGreendam/verdant release owner",
+      "permission": "redistribute-bundled-runtime",
+      "artifact_specific": true,
+      "evidence": {
+        "path": "AUTHORIZATION.json",
+        "bytes": 770,
+        "sha256": "96b2b340b2f53fcce5c75108239730666463a30be99db9770a6537c5e16ee138"
+      },
+      "artifacts": [
+        {
+          "role": "voice_source_manifest",
+          "sha256": "79fa423ca3bd52fe08a72a106ec491e8d9a02106b5560af22c9a4cd848df108d"
+        },
+        {
+          "role": "bank_json",
+          "sha256": "6f8d730c012ae85ab5fede883aba288f653607eda4fc88ffb16c2481ca748e93"
+        },
+        {
+          "role": "bank_tensors",
+          "sha256": "ee82bee1f05799ca73ba3d1212711f8757e2a9f61bfe8b6a7bf0ee4940ded70d"
+        },
+        {
+          "role": "bank_topology",
+          "sha256": "3cd5478c716e0896debacd44dcba1e4a748657d09536ea6b12f5918750f8fe55"
+        },
+        {
+          "role": "bank_token",
+          "sha256": "821b7cd9e7b489077dd55bf581ba90e1dffd3816c6fedcedc320744b498deead"
+        },
+        {
+          "role": "source_controller",
+          "sha256": "f54818427cedbb92c2edf310bd765abfe7919d8c90c4a02e4daf2056b865d965"
+        },
+        {
+          "role": "source_decoder",
+          "sha256": "6a44fd9751d993bd40da3cfa72090e0a28778fb61850eed0038ab0cd0d56b6c4"
+        },
+        {
+          "role": "source_rights",
+          "sha256": "9a4e1ccef118fc97b85a1a17fe3de242459d46e453bd0b187eabeff36653a4da"
+        },
+        {
+          "role": "source_export",
+          "sha256": "320bc4eb97731636ff70cb63b91fdcb2dcaa4bd4ded1838af2b51f9193c3f917"
+        },
+        {
+          "role": "source_contracts",
+          "sha256": "906e949f75d932686557e4d519ce416143a76311ccb5597f66cfab8d11b477f2"
+        },
+        {
+          "role": "verdant_voice_manifest",
+          "sha256": "a2121befa0d2340746f083c12e6b335c932b46a5890ccf0aaaccb13b1e21af91"
+        },
+        {
+          "role": "verdant_voice_context_controller",
+          "sha256": "fdc875f178a323a00949d12f7be4b045e31fe8b2aeef66a13589c6e53f8598b7"
+        },
+        {
+          "role": "verdant_voice_local_controller",
+          "sha256": "08342dcb3d0dd53fb5e07fa3ad00d6a395bc00cbf1101d893fa9b125490b7ae6"
+        },
+        {
+          "role": "verdant_voice_decoder",
+          "sha256": "8b6b7c584d1d2b0cd8550e38e3d303c24614e9a60f3689aea9320ad671f38412"
+        },
+        {
+          "role": "verdant_voice_phone_table",
+          "sha256": "77b7075bd954c3afd7d9e629f1fcb5816f5fd84580cffaf3175974d8cd3f5e60"
+        }
+      ]
+    }
+  ]
+}

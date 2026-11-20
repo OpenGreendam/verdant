@@ -1,0 +1,5489 @@
+{
+  "schema_version": "verdant-phoneme-parity/2",
+  "cases": [
+    {
+      "name": "english_hello",
+      "request": {
+        "tokens": "h ə l oʊ",
+        "language": "en",
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "h",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ə",
+          "source_index": 1,
+          "input_symbol": "ə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "l",
+          "source_index": 2,
+          "input_symbol": "l",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "oʊ",
+          "source_index": 3,
+          "input_symbol": "oʊ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "h",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "hh",
+          "phone_id": 211,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Fric==hh"
+          ],
+          "unit_index": 0,
+          "native_key": "en:hh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "211",
+              "C_Fric": "hh",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "180"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==hh"
+            ]
+          }
+        },
+        {
+          "symbol": "ə",
+          "source_index": 1,
+          "input_symbol": "ə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ax",
+          "phone_id": 180,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ax"
+          ],
+          "unit_index": 1,
+          "native_key": "en:ax",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "180",
+              "C_Vowel": "ax",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "211",
+              "R_Phone": "216"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ax"
+            ]
+          }
+        },
+        {
+          "symbol": "l",
+          "source_index": 2,
+          "input_symbol": "l",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "l",
+          "phone_id": 216,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==l"
+          ],
+          "unit_index": 2,
+          "native_key": "en:l",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "216",
+              "C_Vowel": "l",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "180",
+              "R_Phone": "194"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==l"
+            ]
+          }
+        },
+        {
+          "symbol": "oʊ",
+          "source_index": 3,
+          "input_symbol": "oʊ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ow",
+          "phone_id": 194,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ow"
+          ],
+          "unit_index": 3,
+          "native_key": "en:ow",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "194",
+              "C_Vowel": "ow",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "216",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ow"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.19,
+            0.06,
+            0.19
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            2.94,
+            0.06,
+            2.94
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_explicit_syllables",
+      "request": {
+        "tokens": "h ə . ˈl oʊ",
+        "language": "en",
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "h",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ə",
+          "source_index": 1,
+          "input_symbol": "ə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "l",
+          "source_index": 3,
+          "input_symbol": "ˈl",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "oʊ",
+          "source_index": 4,
+          "input_symbol": "oʊ",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "h",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "hh",
+          "phone_id": 211,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Fric==hh"
+          ],
+          "unit_index": 0,
+          "native_key": "en:hh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "211",
+              "C_Fric": "hh",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "180",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==hh"
+            ]
+          }
+        },
+        {
+          "symbol": "ə",
+          "source_index": 1,
+          "input_symbol": "ə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ax",
+          "phone_id": 180,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ax"
+          ],
+          "unit_index": 1,
+          "native_key": "en:ax",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "180",
+              "C_Vowel": "ax",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "211",
+              "R_Phone": "216",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ax"
+            ]
+          }
+        },
+        {
+          "symbol": "l",
+          "source_index": 3,
+          "input_symbol": "ˈl",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "l",
+          "phone_id": 216,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==l"
+          ],
+          "unit_index": 2,
+          "native_key": "en:l",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "216",
+              "C_Vowel": "l",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "180",
+              "R_Phone": "194",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==l"
+            ]
+          }
+        },
+        {
+          "symbol": "oʊ",
+          "source_index": 4,
+          "input_symbol": "oʊ",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ow",
+          "phone_id": 194,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ow"
+          ],
+          "unit_index": 3,
+          "native_key": "en:ow",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "194",
+              "C_Vowel": "ow",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "216",
+              "R_Phone": "0",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ow"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.19,
+            0.06,
+            0.19
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            2.94,
+            0.06,
+            2.94
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_stress_starts_syllable",
+      "request": {
+        "tokens": "ə ˈb aʊ t",
+        "language": "en",
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "ə",
+          "source_index": 0,
+          "input_symbol": "ə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "b",
+          "source_index": 1,
+          "input_symbol": "ˈb",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "aʊ",
+          "source_index": 2,
+          "input_symbol": "aʊ",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "t",
+          "source_index": 3,
+          "input_symbol": "t",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "ə",
+          "source_index": 0,
+          "input_symbol": "ə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ax",
+          "phone_id": 180,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ax"
+          ],
+          "unit_index": 0,
+          "native_key": "en:ax",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "180",
+              "C_Vowel": "ax",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "201",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ax"
+            ]
+          }
+        },
+        {
+          "symbol": "b",
+          "source_index": 1,
+          "input_symbol": "ˈb",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "b",
+          "phone_id": 201,
+          "context_field": "C_Stop",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Stop==b"
+          ],
+          "unit_index": 1,
+          "native_key": "en:b",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "201",
+              "C_Stop": "b",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "180",
+              "R_Phone": "179",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": true,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Stop==b"
+            ]
+          }
+        },
+        {
+          "symbol": "aʊ",
+          "source_index": 2,
+          "input_symbol": "aʊ",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "aw",
+          "phone_id": 179,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==aw"
+          ],
+          "unit_index": 2,
+          "native_key": "en:aw",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "179",
+              "C_Vowel": "aw",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "201",
+              "R_Phone": "228",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==aw"
+            ]
+          }
+        },
+        {
+          "symbol": "t",
+          "source_index": 3,
+          "input_symbol": "t",
+          "syllable_index": 1,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "t",
+          "phone_id": 228,
+          "context_field": "C_Stop",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Stop==t"
+          ],
+          "unit_index": 3,
+          "native_key": "en:t",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "228",
+              "C_Stop": "t",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "179",
+              "R_Phone": "0",
+              "C_OnsetCoda": "1"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": true,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Stop==t"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.19,
+            0.06,
+            0.19,
+            0.06
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            2.94,
+            0.06,
+            2.94,
+            0.0600000000000005
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_xsampa",
+      "request": {
+        "tokens": "h @ l oU",
+        "language": "en",
+        "alphabet": "xsampa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "h",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ə",
+          "source_index": 1,
+          "input_symbol": "@",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "l",
+          "source_index": 2,
+          "input_symbol": "l",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "oʊ",
+          "source_index": 3,
+          "input_symbol": "oU",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "h",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "hh",
+          "phone_id": 211,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Fric==hh"
+          ],
+          "unit_index": 0,
+          "native_key": "en:hh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "211",
+              "C_Fric": "hh",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "180"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==hh"
+            ]
+          }
+        },
+        {
+          "symbol": "ə",
+          "source_index": 1,
+          "input_symbol": "@",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ax",
+          "phone_id": 180,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ax"
+          ],
+          "unit_index": 1,
+          "native_key": "en:ax",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "180",
+              "C_Vowel": "ax",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "211",
+              "R_Phone": "216"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ax"
+            ]
+          }
+        },
+        {
+          "symbol": "l",
+          "source_index": 2,
+          "input_symbol": "l",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "l",
+          "phone_id": 216,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==l"
+          ],
+          "unit_index": 2,
+          "native_key": "en:l",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "216",
+              "C_Vowel": "l",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "180",
+              "R_Phone": "194"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==l"
+            ]
+          }
+        },
+        {
+          "symbol": "oʊ",
+          "source_index": 3,
+          "input_symbol": "oU",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ow",
+          "phone_id": 194,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ow"
+          ],
+          "unit_index": 3,
+          "native_key": "en:ow",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "194",
+              "C_Vowel": "ow",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "216",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ow"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.19,
+            0.06,
+            0.19
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            2.94,
+            0.06,
+            2.94
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_stress_length",
+      "request": {
+        "tokens": "ˈh ɛ . ˌl uː",
+        "language": "en",
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "ˈh",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "ɛ",
+          "source_index": 1,
+          "input_symbol": "ɛ",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "l",
+          "source_index": 3,
+          "input_symbol": "ˌl",
+          "syllable_index": 1,
+          "stress": 2,
+          "length": 1
+        },
+        {
+          "symbol": "uː",
+          "source_index": 4,
+          "input_symbol": "uː",
+          "syllable_index": 1,
+          "stress": 2,
+          "length": 2
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "h",
+          "source_index": 0,
+          "input_symbol": "ˈh",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "hh",
+          "phone_id": 211,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Fric==hh"
+          ],
+          "unit_index": 0,
+          "native_key": "en:hh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "211",
+              "C_Fric": "hh",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "0",
+              "R_Phone": "183",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==hh"
+            ]
+          }
+        },
+        {
+          "symbol": "ɛ",
+          "source_index": 1,
+          "input_symbol": "ɛ",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "eh",
+          "phone_id": 183,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 1,
+          "native_key": "en:eh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "183",
+              "C_Vowel": "eh",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "211",
+              "R_Phone": "216",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "l",
+          "source_index": 3,
+          "input_symbol": "ˌl",
+          "syllable_index": 1,
+          "stress": 2,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "l",
+          "phone_id": 216,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==l"
+          ],
+          "unit_index": 2,
+          "native_key": "en:l",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "216",
+              "C_Vowel": "l",
+              "C_Language": "3",
+              "C_Stress": "2",
+              "L_Phone": "183",
+              "R_Phone": "199",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==l"
+            ]
+          }
+        },
+        {
+          "symbol": "uː",
+          "source_index": 4,
+          "input_symbol": "uː",
+          "syllable_index": 1,
+          "stress": 2,
+          "length": 2,
+          "native_language": "en",
+          "native_phone": "uw",
+          "phone_id": 199,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==uw"
+          ],
+          "unit_index": 3,
+          "native_key": "en:uw",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "199",
+              "C_Vowel": "uw",
+              "C_Language": "3",
+              "C_Stress": "2",
+              "L_Phone": "216",
+              "R_Phone": "0",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==uw"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.135,
+            0.06,
+            0.245
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            1.9683333333333333,
+            0.06,
+            3.9116666666666666
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_cluster",
+      "request": {
+        "tokens": "s t ɹ eɪ n d",
+        "language": "en",
+        "stress": 1,
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "t",
+          "source_index": 1,
+          "input_symbol": "t",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "ɹ",
+          "source_index": 2,
+          "input_symbol": "ɹ",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "eɪ",
+          "source_index": 3,
+          "input_symbol": "eɪ",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "n",
+          "source_index": 4,
+          "input_symbol": "n",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        },
+        {
+          "symbol": "d",
+          "source_index": 5,
+          "input_symbol": "d",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "s",
+          "phone_id": 226,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Fric==s"
+          ],
+          "unit_index": 0,
+          "native_key": "en:s",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "226",
+              "C_Fric": "s",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "0",
+              "R_Phone": "228",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==s"
+            ]
+          }
+        },
+        {
+          "symbol": "t",
+          "source_index": 1,
+          "input_symbol": "t",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "t",
+          "phone_id": 228,
+          "context_field": "C_Stop",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Stop==t"
+          ],
+          "unit_index": 1,
+          "native_key": "en:t",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "228",
+              "C_Stop": "t",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "226",
+              "R_Phone": "224",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": true,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Stop==t"
+            ]
+          }
+        },
+        {
+          "symbol": "ɹ",
+          "source_index": 2,
+          "input_symbol": "ɹ",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "r",
+          "phone_id": 224,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==r"
+          ],
+          "unit_index": 2,
+          "native_key": "en:r",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "224",
+              "C_Vowel": "r",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "228",
+              "R_Phone": "188",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==r"
+            ]
+          }
+        },
+        {
+          "symbol": "eɪ",
+          "source_index": 3,
+          "input_symbol": "eɪ",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ey",
+          "phone_id": 188,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ey"
+          ],
+          "unit_index": 3,
+          "native_key": "en:ey",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "188",
+              "C_Vowel": "ey",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "224",
+              "R_Phone": "218",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ey"
+            ]
+          }
+        },
+        {
+          "symbol": "n",
+          "source_index": 4,
+          "input_symbol": "n",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "n",
+          "phone_id": 218,
+          "context_field": "C_Nasal",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Nasal==n"
+          ],
+          "unit_index": 4,
+          "native_key": "en:n",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "218",
+              "C_Nasal": "n",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "188",
+              "R_Phone": "204",
+              "C_OnsetCoda": "1"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": true,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Nasal==n"
+            ]
+          }
+        },
+        {
+          "symbol": "d",
+          "source_index": 5,
+          "input_symbol": "d",
+          "syllable_index": 0,
+          "stress": 1,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "d",
+          "phone_id": 204,
+          "context_field": "C_Stop",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Stop==d"
+          ],
+          "unit_index": 5,
+          "native_key": "en:d",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "204",
+              "C_Stop": "d",
+              "C_Language": "3",
+              "C_Stress": "1",
+              "L_Phone": "218",
+              "R_Phone": "0",
+              "C_OnsetCoda": "1"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": true,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Stop==d"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.15000000000000002,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.025000000000000022,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.035,
+            0.035,
+            0.035,
+            0.325,
+            0.035,
+            0.034999999999999976
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.06,
+            0.06,
+            5.7,
+            0.06,
+            0.05999999999999961
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_dark_l_explicit",
+      "request": {
+        "tokens": "l0",
+        "language": "en",
+        "alphabet": "vocaloid-xsampa",
+        "allow_approximation": true,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "ɫ",
+          "source_index": 0,
+          "input_symbol": "l0",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "ɫ",
+          "source_index": 0,
+          "input_symbol": "l0",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "l",
+          "phone_id": 216,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==l"
+          ],
+          "unit_index": 0,
+          "native_key": "en:l",
+          "support": "approximate",
+          "approximation_reason": "The model exposes l without a separately selectable dark-l allophone.",
+          "context": {
+            "features": {
+              "C_Phone": "216",
+              "C_Vowel": "l",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==l"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.025,
+          "weights": null,
+          "expected": [
+            0.025
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.5
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            6.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_aspirated_d_not_dental",
+      "request": {
+        "tokens": "dh D th T",
+        "language": "en",
+        "alphabet": "vocaloid-xsampa",
+        "allow_approximation": true,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "dʰ",
+          "source_index": 0,
+          "input_symbol": "dh",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ð",
+          "source_index": 1,
+          "input_symbol": "D",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "tʰ",
+          "source_index": 2,
+          "input_symbol": "th",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "θ",
+          "source_index": 3,
+          "input_symbol": "T",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "dʰ",
+          "source_index": 0,
+          "input_symbol": "dh",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "d",
+          "phone_id": 204,
+          "context_field": "C_Stop",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Stop==d"
+          ],
+          "unit_index": 0,
+          "native_key": "en:d",
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate.",
+          "context": {
+            "features": {
+              "C_Phone": "204",
+              "C_Stop": "d",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "206"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": true,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Stop==d"
+            ]
+          }
+        },
+        {
+          "symbol": "ð",
+          "source_index": 1,
+          "input_symbol": "D",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "dh",
+          "phone_id": 206,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Fric==dh"
+          ],
+          "unit_index": 1,
+          "native_key": "en:dh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "206",
+              "C_Fric": "dh",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "204",
+              "R_Phone": "228"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==dh"
+            ]
+          }
+        },
+        {
+          "symbol": "tʰ",
+          "source_index": 2,
+          "input_symbol": "th",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "t",
+          "phone_id": 228,
+          "context_field": "C_Stop",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Stop==t"
+          ],
+          "unit_index": 2,
+          "native_key": "en:t",
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate.",
+          "context": {
+            "features": {
+              "C_Phone": "228",
+              "C_Stop": "t",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "206",
+              "R_Phone": "230"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": true,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Stop==t"
+            ]
+          }
+        },
+        {
+          "symbol": "θ",
+          "source_index": 3,
+          "input_symbol": "T",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "th",
+          "phone_id": 230,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_Fric==th"
+          ],
+          "unit_index": 3,
+          "native_key": "en:th",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "230",
+              "C_Fric": "th",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "228",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": [
+              "C_Fric==th"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.125,
+            0.125,
+            0.125,
+            0.125
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            1.5,
+            1.5,
+            1.5,
+            1.5
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_rhotic_sequence",
+      "request": {
+        "tokens": "ɛə",
+        "language": "en",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "ɛə",
+          "source_index": 0,
+          "input_symbol": "ɛə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "ɛə",
+          "source_index": 0,
+          "input_symbol": "ɛə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "eh",
+          "phone_id": 183,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 0,
+          "native_key": "en:eh",
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable.",
+          "context": {
+            "features": {
+              "C_Phone": "183",
+              "C_Vowel": "eh",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "180",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "ɛə",
+          "source_index": 0,
+          "input_symbol": "ɛə",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ax",
+          "phone_id": 180,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==ax"
+          ],
+          "unit_index": 0,
+          "native_key": "en:ax",
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable.",
+          "context": {
+            "features": {
+              "C_Phone": "180",
+              "C_Vowel": "ax",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "183",
+              "R_Phone": "0",
+              "C_OnsetCoda": "1"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==ax"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.05,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.25,
+            0.25
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            3.0,
+            3.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "english_eh_anchor_anomaly",
+      "request": {
+        "tokens": "ɛ",
+        "language": "en",
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "ɛ",
+          "source_index": 0,
+          "input_symbol": "ɛ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "ɛ",
+          "source_index": 0,
+          "input_symbol": "ɛ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "eh",
+          "phone_id": 183,
+          "context_field": "C_Vowel",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 0,
+          "native_key": "en:eh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "183",
+              "C_Vowel": "eh",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "0",
+              "R_Phone": "0",
+              "C_OnsetCoda": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.025,
+          "weights": null,
+          "expected": [
+            0.025
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.5
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            6.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "zh_shanghaihao",
+      "request": {
+        "tokens": "ʂ ɑŋ x aɪ x aʊ",
+        "language": "zh",
+        "tone": 3,
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null
+      },
+      "canonical": [
+        {
+          "symbol": "ʂ",
+          "source_index": 0,
+          "input_symbol": "ʂ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɑŋ",
+          "source_index": 1,
+          "input_symbol": "ɑŋ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "x",
+          "source_index": 2,
+          "input_symbol": "x",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "aɪ",
+          "source_index": 3,
+          "input_symbol": "aɪ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "x",
+          "source_index": 4,
+          "input_symbol": "x",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "aʊ",
+          "source_index": 5,
+          "input_symbol": "aʊ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "ʂ",
+          "source_index": 0,
+          "input_symbol": "ʂ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "sh",
+          "phone_id": 59,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==sh"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:sh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "59",
+              "C_SM": "sh",
+              "C_Tone": "3",
+              "L_Phone": "0",
+              "R_Phone": "6"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==sh"
+            ]
+          }
+        },
+        {
+          "symbol": "ɑŋ",
+          "source_index": 1,
+          "input_symbol": "ɑŋ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "ang",
+          "phone_id": 6,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==ang"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:ang",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "6",
+              "C_YM": "ang",
+              "C_Tone": "3",
+              "L_Phone": "59",
+              "R_Phone": "49"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==ang"
+            ]
+          }
+        },
+        {
+          "symbol": "x",
+          "source_index": 2,
+          "input_symbol": "x",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "h",
+          "phone_id": 49,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==h"
+          ],
+          "unit_index": 2,
+          "native_key": "zh:h",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "49",
+              "C_SM": "h",
+              "C_Tone": "3",
+              "L_Phone": "6",
+              "R_Phone": "4"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==h"
+            ]
+          }
+        },
+        {
+          "symbol": "aɪ",
+          "source_index": 3,
+          "input_symbol": "aɪ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "ai",
+          "phone_id": 4,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==ai"
+          ],
+          "unit_index": 3,
+          "native_key": "zh:ai",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "4",
+              "C_YM": "ai",
+              "C_Tone": "3",
+              "L_Phone": "49",
+              "R_Phone": "49"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==ai"
+            ]
+          }
+        },
+        {
+          "symbol": "x",
+          "source_index": 4,
+          "input_symbol": "x",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "h",
+          "phone_id": 49,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==h"
+          ],
+          "unit_index": 4,
+          "native_key": "zh:h",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "49",
+              "C_SM": "h",
+              "C_Tone": "3",
+              "L_Phone": "4",
+              "R_Phone": "7"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==h"
+            ]
+          }
+        },
+        {
+          "symbol": "aʊ",
+          "source_index": 5,
+          "input_symbol": "aʊ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "ao",
+          "phone_id": 7,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==ao"
+          ],
+          "unit_index": 5,
+          "native_key": "zh:ao",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "7",
+              "C_YM": "ao",
+              "C_Tone": "3",
+              "L_Phone": "49",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==ao"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.15000000000000002,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025000000000000022
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            1.94,
+            0.06,
+            1.94,
+            0.06,
+            1.9400000000000004
+          ]
+        }
+      ]
+    },
+    {
+      "name": "zh_apical_contrast",
+      "request": {
+        "tokens": "t͡s ɹ̩ ʂ ɻ̩ t͡ɕ i",
+        "language": "zh",
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "t͡s",
+          "source_index": 0,
+          "input_symbol": "t͡s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɹ̩",
+          "source_index": 1,
+          "input_symbol": "ɹ̩",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ʂ",
+          "source_index": 2,
+          "input_symbol": "ʂ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɻ̩",
+          "source_index": 3,
+          "input_symbol": "ɻ̩",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "t͡ɕ",
+          "source_index": 4,
+          "input_symbol": "t͡ɕ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "i",
+          "source_index": 5,
+          "input_symbol": "i",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "t͡s",
+          "source_index": 0,
+          "input_symbol": "t͡s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "z",
+          "phone_id": 62,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==z"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:z",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "62",
+              "C_SM": "z",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "19"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==z"
+            ]
+          }
+        },
+        {
+          "symbol": "ɹ̩",
+          "source_index": 1,
+          "input_symbol": "ɹ̩",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "ii",
+          "phone_id": 19,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==ii"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:ii",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "19",
+              "C_YM": "ii",
+              "C_Tone": "1",
+              "L_Phone": "62",
+              "R_Phone": "59"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==ii"
+            ]
+          }
+        },
+        {
+          "symbol": "ʂ",
+          "source_index": 2,
+          "input_symbol": "ʂ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "sh",
+          "phone_id": 59,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==sh"
+          ],
+          "unit_index": 2,
+          "native_key": "zh:sh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "59",
+              "C_SM": "sh",
+              "C_Tone": "1",
+              "L_Phone": "19",
+              "R_Phone": "20"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==sh"
+            ]
+          }
+        },
+        {
+          "symbol": "ɻ̩",
+          "source_index": 3,
+          "input_symbol": "ɻ̩",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "iii",
+          "phone_id": 20,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==iii"
+          ],
+          "unit_index": 3,
+          "native_key": "zh:iii",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "20",
+              "C_YM": "iii",
+              "C_Tone": "1",
+              "L_Phone": "59",
+              "R_Phone": "50"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==iii"
+            ]
+          }
+        },
+        {
+          "symbol": "t͡ɕ",
+          "source_index": 4,
+          "input_symbol": "t͡ɕ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "j",
+          "phone_id": 50,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==j"
+          ],
+          "unit_index": 4,
+          "native_key": "zh:j",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "50",
+              "C_SM": "j",
+              "C_Tone": "1",
+              "L_Phone": "20",
+              "R_Phone": "13"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==j"
+            ]
+          }
+        },
+        {
+          "symbol": "i",
+          "source_index": 5,
+          "input_symbol": "i",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "i",
+          "phone_id": 13,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==i"
+          ],
+          "unit_index": 5,
+          "native_key": "zh:i",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "13",
+              "C_YM": "i",
+              "C_Tone": "1",
+              "L_Phone": "50",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==i"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.15000000000000002,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025000000000000022
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            1.94,
+            0.06,
+            1.94,
+            0.06,
+            1.9400000000000004
+          ]
+        }
+      ]
+    },
+    {
+      "name": "zh_vocaloid_compat",
+      "request": {
+        "tokens": "ts` AN p y",
+        "language": "zh",
+        "alphabet": "vocaloid-xsampa",
+        "allow_approximation": false,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "t͡ʂ",
+          "source_index": 0,
+          "input_symbol": "ts`",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɑŋ",
+          "source_index": 1,
+          "input_symbol": "AN",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "p",
+          "source_index": 2,
+          "input_symbol": "p",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "y",
+          "source_index": 3,
+          "input_symbol": "y",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "t͡ʂ",
+          "source_index": 0,
+          "input_symbol": "ts`",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "zh",
+          "phone_id": 63,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==zh"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:zh",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "63",
+              "C_SM": "zh",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "6"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==zh"
+            ]
+          }
+        },
+        {
+          "symbol": "ɑŋ",
+          "source_index": 1,
+          "input_symbol": "AN",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "ang",
+          "phone_id": 6,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==ang"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:ang",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "6",
+              "C_YM": "ang",
+              "C_Tone": "1",
+              "L_Phone": "63",
+              "R_Phone": "43"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==ang"
+            ]
+          }
+        },
+        {
+          "symbol": "p",
+          "source_index": 2,
+          "input_symbol": "p",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "b",
+          "phone_id": 43,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==b"
+          ],
+          "unit_index": 2,
+          "native_key": "zh:b",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "43",
+              "C_SM": "b",
+              "C_Tone": "1",
+              "L_Phone": "6",
+              "R_Phone": "39"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==b"
+            ]
+          }
+        },
+        {
+          "symbol": "y",
+          "source_index": 3,
+          "input_symbol": "y",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "v",
+          "phone_id": 39,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==v"
+          ],
+          "unit_index": 3,
+          "native_key": "zh:v",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "39",
+              "C_YM": "v",
+              "C_Tone": "1",
+              "L_Phone": "43",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==v"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.024999999999999994
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.19,
+            0.06,
+            0.19
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            2.94,
+            0.06,
+            2.94
+          ]
+        }
+      ]
+    },
+    {
+      "name": "zh_sonorants_umlaut",
+      "request": {
+        "tokens": "m a n i l y",
+        "language": "zh",
+        "tone": 0,
+        "alphabet": "ipa",
+        "allow_approximation": false,
+        "stress": null
+      },
+      "canonical": [
+        {
+          "symbol": "m",
+          "source_index": 0,
+          "input_symbol": "m",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "n",
+          "source_index": 2,
+          "input_symbol": "n",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "i",
+          "source_index": 3,
+          "input_symbol": "i",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "l",
+          "source_index": 4,
+          "input_symbol": "l",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "y",
+          "source_index": 5,
+          "input_symbol": "y",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "m",
+          "source_index": 0,
+          "input_symbol": "m",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "m",
+          "phone_id": 53,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 0,
+          "native_key": "zh:m",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "53",
+              "C_SM": "m",
+              "C_Tone": "0",
+              "L_Phone": "0",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:a",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "0",
+              "L_Phone": "53",
+              "R_Phone": "54"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        },
+        {
+          "symbol": "n",
+          "source_index": 2,
+          "input_symbol": "n",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "n",
+          "phone_id": 54,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 2,
+          "native_key": "zh:n",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "54",
+              "C_SM": "n",
+              "C_Tone": "0",
+              "L_Phone": "3",
+              "R_Phone": "13"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "i",
+          "source_index": 3,
+          "input_symbol": "i",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "i",
+          "phone_id": 13,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==i"
+          ],
+          "unit_index": 3,
+          "native_key": "zh:i",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "13",
+              "C_YM": "i",
+              "C_Tone": "0",
+              "L_Phone": "54",
+              "R_Phone": "52"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==i"
+            ]
+          }
+        },
+        {
+          "symbol": "l",
+          "source_index": 4,
+          "input_symbol": "l",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "l",
+          "phone_id": 52,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 4,
+          "native_key": "zh:l",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "52",
+              "C_SM": "l",
+              "C_Tone": "0",
+              "L_Phone": "13",
+              "R_Phone": "39"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "y",
+          "source_index": 5,
+          "input_symbol": "y",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "v",
+          "phone_id": 39,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==v"
+          ],
+          "unit_index": 5,
+          "native_key": "zh:v",
+          "support": "native",
+          "approximation_reason": null,
+          "context": {
+            "features": {
+              "C_Phone": "39",
+              "C_YM": "v",
+              "C_Tone": "0",
+              "L_Phone": "52",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==v"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.15000000000000002,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025000000000000022
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            1.94,
+            0.06,
+            1.94,
+            0.06,
+            1.9400000000000004
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ja_sakura",
+      "request": {
+        "tokens": "s a k ɯ ɾ a",
+        "language": "ja",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "k",
+          "source_index": 2,
+          "input_symbol": "k",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɯ",
+          "source_index": 3,
+          "input_symbol": "ɯ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɾ",
+          "source_index": 4,
+          "input_symbol": "ɾ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "a",
+          "source_index": 5,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "s",
+          "phone_id": 58,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==s"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:s",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "58",
+              "C_SM": "s",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==s"
+            ]
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "58",
+              "R_Phone": "48"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        },
+        {
+          "symbol": "k",
+          "source_index": 2,
+          "input_symbol": "k",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "g",
+          "phone_id": 48,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==g"
+          ],
+          "unit_index": 2,
+          "native_key": "zh:g",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "48",
+              "C_SM": "g",
+              "C_Tone": "1",
+              "L_Phone": "3",
+              "R_Phone": "29"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==g"
+            ]
+          }
+        },
+        {
+          "symbol": "ɯ",
+          "source_index": 3,
+          "input_symbol": "ɯ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "u",
+          "phone_id": 29,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 3,
+          "native_key": "zh:u",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese unrounded /ɯ/ uses rounded Mandarin /u/.",
+          "context": {
+            "features": {
+              "C_Phone": "29",
+              "C_YM": "u",
+              "C_Tone": "1",
+              "L_Phone": "48",
+              "R_Phone": "207"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "ɾ",
+          "source_index": 4,
+          "input_symbol": "ɾ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "dx",
+          "phone_id": 207,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 4,
+          "native_key": "en:dx",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "207",
+              "C_Fric": "dx",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "29",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 5,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 5,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "207",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.15000000000000002,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025000000000000022
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            1.94,
+            0.06,
+            1.94,
+            0.06,
+            1.9400000000000004
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ja_explicit_moras",
+      "request": {
+        "tokens": "s a . k ɯ . ɾ a",
+        "language": "ja",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "k",
+          "source_index": 3,
+          "input_symbol": "k",
+          "syllable_index": 1,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɯ",
+          "source_index": 4,
+          "input_symbol": "ɯ",
+          "syllable_index": 1,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɾ",
+          "source_index": 6,
+          "input_symbol": "ɾ",
+          "syllable_index": 2,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "a",
+          "source_index": 7,
+          "input_symbol": "a",
+          "syllable_index": 2,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "s",
+          "phone_id": 58,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==s"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:s",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "58",
+              "C_SM": "s",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==s"
+            ]
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "58",
+              "R_Phone": "48"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        },
+        {
+          "symbol": "k",
+          "source_index": 3,
+          "input_symbol": "k",
+          "syllable_index": 1,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "g",
+          "phone_id": 48,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==g"
+          ],
+          "unit_index": 2,
+          "native_key": "zh:g",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "48",
+              "C_SM": "g",
+              "C_Tone": "1",
+              "L_Phone": "3",
+              "R_Phone": "29"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==g"
+            ]
+          }
+        },
+        {
+          "symbol": "ɯ",
+          "source_index": 4,
+          "input_symbol": "ɯ",
+          "syllable_index": 1,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "u",
+          "phone_id": 29,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 3,
+          "native_key": "zh:u",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese unrounded /ɯ/ uses rounded Mandarin /u/.",
+          "context": {
+            "features": {
+              "C_Phone": "29",
+              "C_YM": "u",
+              "C_Tone": "1",
+              "L_Phone": "48",
+              "R_Phone": "207"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "ɾ",
+          "source_index": 6,
+          "input_symbol": "ɾ",
+          "syllable_index": 2,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "dx",
+          "phone_id": 207,
+          "context_field": "C_Fric",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 4,
+          "native_key": "en:dx",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "207",
+              "C_Fric": "dx",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "29",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": true
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 7,
+          "input_symbol": "a",
+          "syllable_index": 2,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 5,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "207",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.15000000000000002,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025,
+            0.025000000000000022
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334,
+            0.05833333333333333,
+            0.10833333333333334
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            1.94,
+            0.06,
+            1.94,
+            0.06,
+            1.9400000000000004
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ja_palatal_nasal",
+      "request": {
+        "tokens": "kʲ o ɴ",
+        "language": "ja",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "kʲ",
+          "source_index": 0,
+          "input_symbol": "kʲ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "o",
+          "source_index": 1,
+          "input_symbol": "o",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɴ",
+          "source_index": 2,
+          "input_symbol": "ɴ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "kʲ",
+          "source_index": 0,
+          "input_symbol": "kʲ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "g",
+          "phone_id": 48,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==g"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:g",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide.",
+          "context": {
+            "features": {
+              "C_Phone": "48",
+              "C_SM": "g",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "233"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==g"
+            ]
+          }
+        },
+        {
+          "symbol": "kʲ",
+          "source_index": 0,
+          "input_symbol": "kʲ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "y",
+          "phone_id": 233,
+          "context_field": "C_Vowel",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Vowel==y"
+          ],
+          "unit_index": 0,
+          "native_key": "en:y",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide.",
+          "context": {
+            "features": {
+              "C_Phone": "233",
+              "C_Vowel": "y",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "48",
+              "R_Phone": "26"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": true,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Vowel==y"
+            ]
+          }
+        },
+        {
+          "symbol": "o",
+          "source_index": 1,
+          "input_symbol": "o",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "o",
+          "phone_id": 26,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==o"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:o",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "26",
+              "C_YM": "o",
+              "C_Tone": "1",
+              "L_Phone": "233",
+              "R_Phone": "219"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==o"
+            ]
+          }
+        },
+        {
+          "symbol": "ɴ",
+          "source_index": 2,
+          "input_symbol": "ɴ",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ng",
+          "phone_id": 219,
+          "context_field": "C_Nasal",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Nasal==ng"
+          ],
+          "unit_index": 2,
+          "native_key": "en:ng",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. An explicit uvular nasal /ɴ/ request uses English velar /ŋ/. Only matching kana provenance can select a separately traced contextual moraic-nasal realization.",
+          "context": {
+            "features": {
+              "C_Phone": "219",
+              "C_Nasal": "ng",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "26",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": true,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Nasal==ng"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025,
+            0.024999999999999994,
+            0.02500000000000001
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.047499999999999994,
+            0.025,
+            0.38,
+            0.04749999999999999
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.047499999999999994,
+            0.025,
+            5.88,
+            0.04750000000000032
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ja_long_vowel_and_geminate",
+      "request": {
+        "tokens": "kː a aː",
+        "language": "ja",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "kː",
+          "source_index": 0,
+          "input_symbol": "kː",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 2
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "aː",
+          "source_index": 2,
+          "input_symbol": "aː",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 2
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "kː",
+          "source_index": 0,
+          "input_symbol": "kː",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 2,
+          "native_language": "zh",
+          "native_phone": "g",
+          "phone_id": 48,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==g"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:g",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered.",
+          "context": {
+            "features": {
+              "C_Phone": "48",
+              "C_SM": "g",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==g"
+            ]
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "48",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        },
+        {
+          "symbol": "aː",
+          "source_index": 2,
+          "input_symbol": "aː",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 2,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 2,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "3",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.07500000000000001,
+          "weights": null,
+          "expected": [
+            0.02500000000000001,
+            0.025,
+            0.025
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.12,
+            0.135,
+            0.245
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.12,
+            1.9683333333333333,
+            3.9116666666666666
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ja_vocaloid_meanings",
+      "request": {
+        "tokens": "S M N N\\",
+        "language": "ja",
+        "alphabet": "vocaloid-xsampa",
+        "allow_approximation": true,
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "ɕ",
+          "source_index": 0,
+          "input_symbol": "S",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɯ",
+          "source_index": 1,
+          "input_symbol": "M",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ŋ",
+          "source_index": 2,
+          "input_symbol": "N",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "ɴ",
+          "source_index": 3,
+          "input_symbol": "N\\",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "ɕ",
+          "source_index": 0,
+          "input_symbol": "S",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "x",
+          "phone_id": 61,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==x"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:x",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "61",
+              "C_SM": "x",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "29"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==x"
+            ]
+          }
+        },
+        {
+          "symbol": "ɯ",
+          "source_index": 1,
+          "input_symbol": "M",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "u",
+          "phone_id": 29,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [],
+          "unit_index": 1,
+          "native_key": "zh:u",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese unrounded /ɯ/ uses rounded Mandarin /u/.",
+          "context": {
+            "features": {
+              "C_Phone": "29",
+              "C_YM": "u",
+              "C_Tone": "1",
+              "L_Phone": "61",
+              "R_Phone": "219"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": []
+          }
+        },
+        {
+          "symbol": "ŋ",
+          "source_index": 2,
+          "input_symbol": "N",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ng",
+          "phone_id": 219,
+          "context_field": "C_Nasal",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Nasal==ng"
+          ],
+          "unit_index": 2,
+          "native_key": "en:ng",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "219",
+              "C_Nasal": "ng",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "29",
+              "R_Phone": "219"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": true,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Nasal==ng"
+            ]
+          }
+        },
+        {
+          "symbol": "ɴ",
+          "source_index": 3,
+          "input_symbol": "N\\",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "en",
+          "native_phone": "ng",
+          "phone_id": 219,
+          "context_field": "C_Nasal",
+          "role": "consonant",
+          "voiced": true,
+          "anchor_questions": [
+            "C_Nasal==ng"
+          ],
+          "unit_index": 3,
+          "native_key": "en:ng",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. An explicit uvular nasal /ɴ/ request uses English velar /ŋ/. Only matching kana provenance can select a separately traced contextual moraic-nasal realization.",
+          "context": {
+            "features": {
+              "C_Phone": "219",
+              "C_Nasal": "ng",
+              "C_Language": "3",
+              "C_Stress": "0",
+              "L_Phone": "219",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": true,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_Nasal==ng"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.1,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.024999999999999994,
+            0.025,
+            0.02500000000000001
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.05833333333333333,
+            0.325,
+            0.05833333333333333,
+            0.05833333333333335
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            5.82,
+            0.06,
+            0.05999999999999961
+          ]
+        }
+      ]
+    },
+    {
+      "name": "no_nucleus",
+      "request": {
+        "tokens": "s sː",
+        "language": "ja",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "sː",
+          "source_index": 1,
+          "input_symbol": "sː",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 2
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "s",
+          "phone_id": 58,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==s"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:s",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "58",
+              "C_SM": "s",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "58"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==s"
+            ]
+          }
+        },
+        {
+          "symbol": "sː",
+          "source_index": 1,
+          "input_symbol": "sː",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 2,
+          "native_language": "zh",
+          "native_phone": "s",
+          "phone_id": 58,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==s"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:s",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "58",
+              "C_SM": "s",
+              "C_Tone": "1",
+              "L_Phone": "58",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==s"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.05,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.175,
+            0.325
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            2.0083333333333333,
+            3.9916666666666667
+          ]
+        }
+      ]
+    },
+    {
+      "name": "manual_weights",
+      "request": {
+        "tokens": "s a",
+        "language": "ja",
+        "allow_approximation": true,
+        "alphabet": "ipa",
+        "stress": null,
+        "tone": 1
+      },
+      "canonical": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1
+        }
+      ],
+      "resolved": [
+        {
+          "symbol": "s",
+          "source_index": 0,
+          "input_symbol": "s",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "s",
+          "phone_id": 58,
+          "context_field": "C_SM",
+          "role": "consonant",
+          "voiced": false,
+          "anchor_questions": [
+            "C_SM==s"
+          ],
+          "unit_index": 0,
+          "native_key": "zh:s",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "58",
+              "C_SM": "s",
+              "C_Tone": "1",
+              "L_Phone": "0",
+              "R_Phone": "3"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": true,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_SM==s"
+            ]
+          }
+        },
+        {
+          "symbol": "a",
+          "source_index": 1,
+          "input_symbol": "a",
+          "syllable_index": 0,
+          "stress": null,
+          "length": 1,
+          "native_language": "zh",
+          "native_phone": "a",
+          "phone_id": 3,
+          "context_field": "C_YM",
+          "role": "nucleus",
+          "voiced": true,
+          "anchor_questions": [
+            "C_YM==a"
+          ],
+          "unit_index": 1,
+          "native_key": "zh:a",
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping.",
+          "context": {
+            "features": {
+              "C_Phone": "3",
+              "C_YM": "a",
+              "C_Tone": "1",
+              "L_Phone": "58",
+              "R_Phone": "0"
+            },
+            "answers": {
+              "C_EN": false,
+              "C_SM": false,
+              "C_SilSp": false,
+              "C_Vowel": false,
+              "C_Stop": false,
+              "C_Nasal": false,
+              "C_Fric": false
+            },
+            "anchor_questions": [
+              "C_YM==a"
+            ]
+          }
+        }
+      ],
+      "duration_cases": [
+        {
+          "total": 0.05,
+          "weights": null,
+          "expected": [
+            0.025,
+            0.025
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": null,
+          "expected": [
+            0.06,
+            0.44
+          ]
+        },
+        {
+          "total": 6.0,
+          "weights": null,
+          "expected": [
+            0.06,
+            5.94
+          ]
+        },
+        {
+          "total": 0.5,
+          "weights": [
+            1,
+            4
+          ],
+          "expected": [
+            0.1,
+            0.4
+          ]
+        }
+      ]
+    }
+  ],
+  "pinyin": [
+    {
+      "token": "ni3",
+      "expected": [
+        "ni",
+        3,
+        "n",
+        "i"
+      ]
+    },
+    {
+      "token": "ma1",
+      "expected": [
+        "ma",
+        1,
+        "m",
+        "a"
+      ]
+    },
+    {
+      "token": "la1",
+      "expected": [
+        "la",
+        1,
+        "l",
+        "a"
+      ]
+    },
+    {
+      "token": "lǜ4",
+      "expected": [
+        "lv",
+        4,
+        "l",
+        "v"
+      ]
+    },
+    {
+      "token": "lu:4",
+      "expected": [
+        "lv",
+        4,
+        "l",
+        "v"
+      ]
+    },
+    {
+      "token": "lv4",
+      "expected": [
+        "lv",
+        4,
+        "l",
+        "v"
+      ]
+    },
+    {
+      "token": "lu4",
+      "expected": [
+        "lu",
+        4,
+        "l",
+        "u"
+      ]
+    },
+    {
+      "token": "nü3",
+      "expected": [
+        "nv",
+        3,
+        "n",
+        "v"
+      ]
+    },
+    {
+      "token": "nu3",
+      "expected": [
+        "nu",
+        3,
+        "n",
+        "u"
+      ]
+    },
+    {
+      "token": "nue4",
+      "expected": [
+        "nve",
+        4,
+        "n",
+        "ve"
+      ]
+    },
+    {
+      "token": "yi",
+      "expected": [
+        "yi",
+        1,
+        "",
+        "i"
+      ]
+    },
+    {
+      "token": "i",
+      "expected": [
+        "yi",
+        1,
+        "",
+        "i"
+      ]
+    },
+    {
+      "token": "u",
+      "expected": [
+        "wu",
+        1,
+        "",
+        "u"
+      ]
+    },
+    {
+      "token": "o",
+      "expected": [
+        "o",
+        1,
+        "",
+        "o"
+      ]
+    },
+    {
+      "token": "zhi",
+      "expected": [
+        "zhi",
+        1,
+        "zh",
+        "iii"
+      ]
+    },
+    {
+      "token": "zi",
+      "expected": [
+        "zi",
+        1,
+        "z",
+        "ii"
+      ]
+    },
+    {
+      "token": "ji",
+      "expected": [
+        "ji",
+        1,
+        "j",
+        "i"
+      ]
+    },
+    {
+      "token": "ju",
+      "expected": [
+        "ju",
+        1,
+        "j",
+        "v"
+      ]
+    },
+    {
+      "token": "jvan1",
+      "expected": [
+        "juan",
+        1,
+        "j",
+        "van"
+      ]
+    },
+    {
+      "token": "juan1",
+      "expected": [
+        "juan",
+        1,
+        "j",
+        "van"
+      ]
+    },
+    {
+      "token": "jue",
+      "expected": [
+        "jue",
+        1,
+        "j",
+        "ve"
+      ]
+    },
+    {
+      "token": "jun",
+      "expected": [
+        "jun",
+        1,
+        "j",
+        "vn"
+      ]
+    },
+    {
+      "token": "yue",
+      "expected": [
+        "yue",
+        1,
+        "",
+        "ve"
+      ]
+    },
+    {
+      "token": "yun",
+      "expected": [
+        "yun",
+        1,
+        "",
+        "vn"
+      ]
+    },
+    {
+      "token": "yuan",
+      "expected": [
+        "yuan",
+        1,
+        "",
+        "van"
+      ]
+    },
+    {
+      "token": "weng",
+      "expected": [
+        "weng",
+        1,
+        "",
+        "ueng"
+      ]
+    },
+    {
+      "token": "shuang",
+      "expected": [
+        "shuang",
+        1,
+        "sh",
+        "uang"
+      ]
+    },
+    {
+      "token": "biang",
+      "expected": [
+        "biang",
+        1,
+        "b",
+        "iang"
+      ]
+    },
+    {
+      "token": "mā",
+      "expected": [
+        "ma",
+        1,
+        "m",
+        "a"
+      ]
+    },
+    {
+      "token": "ma5",
+      "expected": [
+        "ma",
+        0,
+        "m",
+        "a"
+      ]
+    },
+    {
+      "token": "ma0",
+      "expected": [
+        "ma",
+        0,
+        "m",
+        "a"
+      ]
+    },
+    {
+      "token": "LǙ",
+      "expected": [
+        "lv",
+        3,
+        "l",
+        "v"
+      ]
+    }
+  ],
+  "resolve_errors": [
+    {
+      "tokens": "r",
+      "language": "en",
+      "alphabet": "ipa"
+    },
+    {
+      "tokens": "e",
+      "language": "en",
+      "alphabet": "xsampa"
+    },
+    {
+      "tokens": "hello",
+      "language": "en",
+      "alphabet": "ipa"
+    },
+    {
+      "tokens": "ɯ",
+      "language": "ja",
+      "alphabet": "ipa"
+    },
+    {
+      "tokens": "aɪː",
+      "language": "en",
+      "alphabet": "ipa"
+    },
+    {
+      "tokens": "a .",
+      "language": "zh",
+      "alphabet": "ipa"
+    },
+    {
+      "tokens": "ˈ ˌ a",
+      "language": "ja",
+      "alphabet": "ipa",
+      "allow_approximation": true
+    }
+  ],
+  "pinyin_errors": [
+    "mǎ2",
+    "huar1",
+    "yo",
+    "ê",
+    "ba11",
+    "ba6",
+    "你好",
+    "ni3hao3"
+  ]
+}

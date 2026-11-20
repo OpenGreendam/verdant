@@ -1,0 +1,96 @@
+name: frontend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .ci/cargo/registry
+            .ci/cargo/git
+            .ci/target
+          key: ${{ runner.os }}-verdant-${{ hashFiles('frontend/Cargo.lock', 'frontend/Dockerfile') }}
+          restore-keys: ${{ runner.os }}-verdant-
+      - name: Build the development image
+        run: docker build --tag verdant-dev --file frontend/Dockerfile frontend
+      - name: Test, compile, check generated output, and package
+        run: |
+          mkdir -p .ci/cargo .ci/target
+          docker run --rm --memory=8g --cpus=2 \
+            --mount type=bind,src="$PWD",dst=/workspace \
+            --mount type=bind,src="$PWD/.ci/cargo",dst=/cargo-cache \
+            --mount type=bind,src="$PWD/.ci/target",dst=/build \
+            --env CARGO_HOME=/cargo-cache --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/workspace verdant-dev \
+            sh /workspace/tools/check_frontend.sh
+      - name: Retain the guarded Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdant-linux
+          path: |
+            .ci/target/package-smoke.*/*.tar.gz
+            .ci/target/package-smoke.*/*.sha256
+          if-no-files-found: error
+
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: windows-x86_64
+          - runner: macos-15
+            target: macos-aarch64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch locked build inputs
+        working-directory: frontend
+        run: cargo fetch --locked
+      - name: Build and test native executables
+        working-directory: frontend
+        run: |
+          cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
+          cargo test --offline --locked --release -p verdant-app --bin verdant theme::tests
+          cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
+      - name: Assemble and check the native package
+        env:
+          VERDANT_PACKAGE_TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p .ci/runtime .ci/package
+          release=frontend/target/release/verdant-release
+          if [ "$RUNNER_OS" = Windows ]; then release="$release.exe"; fi
+          runtime=$("$release" runtime-inputs --target "$VERDANT_PACKAGE_TARGET")
+          curl --fail --location --max-time 120 "$(jq -er .wheel_url <<< "$runtime")" --output .ci/runtime/onnxruntime.whl
+          selection_sha=$("$release" select-source --repo . --output .ci/source-selection.json | jq -er .sha256)
+          export SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
+          "$release" package --repo . --binaries frontend/target/release --target "$VERDANT_PACKAGE_TARGET" \
+            --onnxruntime-wheel .ci/runtime/onnxruntime.whl --output .ci/package \
+            --source-selection .ci/source-selection.json --source-selection-sha256 "$selection_sha"
+          "$release" check --check .ci/package --require-package --expected-source-commit "$GITHUB_SHA" \
+            --expected-source-selection-sha256 "$selection_sha"
+      - name: Retain the guarded native package
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdant-${{ matrix.target }}
+          path: .ci/package/
+          if-no-files-found: error

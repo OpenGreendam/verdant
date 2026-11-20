@@ -1,0 +1,19 @@
+[package]
+name = "verdant-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Verdant project domain: greendam-project v0.1 model, command batches, reversible transactions, revisions."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+pinyin = { version = "=0.11.0", default-features = false, features = ["heteronym", "with_tone_num_end"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem"] }

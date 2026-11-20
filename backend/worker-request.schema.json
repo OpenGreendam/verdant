@@ -1,0 +1,1416 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opengreendam:worker:1:request",
+  "title": "Verdant native worker request v1",
+  "type": "object",
+  "required": [
+    "protocol",
+    "request_id",
+    "op"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": {
+      "const": "ogd-worker/1"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "op": {
+      "enum": [
+        "capabilities",
+        "render",
+        "cancel",
+        "shutdown",
+        "admit_voice"
+      ]
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "route": {
+      "enum": [
+        "verdant-voice",
+        "C0"
+      ]
+    },
+    "payload": {
+      "$ref": "#/$defs/payload"
+    },
+    "voice_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "assets": {
+      "$ref": "#/$defs/voiceAssets"
+    },
+    "source_evidence": {
+      "$ref": "#/$defs/sourceEvidence"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "render"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "job_id",
+          "revision",
+          "route",
+          "payload"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": ["route"],
+        "properties": { "op": { "const": "render" }, "route": { "const": "C0" } }
+      },
+      "then": {
+        "required": ["voice_ref"],
+        "properties": { "voice_ref": { "const": "verdant-original-sn16k" } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "cancel"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "job_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "required": [
+              "vocal_tract"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "enum": [
+              "C0"
+            ]
+          },
+          "payload": {
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "required": [
+              "model_dynamics"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "enum": [
+              "C0"
+            ]
+          },
+          "payload": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              }
+            },
+            "not": {
+              "required": [
+                "score"
+              ],
+              "properties": {
+                "score": {
+                  "required": [
+                    "synthesis"
+                  ],
+                  "properties": {
+                    "synthesis": {
+                      "required": [
+                        "gain_mode"
+                      ],
+                      "properties": {
+                        "gain_mode": {
+                          "const": "relative"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "required": [
+              "consonant_dynamics"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "enum": [
+              "C0"
+            ]
+          },
+          "payload": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              }
+            },
+            "not": {
+              "required": [
+                "score"
+              ],
+              "properties": {
+                "score": {
+                  "required": [
+                    "synthesis"
+                  ],
+                  "properties": {
+                    "synthesis": {
+                      "required": [
+                        "gain_mode"
+                      ],
+                      "properties": {
+                        "gain_mode": {
+                          "const": "relative"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "required": [
+              "expression"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "route": {
+            "enum": [
+              "verdant-voice",
+              "C0"
+            ]
+          },
+          "payload": {
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "required": [
+              "output_transients"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "route": {
+            "enum": [
+              "verdant-voice",
+              "C0"
+            ]
+          },
+          "payload": {
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "admit_voice"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reference",
+          "display_name",
+          "assets"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "assets"
+        ],
+        "properties": {
+          "assets": {
+            "required": [
+              "voice_package"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "source_evidence"
+        ],
+        "properties": {
+          "op": {
+            "const": "admit_voice"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "source_evidence"
+        ]
+      },
+      "then": {
+        "properties": {
+          "op": {
+            "const": "admit_voice"
+          },
+          "assets": {
+            "required": [
+              "voice_package"
+            ]
+          }
+        },
+        "required": [
+          "assets"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": ["payload"],
+        "properties": {
+          "payload": {"required": ["voice_music"]}
+        }
+      },
+      "then": {
+        "required": ["route"],
+        "properties": {
+          "route": {"const": "verdant-voice"},
+          "payload": {
+            "properties": {"kind": {"const": "native_score"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "const": "verdant-voice"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              },
+              "control_track": {
+                "properties": {
+                  "f0_hz": {"items": {"maximum": 2000}}
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "vocal_tract"
+                  ]
+                },
+                {
+                  "required": [
+                    "model_dynamics"
+                  ]
+                },
+                {
+                  "required": [
+                    "consonant_dynamics"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "score": {
+                "properties": {
+                  "segments": {
+                    "items": {
+                      "properties": {
+                        "duration_seconds": {"minimum": 0.024999999999000003},
+                        "f0_hz": {
+                          "maximum": 2000
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "control_track": {
+                "properties": {
+                  "f0_hz": {
+                    "items": {
+                      "maximum": 4000
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "controlTrack": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "frame_times_seconds",
+        "f0_hz",
+        "uv"
+      ],
+      "properties": {
+        "frame_times_seconds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32768,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120.000000000001
+          }
+        },
+        "f0_hz": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32768,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 4000
+          }
+        },
+        "uv": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32768,
+          "items": {
+            "type": "boolean"
+          }
+        }
+      },
+      "description": "Aligned increasing controls. continuous-runs-v1 admits <=120 s and 32768 points; every other payload additionally uses legacyControlTrack (30 s / 20000). Worker enforces equal lengths and route pitch ranges. verdant-voice and C0 admit 35..2000 Hz."
+    },
+    "nativeScore": {
+      "type": "object",
+      "required": [
+        "segments"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2048,
+          "items": {
+            "type": "object",
+            "required": [
+              "duration_seconds"
+            ],
+            "properties": {
+              "duration_seconds": {
+                "type": "number",
+                "minimum": 0.004999999999,
+                "maximum": 30.000000000001,
+                "description": "verdant-voice accepts 5 ms to 30 s. Other routes require 25 ms to 30 s. Bounds allow 1e-12 s of arithmetic residue."
+              },
+              "gap_after_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 30.000000000001,
+                "description": "Nominal range 0 to 30 s; only the upper bound allows 1e-12 s of floating-point arithmetic residue."
+              },
+              "vowel": {
+                "enum": [
+                  "a",
+                  "i",
+                  "u",
+                  "e",
+                  "o"
+                ]
+              },
+              "context_mode": {
+                "type": "string"
+              },
+              "context": {
+                "type": "object"
+              },
+              "midi_note": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 127
+              },
+              "f0_hz": {
+                "type": "number",
+                "minimum": 35,
+                "maximum": 2000
+              },
+              "voiced": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "phoneme": {
+                "type": "object",
+                "description": "Inspect-only pronunciation trace. Target IPA and source language are retained independently of the selected native acoustic phone.",
+                "required": [
+                  "canonical_ipa",
+                  "source_language",
+                  "input_alphabet",
+                  "native_key",
+                  "support"
+                ],
+                "properties": {
+                  "canonical_ipa": {
+                    "type": "string"
+                  },
+                  "source_language": {
+                    "enum": [
+                      "zh",
+                      "en",
+                      "ja"
+                    ]
+                  },
+                  "source_note_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional explicit frontend note ownership for verdant-voice music articulation; not a learned input or authenticated identity. Absence preserves separate-segment behavior."
+                  },
+                  "input_alphabet": {
+                    "enum": [
+                      "ipa",
+                      "xsampa",
+                      "vocaloid-xsampa",
+                      "kana"
+                    ]
+                  },
+                  "native_key": {
+                    "type": "string"
+                  },
+                  "support": {
+                    "enum": [
+                      "native",
+                      "approximate"
+                    ]
+                  },
+                  "approximation_reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "realization": {
+                    "type": "object",
+                    "description": "Optional kana-specific phonetic realization. Canonical IPA and source language remain unchanged; this trace does not instruct the renderer to infer a new substitution.",
+                    "required": [
+                      "schema_version",
+                      "source_mora",
+                      "source_phonological",
+                      "target_ipa",
+                      "following_ipa",
+                      "rule"
+                    ],
+                    "properties": {
+                      "schema_version": {
+                        "const": "verdant-japanese-realization/1"
+                      },
+                      "source_mora": {
+                        "const": "ん"
+                      },
+                      "source_phonological": {
+                        "const": "moraic_nasal"
+                      },
+                      "target_ipa": {
+                        "enum": [
+                          "m",
+                          "n",
+                          "ŋ"
+                        ]
+                      },
+                      "following_ipa": {
+                        "type": "string"
+                      },
+                      "rule": {
+                        "const": "same-written-word nasal place assimilation"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "continuation_of": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Earlier nucleus segment index in the same adjacent, voiced continuation group; cross-gap or mismatched links are rejected by native planning."
+              }
+            }
+          }
+        },
+        "synthesis": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "duration_mode": {
+              "enum": [
+                "singing",
+                "model"
+              ]
+            },
+            "source_profile": {
+              "enum": [
+                "phonetic",
+                "legacy"
+              ]
+            },
+            "prosody_mode": {
+              "enum": [
+                "auto",
+                "step"
+              ]
+            },
+            "vowel_brightness_db": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 8
+            },
+            "gain_mode": {
+              "enum": [
+                "off",
+                "relative"
+              ],
+              "description": "Default off. Relative is a bounded experimental envelope from original model log-gain, not recovered absolute calibration."
+            },
+            "vowel_balance_db": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 18,
+              "description": "Bounded H2/H3 source compensation for eligible stable voiced vowels. Native CLI and absent legacy requests default to 0; the GPUI v10 preset explicitly sends 18."
+            },
+            "phonetic_correction": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "strength"
+              ],
+              "properties": {
+                "method": {
+                  "const": "articulatory-v1"
+                },
+                "strength": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "description": "Optional experimental target-phoneme correction. Only verified target/native mapping pairs with a declared recipe are modified. Authored F0 and note duration are preserved; unmatched targets remain explicitly approximate. Null or zero strength leaves the old DSP unchanged."
+            }
+          }
+        },
+        "original_hierarchy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "nodes",
+            "segment_node_indices",
+            "provenance"
+          ],
+          "description": "Optional caller-supplied original hierarchy. Every segment must have an explicit original phone and a matching node index. Does not predict original linguistic boundaries from text or notes.",
+          "properties": {
+            "schema_version": {
+              "const": "ogd-explicit-original-hierarchy/1"
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "segment_node_indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2048,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4095
+              }
+            },
+            "nodes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4096,
+              "items": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "left_level",
+                  "right_level"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 235
+                  },
+                  "left_level": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "right_level": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  }
+                }
+              }
+            }
+          }
+        },
+        "phoneme_timing": {
+          "$ref": "#/$defs/phonemeTiming"
+        },
+        "continuity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method"
+          ],
+          "properties": {
+            "method": {
+              "const": "continuous-runs-v1"
+            }
+          },
+          "description": "Explicit whole-run mode; requires validated vowel anchors. One invocation retains all existing synthesis state. Bound120 s /2048 segments, no silent internal split."
+        }
+      },
+      "description": "Explicit native score. Legacy whole phrase including gaps <=30 s /512 segments; continuity marker with validated vowel anchors permits <=120 s /2048 segments. Worker checks compensated total and trace arithmetic. Per-segment limits stay30 s.",
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "continuity"
+            ]
+          },
+          "then": {
+            "required": [
+              "phoneme_timing"
+            ]
+          },
+          "else": {
+            "properties": {
+              "segments": {
+                "maxItems": 512
+              },
+              "phoneme_timing": {
+                "properties": {
+                  "notes": {
+                    "maxItems": 512
+                  }
+                }
+              },
+              "original_hierarchy": {
+                "properties": {
+                  "segment_node_indices": {
+                    "maxItems": 512
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "kind",
+        "score"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "native_score"
+        },
+        "score": {
+          "$ref": "#/$defs/nativeScore"
+        },
+        "control_track": {
+          "$ref": "#/$defs/controlTrack"
+        },
+        "native_seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "voice_music": {
+          "$ref": "#/$defs/voiceMusic"
+        },
+        "vocal_tract": {
+          "$ref": "#/$defs/vocalTract"
+        },
+        "model_dynamics": {
+          "$ref": "#/$defs/modelDynamics"
+        },
+        "consonant_dynamics": {
+          "$ref": "#/$defs/consonantDynamics"
+        },
+        "expression": {
+          "$ref": "#/$defs/expression"
+        },
+        "output_transients": {
+          "$ref": "#/$defs/outputTransients"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "score"
+            ],
+            "properties": {
+              "kind": {
+                "const": "native_score"
+              },
+              "score": {
+                "required": [
+                  "continuity"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "control_track": {
+                "$ref": "#/$defs/legacyControlTrack"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "voiceMusic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "sample_rate"],
+      "properties": {
+        "method": {"const": "verdant-voice-music-v1"},
+        "sample_rate": {"type": "integer", "enum": [44100, 48000]}
+      },
+      "description": "Explicit output-rate conversion and attenuation-only headroom after native 48 kHz verdant-voice decoding. Native semantic articulation and the learned audio band are preserved. Omit for the unchanged 48 kHz decoded output."
+    },
+    "vocalTract": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/bilinearVocalTract"
+        },
+        {
+          "$ref": "#/$defs/anchoredVocalTract"
+        }
+      ],
+      "description": "Independent Native spectral-envelope transform for C0 native_score. All frames share one configuration; authored F0, UV, timing and synthesis seed selection are unchanged."
+    },
+    "bilinearVocalTract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "ratio"
+      ],
+      "properties": {
+        "method": {
+          "const": "bilinear-v1"
+        },
+        "ratio": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 1.25
+        }
+      },
+      "description": "Independent Native spectral-envelope transform for C0 native_score. Ratio 1 is an exact bypass; authored F0, UV, timing and synthesis seed selection are unchanged."
+    },
+    "anchoredVocalTract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "ratio",
+        "anchor_ratios"
+      ],
+      "properties": {
+        "method": {
+          "const": "anchored-warp-v1"
+        },
+        "ratio": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 1.25
+        },
+        "anchor_ratios": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0.8,
+            "maximum": 1.25
+          }
+        }
+      },
+      "description": "Global residual monotone PCHIP warp after bilinear-v1, at fixed 0.1 and 0.3 Nyquist anchors. Anchor ratios [1,1] dispatch exactly to bilinear-v1 at the same ratio."
+    },
+    "modelDynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "strength",
+        "max_attenuation_db"
+      ],
+      "properties": {
+        "method": {
+          "const": "voiced-envelope-v1"
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_attenuation_db": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12
+        }
+      },
+      "description": "Optional attenuation-only model log-gain envelope for explicitly voiced vowel regions. Native C0 only, applied after existing run calibration without renormalization. Omit to disable; either numeric control at zero bypasses exactly. Independent of score.synthesis and its seed semantics. Cannot coexist with legacy gain_mode relative. Class labels describe inventory phones, not inferred acoustic subdivisions of compound finals."
+    },
+    "phonemeTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "notes"
+      ],
+      "description": "Explicit frontend schedule. Worker additionally checks coverage and arithmetic equality to supplied segment boundaries; this schema cannot express those cross-field constraints.",
+      "properties": {
+        "method": {
+          "const": "vowel-anchor-v1"
+        },
+        "notes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2048,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "note_id",
+              "note_onset_seconds",
+              "note_end_seconds",
+              "first_segment_index",
+              "nucleus_segment_index",
+              "end_segment_index",
+              "prefix_seconds",
+              "tail_trim_seconds"
+            ],
+            "properties": {
+              "note_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "note_onset_seconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "note_end_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "first_segment_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "nucleus_segment_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_segment_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "prefix_seconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "tail_trim_seconds": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "consonantDynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "strength",
+        "max_attenuation_db"
+      ],
+      "properties": {
+        "method": {
+          "const": "unvoiced-model-envelope-v1"
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_attenuation_db": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12
+        }
+      },
+      "description": "Optional bounded model log-gain envelope for noise excitation in explicitly unvoiced stop and affricate regions. Native C0 only. Preserves the existing run calibration from an unchanged excitation reference; does not move release timing or renormalize the candidate. Omit to disable; either numeric control at zero bypasses exactly. Independent of score.synthesis and its seed semantics. Cannot coexist with legacy gain_mode relative. Filter memory can affect adjacent samples, so the noise-envelope bound is not a pointwise output-waveform bound."
+    },
+    "legacyControlTrack": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "frame_times_seconds",
+        "f0_hz",
+        "uv"
+      ],
+      "properties": {
+        "frame_times_seconds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 20000,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30.000000000001
+          }
+        },
+        "f0_hz": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 20000,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          }
+        },
+        "uv": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 20000,
+          "items": {
+            "type": "boolean"
+          }
+        }
+      },
+      "description": "Equal lengths; increasing times; uv=true means F0=0, voiced F0>0. The 30 s bound allows only 1e-12 s arithmetic residue. Worker admits 35..2000 Hz voiced authored F0. All authored anchors are validated before interpolation without clipping."
+    },
+    "outputTransients": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "strength",
+        "max_attenuation_db"
+      ],
+      "properties": {
+        "method": {
+          "const": "phoneme-output-envelope-v1"
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_attenuation_db": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12
+        }
+      },
+      "description": "Optional bounded model log-gain envelope for noise excitation in explicitly unvoiced stop and affricate regions. Native C0 only. Preserves the existing run calibration from an unchanged excitation reference; does not move release timing or renormalize the candidate. Omit to disable; either numeric control at zero bypasses exactly. Independent of score.synthesis and its seed semantics. Cannot coexist with legacy gain_mode relative. Filter memory can affect adjacent samples, so the noise-envelope bound is not a pointwise output-waveform bound."
+    },
+    "expression": {
+      "type": "object",
+      "description": "Compiled expression curves in note-relative seconds, including exact tempo-boundary anchors: at most 32768 points per curve and 2048 owned intervals. Project authoring remains limited to 4096 points per curve; the worker retains the total 8 MiB wire-request bound.",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "segments"
+      ],
+      "properties": {
+        "method": {
+          "const": "vocaloid-controls-v1"
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2048,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_seconds",
+              "end_seconds",
+              "note_onset_seconds",
+              "curves"
+            ],
+            "properties": {
+              "start_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 120.000000001
+              },
+              "end_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 120.000000001
+              },
+              "note_onset_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 120.000000001
+              },
+              "curves": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "BRE": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32768,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 120
+                        },
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 127
+                        }
+                      ]
+                    }
+                  },
+                  "BRI": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32768,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 120
+                        },
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 127
+                        }
+                      ]
+                    }
+                  },
+                  "CLE": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32768,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 120
+                        },
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 127
+                        }
+                      ]
+                    }
+                  },
+                  "GEN": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32768,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 120
+                        },
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 127
+                        }
+                      ]
+                    }
+                  },
+                  "OPE": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32768,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 120
+                        },
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 127
+                        }
+                      ]
+                    }
+                  },
+                  "GWL": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32768,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 120
+                        },
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 127
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "voiceAssets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "token": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "voice_package": { "type": "string", "minLength": 1 }
+      },
+      "oneOf": [
+        {
+          "required": ["voice_package"],
+          "not": { "anyOf": [{ "required": ["token"] }, { "required": ["model"] }] }
+        },
+        {
+          "required": ["token", "model"],
+          "not": { "required": ["voice_package"] }
+        }
+      ]
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token",
+        "model",
+        "rights_attested"
+      ],
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_attested": {
+          "const": true
+        }
+      }
+    }
+  }
+}

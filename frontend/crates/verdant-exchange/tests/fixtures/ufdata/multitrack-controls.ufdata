@@ -1,0 +1,45 @@
+{
+  "formatVersion": 1,
+  "project": {
+    "name": "Timing and phoneme diagnostics",
+    "tracks": [
+      {
+        "name": "Lead",
+        "notes": [
+          {"key": 60, "tickOn": 0, "tickOff": 480, "lyric": "啊", "phoneme": "  a   i  ", "vendorNote": {"kept": 7}},
+          {"key": 62, "tickOn": 600, "tickOff": 960, "lyric": "い", "phoneme": null},
+          {"key": 65, "tickOn": 1680, "tickOff": 2160, "lyric": "u", "phoneme": "d u"}
+        ],
+        "pitch": {
+          "ticks": [-120, 0, 240, 360, 480, 600, 720, 960, 1560, 1680, 1800, 2160, 2300],
+          "values": [60.1, 60.25, 60.5, null, null, 62.75, null, 63.0, null, 65.1, 65.2, null, 66.0],
+          "isAbsolute": true,
+          "vendorPitch": "preserve only while pitch is unchanged"
+        },
+        "vendorTrack": {"kept": true}
+      },
+      {
+        "name": "Harmony",
+        "notes": [
+          {"key": 61, "tickOn": 0, "tickOff": 240, "lyric": "a", "phoneme": ""},
+          {"key": 64, "tickOn": 480, "tickOff": 720, "lyric": "i"}
+        ],
+        "pitch": {"ticks": [-20, 0, 120, 240, 480, 600, 720, 3000], "values": [0.0, 0.0, 0.125, 0.0, -0.25, 0.5, 0.0, 0.0], "isAbsolute": false}
+      },
+      {"name": "Empty", "notes": [], "pitch": {}}
+    ],
+    "timeSignatures": [
+      {"measurePosition": 0, "numerator": 3, "denominator": 4, "vendorMeter": "first"},
+      {"measurePosition": 2, "numerator": 5, "denominator": 8},
+      {"measurePosition": 4, "numerator": 4, "denominator": 4}
+    ],
+    "tempos": [
+      {"tickPosition": 0, "bpm": 120.5, "vendorTempo": "first"},
+      {"tickPosition": 720, "bpm": 90.25},
+      {"tickPosition": 3600, "bpm": 133.333333}
+    ],
+    "measurePrefix": 2,
+    "vendorProject": [1, 2, 3]
+  },
+  "vendorRoot": {"roundtrip": true}
+}

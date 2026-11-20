@@ -1,0 +1,5970 @@
+{
+  "schema_version": "verdant-phonemes/2",
+  "canonical_alphabet": "ipa",
+  "supported_alphabets": [
+    "ipa",
+    "xsampa",
+    "vocaloid-xsampa"
+  ],
+  "scope": "Finite explicit phonetic units, not text G2P. IPA/X-SAMPA meanings never depend on language. Compound Mandarin rimes are written as IPA sequences within a whitespace-delimited unit. Native means an existing broad phonemic model path, not perfect phonetic realization. Japanese is an explicit cross-language approximation.",
+  "sources": [
+    {
+      "url": "https://www.internationalphoneticassociation.org/content/chart",
+      "purpose": "Canonical IPA symbols and diacritics"
+    },
+    {
+      "url": "https://www.phon.ucl.ac.uk/home/sampa/ipasam-x.pdf",
+      "purpose": "Original X-SAMPA definition; publisher fetch timed out during audit, cross-checked with eSpeak documentation"
+    },
+    {
+      "url": "https://github.com/espeak-ng/espeak-ng/blob/master/docs/phonemes/xsampa.md",
+      "purpose": "Open implementation documentation of standard X-SAMPA"
+    },
+    {
+      "url": "https://rsc-net.vocaloid.com/assets/pdf_files/VOCALOID5_Reference_Manual_ENG.pdf",
+      "purpose": "Explicit V5 English/Japanese/Chinese import dialect tables, pp.65–76"
+    },
+    {
+      "url": "https://clrd.ninjal.ac.jp/csj/misc/preliminary/labeling.html",
+      "purpose": "Japanese special morae and separate stop/affricate closure labels"
+    },
+    {
+      "url": "https://www.coelang.tufs.ac.jp/ja/en/pmod/practical/02-04-01.php",
+      "purpose": "Moraic nasal context dependence and duration"
+    }
+  ],
+  "duration_policy": {
+    "min_phone_seconds": 0.025,
+    "consonant_seconds": 0.06,
+    "consonant_share": 0.35,
+    "max_total_seconds": 30.0,
+    "note": "Reserve each native phone minimum; count an expanded canonical consonant once in min(0.06*sum(canonical consonant length),0.35*total), bounded by all native minima. Divide consonant excess between canonical units by length; palatal /j/ helpers retain only their native minimum. Divide vowel remainder by length. Kana groups reserve one ordinary mora for the C/V split and each extra っ/ー mora for its own consonant/nucleus. Manual native-phone weights remain exact shares and override automatic timing."
+  },
+  "markers": {
+    "ipa_stress": {
+      "ˈ": 1,
+      "ˌ": 2
+    },
+    "xsampa_stress": {
+      "\"": 1,
+      "%": 2
+    },
+    "syllable_boundary": ".",
+    "note": "A stress marker starts a new syllable after existing phones unless a dot already started one; it applies through that syllable. Stress defaults to 0 for English. A suffix length marker is part of a supported unit, never stripped."
+  },
+  "units": {
+    "a": {
+      "xsampa": "a",
+      "role": "nucleus",
+      "length": 1
+    },
+    "an": {
+      "xsampa": "an",
+      "role": "nucleus",
+      "length": 1
+    },
+    "aɪ": {
+      "xsampa": "aI",
+      "role": "nucleus",
+      "length": 1
+    },
+    "aʊ": {
+      "xsampa": "aU",
+      "role": "nucleus",
+      "length": 1
+    },
+    "aː": {
+      "xsampa": "a:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "b": {
+      "xsampa": "b",
+      "role": "consonant",
+      "length": 1
+    },
+    "bʰ": {
+      "xsampa": "b_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "bʰː": {
+      "xsampa": "b_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "bʲ": {
+      "xsampa": "b_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "bʲː": {
+      "xsampa": "b_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "bː": {
+      "xsampa": "b:",
+      "role": "consonant",
+      "length": 2
+    },
+    "d": {
+      "xsampa": "d",
+      "role": "consonant",
+      "length": 1
+    },
+    "dʰ": {
+      "xsampa": "d_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "dʰː": {
+      "xsampa": "d_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "dʲ": {
+      "xsampa": "d_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "dʲː": {
+      "xsampa": "d_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "dː": {
+      "xsampa": "d:",
+      "role": "consonant",
+      "length": 2
+    },
+    "d͡z": {
+      "xsampa": "d_z",
+      "role": "consonant",
+      "length": 1
+    },
+    "d͡zː": {
+      "xsampa": "d_z:",
+      "role": "consonant",
+      "length": 2
+    },
+    "d͡ʑ": {
+      "xsampa": "d_z\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "d͡ʑː": {
+      "xsampa": "d_z\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "d͡ʒ": {
+      "xsampa": "d_Z",
+      "role": "consonant",
+      "length": 1
+    },
+    "d͡ʒː": {
+      "xsampa": "d_Z:",
+      "role": "consonant",
+      "length": 2
+    },
+    "e": {
+      "xsampa": "e",
+      "role": "nucleus",
+      "length": 1
+    },
+    "eɪ": {
+      "xsampa": "eI",
+      "role": "nucleus",
+      "length": 1
+    },
+    "eː": {
+      "xsampa": "e:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "f": {
+      "xsampa": "f",
+      "role": "consonant",
+      "length": 1
+    },
+    "fː": {
+      "xsampa": "f:",
+      "role": "consonant",
+      "length": 2
+    },
+    "h": {
+      "xsampa": "h",
+      "role": "consonant",
+      "length": 1
+    },
+    "hʲ": {
+      "xsampa": "h_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "hʲː": {
+      "xsampa": "h_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "hː": {
+      "xsampa": "h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "i": {
+      "xsampa": "i",
+      "role": "nucleus",
+      "length": 1
+    },
+    "in": {
+      "xsampa": "in",
+      "role": "nucleus",
+      "length": 1
+    },
+    "iŋ": {
+      "xsampa": "iN",
+      "role": "nucleus",
+      "length": 1
+    },
+    "iː": {
+      "xsampa": "i:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "j": {
+      "xsampa": "j",
+      "role": "consonant",
+      "length": 1
+    },
+    "ja": {
+      "xsampa": "ja",
+      "role": "nucleus",
+      "length": 1
+    },
+    "jaʊ": {
+      "xsampa": "jaU",
+      "role": "nucleus",
+      "length": 1
+    },
+    "joʊ": {
+      "xsampa": "joU",
+      "role": "nucleus",
+      "length": 1
+    },
+    "jɑŋ": {
+      "xsampa": "jAN",
+      "role": "nucleus",
+      "length": 1
+    },
+    "jɛ": {
+      "xsampa": "jE",
+      "role": "nucleus",
+      "length": 1
+    },
+    "jɛn": {
+      "xsampa": "jEn",
+      "role": "nucleus",
+      "length": 1
+    },
+    "jʊŋ": {
+      "xsampa": "jUN",
+      "role": "nucleus",
+      "length": 1
+    },
+    "jː": {
+      "xsampa": "j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "k": {
+      "xsampa": "k",
+      "role": "consonant",
+      "length": 1
+    },
+    "kʰ": {
+      "xsampa": "k_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "kʰː": {
+      "xsampa": "k_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "kʲ": {
+      "xsampa": "k_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "kʲː": {
+      "xsampa": "k_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "kː": {
+      "xsampa": "k:",
+      "role": "consonant",
+      "length": 2
+    },
+    "l": {
+      "xsampa": "l",
+      "role": "consonant",
+      "length": 1
+    },
+    "lː": {
+      "xsampa": "l:",
+      "role": "consonant",
+      "length": 2
+    },
+    "m": {
+      "xsampa": "m",
+      "role": "consonant",
+      "length": 1
+    },
+    "mʲ": {
+      "xsampa": "m_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "mʲː": {
+      "xsampa": "m_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "mː": {
+      "xsampa": "m:",
+      "role": "consonant",
+      "length": 2
+    },
+    "n": {
+      "xsampa": "n",
+      "role": "consonant",
+      "length": 1
+    },
+    "nʲ": {
+      "xsampa": "n_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "nʲː": {
+      "xsampa": "n_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "nː": {
+      "xsampa": "n:",
+      "role": "consonant",
+      "length": 2
+    },
+    "o": {
+      "xsampa": "o",
+      "role": "nucleus",
+      "length": 1
+    },
+    "oʊ": {
+      "xsampa": "oU",
+      "role": "nucleus",
+      "length": 1
+    },
+    "oː": {
+      "xsampa": "o:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "p": {
+      "xsampa": "p",
+      "role": "consonant",
+      "length": 1
+    },
+    "pʰ": {
+      "xsampa": "p_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "pʰː": {
+      "xsampa": "p_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "pʲ": {
+      "xsampa": "p_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "pʲː": {
+      "xsampa": "p_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "pː": {
+      "xsampa": "p:",
+      "role": "consonant",
+      "length": 2
+    },
+    "r": {
+      "xsampa": "r",
+      "role": "consonant",
+      "length": 1
+    },
+    "rː": {
+      "xsampa": "r:",
+      "role": "consonant",
+      "length": 2
+    },
+    "s": {
+      "xsampa": "s",
+      "role": "consonant",
+      "length": 1
+    },
+    "sː": {
+      "xsampa": "s:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t": {
+      "xsampa": "t",
+      "role": "consonant",
+      "length": 1
+    },
+    "tʰ": {
+      "xsampa": "t_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "tʰː": {
+      "xsampa": "t_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "tʲ": {
+      "xsampa": "t_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "tʲː": {
+      "xsampa": "t_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "tː": {
+      "xsampa": "t:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡s": {
+      "xsampa": "t_s",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡sʰ": {
+      "xsampa": "t_s_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡sʰː": {
+      "xsampa": "t_s_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡sː": {
+      "xsampa": "t_s:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡ɕ": {
+      "xsampa": "t_s\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡ɕʰ": {
+      "xsampa": "t_s\\_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡ɕʰː": {
+      "xsampa": "t_s\\_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡ɕː": {
+      "xsampa": "t_s\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡ʂ": {
+      "xsampa": "t_s`",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡ʂʰ": {
+      "xsampa": "t_s`_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡ʂʰː": {
+      "xsampa": "t_s`_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡ʂː": {
+      "xsampa": "t_s`:",
+      "role": "consonant",
+      "length": 2
+    },
+    "t͡ʃ": {
+      "xsampa": "t_S",
+      "role": "consonant",
+      "length": 1
+    },
+    "t͡ʃː": {
+      "xsampa": "t_S:",
+      "role": "consonant",
+      "length": 2
+    },
+    "u": {
+      "xsampa": "u",
+      "role": "nucleus",
+      "length": 1
+    },
+    "uː": {
+      "xsampa": "u:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "v": {
+      "xsampa": "v",
+      "role": "consonant",
+      "length": 1
+    },
+    "vː": {
+      "xsampa": "v:",
+      "role": "consonant",
+      "length": 2
+    },
+    "w": {
+      "xsampa": "w",
+      "role": "consonant",
+      "length": 1
+    },
+    "wa": {
+      "xsampa": "wa",
+      "role": "nucleus",
+      "length": 1
+    },
+    "wan": {
+      "xsampa": "wan",
+      "role": "nucleus",
+      "length": 1
+    },
+    "waɪ": {
+      "xsampa": "waI",
+      "role": "nucleus",
+      "length": 1
+    },
+    "weɪ": {
+      "xsampa": "weI",
+      "role": "nucleus",
+      "length": 1
+    },
+    "wo": {
+      "xsampa": "wo",
+      "role": "nucleus",
+      "length": 1
+    },
+    "wɑŋ": {
+      "xsampa": "wAN",
+      "role": "nucleus",
+      "length": 1
+    },
+    "wən": {
+      "xsampa": "w@n",
+      "role": "nucleus",
+      "length": 1
+    },
+    "wəŋ": {
+      "xsampa": "w@N",
+      "role": "nucleus",
+      "length": 1
+    },
+    "wː": {
+      "xsampa": "w:",
+      "role": "consonant",
+      "length": 2
+    },
+    "x": {
+      "xsampa": "x",
+      "role": "consonant",
+      "length": 1
+    },
+    "xː": {
+      "xsampa": "x:",
+      "role": "consonant",
+      "length": 2
+    },
+    "y": {
+      "xsampa": "y",
+      "role": "nucleus",
+      "length": 1
+    },
+    "yn": {
+      "xsampa": "yn",
+      "role": "nucleus",
+      "length": 1
+    },
+    "yː": {
+      "xsampa": "y:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "z": {
+      "xsampa": "z",
+      "role": "consonant",
+      "length": 1
+    },
+    "zː": {
+      "xsampa": "z:",
+      "role": "consonant",
+      "length": 2
+    },
+    "æ": {
+      "xsampa": "{",
+      "role": "nucleus",
+      "length": 1
+    },
+    "æː": {
+      "xsampa": "{:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ç": {
+      "xsampa": "C",
+      "role": "consonant",
+      "length": 1
+    },
+    "çː": {
+      "xsampa": "C:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ð": {
+      "xsampa": "D",
+      "role": "consonant",
+      "length": 1
+    },
+    "ðː": {
+      "xsampa": "D:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ŋ": {
+      "xsampa": "N",
+      "role": "consonant",
+      "length": 1
+    },
+    "ŋʲ": {
+      "xsampa": "N_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "ŋʲː": {
+      "xsampa": "N_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ŋː": {
+      "xsampa": "N:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɑ": {
+      "xsampa": "A",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɑŋ": {
+      "xsampa": "AN",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɑə": {
+      "xsampa": "A@",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɑɹ": {
+      "xsampa": "Ar\\",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɑː": {
+      "xsampa": "A:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɒ": {
+      "xsampa": "Q",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɒː": {
+      "xsampa": "Q:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɔ": {
+      "xsampa": "O",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɔə": {
+      "xsampa": "O@",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɔɪ": {
+      "xsampa": "OI",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɔː": {
+      "xsampa": "O:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɕ": {
+      "xsampa": "s\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɕː": {
+      "xsampa": "s\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ə": {
+      "xsampa": "@",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ən": {
+      "xsampa": "@n",
+      "role": "nucleus",
+      "length": 1
+    },
+    "əŋ": {
+      "xsampa": "@N",
+      "role": "nucleus",
+      "length": 1
+    },
+    "əʊ": {
+      "xsampa": "@U",
+      "role": "nucleus",
+      "length": 1
+    },
+    "əː": {
+      "xsampa": "@:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɚ": {
+      "xsampa": "@`",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɚː": {
+      "xsampa": "@`:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɛ": {
+      "xsampa": "E",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɛə": {
+      "xsampa": "E@",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɛː": {
+      "xsampa": "E:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɜ": {
+      "xsampa": "3",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɜː": {
+      "xsampa": "3:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɝ": {
+      "xsampa": "3`",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɝː": {
+      "xsampa": "3`:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɡ": {
+      "xsampa": "g",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɡʰ": {
+      "xsampa": "g_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɡʰː": {
+      "xsampa": "g_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɡʲ": {
+      "xsampa": "g_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɡʲː": {
+      "xsampa": "g_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɡː": {
+      "xsampa": "g:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɤ": {
+      "xsampa": "7",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɤː": {
+      "xsampa": "7:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɥ": {
+      "xsampa": "H",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɥɛ": {
+      "xsampa": "HE",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɥɛn": {
+      "xsampa": "HEn",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɥː": {
+      "xsampa": "H:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɦ": {
+      "xsampa": "h\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɦː": {
+      "xsampa": "h\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɨ": {
+      "xsampa": "1",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɨː": {
+      "xsampa": "1:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɪ": {
+      "xsampa": "I",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɪə": {
+      "xsampa": "I@",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɪː": {
+      "xsampa": "I:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɫ": {
+      "xsampa": "5",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɫː": {
+      "xsampa": "5:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɯ": {
+      "xsampa": "M",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɯː": {
+      "xsampa": "M:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɲ": {
+      "xsampa": "J",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɲː": {
+      "xsampa": "J:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɴ": {
+      "xsampa": "N\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɴː": {
+      "xsampa": "N\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɸ": {
+      "xsampa": "p\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɸʲ": {
+      "xsampa": "p\\_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɸʲː": {
+      "xsampa": "p\\_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɸː": {
+      "xsampa": "p\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɹ": {
+      "xsampa": "r\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɹː": {
+      "xsampa": "r\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɹ̩": {
+      "xsampa": "r\\=",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɹ̩ː": {
+      "xsampa": "r\\=:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɻ": {
+      "xsampa": "r\\`",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɻː": {
+      "xsampa": "r\\`:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɻ̩": {
+      "xsampa": "r\\`=",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ɻ̩ː": {
+      "xsampa": "r\\`=:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ɾ": {
+      "xsampa": "4",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɾʲ": {
+      "xsampa": "4_j",
+      "role": "consonant",
+      "length": 1
+    },
+    "ɾʲː": {
+      "xsampa": "4_j:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ɾː": {
+      "xsampa": "4:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʂ": {
+      "xsampa": "s`",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʂː": {
+      "xsampa": "s`:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʃ": {
+      "xsampa": "S",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʃː": {
+      "xsampa": "S:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʈ͡ʂ": {
+      "xsampa": "t`_s`",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʈ͡ʂʰ": {
+      "xsampa": "t`_s`_h",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʈ͡ʂʰː": {
+      "xsampa": "t`_s`_h:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʈ͡ʂː": {
+      "xsampa": "t`_s`:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʊ": {
+      "xsampa": "U",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ʊŋ": {
+      "xsampa": "UN",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ʊə": {
+      "xsampa": "U@",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ʊː": {
+      "xsampa": "U:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ʌ": {
+      "xsampa": "V",
+      "role": "nucleus",
+      "length": 1
+    },
+    "ʌː": {
+      "xsampa": "V:",
+      "role": "nucleus",
+      "length": 2
+    },
+    "ʐ": {
+      "xsampa": "z`",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʐː": {
+      "xsampa": "z`:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʑ": {
+      "xsampa": "z\\",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʑː": {
+      "xsampa": "z\\:",
+      "role": "consonant",
+      "length": 2
+    },
+    "ʒ": {
+      "xsampa": "Z",
+      "role": "consonant",
+      "length": 1
+    },
+    "ʒː": {
+      "xsampa": "Z:",
+      "role": "consonant",
+      "length": 2
+    },
+    "θ": {
+      "xsampa": "T",
+      "role": "consonant",
+      "length": 1
+    },
+    "θː": {
+      "xsampa": "T:",
+      "role": "consonant",
+      "length": 2
+    }
+  },
+  "ipa_aliases": {
+    "g": "ɡ",
+    "tʃ": "t͡ʃ",
+    "dʒ": "d͡ʒ",
+    "ts": "t͡s",
+    "dz": "d͡z",
+    "tɕ": "t͡ɕ",
+    "dʑ": "d͡ʑ",
+    "tʂ": "t͡ʂ",
+    "ʈʂ": "ʈ͡ʂ",
+    "t͜ʃ": "t͡ʃ",
+    "d͜ʒ": "d͡ʒ",
+    "t͜s": "t͡s",
+    "d͜z": "d͡z",
+    "t͜ɕ": "t͡ɕ",
+    "d͜ʑ": "d͡ʑ",
+    "t͜ʂ": "t͡ʂ",
+    "ʈ͜ʂ": "ʈ͡ʂ",
+    "gː": "ɡː",
+    "gʰ": "ɡʰ",
+    "gʲ": "ɡʲ",
+    "gʰː": "ɡʰː",
+    "gʲː": "ɡʲː",
+    "tʃː": "t͡ʃː",
+    "dʒː": "d͡ʒː",
+    "tsː": "t͡sː",
+    "tsʰ": "t͡sʰ",
+    "tsʰː": "t͡sʰː",
+    "dzː": "d͡zː",
+    "tɕː": "t͡ɕː",
+    "tɕʰ": "t͡ɕʰ",
+    "tɕʰː": "t͡ɕʰː",
+    "dʑː": "d͡ʑː",
+    "tʂː": "t͡ʂː",
+    "tʂʰ": "t͡ʂʰ",
+    "tʂʰː": "t͡ʂʰː",
+    "ʈʂː": "ʈ͡ʂː",
+    "ʈʂʰ": "ʈ͡ʂʰ",
+    "ʈʂʰː": "ʈ͡ʂʰː",
+    "t͜ʃː": "t͡ʃː",
+    "d͜ʒː": "d͡ʒː",
+    "t͜sː": "t͡sː",
+    "t͜sʰ": "t͡sʰ",
+    "t͜sʰː": "t͡sʰː",
+    "d͜zː": "d͡zː",
+    "t͜ɕː": "t͡ɕː",
+    "t͜ɕʰ": "t͡ɕʰ",
+    "t͜ɕʰː": "t͡ɕʰː",
+    "d͜ʑː": "d͡ʑː",
+    "t͜ʂː": "t͡ʂː",
+    "t͜ʂʰ": "t͡ʂʰ",
+    "t͜ʂʰː": "t͡ʂʰː",
+    "ʈ͜ʂː": "ʈ͡ʂː",
+    "ʈ͜ʂʰ": "ʈ͡ʂʰ",
+    "ʈ͜ʂʰː": "ʈ͡ʂʰː",
+    "ç": "ç",
+    "çː": "çː"
+  },
+  "xsampa_aliases": {
+    "ts": "t͡s",
+    "dz": "d͡z",
+    "tS": "t͡ʃ",
+    "dZ": "d͡ʒ",
+    "ts\\": "t͡ɕ",
+    "dz\\": "d͡ʑ",
+    "r\\_=": "ɹ̩",
+    "r\\`_=": "ɻ̩",
+    "ts:": "t͡sː",
+    "ts_h": "t͡sʰ",
+    "ts_h:": "t͡sʰː",
+    "dz:": "d͡zː",
+    "tS:": "t͡ʃː",
+    "dZ:": "d͡ʒː",
+    "ts\\:": "t͡ɕː",
+    "ts\\_h": "t͡ɕʰ",
+    "ts\\_h:": "t͡ɕʰː",
+    "dz\\:": "d͡ʑː",
+    "r\\_=:": "ɹ̩ː",
+    "r\\`_=:": "ɻ̩ː"
+  },
+  "native_phones": {
+    "en:aa": {
+      "native_language": "en",
+      "native_phone": "aa",
+      "phone_id": 174,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==aa"
+      ]
+    },
+    "en:ae": {
+      "native_language": "en",
+      "native_phone": "ae",
+      "phone_id": 175,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ae"
+      ]
+    },
+    "en:ah": {
+      "native_language": "en",
+      "native_phone": "ah",
+      "phone_id": 176,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ah"
+      ]
+    },
+    "en:ao": {
+      "native_language": "en",
+      "native_phone": "ao",
+      "phone_id": 177,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ao"
+      ]
+    },
+    "en:ar": {
+      "native_language": "en",
+      "native_phone": "ar",
+      "phone_id": 178,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:aw": {
+      "native_language": "en",
+      "native_phone": "aw",
+      "phone_id": 179,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==aw"
+      ]
+    },
+    "en:ax": {
+      "native_language": "en",
+      "native_phone": "ax",
+      "phone_id": 180,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ax"
+      ]
+    },
+    "en:axr": {
+      "native_language": "en",
+      "native_phone": "axr",
+      "phone_id": 181,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:ay": {
+      "native_language": "en",
+      "native_phone": "ay",
+      "phone_id": 182,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ay"
+      ]
+    },
+    "en:b": {
+      "native_language": "en",
+      "native_phone": "b",
+      "phone_id": 201,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Stop==b"
+      ]
+    },
+    "en:bcl": {
+      "native_language": "en",
+      "native_phone": "bcl",
+      "phone_id": 202,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:ch": {
+      "native_language": "en",
+      "native_phone": "ch",
+      "phone_id": 203,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Fric==ch"
+      ]
+    },
+    "en:d": {
+      "native_language": "en",
+      "native_phone": "d",
+      "phone_id": 204,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Stop==d"
+      ]
+    },
+    "en:dcl": {
+      "native_language": "en",
+      "native_phone": "dcl",
+      "phone_id": 205,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:dh": {
+      "native_language": "en",
+      "native_phone": "dh",
+      "phone_id": 206,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Fric==dh"
+      ]
+    },
+    "en:dx": {
+      "native_language": "en",
+      "native_phone": "dx",
+      "phone_id": 207,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:eh": {
+      "native_language": "en",
+      "native_phone": "eh",
+      "phone_id": 183,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:el": {
+      "native_language": "en",
+      "native_phone": "el",
+      "phone_id": 184,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:em": {
+      "native_language": "en",
+      "native_phone": "em",
+      "phone_id": 185,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:en": {
+      "native_language": "en",
+      "native_phone": "en",
+      "phone_id": 186,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:er": {
+      "native_language": "en",
+      "native_phone": "er",
+      "phone_id": 187,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==er"
+      ]
+    },
+    "en:ey": {
+      "native_language": "en",
+      "native_phone": "ey",
+      "phone_id": 188,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ey"
+      ]
+    },
+    "en:f": {
+      "native_language": "en",
+      "native_phone": "f",
+      "phone_id": 208,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Fric==f"
+      ]
+    },
+    "en:g": {
+      "native_language": "en",
+      "native_phone": "g",
+      "phone_id": 209,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Stop==g"
+      ]
+    },
+    "en:gcl": {
+      "native_language": "en",
+      "native_phone": "gcl",
+      "phone_id": 210,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:hh": {
+      "native_language": "en",
+      "native_phone": "hh",
+      "phone_id": 211,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Fric==hh"
+      ]
+    },
+    "en:hsharp": {
+      "native_language": "en",
+      "native_phone": "hsharp",
+      "phone_id": 212,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:ih": {
+      "native_language": "en",
+      "native_phone": "ih",
+      "phone_id": 189,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ih"
+      ]
+    },
+    "en:ir": {
+      "native_language": "en",
+      "native_phone": "ir",
+      "phone_id": 190,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:ix": {
+      "native_language": "en",
+      "native_phone": "ix",
+      "phone_id": 191,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:iy": {
+      "native_language": "en",
+      "native_phone": "iy",
+      "phone_id": 192,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==iy"
+      ]
+    },
+    "en:jh": {
+      "native_language": "en",
+      "native_phone": "jh",
+      "phone_id": 213,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Fric==jh"
+      ]
+    },
+    "en:k": {
+      "native_language": "en",
+      "native_phone": "k",
+      "phone_id": 214,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Stop==k"
+      ]
+    },
+    "en:kcl": {
+      "native_language": "en",
+      "native_phone": "kcl",
+      "phone_id": 215,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:l": {
+      "native_language": "en",
+      "native_phone": "l",
+      "phone_id": 216,
+      "context_field": "C_Vowel",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==l"
+      ]
+    },
+    "en:m": {
+      "native_language": "en",
+      "native_phone": "m",
+      "phone_id": 217,
+      "context_field": "C_Nasal",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Nasal==m"
+      ]
+    },
+    "en:n": {
+      "native_language": "en",
+      "native_phone": "n",
+      "phone_id": 218,
+      "context_field": "C_Nasal",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Nasal==n"
+      ]
+    },
+    "en:ng": {
+      "native_language": "en",
+      "native_phone": "ng",
+      "phone_id": 219,
+      "context_field": "C_Nasal",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Nasal==ng"
+      ]
+    },
+    "en:nx": {
+      "native_language": "en",
+      "native_phone": "nx",
+      "phone_id": 220,
+      "context_field": "C_Nasal",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:oo": {
+      "native_language": "en",
+      "native_phone": "oo",
+      "phone_id": 193,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==oo"
+      ]
+    },
+    "en:ow": {
+      "native_language": "en",
+      "native_phone": "ow",
+      "phone_id": 194,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==ow"
+      ]
+    },
+    "en:ox": {
+      "native_language": "en",
+      "native_phone": "ox",
+      "phone_id": 195,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:oy": {
+      "native_language": "en",
+      "native_phone": "oy",
+      "phone_id": 196,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==oy"
+      ]
+    },
+    "en:p": {
+      "native_language": "en",
+      "native_phone": "p",
+      "phone_id": 221,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Stop==p"
+      ]
+    },
+    "en:pau": {
+      "native_language": "en",
+      "native_phone": "pau",
+      "phone_id": 222,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:pcl": {
+      "native_language": "en",
+      "native_phone": "pcl",
+      "phone_id": 223,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:r": {
+      "native_language": "en",
+      "native_phone": "r",
+      "phone_id": 224,
+      "context_field": "C_Vowel",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==r"
+      ]
+    },
+    "en:rx": {
+      "native_language": "en",
+      "native_phone": "rx",
+      "phone_id": 225,
+      "context_field": "C_Vowel",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:s": {
+      "native_language": "en",
+      "native_phone": "s",
+      "phone_id": 226,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Fric==s"
+      ]
+    },
+    "en:sh": {
+      "native_language": "en",
+      "native_phone": "sh",
+      "phone_id": 227,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Fric==sh"
+      ]
+    },
+    "en:t": {
+      "native_language": "en",
+      "native_phone": "t",
+      "phone_id": 228,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Stop==t"
+      ]
+    },
+    "en:tcl": {
+      "native_language": "en",
+      "native_phone": "tcl",
+      "phone_id": 229,
+      "context_field": "C_Stop",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": []
+    },
+    "en:th": {
+      "native_language": "en",
+      "native_phone": "th",
+      "phone_id": 230,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_Fric==th"
+      ]
+    },
+    "en:uh": {
+      "native_language": "en",
+      "native_phone": "uh",
+      "phone_id": 197,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==uh"
+      ]
+    },
+    "en:ur": {
+      "native_language": "en",
+      "native_phone": "ur",
+      "phone_id": 198,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:uw": {
+      "native_language": "en",
+      "native_phone": "uw",
+      "phone_id": 199,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==uw"
+      ]
+    },
+    "en:ux": {
+      "native_language": "en",
+      "native_phone": "ux",
+      "phone_id": 200,
+      "context_field": "C_Vowel",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "en:v": {
+      "native_language": "en",
+      "native_phone": "v",
+      "phone_id": 231,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Fric==v"
+      ]
+    },
+    "en:w": {
+      "native_language": "en",
+      "native_phone": "w",
+      "phone_id": 232,
+      "context_field": "C_Vowel",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==w"
+      ]
+    },
+    "en:y": {
+      "native_language": "en",
+      "native_phone": "y",
+      "phone_id": 233,
+      "context_field": "C_Vowel",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Vowel==y"
+      ]
+    },
+    "en:z": {
+      "native_language": "en",
+      "native_phone": "z",
+      "phone_id": 234,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Fric==z"
+      ]
+    },
+    "en:zh": {
+      "native_language": "en",
+      "native_phone": "zh",
+      "phone_id": 235,
+      "context_field": "C_Fric",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_Fric==zh"
+      ]
+    },
+    "zh:a": {
+      "native_language": "zh",
+      "native_phone": "a",
+      "phone_id": 3,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==a"
+      ]
+    },
+    "zh:ai": {
+      "native_language": "zh",
+      "native_phone": "ai",
+      "phone_id": 4,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ai"
+      ]
+    },
+    "zh:an": {
+      "native_language": "zh",
+      "native_phone": "an",
+      "phone_id": 5,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==an"
+      ]
+    },
+    "zh:ang": {
+      "native_language": "zh",
+      "native_phone": "ang",
+      "phone_id": 6,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ang"
+      ]
+    },
+    "zh:ao": {
+      "native_language": "zh",
+      "native_phone": "ao",
+      "phone_id": 7,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ao"
+      ]
+    },
+    "zh:b": {
+      "native_language": "zh",
+      "native_phone": "b",
+      "phone_id": 43,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==b"
+      ]
+    },
+    "zh:c": {
+      "native_language": "zh",
+      "native_phone": "c",
+      "phone_id": 44,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==c"
+      ]
+    },
+    "zh:ch": {
+      "native_language": "zh",
+      "native_phone": "ch",
+      "phone_id": 45,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==ch"
+      ]
+    },
+    "zh:d": {
+      "native_language": "zh",
+      "native_phone": "d",
+      "phone_id": 46,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==d"
+      ]
+    },
+    "zh:e": {
+      "native_language": "zh",
+      "native_phone": "e",
+      "phone_id": 8,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==e"
+      ]
+    },
+    "zh:ei": {
+      "native_language": "zh",
+      "native_phone": "ei",
+      "phone_id": 9,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ei"
+      ]
+    },
+    "zh:en": {
+      "native_language": "zh",
+      "native_phone": "en",
+      "phone_id": 10,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==en"
+      ]
+    },
+    "zh:eng": {
+      "native_language": "zh",
+      "native_phone": "eng",
+      "phone_id": 11,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==eng"
+      ]
+    },
+    "zh:er": {
+      "native_language": "zh",
+      "native_phone": "er",
+      "phone_id": 12,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==er"
+      ]
+    },
+    "zh:f": {
+      "native_language": "zh",
+      "native_phone": "f",
+      "phone_id": 47,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==f"
+      ]
+    },
+    "zh:g": {
+      "native_language": "zh",
+      "native_phone": "g",
+      "phone_id": 48,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==g"
+      ]
+    },
+    "zh:h": {
+      "native_language": "zh",
+      "native_phone": "h",
+      "phone_id": 49,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==h"
+      ]
+    },
+    "zh:i": {
+      "native_language": "zh",
+      "native_phone": "i",
+      "phone_id": 13,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==i"
+      ]
+    },
+    "zh:ia": {
+      "native_language": "zh",
+      "native_phone": "ia",
+      "phone_id": 14,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ia"
+      ]
+    },
+    "zh:ian": {
+      "native_language": "zh",
+      "native_phone": "ian",
+      "phone_id": 15,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ian"
+      ]
+    },
+    "zh:iang": {
+      "native_language": "zh",
+      "native_phone": "iang",
+      "phone_id": 16,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==iang"
+      ]
+    },
+    "zh:iao": {
+      "native_language": "zh",
+      "native_phone": "iao",
+      "phone_id": 17,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==iao"
+      ]
+    },
+    "zh:ie": {
+      "native_language": "zh",
+      "native_phone": "ie",
+      "phone_id": 18,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ie"
+      ]
+    },
+    "zh:ii": {
+      "native_language": "zh",
+      "native_phone": "ii",
+      "phone_id": 19,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ii"
+      ]
+    },
+    "zh:iii": {
+      "native_language": "zh",
+      "native_phone": "iii",
+      "phone_id": 20,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==iii"
+      ]
+    },
+    "zh:in": {
+      "native_language": "zh",
+      "native_phone": "in",
+      "phone_id": 21,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==in"
+      ]
+    },
+    "zh:ing": {
+      "native_language": "zh",
+      "native_phone": "ing",
+      "phone_id": 22,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ing"
+      ]
+    },
+    "zh:io": {
+      "native_language": "zh",
+      "native_phone": "io",
+      "phone_id": 23,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "zh:iong": {
+      "native_language": "zh",
+      "native_phone": "iong",
+      "phone_id": 24,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==iong"
+      ]
+    },
+    "zh:iou": {
+      "native_language": "zh",
+      "native_phone": "iou",
+      "phone_id": 25,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==iou"
+      ]
+    },
+    "zh:j": {
+      "native_language": "zh",
+      "native_phone": "j",
+      "phone_id": 50,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==j"
+      ]
+    },
+    "zh:k": {
+      "native_language": "zh",
+      "native_phone": "k",
+      "phone_id": 51,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==k"
+      ]
+    },
+    "zh:l": {
+      "native_language": "zh",
+      "native_phone": "l",
+      "phone_id": 52,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "zh:m": {
+      "native_language": "zh",
+      "native_phone": "m",
+      "phone_id": 53,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "zh:n": {
+      "native_language": "zh",
+      "native_phone": "n",
+      "phone_id": 54,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "zh:o": {
+      "native_language": "zh",
+      "native_phone": "o",
+      "phone_id": 26,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==o"
+      ]
+    },
+    "zh:ong": {
+      "native_language": "zh",
+      "native_phone": "ong",
+      "phone_id": 27,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ong"
+      ]
+    },
+    "zh:ou": {
+      "native_language": "zh",
+      "native_phone": "ou",
+      "phone_id": 28,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ou"
+      ]
+    },
+    "zh:p": {
+      "native_language": "zh",
+      "native_phone": "p",
+      "phone_id": 55,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==p"
+      ]
+    },
+    "zh:q": {
+      "native_language": "zh",
+      "native_phone": "q",
+      "phone_id": 56,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==q"
+      ]
+    },
+    "zh:r": {
+      "native_language": "zh",
+      "native_phone": "r",
+      "phone_id": 57,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": true,
+      "anchor_questions": [
+        "C_SM==r"
+      ]
+    },
+    "zh:s": {
+      "native_language": "zh",
+      "native_phone": "s",
+      "phone_id": 58,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==s"
+      ]
+    },
+    "zh:sh": {
+      "native_language": "zh",
+      "native_phone": "sh",
+      "phone_id": 59,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==sh"
+      ]
+    },
+    "zh:t": {
+      "native_language": "zh",
+      "native_phone": "t",
+      "phone_id": 60,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==t"
+      ]
+    },
+    "zh:u": {
+      "native_language": "zh",
+      "native_phone": "u",
+      "phone_id": 29,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "zh:ua": {
+      "native_language": "zh",
+      "native_phone": "ua",
+      "phone_id": 30,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ua"
+      ]
+    },
+    "zh:uai": {
+      "native_language": "zh",
+      "native_phone": "uai",
+      "phone_id": 31,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==uai"
+      ]
+    },
+    "zh:uan": {
+      "native_language": "zh",
+      "native_phone": "uan",
+      "phone_id": 32,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==uan"
+      ]
+    },
+    "zh:uang": {
+      "native_language": "zh",
+      "native_phone": "uang",
+      "phone_id": 33,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==uang"
+      ]
+    },
+    "zh:uei": {
+      "native_language": "zh",
+      "native_phone": "uei",
+      "phone_id": 34,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==uei"
+      ]
+    },
+    "zh:uen": {
+      "native_language": "zh",
+      "native_phone": "uen",
+      "phone_id": 35,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==uen"
+      ]
+    },
+    "zh:ueng": {
+      "native_language": "zh",
+      "native_phone": "ueng",
+      "phone_id": 36,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ueng"
+      ]
+    },
+    "zh:un": {
+      "native_language": "zh",
+      "native_phone": "un",
+      "phone_id": 37,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": []
+    },
+    "zh:uo": {
+      "native_language": "zh",
+      "native_phone": "uo",
+      "phone_id": 38,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==uo"
+      ]
+    },
+    "zh:v": {
+      "native_language": "zh",
+      "native_phone": "v",
+      "phone_id": 39,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==v"
+      ]
+    },
+    "zh:van": {
+      "native_language": "zh",
+      "native_phone": "van",
+      "phone_id": 40,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==van"
+      ]
+    },
+    "zh:ve": {
+      "native_language": "zh",
+      "native_phone": "ve",
+      "phone_id": 41,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==ve"
+      ]
+    },
+    "zh:vn": {
+      "native_language": "zh",
+      "native_phone": "vn",
+      "phone_id": 42,
+      "context_field": "C_YM",
+      "role": "nucleus",
+      "voiced": true,
+      "anchor_questions": [
+        "C_YM==vn"
+      ]
+    },
+    "zh:x": {
+      "native_language": "zh",
+      "native_phone": "x",
+      "phone_id": 61,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==x"
+      ]
+    },
+    "zh:z": {
+      "native_language": "zh",
+      "native_phone": "z",
+      "phone_id": 62,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==z"
+      ]
+    },
+    "zh:zh": {
+      "native_language": "zh",
+      "native_phone": "zh",
+      "phone_id": 63,
+      "context_field": "C_SM",
+      "role": "consonant",
+      "voiced": false,
+      "anchor_questions": [
+        "C_SM==zh"
+      ]
+    }
+  },
+  "languages": {
+    "zh": {
+      "support": "native",
+      "mappings": {
+        "p": {
+          "phones": [
+            "zh:b"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "pʰ": {
+          "phones": [
+            "zh:p"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "m": {
+          "phones": [
+            "zh:m"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "f": {
+          "phones": [
+            "zh:f"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t": {
+          "phones": [
+            "zh:d"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "tʰ": {
+          "phones": [
+            "zh:t"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "n": {
+          "phones": [
+            "zh:n"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "l": {
+          "phones": [
+            "zh:l"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "k": {
+          "phones": [
+            "zh:g"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "kʰ": {
+          "phones": [
+            "zh:k"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "x": {
+          "phones": [
+            "zh:h"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ɕ": {
+          "phones": [
+            "zh:j"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ɕʰ": {
+          "phones": [
+            "zh:q"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɕ": {
+          "phones": [
+            "zh:x"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ʂ": {
+          "phones": [
+            "zh:zh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ʂʰ": {
+          "phones": [
+            "zh:ch"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʂ": {
+          "phones": [
+            "zh:sh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɻ": {
+          "phones": [
+            "zh:r"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡s": {
+          "phones": [
+            "zh:z"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡sʰ": {
+          "phones": [
+            "zh:c"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "s": {
+          "phones": [
+            "zh:s"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "a": {
+          "phones": [
+            "zh:a"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "aɪ": {
+          "phones": [
+            "zh:ai"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "an": {
+          "phones": [
+            "zh:an"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɑŋ": {
+          "phones": [
+            "zh:ang"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "aʊ": {
+          "phones": [
+            "zh:ao"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɤ": {
+          "phones": [
+            "zh:e"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "eɪ": {
+          "phones": [
+            "zh:ei"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ən": {
+          "phones": [
+            "zh:en"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "əŋ": {
+          "phones": [
+            "zh:eng"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɚ": {
+          "phones": [
+            "zh:er"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "i": {
+          "phones": [
+            "zh:i"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ja": {
+          "phones": [
+            "zh:ia"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "jɛn": {
+          "phones": [
+            "zh:ian"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "jɑŋ": {
+          "phones": [
+            "zh:iang"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "jaʊ": {
+          "phones": [
+            "zh:iao"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "jɛ": {
+          "phones": [
+            "zh:ie"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɹ̩": {
+          "phones": [
+            "zh:ii"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɻ̩": {
+          "phones": [
+            "zh:iii"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "in": {
+          "phones": [
+            "zh:in"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "iŋ": {
+          "phones": [
+            "zh:ing"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "jʊŋ": {
+          "phones": [
+            "zh:iong"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "joʊ": {
+          "phones": [
+            "zh:iou"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "o": {
+          "phones": [
+            "zh:o"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʊŋ": {
+          "phones": [
+            "zh:ong"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "oʊ": {
+          "phones": [
+            "zh:ou"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "u": {
+          "phones": [
+            "zh:u"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wa": {
+          "phones": [
+            "zh:ua"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "waɪ": {
+          "phones": [
+            "zh:uai"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wan": {
+          "phones": [
+            "zh:uan"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wɑŋ": {
+          "phones": [
+            "zh:uang"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "weɪ": {
+          "phones": [
+            "zh:uei"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wən": {
+          "phones": [
+            "zh:uen"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wəŋ": {
+          "phones": [
+            "zh:ueng"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wo": {
+          "phones": [
+            "zh:uo"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "y": {
+          "phones": [
+            "zh:v"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɥɛn": {
+          "phones": [
+            "zh:van"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɥɛ": {
+          "phones": [
+            "zh:ve"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "yn": {
+          "phones": [
+            "zh:vn"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʈ͡ʂ": {
+          "phones": [
+            "zh:zh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʈ͡ʂʰ": {
+          "phones": [
+            "zh:ch"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʐ": {
+          "phones": [
+            "zh:r"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The recovered Mandarin r model is represented broadly as /ɻ/; a dedicated voiced retroflex fricative allophone is not selectable."
+        },
+        "pː": {
+          "phones": [
+            "zh:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "pʰː": {
+          "phones": [
+            "zh:p"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "mː": {
+          "phones": [
+            "zh:m"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "fː": {
+          "phones": [
+            "zh:f"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "tː": {
+          "phones": [
+            "zh:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "tʰː": {
+          "phones": [
+            "zh:t"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "nː": {
+          "phones": [
+            "zh:n"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "lː": {
+          "phones": [
+            "zh:l"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "kː": {
+          "phones": [
+            "zh:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "kʰː": {
+          "phones": [
+            "zh:k"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "xː": {
+          "phones": [
+            "zh:h"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ɕː": {
+          "phones": [
+            "zh:j"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "t͡ɕʰː": {
+          "phones": [
+            "zh:q"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ɕː": {
+          "phones": [
+            "zh:x"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ʂː": {
+          "phones": [
+            "zh:zh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "t͡ʂʰː": {
+          "phones": [
+            "zh:ch"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ʂː": {
+          "phones": [
+            "zh:sh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɻː": {
+          "phones": [
+            "zh:r"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡sː": {
+          "phones": [
+            "zh:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "t͡sʰː": {
+          "phones": [
+            "zh:c"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "sː": {
+          "phones": [
+            "zh:s"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "aː": {
+          "phones": [
+            "zh:a"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɤː": {
+          "phones": [
+            "zh:e"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɚː": {
+          "phones": [
+            "zh:er"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "iː": {
+          "phones": [
+            "zh:i"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɹ̩ː": {
+          "phones": [
+            "zh:ii"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɻ̩ː": {
+          "phones": [
+            "zh:iii"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "oː": {
+          "phones": [
+            "zh:o"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "uː": {
+          "phones": [
+            "zh:u"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "yː": {
+          "phones": [
+            "zh:v"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʈ͡ʂː": {
+          "phones": [
+            "zh:zh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ʈ͡ʂʰː": {
+          "phones": [
+            "zh:ch"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ʐː": {
+          "phones": [
+            "zh:r"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The recovered Mandarin r model is represented broadly as /ɻ/; a dedicated voiced retroflex fricative allophone is not selectable."
+        }
+      },
+      "vocaloid_import": {
+        "a": [
+          "a"
+        ],
+        "o": [
+          "o"
+        ],
+        "7": [
+          "ɤ"
+        ],
+        "i": [
+          "i"
+        ],
+        "u": [
+          "u"
+        ],
+        "y": [
+          "y"
+        ],
+        "@`": [
+          "ɚ"
+        ],
+        "i\\": [
+          "ɹ̩"
+        ],
+        "i`": [
+          "ɻ̩"
+        ],
+        "aI": [
+          "aɪ"
+        ],
+        "ei": [
+          "eɪ"
+        ],
+        "AU": [
+          "aʊ"
+        ],
+        "@U": [
+          "oʊ"
+        ],
+        "ia": [
+          "ja"
+        ],
+        "iE_r": [
+          "jɛ"
+        ],
+        "ua": [
+          "wa"
+        ],
+        "uo": [
+          "wo"
+        ],
+        "yE_r": [
+          "ɥɛ"
+        ],
+        "iAU": [
+          "jaʊ"
+        ],
+        "i@U": [
+          "joʊ"
+        ],
+        "uaI": [
+          "waɪ"
+        ],
+        "uei": [
+          "weɪ"
+        ],
+        "a_n": [
+          "an"
+        ],
+        "@_n": [
+          "ən"
+        ],
+        "i_n": [
+          "in"
+        ],
+        "iE_n": [
+          "jɛn"
+        ],
+        "ua_n": [
+          "wan"
+        ],
+        "u@_n": [
+          "wən"
+        ],
+        "y_n": [
+          "yn"
+        ],
+        "y{_n": [
+          "ɥɛn"
+        ],
+        "AN": [
+          "ɑŋ"
+        ],
+        "@N": [
+          "əŋ"
+        ],
+        "iN": [
+          "iŋ"
+        ],
+        "iAN": [
+          "jɑŋ"
+        ],
+        "uAN": [
+          "wɑŋ"
+        ],
+        "u@N": [
+          "wəŋ"
+        ],
+        "UN": [
+          "ʊŋ"
+        ],
+        "iUN": [
+          "jʊŋ"
+        ],
+        "p": [
+          "p"
+        ],
+        "p_h": [
+          "pʰ"
+        ],
+        "m": [
+          "m"
+        ],
+        "f": [
+          "f"
+        ],
+        "t": [
+          "t"
+        ],
+        "t_h": [
+          "tʰ"
+        ],
+        "n": [
+          "n"
+        ],
+        "l": [
+          "l"
+        ],
+        "k": [
+          "k"
+        ],
+        "k_h": [
+          "kʰ"
+        ],
+        "x": [
+          "x"
+        ],
+        "ts\\": [
+          "t͡ɕ"
+        ],
+        "ts\\_h": [
+          "t͡ɕʰ"
+        ],
+        "s\\": [
+          "ɕ"
+        ],
+        "ts`": [
+          "t͡ʂ"
+        ],
+        "ts`_h": [
+          "t͡ʂʰ"
+        ],
+        "s`": [
+          "ʂ"
+        ],
+        "z`": [
+          "ɻ"
+        ],
+        "ts": [
+          "t͡s"
+        ],
+        "ts_h": [
+          "t͡sʰ"
+        ],
+        "s": [
+          "s"
+        ]
+      }
+    },
+    "en": {
+      "support": "native",
+      "mappings": {
+        "ɑ": {
+          "phones": [
+            "en:aa"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "æ": {
+          "phones": [
+            "en:ae"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʌ": {
+          "phones": [
+            "en:ah"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɔ": {
+          "phones": [
+            "en:ao"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "aʊ": {
+          "phones": [
+            "en:aw"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ə": {
+          "phones": [
+            "en:ax"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɚ": {
+          "phones": [
+            "en:er"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The axr label has no independently distinguished current-context acoustic path (it collides with el/em/en/ix/ox/ux). Use the available rhotic er model with explicit stress, defaulting to 0, as an approximation to /ɚ/."
+        },
+        "aɪ": {
+          "phones": [
+            "en:ay"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɛ": {
+          "phones": [
+            "en:eh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɝ": {
+          "phones": [
+            "en:er"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "eɪ": {
+          "phones": [
+            "en:ey"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɪ": {
+          "phones": [
+            "en:ih"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "i": {
+          "phones": [
+            "en:iy"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "oʊ": {
+          "phones": [
+            "en:ow"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "əʊ": {
+          "phones": [
+            "en:ow"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɔɪ": {
+          "phones": [
+            "en:oy"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʊ": {
+          "phones": [
+            "en:uh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "u": {
+          "phones": [
+            "en:uw"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "b": {
+          "phones": [
+            "en:b"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t͡ʃ": {
+          "phones": [
+            "en:ch"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "d": {
+          "phones": [
+            "en:d"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ð": {
+          "phones": [
+            "en:dh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɾ": {
+          "phones": [
+            "en:dx"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "f": {
+          "phones": [
+            "en:f"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɡ": {
+          "phones": [
+            "en:g"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "h": {
+          "phones": [
+            "en:hh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "d͡ʒ": {
+          "phones": [
+            "en:jh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "k": {
+          "phones": [
+            "en:k"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "l": {
+          "phones": [
+            "en:l"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "m": {
+          "phones": [
+            "en:m"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "n": {
+          "phones": [
+            "en:n"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ŋ": {
+          "phones": [
+            "en:ng"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "p": {
+          "phones": [
+            "en:p"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɹ": {
+          "phones": [
+            "en:r"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "s": {
+          "phones": [
+            "en:s"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʃ": {
+          "phones": [
+            "en:sh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "t": {
+          "phones": [
+            "en:t"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "θ": {
+          "phones": [
+            "en:th"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "v": {
+          "phones": [
+            "en:v"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "w": {
+          "phones": [
+            "en:w"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "j": {
+          "phones": [
+            "en:y"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "z": {
+          "phones": [
+            "en:z"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʒ": {
+          "phones": [
+            "en:zh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɒ": {
+          "phones": [
+            "en:aa"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The English LOT vowel /ɒ/ uses the available /ɑ/-like aa model; rounding and accent are not preserved."
+        },
+        "ɜ": {
+          "phones": [
+            "en:er"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The available er model is rhotic; non-rhotic /ɜ/ is an approximation."
+        },
+        "ɪə": {
+          "phones": [
+            "en:ih",
+            "en:ax"
+          ],
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable."
+        },
+        "ɛə": {
+          "phones": [
+            "en:eh",
+            "en:ax"
+          ],
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable."
+        },
+        "ʊə": {
+          "phones": [
+            "en:uh",
+            "en:ax"
+          ],
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable."
+        },
+        "ɔə": {
+          "phones": [
+            "en:ao",
+            "en:ax"
+          ],
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable."
+        },
+        "ɑə": {
+          "phones": [
+            "en:aa",
+            "en:ax"
+          ],
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable."
+        },
+        "ɑɹ": {
+          "phones": [
+            "en:aa",
+            "en:r"
+          ],
+          "support": "approximate",
+          "approximation_reason": "This accent-dependent centering/rhotic sequence is composed from separately rendered native English phones; its original transition model is unavailable."
+        },
+        "ɫ": {
+          "phones": [
+            "en:l"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The model exposes l without a separately selectable dark-l allophone."
+        },
+        "pʰ": {
+          "phones": [
+            "en:p"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate."
+        },
+        "tʰ": {
+          "phones": [
+            "en:t"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate."
+        },
+        "kʰ": {
+          "phones": [
+            "en:k"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate."
+        },
+        "bʰ": {
+          "phones": [
+            "en:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate."
+        },
+        "dʰ": {
+          "phones": [
+            "en:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate."
+        },
+        "ɡʰ": {
+          "phones": [
+            "en:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate."
+        },
+        "ɑː": {
+          "phones": [
+            "en:aa"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "æː": {
+          "phones": [
+            "en:ae"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʌː": {
+          "phones": [
+            "en:ah"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɔː": {
+          "phones": [
+            "en:ao"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "əː": {
+          "phones": [
+            "en:ax"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɚː": {
+          "phones": [
+            "en:er"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The axr label has no independently distinguished current-context acoustic path (it collides with el/em/en/ix/ox/ux). Use the available rhotic er model with explicit stress, defaulting to 0, as an approximation to /ɚ/."
+        },
+        "ɛː": {
+          "phones": [
+            "en:eh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɝː": {
+          "phones": [
+            "en:er"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɪː": {
+          "phones": [
+            "en:ih"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "iː": {
+          "phones": [
+            "en:iy"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʊː": {
+          "phones": [
+            "en:uh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "uː": {
+          "phones": [
+            "en:uw"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "bː": {
+          "phones": [
+            "en:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "t͡ʃː": {
+          "phones": [
+            "en:ch"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "dː": {
+          "phones": [
+            "en:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ðː": {
+          "phones": [
+            "en:dh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɾː": {
+          "phones": [
+            "en:dx"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "fː": {
+          "phones": [
+            "en:f"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɡː": {
+          "phones": [
+            "en:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "hː": {
+          "phones": [
+            "en:hh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "d͡ʒː": {
+          "phones": [
+            "en:jh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "kː": {
+          "phones": [
+            "en:k"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "lː": {
+          "phones": [
+            "en:l"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "mː": {
+          "phones": [
+            "en:m"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "nː": {
+          "phones": [
+            "en:n"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ŋː": {
+          "phones": [
+            "en:ng"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "pː": {
+          "phones": [
+            "en:p"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ɹː": {
+          "phones": [
+            "en:r"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "sː": {
+          "phones": [
+            "en:s"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʃː": {
+          "phones": [
+            "en:sh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "tː": {
+          "phones": [
+            "en:t"
+          ],
+          "support": "approximate",
+          "approximation_reason": "Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "θː": {
+          "phones": [
+            "en:th"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "vː": {
+          "phones": [
+            "en:v"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "wː": {
+          "phones": [
+            "en:w"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "jː": {
+          "phones": [
+            "en:y"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "zː": {
+          "phones": [
+            "en:z"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ʒː": {
+          "phones": [
+            "en:zh"
+          ],
+          "support": "native",
+          "approximation_reason": null
+        },
+        "ɒː": {
+          "phones": [
+            "en:aa"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The English LOT vowel /ɒ/ uses the available /ɑ/-like aa model; rounding and accent are not preserved."
+        },
+        "ɜː": {
+          "phones": [
+            "en:er"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The available er model is rhotic; non-rhotic /ɜ/ is an approximation."
+        },
+        "ɫː": {
+          "phones": [
+            "en:l"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The model exposes l without a separately selectable dark-l allophone."
+        },
+        "pʰː": {
+          "phones": [
+            "en:p"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "tʰː": {
+          "phones": [
+            "en:t"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "kʰː": {
+          "phones": [
+            "en:k"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "bʰː": {
+          "phones": [
+            "en:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "dʰː": {
+          "phones": [
+            "en:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ɡʰː": {
+          "phones": [
+            "en:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "The native English stop has no separately selectable aspiration allophone; the requested aspiration contrast is retained in the canonical label but acoustically approximate. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        }
+      },
+      "vocaloid_import": {
+        "V": [
+          "ʌ"
+        ],
+        "e": [
+          "ɛ"
+        ],
+        "I": [
+          "ɪ"
+        ],
+        "i:": [
+          "iː"
+        ],
+        "{": [
+          "æ"
+        ],
+        "O:": [
+          "ɔː"
+        ],
+        "Q": [
+          "ɒ"
+        ],
+        "U": [
+          "ʊ"
+        ],
+        "u:": [
+          "uː"
+        ],
+        "@r": [
+          "ɚ"
+        ],
+        "eI": [
+          "eɪ"
+        ],
+        "aI": [
+          "aɪ"
+        ],
+        "OI": [
+          "ɔɪ"
+        ],
+        "@U": [
+          "əʊ"
+        ],
+        "aU": [
+          "aʊ"
+        ],
+        "I@": [
+          "ɪə"
+        ],
+        "e@": [
+          "ɛə"
+        ],
+        "U@": [
+          "ʊə"
+        ],
+        "O@": [
+          "ɔə"
+        ],
+        "Q@": [
+          "ɑɹ"
+        ],
+        "@": [
+          "ə"
+        ],
+        "w": [
+          "w"
+        ],
+        "j": [
+          "j"
+        ],
+        "b": [
+          "b"
+        ],
+        "d": [
+          "d"
+        ],
+        "g": [
+          "ɡ"
+        ],
+        "bh": [
+          "bʰ"
+        ],
+        "dh": [
+          "dʰ"
+        ],
+        "gh": [
+          "ɡʰ"
+        ],
+        "dZ": [
+          "d͡ʒ"
+        ],
+        "v": [
+          "v"
+        ],
+        "D": [
+          "ð"
+        ],
+        "z": [
+          "z"
+        ],
+        "Z": [
+          "ʒ"
+        ],
+        "m": [
+          "m"
+        ],
+        "n": [
+          "n"
+        ],
+        "N": [
+          "ŋ"
+        ],
+        "r": [
+          "ɹ"
+        ],
+        "l": [
+          "l"
+        ],
+        "l0": [
+          "ɫ"
+        ],
+        "p": [
+          "p"
+        ],
+        "t": [
+          "t"
+        ],
+        "k": [
+          "k"
+        ],
+        "ph": [
+          "pʰ"
+        ],
+        "th": [
+          "tʰ"
+        ],
+        "kh": [
+          "kʰ"
+        ],
+        "tS": [
+          "t͡ʃ"
+        ],
+        "f": [
+          "f"
+        ],
+        "T": [
+          "θ"
+        ],
+        "s": [
+          "s"
+        ],
+        "S": [
+          "ʃ"
+        ],
+        "h": [
+          "h"
+        ]
+      }
+    },
+    "ja": {
+      "support": "approximate",
+      "mappings": {
+        "a": {
+          "phones": [
+            "zh:a"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "i": {
+          "phones": [
+            "zh:i"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɯ": {
+          "phones": [
+            "zh:u"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese unrounded /ɯ/ uses rounded Mandarin /u/."
+        },
+        "e": {
+          "phones": [
+            "en:eh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese close-mid /e/ uses English open-mid /ɛ/, avoiding the gliding /eɪ/ model."
+        },
+        "o": {
+          "phones": [
+            "zh:o"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "k": {
+          "phones": [
+            "zh:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɡ": {
+          "phones": [
+            "en:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "s": {
+          "phones": [
+            "zh:s"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɕ": {
+          "phones": [
+            "zh:x"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "z": {
+          "phones": [
+            "en:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ʑ": {
+          "phones": [
+            "en:zh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese alveolo-palatal /ʑ/ uses English postalveolar /ʒ/."
+        },
+        "d͡z": {
+          "phones": [
+            "en:d",
+            "en:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. A voiced alveolar affricate is composed from separately rendered /d/ and /z/."
+        },
+        "d͡ʑ": {
+          "phones": [
+            "en:jh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese alveolo-palatal affricate uses English postalveolar /d͡ʒ/."
+        },
+        "t": {
+          "phones": [
+            "zh:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "t͡s": {
+          "phones": [
+            "zh:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "t͡ɕ": {
+          "phones": [
+            "zh:j"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "d": {
+          "phones": [
+            "en:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "n": {
+          "phones": [
+            "zh:n"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɲ": {
+          "phones": [
+            "zh:n",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. A palatal nasal is composed from /n/ and a separate /j/ glide."
+        },
+        "h": {
+          "phones": [
+            "en:hh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɦ": {
+          "phones": [
+            "en:hh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Voiced glottal /ɦ/ uses the unvoiced /h/ model."
+        },
+        "ç": {
+          "phones": [
+            "zh:x"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Palatal /ç/ uses Mandarin alveolo-palatal /ɕ/."
+        },
+        "ɸ": {
+          "phones": [
+            "zh:f"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Bilabial /ɸ/ uses Mandarin labiodental /f/."
+        },
+        "b": {
+          "phones": [
+            "en:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "p": {
+          "phones": [
+            "zh:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "m": {
+          "phones": [
+            "zh:m"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "j": {
+          "phones": [
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɾ": {
+          "phones": [
+            "en:dx"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "w": {
+          "phones": [
+            "en:w"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ŋ": {
+          "phones": [
+            "en:ng"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɴ": {
+          "phones": [
+            "en:ng"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. An explicit uvular nasal /ɴ/ request uses English velar /ŋ/. Only matching kana provenance can select a separately traced contextual moraic-nasal realization."
+        },
+        "v": {
+          "phones": [
+            "en:v"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "kʲ": {
+          "phones": [
+            "zh:g",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ɡʲ": {
+          "phones": [
+            "en:g",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "tʲ": {
+          "phones": [
+            "zh:d",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "dʲ": {
+          "phones": [
+            "en:d",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "nʲ": {
+          "phones": [
+            "zh:n",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "hʲ": {
+          "phones": [
+            "en:hh",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "pʲ": {
+          "phones": [
+            "zh:b",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "bʲ": {
+          "phones": [
+            "en:b",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "mʲ": {
+          "phones": [
+            "zh:m",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ɾʲ": {
+          "phones": [
+            "en:dx",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ŋʲ": {
+          "phones": [
+            "en:ng",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ɸʲ": {
+          "phones": [
+            "zh:f",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "aː": {
+          "phones": [
+            "zh:a"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "iː": {
+          "phones": [
+            "zh:i"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɯː": {
+          "phones": [
+            "zh:u"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese unrounded /ɯ/ uses rounded Mandarin /u/."
+        },
+        "eː": {
+          "phones": [
+            "en:eh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese close-mid /e/ uses English open-mid /ɛ/, avoiding the gliding /eɪ/ model."
+        },
+        "oː": {
+          "phones": [
+            "zh:o"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "kː": {
+          "phones": [
+            "zh:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ɡː": {
+          "phones": [
+            "en:g"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "sː": {
+          "phones": [
+            "zh:s"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɕː": {
+          "phones": [
+            "zh:x"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "zː": {
+          "phones": [
+            "en:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ʑː": {
+          "phones": [
+            "en:zh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese alveolo-palatal /ʑ/ uses English postalveolar /ʒ/."
+        },
+        "d͡zː": {
+          "phones": [
+            "en:d",
+            "en:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. A voiced alveolar affricate is composed from separately rendered /d/ and /z/. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "d͡ʑː": {
+          "phones": [
+            "en:jh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Japanese alveolo-palatal affricate uses English postalveolar /d͡ʒ/. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "tː": {
+          "phones": [
+            "zh:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "t͡sː": {
+          "phones": [
+            "zh:z"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "t͡ɕː": {
+          "phones": [
+            "zh:j"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "dː": {
+          "phones": [
+            "en:d"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "nː": {
+          "phones": [
+            "zh:n"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɲː": {
+          "phones": [
+            "zh:n",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. A palatal nasal is composed from /n/ and a separate /j/ glide."
+        },
+        "hː": {
+          "phones": [
+            "en:hh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɦː": {
+          "phones": [
+            "en:hh"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Voiced glottal /ɦ/ uses the unvoiced /h/ model."
+        },
+        "çː": {
+          "phones": [
+            "zh:x"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Palatal /ç/ uses Mandarin alveolo-palatal /ɕ/."
+        },
+        "ɸː": {
+          "phones": [
+            "zh:f"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Bilabial /ɸ/ uses Mandarin labiodental /f/."
+        },
+        "bː": {
+          "phones": [
+            "en:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "pː": {
+          "phones": [
+            "zh:b"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "mː": {
+          "phones": [
+            "zh:m"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "jː": {
+          "phones": [
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɾː": {
+          "phones": [
+            "en:dx"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "wː": {
+          "phones": [
+            "en:w"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ŋː": {
+          "phones": [
+            "en:ng"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "ɴː": {
+          "phones": [
+            "en:ng"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping. An explicit uvular nasal /ɴ/ request uses English velar /ŋ/. Only matching kana provenance can select a separately traced contextual moraic-nasal realization."
+        },
+        "vː": {
+          "phones": [
+            "en:v"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; this is an explicit Mandarin/English voice mapping."
+        },
+        "kʲː": {
+          "phones": [
+            "zh:g",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "ɡʲː": {
+          "phones": [
+            "en:g",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "tʲː": {
+          "phones": [
+            "zh:d",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "dʲː": {
+          "phones": [
+            "en:d",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "nʲː": {
+          "phones": [
+            "zh:n",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "hʲː": {
+          "phones": [
+            "en:hh",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "pʲː": {
+          "phones": [
+            "zh:b",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "bʲː": {
+          "phones": [
+            "en:b",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide. Length stretches the existing whole five-state phone; a distinct geminate closure and single release have not been recovered."
+        },
+        "mʲː": {
+          "phones": [
+            "zh:m",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ɾʲː": {
+          "phones": [
+            "en:dx",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ŋʲː": {
+          "phones": [
+            "en:ng",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        },
+        "ɸʲː": {
+          "phones": [
+            "zh:f",
+            "en:y"
+          ],
+          "support": "approximate",
+          "approximation_reason": "No Japanese acoustic inventory is present; palatalization is approximated by a base phone followed by a separate English /j/ glide."
+        }
+      },
+      "vocaloid_import": {
+        "a": [
+          "a"
+        ],
+        "i": [
+          "i"
+        ],
+        "M": [
+          "ɯ"
+        ],
+        "e": [
+          "e"
+        ],
+        "o": [
+          "o"
+        ],
+        "k": [
+          "k"
+        ],
+        "k'": [
+          "kʲ"
+        ],
+        "g": [
+          "ɡ"
+        ],
+        "g'": [
+          "ɡʲ"
+        ],
+        "N": [
+          "ŋ"
+        ],
+        "N'": [
+          "ŋʲ"
+        ],
+        "s": [
+          "s"
+        ],
+        "S": [
+          "ɕ"
+        ],
+        "z": [
+          "z"
+        ],
+        "Z": [
+          "ʑ"
+        ],
+        "dz": [
+          "d͡z"
+        ],
+        "dZ": [
+          "d͡ʑ"
+        ],
+        "t": [
+          "t"
+        ],
+        "t'": [
+          "tʲ"
+        ],
+        "ts": [
+          "t͡s"
+        ],
+        "tS": [
+          "t͡ɕ"
+        ],
+        "d": [
+          "d"
+        ],
+        "d'": [
+          "dʲ"
+        ],
+        "n": [
+          "n"
+        ],
+        "J": [
+          "ɲ"
+        ],
+        "h": [
+          "h"
+        ],
+        "h\\": [
+          "ɦ"
+        ],
+        "C": [
+          "ç"
+        ],
+        "p\\": [
+          "ɸ"
+        ],
+        "p\\'": [
+          "ɸʲ"
+        ],
+        "b": [
+          "b"
+        ],
+        "b'": [
+          "bʲ"
+        ],
+        "p": [
+          "p"
+        ],
+        "p'": [
+          "pʲ"
+        ],
+        "m": [
+          "m"
+        ],
+        "m'": [
+          "mʲ"
+        ],
+        "j": [
+          "j"
+        ],
+        "4": [
+          "ɾ"
+        ],
+        "4'": [
+          "ɾʲ"
+        ],
+        "w": [
+          "w"
+        ],
+        "N\\": [
+          "ɴ"
+        ]
+      }
+    }
+  },
+  "japanese_kana": {
+    "schema_version": "verdant-kana/1",
+    "moras": {
+      "あ": [
+        "a"
+      ],
+      "い": [
+        "i"
+      ],
+      "う": [
+        "ɯ"
+      ],
+      "え": [
+        "e"
+      ],
+      "お": [
+        "o"
+      ],
+      "か": [
+        "k",
+        "a"
+      ],
+      "き": [
+        "kʲ",
+        "i"
+      ],
+      "く": [
+        "k",
+        "ɯ"
+      ],
+      "け": [
+        "k",
+        "e"
+      ],
+      "こ": [
+        "k",
+        "o"
+      ],
+      "が": [
+        "ɡ",
+        "a"
+      ],
+      "ぎ": [
+        "ɡʲ",
+        "i"
+      ],
+      "ぐ": [
+        "ɡ",
+        "ɯ"
+      ],
+      "げ": [
+        "ɡ",
+        "e"
+      ],
+      "ご": [
+        "ɡ",
+        "o"
+      ],
+      "さ": [
+        "s",
+        "a"
+      ],
+      "し": [
+        "ɕ",
+        "i"
+      ],
+      "す": [
+        "s",
+        "ɯ"
+      ],
+      "せ": [
+        "s",
+        "e"
+      ],
+      "そ": [
+        "s",
+        "o"
+      ],
+      "ざ": [
+        "z",
+        "a"
+      ],
+      "じ": [
+        "d͡ʑ",
+        "i"
+      ],
+      "ず": [
+        "z",
+        "ɯ"
+      ],
+      "ぜ": [
+        "z",
+        "e"
+      ],
+      "ぞ": [
+        "z",
+        "o"
+      ],
+      "た": [
+        "t",
+        "a"
+      ],
+      "ち": [
+        "t͡ɕ",
+        "i"
+      ],
+      "つ": [
+        "t͡s",
+        "ɯ"
+      ],
+      "て": [
+        "t",
+        "e"
+      ],
+      "と": [
+        "t",
+        "o"
+      ],
+      "だ": [
+        "d",
+        "a"
+      ],
+      "ぢ": [
+        "d͡ʑ",
+        "i"
+      ],
+      "づ": [
+        "z",
+        "ɯ"
+      ],
+      "で": [
+        "d",
+        "e"
+      ],
+      "ど": [
+        "d",
+        "o"
+      ],
+      "な": [
+        "n",
+        "a"
+      ],
+      "に": [
+        "ɲ",
+        "i"
+      ],
+      "ぬ": [
+        "n",
+        "ɯ"
+      ],
+      "ね": [
+        "n",
+        "e"
+      ],
+      "の": [
+        "n",
+        "o"
+      ],
+      "は": [
+        "h",
+        "a"
+      ],
+      "ひ": [
+        "ç",
+        "i"
+      ],
+      "ふ": [
+        "ɸ",
+        "ɯ"
+      ],
+      "へ": [
+        "h",
+        "e"
+      ],
+      "ほ": [
+        "h",
+        "o"
+      ],
+      "ば": [
+        "b",
+        "a"
+      ],
+      "び": [
+        "bʲ",
+        "i"
+      ],
+      "ぶ": [
+        "b",
+        "ɯ"
+      ],
+      "べ": [
+        "b",
+        "e"
+      ],
+      "ぼ": [
+        "b",
+        "o"
+      ],
+      "ぱ": [
+        "p",
+        "a"
+      ],
+      "ぴ": [
+        "pʲ",
+        "i"
+      ],
+      "ぷ": [
+        "p",
+        "ɯ"
+      ],
+      "ぺ": [
+        "p",
+        "e"
+      ],
+      "ぽ": [
+        "p",
+        "o"
+      ],
+      "ま": [
+        "m",
+        "a"
+      ],
+      "み": [
+        "mʲ",
+        "i"
+      ],
+      "む": [
+        "m",
+        "ɯ"
+      ],
+      "め": [
+        "m",
+        "e"
+      ],
+      "も": [
+        "m",
+        "o"
+      ],
+      "ら": [
+        "ɾ",
+        "a"
+      ],
+      "り": [
+        "ɾʲ",
+        "i"
+      ],
+      "る": [
+        "ɾ",
+        "ɯ"
+      ],
+      "れ": [
+        "ɾ",
+        "e"
+      ],
+      "ろ": [
+        "ɾ",
+        "o"
+      ],
+      "や": [
+        "j",
+        "a"
+      ],
+      "ゆ": [
+        "j",
+        "ɯ"
+      ],
+      "よ": [
+        "j",
+        "o"
+      ],
+      "わ": [
+        "w",
+        "a"
+      ],
+      "ゐ": [
+        "i"
+      ],
+      "ゑ": [
+        "e"
+      ],
+      "を": [
+        "o"
+      ],
+      "ん": [
+        "ɴ"
+      ],
+      "ゔ": [
+        "v",
+        "ɯ"
+      ],
+      "きゃ": [
+        "kʲ",
+        "a"
+      ],
+      "きゅ": [
+        "kʲ",
+        "ɯ"
+      ],
+      "きょ": [
+        "kʲ",
+        "o"
+      ],
+      "ぎゃ": [
+        "ɡʲ",
+        "a"
+      ],
+      "ぎゅ": [
+        "ɡʲ",
+        "ɯ"
+      ],
+      "ぎょ": [
+        "ɡʲ",
+        "o"
+      ],
+      "しゃ": [
+        "ɕ",
+        "a"
+      ],
+      "しゅ": [
+        "ɕ",
+        "ɯ"
+      ],
+      "しょ": [
+        "ɕ",
+        "o"
+      ],
+      "じゃ": [
+        "d͡ʑ",
+        "a"
+      ],
+      "じゅ": [
+        "d͡ʑ",
+        "ɯ"
+      ],
+      "じょ": [
+        "d͡ʑ",
+        "o"
+      ],
+      "ちゃ": [
+        "t͡ɕ",
+        "a"
+      ],
+      "ちゅ": [
+        "t͡ɕ",
+        "ɯ"
+      ],
+      "ちょ": [
+        "t͡ɕ",
+        "o"
+      ],
+      "ぢゃ": [
+        "d͡ʑ",
+        "a"
+      ],
+      "ぢゅ": [
+        "d͡ʑ",
+        "ɯ"
+      ],
+      "ぢょ": [
+        "d͡ʑ",
+        "o"
+      ],
+      "にゃ": [
+        "ɲ",
+        "a"
+      ],
+      "にゅ": [
+        "ɲ",
+        "ɯ"
+      ],
+      "にょ": [
+        "ɲ",
+        "o"
+      ],
+      "ひゃ": [
+        "ç",
+        "a"
+      ],
+      "ひゅ": [
+        "ç",
+        "ɯ"
+      ],
+      "ひょ": [
+        "ç",
+        "o"
+      ],
+      "びゃ": [
+        "bʲ",
+        "a"
+      ],
+      "びゅ": [
+        "bʲ",
+        "ɯ"
+      ],
+      "びょ": [
+        "bʲ",
+        "o"
+      ],
+      "ぴゃ": [
+        "pʲ",
+        "a"
+      ],
+      "ぴゅ": [
+        "pʲ",
+        "ɯ"
+      ],
+      "ぴょ": [
+        "pʲ",
+        "o"
+      ],
+      "みゃ": [
+        "mʲ",
+        "a"
+      ],
+      "みゅ": [
+        "mʲ",
+        "ɯ"
+      ],
+      "みょ": [
+        "mʲ",
+        "o"
+      ],
+      "りゃ": [
+        "ɾʲ",
+        "a"
+      ],
+      "りゅ": [
+        "ɾʲ",
+        "ɯ"
+      ],
+      "りょ": [
+        "ɾʲ",
+        "o"
+      ],
+      "いぇ": [
+        "j",
+        "e"
+      ],
+      "うぃ": [
+        "w",
+        "i"
+      ],
+      "うぇ": [
+        "w",
+        "e"
+      ],
+      "うぉ": [
+        "w",
+        "o"
+      ],
+      "しぇ": [
+        "ɕ",
+        "e"
+      ],
+      "じぇ": [
+        "d͡ʑ",
+        "e"
+      ],
+      "ちぇ": [
+        "t͡ɕ",
+        "e"
+      ],
+      "てぃ": [
+        "tʲ",
+        "i"
+      ],
+      "でぃ": [
+        "dʲ",
+        "i"
+      ],
+      "てゅ": [
+        "tʲ",
+        "ɯ"
+      ],
+      "でゅ": [
+        "dʲ",
+        "ɯ"
+      ],
+      "とぅ": [
+        "t",
+        "ɯ"
+      ],
+      "どぅ": [
+        "d",
+        "ɯ"
+      ],
+      "つぁ": [
+        "t͡s",
+        "a"
+      ],
+      "つぃ": [
+        "t͡s",
+        "i"
+      ],
+      "つぇ": [
+        "t͡s",
+        "e"
+      ],
+      "つぉ": [
+        "t͡s",
+        "o"
+      ],
+      "ふぁ": [
+        "ɸ",
+        "a"
+      ],
+      "ふぃ": [
+        "ɸʲ",
+        "i"
+      ],
+      "ふぇ": [
+        "ɸ",
+        "e"
+      ],
+      "ふぉ": [
+        "ɸ",
+        "o"
+      ],
+      "ふゅ": [
+        "ɸʲ",
+        "ɯ"
+      ],
+      "ゔぁ": [
+        "v",
+        "a"
+      ],
+      "ゔぃ": [
+        "v",
+        "i"
+      ],
+      "ゔぇ": [
+        "v",
+        "e"
+      ],
+      "ゔぉ": [
+        "v",
+        "o"
+      ],
+      "くぁ": [
+        "k",
+        "w",
+        "a"
+      ],
+      "くぃ": [
+        "k",
+        "w",
+        "i"
+      ],
+      "くぇ": [
+        "k",
+        "w",
+        "e"
+      ],
+      "くぉ": [
+        "k",
+        "w",
+        "o"
+      ],
+      "ぐぁ": [
+        "ɡ",
+        "w",
+        "a"
+      ],
+      "ぐぃ": [
+        "ɡ",
+        "w",
+        "i"
+      ],
+      "ぐぇ": [
+        "ɡ",
+        "w",
+        "e"
+      ],
+      "ぐぉ": [
+        "ɡ",
+        "w",
+        "o"
+      ]
+    },
+    "katakana_to_hiragana": {
+      "ァ": "ぁ",
+      "ア": "あ",
+      "ィ": "ぃ",
+      "イ": "い",
+      "ゥ": "ぅ",
+      "ウ": "う",
+      "ェ": "ぇ",
+      "エ": "え",
+      "ォ": "ぉ",
+      "オ": "お",
+      "カ": "か",
+      "ガ": "が",
+      "キ": "き",
+      "ギ": "ぎ",
+      "ク": "く",
+      "グ": "ぐ",
+      "ケ": "け",
+      "ゲ": "げ",
+      "コ": "こ",
+      "ゴ": "ご",
+      "サ": "さ",
+      "ザ": "ざ",
+      "シ": "し",
+      "ジ": "じ",
+      "ス": "す",
+      "ズ": "ず",
+      "セ": "せ",
+      "ゼ": "ぜ",
+      "ソ": "そ",
+      "ゾ": "ぞ",
+      "タ": "た",
+      "ダ": "だ",
+      "チ": "ち",
+      "ヂ": "ぢ",
+      "ッ": "っ",
+      "ツ": "つ",
+      "ヅ": "づ",
+      "テ": "て",
+      "デ": "で",
+      "ト": "と",
+      "ド": "ど",
+      "ナ": "な",
+      "ニ": "に",
+      "ヌ": "ぬ",
+      "ネ": "ね",
+      "ノ": "の",
+      "ハ": "は",
+      "バ": "ば",
+      "パ": "ぱ",
+      "ヒ": "ひ",
+      "ビ": "び",
+      "ピ": "ぴ",
+      "フ": "ふ",
+      "ブ": "ぶ",
+      "プ": "ぷ",
+      "ヘ": "へ",
+      "ベ": "べ",
+      "ペ": "ぺ",
+      "ホ": "ほ",
+      "ボ": "ぼ",
+      "ポ": "ぽ",
+      "マ": "ま",
+      "ミ": "み",
+      "ム": "む",
+      "メ": "め",
+      "モ": "も",
+      "ャ": "ゃ",
+      "ヤ": "や",
+      "ュ": "ゅ",
+      "ユ": "ゆ",
+      "ョ": "ょ",
+      "ヨ": "よ",
+      "ラ": "ら",
+      "リ": "り",
+      "ル": "る",
+      "レ": "れ",
+      "ロ": "ろ",
+      "ヮ": "ゎ",
+      "ワ": "わ",
+      "ヰ": "ゐ",
+      "ヱ": "ゑ",
+      "ヲ": "を",
+      "ン": "ん",
+      "ヴ": "ゔ",
+      "ヵ": "ゕ",
+      "ヶ": "ゖ"
+    },
+    "unicode_aliases": {
+      "が": "が",
+      "ぎ": "ぎ",
+      "ぐ": "ぐ",
+      "げ": "げ",
+      "ご": "ご",
+      "ざ": "ざ",
+      "じ": "じ",
+      "ず": "ず",
+      "ぜ": "ぜ",
+      "ぞ": "ぞ",
+      "だ": "だ",
+      "ぢ": "ぢ",
+      "づ": "づ",
+      "で": "で",
+      "ど": "ど",
+      "ば": "ば",
+      "ぱ": "ぱ",
+      "び": "び",
+      "ぴ": "ぴ",
+      "ぶ": "ぶ",
+      "ぷ": "ぷ",
+      "べ": "べ",
+      "ぺ": "ぺ",
+      "ぼ": "ぼ",
+      "ぽ": "ぽ",
+      "ゔ": "ゔ",
+      "ゞ": "ゞ",
+      "ガ": "ガ",
+      "ギ": "ギ",
+      "グ": "グ",
+      "ゲ": "ゲ",
+      "ゴ": "ゴ",
+      "ザ": "ザ",
+      "ジ": "ジ",
+      "ズ": "ズ",
+      "ゼ": "ゼ",
+      "ゾ": "ゾ",
+      "ダ": "ダ",
+      "ヂ": "ヂ",
+      "ヅ": "ヅ",
+      "デ": "デ",
+      "ド": "ド",
+      "バ": "バ",
+      "パ": "パ",
+      "ビ": "ビ",
+      "ピ": "ピ",
+      "ブ": "ブ",
+      "プ": "プ",
+      "ベ": "ベ",
+      "ペ": "ペ",
+      "ボ": "ボ",
+      "ポ": "ポ",
+      "ヴ": "ヴ",
+      "ヷ": "ヷ",
+      "ヸ": "ヸ",
+      "ヹ": "ヹ",
+      "ヺ": "ヺ",
+      "ｦ": "ヲ",
+      "ｦﾞ": "ヺ",
+      "ｧ": "ァ",
+      "ｨ": "ィ",
+      "ｩ": "ゥ",
+      "ｪ": "ェ",
+      "ｫ": "ォ",
+      "ｬ": "ャ",
+      "ｭ": "ュ",
+      "ｮ": "ョ",
+      "ｯ": "ッ",
+      "ｰ": "ー",
+      "ｱ": "ア",
+      "ｲ": "イ",
+      "ｳ": "ウ",
+      "ｳﾞ": "ヴ",
+      "ｴ": "エ",
+      "ｵ": "オ",
+      "ｶ": "カ",
+      "ｶﾞ": "ガ",
+      "ｷ": "キ",
+      "ｷﾞ": "ギ",
+      "ｸ": "ク",
+      "ｸﾞ": "グ",
+      "ｹ": "ケ",
+      "ｹﾞ": "ゲ",
+      "ｺ": "コ",
+      "ｺﾞ": "ゴ",
+      "ｻ": "サ",
+      "ｻﾞ": "ザ",
+      "ｼ": "シ",
+      "ｼﾞ": "ジ",
+      "ｽ": "ス",
+      "ｽﾞ": "ズ",
+      "ｾ": "セ",
+      "ｾﾞ": "ゼ",
+      "ｿ": "ソ",
+      "ｿﾞ": "ゾ",
+      "ﾀ": "タ",
+      "ﾀﾞ": "ダ",
+      "ﾁ": "チ",
+      "ﾁﾞ": "ヂ",
+      "ﾂ": "ツ",
+      "ﾂﾞ": "ヅ",
+      "ﾃ": "テ",
+      "ﾃﾞ": "デ",
+      "ﾄ": "ト",
+      "ﾄﾞ": "ド",
+      "ﾅ": "ナ",
+      "ﾆ": "ニ",
+      "ﾇ": "ヌ",
+      "ﾈ": "ネ",
+      "ﾉ": "ノ",
+      "ﾊ": "ハ",
+      "ﾊﾞ": "バ",
+      "ﾊﾟ": "パ",
+      "ﾋ": "ヒ",
+      "ﾋﾞ": "ビ",
+      "ﾋﾟ": "ピ",
+      "ﾌ": "フ",
+      "ﾌﾞ": "ブ",
+      "ﾌﾟ": "プ",
+      "ﾍ": "ヘ",
+      "ﾍﾞ": "ベ",
+      "ﾍﾟ": "ペ",
+      "ﾎ": "ホ",
+      "ﾎﾞ": "ボ",
+      "ﾎﾟ": "ポ",
+      "ﾏ": "マ",
+      "ﾐ": "ミ",
+      "ﾑ": "ム",
+      "ﾒ": "メ",
+      "ﾓ": "モ",
+      "ﾔ": "ヤ",
+      "ﾕ": "ユ",
+      "ﾖ": "ヨ",
+      "ﾗ": "ラ",
+      "ﾘ": "リ",
+      "ﾙ": "ル",
+      "ﾚ": "レ",
+      "ﾛ": "ロ",
+      "ﾜ": "ワ",
+      "ﾜﾞ": "ヷ",
+      "ﾝ": "ン",
+      "ﾞ": "゙",
+      "ﾟ": "゚"
+    },
+    "geminate_onsets": [
+      "k",
+      "kʲ",
+      "ɡ",
+      "ɡʲ",
+      "s",
+      "ɕ",
+      "z",
+      "t",
+      "tʲ",
+      "t͡s",
+      "t͡ɕ",
+      "d",
+      "dʲ",
+      "d͡ʑ",
+      "p",
+      "pʲ",
+      "b",
+      "bʲ",
+      "ɸ",
+      "ɸʲ",
+      "h",
+      "ç"
+    ],
+    "common_long_vowels": {
+      "a a": "aː",
+      "i i": "iː",
+      "ɯ ɯ": "ɯː",
+      "e e": "eː",
+      "o o": "oː",
+      "e i": "eː",
+      "o ɯ": "oː"
+    },
+    "moraic_nasal_allophones": {
+      "p": "m",
+      "b": "m",
+      "m": "m",
+      "pʲ": "m",
+      "bʲ": "m",
+      "mʲ": "m",
+      "t": "n",
+      "d": "n",
+      "n": "n",
+      "k": "ŋ",
+      "ɡ": "ŋ"
+    },
+    "realization_schema": "verdant-japanese-realization/1",
+    "scope": "Finite kana reading helper, not Japanese text G2P. No kanji, word accent, particle reading, or automatic vowel devoicing. Matching kana provenance permits conservative moraic-nasal place assimilation before selected consonants within the same written word; canonical IPA remains unchanged and realized targets are separately traced. Other nasal allophones remain approximate. Explicit ー is honored. Optional common-long-vowel rules are an author-selected orthographic heuristic, not a lexical dictionary.",
+    "source": "Curated standard kana correspondences; special-mora distinctions cross-checked against NINJAL CSJ labeling and TUFS pronunciation materials."
+  },
+  "pinyin_ipa": {
+    "initials": {
+      "b": "p",
+      "p": "pʰ",
+      "m": "m",
+      "f": "f",
+      "d": "t",
+      "t": "tʰ",
+      "n": "n",
+      "l": "l",
+      "g": "k",
+      "k": "kʰ",
+      "h": "x",
+      "j": "t͡ɕ",
+      "q": "t͡ɕʰ",
+      "x": "ɕ",
+      "zh": "t͡ʂ",
+      "ch": "t͡ʂʰ",
+      "sh": "ʂ",
+      "r": "ɻ",
+      "z": "t͡s",
+      "c": "t͡sʰ",
+      "s": "s"
+    },
+    "finals": {
+      "a": "a",
+      "ai": "aɪ",
+      "an": "an",
+      "ang": "ɑŋ",
+      "ao": "aʊ",
+      "e": "ɤ",
+      "ei": "eɪ",
+      "en": "ən",
+      "eng": "əŋ",
+      "er": "ɚ",
+      "i": "i",
+      "ia": "ja",
+      "ian": "jɛn",
+      "iang": "jɑŋ",
+      "iao": "jaʊ",
+      "ie": "jɛ",
+      "ii": "ɹ̩",
+      "iii": "ɻ̩",
+      "in": "in",
+      "ing": "iŋ",
+      "iong": "jʊŋ",
+      "iou": "joʊ",
+      "o": "o",
+      "ong": "ʊŋ",
+      "ou": "oʊ",
+      "u": "u",
+      "ua": "wa",
+      "uai": "waɪ",
+      "uan": "wan",
+      "uang": "wɑŋ",
+      "uei": "weɪ",
+      "uen": "wən",
+      "ueng": "wəŋ",
+      "uo": "wo",
+      "v": "y",
+      "van": "ɥɛn",
+      "ve": "ɥɛ",
+      "vn": "yn"
+    }
+  }
+}

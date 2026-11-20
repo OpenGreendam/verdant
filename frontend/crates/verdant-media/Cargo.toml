@@ -1,0 +1,24 @@
+[package]
+name = "verdant-media"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Authorized audio import, verified clip documents and shared prepared PCM."
+
+[dependencies]
+symphonia = { version = "=0.5.5", features = ["all"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+verdant-domain = { path = "../verdant-domain" }
+verdant-audio = { path = "../verdant-audio", default-features = false }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }

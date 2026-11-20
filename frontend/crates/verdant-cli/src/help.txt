@@ -1,0 +1,24 @@
+Usage: verdant-cli COMMAND [ARGUMENTS] [--json | --events]
+       verdant-cli request --json < request.json
+       verdant-cli serve --stdio
+
+Commands:
+  capabilities                 List protocol, formats, and operations
+  schema [OPERATION]           Describe the machine interface
+  doctor                       Check the native worker and installed voices
+  project new|inspect|validate|apply|save-as|recover|migrate|pack|unpack
+  history list|undo|redo       Inspect or apply persisted editor history
+  import SOURCE --output PROJECT
+  export project PROJECT --output SCORE
+  render PROJECT --output WAV [--report JSON]
+  export audio PROJECT --output WAV
+  job list|inspect|cancel|retry
+  cache list|verify|clean
+  voice list|verify|convert|install|remove|set-default|import-originals
+  media import|relink|inspect|verify
+  effect scan|catalog|status
+  batch --requests FILE       Run independent requests in order
+
+--params FILE adds a JSON object of operation parameters.
+--json emits one response. --events emits one JSON record per line.
+Render and export put audio in files. Diagnostics go to standard error.

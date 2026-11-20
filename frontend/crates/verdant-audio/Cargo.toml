@@ -1,0 +1,19 @@
+[package]
+name = "verdant-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Prepared-PCM transport: device sample clock, lock-free control, crossfaded timeline swaps."
+
+[features]
+default = ["audio-device"]
+audio-device = ["dep:cpal"]
+
+[[bench]]
+name = "callback_p99"
+harness = false
+
+[dependencies]
+cpal = { version = "0.18", optional = true }
+rtrb = "0.4"

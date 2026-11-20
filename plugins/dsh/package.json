@@ -1,0 +1,49 @@
+{
+  "name": "verdant-dsh",
+  "version": "0.1.0",
+  "description": "Verdant CLI tools and managed project handoff for DeepSeek Harness",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" }
+  },
+  "files": ["lib", "cordis.patch.yml", "README.md", "LICENSE"],
+  "engines": { "node": ">=24.9.0", "dsh": "0.2.2-rc.5" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenGreendam/verdant.git",
+    "directory": "plugins/dsh"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/schemastery": "3.19.0",
+    "@deepseek-ai/dsh-agent": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-attachment": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-commands": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-jobs": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/schemastery": "3.19.0",
+    "@deepseek-ai/dsh-agent": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-attachment": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-commands": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-jobs": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}

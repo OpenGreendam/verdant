@@ -1,0 +1,2241 @@
+{
+  "format": "greendam-native-diagnostic-v1",
+  "title": "native",
+  "status": "actually_rendered_approximate_native_parameter_synthesis",
+  "implementation": {
+    "version": "0.2.0",
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "source_sha256": {
+      "__init__.py": "a5b031205f9e69b19f4b1347e0a2d9f1d8525eaf272c7eae04ac42e5c538e0d4",
+      "__main__.py": "906a087de24e2a975bc5693060116cba80bafd349fceea2ffcc79876e907b048",
+      "context.py": "ba6c852a0e8ff0bfd07582c0c75d7b846902a39c83b019af674e9037703ffa2b",
+      "dsp.py": "ead95890b3332d161a8a4eb670e08cfdbe4c601b540cbc5c71d00f45a906395b",
+      "mlpg.py": "368d862df1759868d3f8c18aac8f605167770d8ad4d06122438b1c7320dbd371",
+      "model.py": "58842881dd8c4171b6094ed0cf72aa5ba562331532de7fa1719ed68e8613a1f5",
+      "pinyin.py": "20c61ed704ccbe16a701d8af4f495205ad37e04227762b3d2221a1bf6102f286",
+      "render.py": "df11a504a605e1678908a9ffa1c44588e5163e77876ebe1eaef48ff8866d18f2"
+    }
+  },
+  "provenance": {
+    "token": {
+      "name": "sn16k.tkn",
+      "bytes": 326581,
+      "sha256": "821b7cd9e7b489077dd55bf581ba90e1dffd3816c6fedcedc320744b498deead"
+    },
+    "model": {
+      "name": "sn16k.bin",
+      "bytes": 8470624,
+      "sha256": "213aa67a5b92fc311d524da6d9868f87df584b00e2eb9a0b9fb46822602353ff"
+    },
+    "voice_attributes": {
+      "name": "sn",
+      "vid": "10008",
+      "chnname": "楠楠",
+      "gender": "1",
+      "age": "1",
+      "supplang": "0x0804",
+      "mixsupp": "word",
+      "langscore": "4200",
+      "encrypt": "1"
+    },
+    "token_attributes": {
+      "name": "sn",
+      "sample-rate": "16000",
+      "pronstyle": "common",
+      "lsf_coef_order": "24",
+      "lsf_diff_order": "16"
+    },
+    "identity_status": "4900 sn/楠楠 candidate; target 童声01 identity not established"
+  },
+  "assumptions": [
+    "Input is the audited 4900 sn/楠楠 candidate; identity with target 童声01 is unconfirmed.",
+    "This is executable parameter reconstruction, not execution or bit-exact emulation of the original engine.",
+    "First-child truth polarity is an explicit parameter, not established from the original call path.",
+    "Unknown context questions remain unknown; diagnostic selection explores both branches and records its chosen path.",
+    "Frame shift defaults to 5 ms; original frame shift is not established.",
+    "Three 41-dimensional mean groups and variance groups are treated as static, delta, delta-delta observations.",
+    "Within each 41-vector, dimensions 0:16 constrain adjacent LSF spatial differences; dimensions 16:40 are the 24 LSFs. Spatial differences are not temporal deltas.",
+    "Temporal windows [1], [-.5,0,.5], [.25,-.5,.25] are observed backend constants; their use and endpoint replication here are assumptions.",
+    "Pitch triplets are interpreted as probability, natural-log-F0 mean, variance; the original execution path is unverified.",
+    "State-duration first five values are interpreted as relative state means; user duration rescales them. Original phone/state coupling and duration units are not reproduced.",
+    "LSF stabilization and filter bandwidth expansion are explicit reconstruction choices.",
+    "The last spectral scalar is exported but not used as amplitude because its gain semantics remain unknown.",
+    "The original opaque pulse table is not decoded or used; conventional excitation is substituted.",
+    "No original Chinese text frontend, lexicon, prosody model execution, coarticulation rules or full TTS is claimed."
+  ],
+  "sample_rate": 16000,
+  "hop_samples": 80,
+  "hop_seconds": 0.005,
+  "seed": 10008,
+  "first_child_truth_assumed": false,
+  "policy": "diagnostic-medoid",
+  "source": "rosenberg",
+  "segments": [
+    {
+      "label": "a",
+      "request": {
+        "vowel": "a",
+        "context_mode": "english-proxy",
+        "duration_seconds": 0.35,
+        "f0_hz": 300,
+        "voiced": true
+      },
+      "context": {
+        "label": "diagnostic_english_proxy_a_via_aa",
+        "features": {
+          "C_Tone": "1",
+          "L_SilSp": "sil",
+          "R_SilSp": "sil",
+          "C_Vowel": "aa"
+        },
+        "answers": {
+          "C_EN": true,
+          "C_SM": false,
+          "C_Voiced": true,
+          "C_Vowel": true,
+          "C_SilSp": false,
+          "C_Nasal": false,
+          "C_Fric": false,
+          "C_Stop": false,
+          "L_SilSp": true,
+          "R_SilSp": true
+        },
+        "anchor_questions": [
+          "C_Vowel==aa"
+        ],
+        "assumptions": [
+          "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+          "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+        ],
+        "diagnostic_answers": {
+          "C_Front": false,
+          "C_LWLevel==4": false,
+          "R_Stress==XX": false,
+          "C_ATP_L0inL1<=02": false,
+          "C_AN_L0inL3<=03": false,
+          "R_Vowel": false,
+          "C_VLS3": false,
+          "R_Nasal": false,
+          "C_RP_L0inL3==3": false,
+          "R_Dental": false,
+          "C_VLS4": false,
+          "C_VLS2": false,
+          "R_Stress==0": false,
+          "L_Fric==hh": false,
+          "C_RWLevel==4": false,
+          "C_LWLevel==50": false,
+          "C_RP_L0inL3==1": true,
+          "R_Stop": true,
+          "C_Dental": false,
+          "C_ATP_L0inL1<=04": true,
+          "R_Nasal==n": false,
+          "ZC_PronStyle==1": false,
+          "C_OnsetCoda==0": false,
+          "L_Vowel": true
+        }
+      },
+      "initial_context": {
+        "label": "diagnostic_english_proxy_a_via_aa",
+        "features": {
+          "C_Tone": "1",
+          "L_SilSp": "sil",
+          "R_SilSp": "sil",
+          "C_Vowel": "aa"
+        },
+        "answers": {
+          "C_EN": true,
+          "C_SM": false,
+          "C_Voiced": true,
+          "C_Vowel": true,
+          "C_SilSp": false,
+          "C_Nasal": false,
+          "C_Fric": false,
+          "C_Stop": false,
+          "L_SilSp": true,
+          "R_SilSp": true
+        },
+        "anchor_questions": [
+          "C_Vowel==aa"
+        ],
+        "assumptions": [
+          "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+          "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+        ],
+        "diagnostic_answers": {}
+      },
+      "selection_mode": "coherent",
+      "diagnostic_completion_order": [
+        "cep2",
+        "cep1",
+        "cep3",
+        "cep0",
+        "cep4",
+        "pitch2",
+        "pitch1",
+        "pitch3",
+        "pitch0",
+        "pitch4",
+        "state-dur-tree",
+        "phone-dur-tree"
+      ],
+      "diagnostic_seed_policy": "first exact-phone-anchor-compatible tree in spectral-priority order; then fixed tree order",
+      "diagnostic_anchor_probes_before_completion": [
+        {
+          "tree": "cep2",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "cep1",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "cep3",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "cep0",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "cep4",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "pitch2",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "pitch1",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "pitch3",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "pitch0",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "pitch4",
+          "positive_exact_anchor_hits": 1
+        },
+        {
+          "tree": "state-dur-tree",
+          "positive_exact_anchor_hits": 0
+        },
+        {
+          "tree": "phone-dur-tree",
+          "positive_exact_anchor_hits": 0
+        }
+      ],
+      "shared_diagnostic_completions": [
+        {
+          "question": "C_Front",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_LWLevel==4",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Stress==XX",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_ATP_L0inL1<=02",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_AN_L0inL3<=03",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Vowel",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep1",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_VLS3",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep3",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Nasal",
+          "assumed_answer": false,
+          "introduced_by_tree": "cep4",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_RP_L0inL3==3",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Dental",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_VLS4",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_VLS2",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Stress==0",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch2",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "L_Fric==hh",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch1",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_RWLevel==4",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch1",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_LWLevel==50",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch3",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_RP_L0inL3==1",
+          "assumed_answer": true,
+          "introduced_by_tree": "pitch3",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Stop",
+          "assumed_answer": true,
+          "introduced_by_tree": "pitch3",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_Dental",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch0",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_ATP_L0inL1<=04",
+          "assumed_answer": true,
+          "introduced_by_tree": "pitch0",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "R_Nasal==n",
+          "assumed_answer": false,
+          "introduced_by_tree": "pitch0",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "ZC_PronStyle==1",
+          "assumed_answer": false,
+          "introduced_by_tree": "state-dur-tree",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "C_OnsetCoda==0",
+          "assumed_answer": false,
+          "introduced_by_tree": "state-dur-tree",
+          "status": "diagnostic assumption, not recovered frontend output"
+        },
+        {
+          "question": "L_Vowel",
+          "assumed_answer": true,
+          "introduced_by_tree": "phone-dur-tree",
+          "status": "diagnostic assumption, not recovered frontend output"
+        }
+      ],
+      "cross_tree_question_truth_conflicts": [],
+      "requested_seconds": 0.35,
+      "actual_seconds": 0.35,
+      "state_frames": [
+        7,
+        17,
+        22,
+        13,
+        11
+      ],
+      "state_duration_mean_interpretation": [
+        4.825243,
+        12.94175,
+        17.68932,
+        10.36893,
+        8.07767
+      ],
+      "state_duration_variance_interpretation": [
+        54.63965,
+        169.327,
+        154.8067,
+        68.82535,
+        17.32435
+      ],
+      "phone_duration_record_unused_in_timing": [
+        40.10794,
+        264.1507
+      ],
+      "leaf_selections": [
+        {
+          "tree": "cep2",
+          "leaf_index_0based": 957,
+          "leaf_double_offset_1based": 235423,
+          "leaf_record_bytes": 1968,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {}
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 13,
+          "compatible_leaf_count_after_preferences": 6,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.39117729945401697,
+          "unknown_questions_on_selected_path": [
+            "C_Front",
+            "C_LWLevel==4",
+            "R_Stress==XX",
+            "C_ATP_L0inL1<=02",
+            "C_AN_L0inL3<=03"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 688,
+              "question": "C_Vowel==ow",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 513,
+              "question": "C_LWLevel==4",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 990,
+              "question": "R_Stress==XX",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 297,
+              "question": "C_ATP_L0inL1<=02",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 181,
+              "question": "C_AN_L0inL3<=03",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "cep1",
+          "leaf_index_0based": 827,
+          "leaf_double_offset_1based": 203443,
+          "leaf_record_bytes": 1968,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 2,
+          "compatible_leaf_count_after_preferences": 2,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 1.0000000000000748,
+          "unknown_questions_on_selected_path": [
+            "R_Vowel"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 685,
+              "question": "C_Vowel==iy",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 684,
+              "question": "C_Vowel==ih",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 1004,
+              "question": "R_Vowel",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 692,
+              "question": "C_Vowel==uw",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 686,
+              "question": "C_Vowel==l",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 990,
+              "question": "R_Stress==XX",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "cep3",
+          "leaf_index_0based": 591,
+          "leaf_double_offset_1based": 145387,
+          "leaf_record_bytes": 1968,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 2,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [
+            "C_VLS3"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 690,
+              "question": "C_Vowel==r",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 669,
+              "question": "C_VLS3",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 1004,
+              "question": "R_Vowel",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 977,
+              "question": "R_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "cep0",
+          "leaf_index_0based": 482,
+          "leaf_double_offset_1based": 118573,
+          "leaf_record_bytes": 1968,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 1,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 517,
+              "question": "C_Nasal",
+              "answer": false,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 811,
+              "question": "L_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 1004,
+              "question": "R_Vowel",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 669,
+              "question": "C_VLS3",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "cep4",
+          "leaf_index_0based": 550,
+          "leaf_double_offset_1based": 135301,
+          "leaf_record_bytes": 1968,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 4,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [
+            "R_Nasal"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 1004,
+              "question": "R_Vowel",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 942,
+              "question": "R_Nasal",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 977,
+              "question": "R_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 688,
+              "question": "C_Vowel==ow",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 686,
+              "question": "C_Vowel==l",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 692,
+              "question": "C_Vowel==uw",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 679,
+              "question": "C_Vowel==ax",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "pitch2",
+          "leaf_index_0based": 81,
+          "leaf_double_offset_1based": 730,
+          "leaf_record_bytes": 72,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 13,
+          "compatible_leaf_count_after_preferences": 2,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 1.0,
+          "unknown_questions_on_selected_path": [
+            "C_RP_L0inL3==3",
+            "R_Dental",
+            "C_VLS4",
+            "C_VLS2",
+            "R_Stress==0"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 679,
+              "question": "C_Vowel==ax",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 693,
+              "question": "C_Vowel==w",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 1004,
+              "question": "R_Vowel",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 573,
+              "question": "C_RP_L0inL3==3",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 688,
+              "question": "C_Vowel==ow",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 942,
+              "question": "R_Nasal",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 692,
+              "question": "C_Vowel==uw",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 928,
+              "question": "R_Dental",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 686,
+              "question": "C_Vowel==l",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 670,
+              "question": "C_VLS4",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 668,
+              "question": "C_VLS2",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 988,
+              "question": "R_Stress==0",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "pitch1",
+          "leaf_index_0based": 106,
+          "leaf_double_offset_1based": 955,
+          "leaf_record_bytes": 72,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false,
+              "C_RP_L0inL3==3": false,
+              "R_Dental": false,
+              "C_VLS4": false,
+              "C_VLS2": false,
+              "R_Stress==0": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 6,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [
+            "L_Fric==hh",
+            "C_RWLevel==4"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 681,
+              "question": "C_Vowel==eh",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 670,
+              "question": "C_VLS4",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 766,
+              "question": "L_Fric==hh",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 990,
+              "question": "R_Stress==XX",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 685,
+              "question": "C_Vowel==iy",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 694,
+              "question": "C_Vowel==y",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 693,
+              "question": "C_Vowel==w",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 606,
+              "question": "C_RWLevel==4",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "pitch3",
+          "leaf_index_0based": 987,
+          "leaf_double_offset_1based": 8884,
+          "leaf_record_bytes": 72,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false,
+              "C_RP_L0inL3==3": false,
+              "R_Dental": false,
+              "C_VLS4": false,
+              "C_VLS2": false,
+              "R_Stress==0": false,
+              "L_Fric==hh": false,
+              "C_RWLevel==4": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 15,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [
+            "C_LWLevel==50",
+            "C_RP_L0inL3==1",
+            "R_Stop"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 690,
+              "question": "C_Vowel==r",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 668,
+              "question": "C_VLS2",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 514,
+              "question": "C_LWLevel==50",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 573,
+              "question": "C_RP_L0inL3==3",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 494,
+              "question": "C_Front",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 571,
+              "question": "C_RP_L0inL3==1",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 688,
+              "question": "C_Vowel==ow",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 677,
+              "question": "C_Vowel==ao",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 981,
+              "question": "R_Stop",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "pitch0",
+          "leaf_index_0based": 987,
+          "leaf_double_offset_1based": 8884,
+          "leaf_record_bytes": 72,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false,
+              "C_RP_L0inL3==3": false,
+              "R_Dental": false,
+              "C_VLS4": false,
+              "C_VLS2": false,
+              "R_Stress==0": false,
+              "L_Fric==hh": false,
+              "C_RWLevel==4": false,
+              "C_LWLevel==50": false,
+              "C_RP_L0inL3==1": true,
+              "R_Stop": true
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 4,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [
+            "C_Dental",
+            "C_ATP_L0inL1<=04",
+            "R_Nasal==n"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 519,
+              "question": "C_Nasal==n",
+              "answer": false,
+              "answer_source": "declared_category_nonmembership:C_Nasal",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 643,
+              "question": "C_Stop",
+              "answer": false,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 492,
+              "question": "C_Fric==z",
+              "answer": false,
+              "answer_source": "declared_category_nonmembership:C_Fric",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 520,
+              "question": "C_Nasal==ng",
+              "answer": false,
+              "answer_source": "declared_category_nonmembership:C_Nasal",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 811,
+              "question": "L_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 480,
+              "question": "C_Dental",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 517,
+              "question": "C_Nasal",
+              "answer": false,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 686,
+              "question": "C_Vowel==l",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 1004,
+              "question": "R_Vowel",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 681,
+              "question": "C_Vowel==eh",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 677,
+              "question": "C_Vowel==ao",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 299,
+              "question": "C_ATP_L0inL1<=04",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 944,
+              "question": "R_Nasal==n",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "pitch4",
+          "leaf_index_0based": 106,
+          "leaf_double_offset_1based": 955,
+          "leaf_record_bytes": 72,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false,
+              "C_RP_L0inL3==3": false,
+              "R_Dental": false,
+              "C_VLS4": false,
+              "C_VLS2": false,
+              "R_Stress==0": false,
+              "L_Fric==hh": false,
+              "C_RWLevel==4": false,
+              "C_LWLevel==50": false,
+              "C_RP_L0inL3==1": true,
+              "R_Stop": true,
+              "C_Dental": false,
+              "C_ATP_L0inL1<=04": true,
+              "R_Nasal==n": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 1,
+          "compatible_leaf_count_after_preferences": 1,
+          "positive_exact_anchor_hits": 1,
+          "medoid_distance": 0.0,
+          "unknown_questions_on_selected_path": [],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 977,
+              "question": "R_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 669,
+              "question": "C_VLS3",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 674,
+              "question": "C_Vowel==aa",
+              "answer": true,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "state-dur-tree",
+          "leaf_index_0based": 708,
+          "leaf_double_offset_1based": 7081,
+          "leaf_record_bytes": 80,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false,
+              "C_RP_L0inL3==3": false,
+              "R_Dental": false,
+              "C_VLS4": false,
+              "C_VLS2": false,
+              "R_Stress==0": false,
+              "L_Fric==hh": false,
+              "C_RWLevel==4": false,
+              "C_LWLevel==50": false,
+              "C_RP_L0inL3==1": true,
+              "R_Stop": true,
+              "C_Dental": false,
+              "C_ATP_L0inL1<=04": true,
+              "R_Nasal==n": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 11,
+          "compatible_leaf_count_after_preferences": 11,
+          "positive_exact_anchor_hits": 0,
+          "medoid_distance": 0.04561495046758083,
+          "unknown_questions_on_selected_path": [
+            "ZC_PronStyle==1",
+            "C_OnsetCoda==0"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 643,
+              "question": "C_Stop",
+              "answer": false,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 519,
+              "question": "C_Nasal==n",
+              "answer": false,
+              "answer_source": "declared_category_nonmembership:C_Nasal",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 1093,
+              "question": "ZC_PronStyle==1",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 977,
+              "question": "R_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 521,
+              "question": "C_OnsetCoda==0",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 686,
+              "question": "C_Vowel==l",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 684,
+              "question": "C_Vowel==ih",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 679,
+              "question": "C_Vowel==ax",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 670,
+              "question": "C_VLS4",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 688,
+              "question": "C_Vowel==ow",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        },
+        {
+          "tree": "phone-dur-tree",
+          "leaf_index_0based": 464,
+          "leaf_double_offset_1based": 929,
+          "leaf_record_bytes": 16,
+          "context": {
+            "label": "diagnostic_english_proxy_a_via_aa",
+            "features": {
+              "C_Tone": "1",
+              "L_SilSp": "sil",
+              "R_SilSp": "sil",
+              "C_Vowel": "aa"
+            },
+            "answers": {
+              "C_EN": true,
+              "C_SM": false,
+              "C_Voiced": true,
+              "C_Vowel": true,
+              "C_SilSp": false,
+              "C_Nasal": false,
+              "C_Fric": false,
+              "C_Stop": false,
+              "L_SilSp": true,
+              "R_SilSp": true
+            },
+            "anchor_questions": [
+              "C_Vowel==aa"
+            ],
+            "assumptions": [
+              "Explicit English vowel proxy aa; not a certified Mandarin /a/ path.",
+              "Synthetic isolated context and name-based boolean interpretation; unresolved questions are retained."
+            ],
+            "diagnostic_answers": {
+              "C_Front": false,
+              "C_LWLevel==4": false,
+              "R_Stress==XX": false,
+              "C_ATP_L0inL1<=02": false,
+              "C_AN_L0inL3<=03": false,
+              "R_Vowel": false,
+              "C_VLS3": false,
+              "R_Nasal": false,
+              "C_RP_L0inL3==3": false,
+              "R_Dental": false,
+              "C_VLS4": false,
+              "C_VLS2": false,
+              "R_Stress==0": false,
+              "L_Fric==hh": false,
+              "C_RWLevel==4": false,
+              "C_LWLevel==50": false,
+              "C_RP_L0inL3==1": true,
+              "R_Stop": true,
+              "C_Dental": false,
+              "C_ATP_L0inL1<=04": true,
+              "R_Nasal==n": false,
+              "ZC_PronStyle==1": false,
+              "C_OnsetCoda==0": false
+            }
+          },
+          "policy": "diagnostic-medoid",
+          "branch_polarity": "first_false",
+          "branch_polarity_status": "explicit assumption; original semantics unverified",
+          "compatible_leaf_count_before_anchor_preference": 2,
+          "compatible_leaf_count_after_preferences": 2,
+          "positive_exact_anchor_hits": 0,
+          "medoid_distance": 0.999999999999998,
+          "unknown_questions_on_selected_path": [
+            "L_Vowel"
+          ],
+          "path": [
+            {
+              "question_id": 481,
+              "question": "C_EN",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 1093,
+              "question": "ZC_PronStyle==1",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 977,
+              "question": "R_SilSp",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 673,
+              "question": "C_Vowel",
+              "answer": true,
+              "answer_source": "explicit_question_answer",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            },
+            {
+              "question_id": 521,
+              "question": "C_OnsetCoda==0",
+              "answer": false,
+              "answer_source": "shared_diagnostic_context_completion",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 684,
+              "question": "C_Vowel==ih",
+              "answer": false,
+              "answer_source": "explicit_feature:C_Vowel",
+              "chosen_child": "first",
+              "assumed_child_truth": false
+            },
+            {
+              "question_id": 847,
+              "question": "L_Vowel",
+              "answer": null,
+              "answer_source": "unknown_preserved",
+              "chosen_child": "second",
+              "assumed_child_truth": true
+            }
+          ],
+          "selection_status": "diagnostic selection among unresolved branches; not original frontend output"
+        }
+      ],
+      "spectral_mlpg": {
+        "solver": "scipy.sparse.linalg.spsolve",
+        "unknowns": 1750,
+        "normal_matrix_nonzeros": 19608,
+        "relative_normal_equation_residual": 3.1518575351933015e-13,
+        "weighted_squared_error": 845.0658547703746,
+        "temporal_windows_assumed_from_backend_constants": [
+          [
+            1.0
+          ],
+          [
+            -0.5,
+            0.0,
+            0.5
+          ],
+          [
+            0.25,
+            -0.5,
+            0.25
+          ]
+        ],
+        "boundary_policy_assumed": "replicate first and last frame",
+        "variance_floor_added": false
+      },
+      "pitch_mlpg": {
+        "solver": "scipy.sparse.linalg.spsolve",
+        "unknowns": 70,
+        "normal_matrix_nonzeros": 344,
+        "relative_normal_equation_residual": 1.8261236012727741e-13,
+        "weighted_squared_error": 78.48307773990123,
+        "temporal_windows_assumed_from_backend_constants": [
+          [
+            1.0
+          ],
+          [
+            -0.5,
+            0.0,
+            0.5
+          ],
+          [
+            0.25,
+            -0.5,
+            0.25
+          ]
+        ],
+        "boundary_policy_assumed": "replicate first and last frame",
+        "variance_floor_added": false
+      },
+      "lsf_projection": {
+        "method": "bounded isotonic projection",
+        "minimum_gap_radians": 0.01,
+        "changed_frames": 0,
+        "maximum_change_radians": 2.220446049250313e-16
+      },
+      "f0_mode": "explicit_user_frequency",
+      "voicing_mode": "explicit segment voicing, original probability retained in NPZ",
+      "dsp": {
+        "source": "rosenberg",
+        "original_pulse_table_used": false,
+        "source_status": "traditional approximate excitation, original excitation not decoded",
+        "seed": 10008,
+        "bandwidth_expansion_gamma": 0.994,
+        "maximum_frame_filter_pole_radius": 0.9773580831143933,
+        "filter_energy_equalization": "inverse RMS response over 1024 frequency bins",
+        "unidentified_scalar_gain_used": false,
+        "voiced_noise_level": 0.012,
+        "rosenberg_open_fraction": 0.45,
+        "rosenberg_close_fraction": 0.2,
+        "sample_filter_interpolation": "linear PARCOR at frame centers, held at endpoints; all-pole synthesis lattice",
+        "control_frame_time": "(frame_index + .5) * hop_samples / sample_rate",
+        "maximum_absolute_reflection_coefficient": 0.9882646352854383,
+        "interpolated_filter_stability": "each interpolated PARCOR remains strictly within (-1,1); actual waveform checked finite",
+        "endpoint_ramp_seconds": 0.012
+      },
+      "segment_peak_calibration_gain": 0.0863524922543963,
+      "raw_model_f0_range_hz": [
+        209.19178094122313,
+        248.9667955127853
+      ],
+      "first_frame": 0,
+      "frame_count": 70
+    }
+  ],
+  "selection_mode": "coherent",
+  "context_consistency_scope": "same question has one shared truth across all 12 trees per segment; unknown group semantics still unverified",
+  "files": {
+    "wav": "native.wav",
+    "parameters": "native.npz"
+  },
+  "audio_metrics": {
+    "duration_seconds": 0.35,
+    "samples": 5600,
+    "frames": 70,
+    "peak": 0.65,
+    "rms": 0.23970179171657596,
+    "nonfinite_samples": 0,
+    "clipped_samples": 0
+  }
+}

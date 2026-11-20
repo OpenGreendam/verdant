@@ -1,0 +1,23 @@
+[package]
+name = "proto-ui-gpui-native"
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[features]
+default = ["gpui-modern-element-api"]
+# Host ABI selection for GPUI's blanket IntoElement impl and cached path IDs.
+gpui-modern-element-api = []
+# Requires an explicit local upstream focus-tree patch; not an advertised profile capability.
+experimental-focus-tree = []
+# Native consumer evidence only; no product introspection surface by default.
+test-support = []
+
+[dependencies]
+gpui = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-segmentation = "=1.13.3"
+data-url = "=0.3.2"
+image = { version = "=0.25.10", default-features = false }

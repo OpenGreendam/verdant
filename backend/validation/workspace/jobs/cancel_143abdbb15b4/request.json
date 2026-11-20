@@ -1,0 +1,22 @@
+{
+  "protocol": "ogd-worker/1",
+  "request_id": "long",
+  "op": "render",
+  "job_id": "cancel_143abdbb15b4",
+  "revision": 3,
+  "route": "C0",
+  "payload": {
+    "kind": "native_score",
+    "score": {
+      "segments": [
+        {
+          "vowel": "a",
+          "context_mode": "english-proxy",
+          "duration_seconds": 15,
+          "f0_hz": 300,
+          "voiced": true
+        }
+      ]
+    }
+  }
+}

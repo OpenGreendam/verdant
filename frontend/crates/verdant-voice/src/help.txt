@@ -1,0 +1,31 @@
+Manage local Verdant voice packages.
+
+verdant-voice install ZIP_OR_DIR [--registry FILE] [--set-default]
+    [--artifact-policy FILE --artifact-policy-sha256 REVIEWED_SHA256]
+verdant-voice list [--registry FILE]
+verdant-voice remove REFERENCE [--registry FILE]
+verdant-voice set-default REFERENCE [--registry FILE]
+verdant-voice import-originals --token FILE --model FILE [--registry FILE]
+
+Development conversion:
+verdant-voice convert --source DIR --destination DIR --source-token FILE --source-model FILE
+
+Install verifies the package against this Verdant build and publishes it under
+the desktop data directory's voices/ folder. Supply a ZIP or directory with
+manifest.json, bank.safetensors, the three ONNX graphs and declared source and
+rights records at the root. Installation changes the default only when asked.
+For policy-based admission, supply the external policy and its independently
+reviewed SHA-256 together.
+The install result reports package registration and render readiness separately.
+
+Remove unregisters a reference and clears the default if it was selected.
+Package files are retained for other registries. Existing project selections
+are preserved.
+
+Import-originals registers verdant-original-sn16k for Verdant's C0 raw-source
+reconstruction. Keep the token and model at their original paths. This command
+preserves the default and is independent of ONNX package installation.
+
+The registry defaults to VERDANT_VOICE_REGISTRY, then voices.json in
+VERDANT_STATE_DIR or the desktop state directory. Packages use
+VERDANT_USER_DATA_DIR or the desktop data directory.

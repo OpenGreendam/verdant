@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Verdant
+Comment=Edit singing projects and exchange scores
+Exec=verdant %f
+TryExec=verdant
+Terminal=false
+Categories=AudioVideo;Audio;Music;
+MimeType=application/x-verdant-project;
+StartupWMClass=verdant

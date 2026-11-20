@@ -1,0 +1,19 @@
+backend/validation export-ignore
+backend/validation-final export-ignore
+backend/validation-pinned export-ignore
+# The worker burns SHA-256 fingerprints of these sources into the binary and the
+# model loader verifies embedded JSON against data_manifest.json. A CRLF
+# checkout on Windows would change every fingerprint, so these trees must
+# round-trip byte-exact regardless of core.autocrlf.
+frontend/crates/verdant-backend/** -text
+frontend/crates/verdant-synthesis/** -text
+frontend/crates/verdant-worker/** -text
+frontend/Cargo.toml -text
+frontend/Cargo.lock -text
+backend/worker-request.schema.json -text
+# The compiler receipt hashes the authored source and every generated member.
+frontend/proto-ui/src/** -text
+frontend/proto-ui/generated/** -text
+# Embedded test fixtures are consumed byte-exact by include_bytes!/include_str!
+# assertions, so CRLF checkout conversion would break them too.
+frontend/crates/*/tests/fixtures/** -text
