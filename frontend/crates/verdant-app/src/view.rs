@@ -26,7 +26,7 @@ use crate::generated::controls::{
 use crate::phoneme_lane::{PHONEME_LANE_H, timeline_phoneme_lane};
 use crate::theme::{Theme, mix};
 use crate::ui_controls::{
-    BAR_BTN_H, Drawer, PANEL_BTN_H, RIGHT_RAIL_W, RightDockTab, SplitterKind, WidthClass,
+    BAR_BTN_H, Drawer, PANEL_BTN_H, RightDockTab, SplitterKind, WidthClass,
     generated_select_button, horizontal_timeline_bar, icon_command_button, icon_selectable_button,
     numeric_pill, route_short_name, select_button, selectable_button, selectable_command_button,
     splitter_bar,
@@ -97,7 +97,6 @@ enum ChromePane {
     ControlBar,
     Inspector,
     PropertyDock,
-    IconRail,
     Arrangement,
 }
 
@@ -113,7 +112,6 @@ impl Render for ChromeView {
             ChromePane::ControlBar => ed.control_bar(cx).into_any_element(),
             ChromePane::Inspector => ed.left_track_panel(cx).into_any_element(),
             ChromePane::PropertyDock => ed.right_synthv_dock(cx).into_any_element(),
-            ChromePane::IconRail => ed.right_icon_rail(cx).into_any_element(),
             ChromePane::Arrangement => ed.arrangement_content(cx),
         })
     }
@@ -123,7 +121,6 @@ pub(crate) struct ChromeViews {
     control_bar: Entity<ChromeView>,
     inspector: Entity<ChromeView>,
     property_dock: Entity<ChromeView>,
-    icon_rail: Entity<ChromeView>,
     arrangement: Entity<ChromeView>,
 }
 
@@ -139,7 +136,6 @@ impl ChromeViews {
             control_bar: view(ChromePane::ControlBar),
             inspector: view(ChromePane::Inspector),
             property_dock: view(ChromePane::PropertyDock),
-            icon_rail: view(ChromePane::IconRail),
             arrangement: view(ChromePane::Arrangement),
         }
     }
@@ -542,46 +538,6 @@ impl Editor {
                     ),
             );
 
-        let mut list_section = section("工程轨道列表", th);
-        for (idx, t) in project.tracks.iter().enumerate() {
-            let is_sel = t.id == self.session.track;
-            let tid = t.id.clone();
-            let tr_route = route_short_name(verdant_backend::adapter::desktop_route(&project, t, self.scheduler.capabilities.as_ref()));
-            list_section = list_section.child(
-                div()
-                    .id(SharedString::from(format!("left-track-row-{idx}")))
-                    .role(Role::Button)
-                    .aria_selected(is_sel)
-                    .h(px(PANEL_BTN_H + 4.0))
-                    .px(px(8.0))
-                    .rounded(px(6.0))
-                    .when(is_sel, |d| d.bg(mix(th.card, th.accent, 0.24)))
-                    .hover(move |s| s.bg(if is_sel { mix(th.card, th.accent, 0.3) } else { th.hover }))
-                    .flex()
-                    .items_center()
-                    .gap(px(6.0))
-                    .text_xs()
-                    .child(div().text_size(px(10.0)).text_color(th.text_tertiary).child(format!("{:02}", idx + 1)))
-                    .child(div().size(px(8.0)).rounded(px(2.0)).bg(th.track(t.color.as_deref())))
-                    .child(div().flex_1().truncate().font_weight(if is_sel { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).child(t.name.clone()))
-                    .child(div().text_size(px(10.0)).text_color(th.text_secondary).child(tr_route))
-                    .on_click({ let tid = tid.clone(); cx.listener(move |ed, _, _, cx| {
-                        let _ = ed.select_track(tid.clone(), cx);
-                    }) })
-                    .on_mouse_down(gpui::MouseButton::Right, cx.listener(move |ed, ev: &gpui::MouseDownEvent, window, cx| {
-                        if ed.select_track(tid.clone(), cx) { ed.track_menu(tid.clone(), ev.position, window, cx); }
-                        cx.stop_propagation();
-                    })),
-            );
-        }
-        list_section = list_section.child(
-            div()
-                .mt(px(2.0))
-                .flex()
-                .gap(px(5.0))
-                .child(icon_command_button(self, Cmd::AddTrack, Arg::None, "plus", "新建轨道", "new-track", false, cx).h(px(PANEL_BTN_H)).flex_1()),
-        );
-
         div()
             .id("inspector")
             .w(px(self.layout.inspector_width))
@@ -596,77 +552,9 @@ impl Editor {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .child(div().flex().flex_col().children(selection).child(track_section).child(mix_section).child(list_section)),
+                    .child(div().flex().flex_col().pb(px(18.0)).children(selection).child(track_section).child(mix_section)),
             )
             .into_any_element()
-    }
-
-    /// Far-right Synthesizer V Studio-style vertical icon rail (`36px` wide).
-    fn right_icon_rail(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let th = self.theme;
-        let open = self.right_dock_visible();
-        let cur_tab = self.layout.right_dock_tab;
-        let error_count = self.plans.iter().flat_map(|p| &p.diagnostics).filter(|d| d.severity == Severity::Error).count();
-
-        let tabs = [
-            (RightDockTab::VoiceTimbre, "sparkles", "声线与音色参数", false, false),
-            (RightDockTab::Dictionary, "languages", "词典与多语言分段", false, false),
-            (RightDockTab::RenderInserts, "cpu", "合成诊断与插入效果器", error_count > 0, error_count > 0),
-            (RightDockTab::HistorySystem, "history", "编辑历史与系统设置", false, false),
-        ];
-
-        div()
-            .id("right-icon-rail")
-            .w(px(RIGHT_RAIL_W))
-            .h_full()
-            .flex_none()
-            .flex()
-            .flex_col()
-            .items_center()
-            .py(px(6.0))
-            .gap(px(6.0))
-            .bg(th.surface)
-            .border_l_1()
-            .border_color(th.shade)
-            .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
-                if ed.lyric.is_some() { window.prevent_default(); }
-            }))
-            .children(tabs.into_iter().map(|(tab, ic, tip, show_dot, is_err_dot)| {
-                let active = open && cur_tab == tab;
-                let fg = if active { th.text } else { th.text_secondary };
-                div()
-                    .id(SharedString::from(format!("rail-tab-{tab:?}")))
-                    .role(Role::Button)
-                    .aria_label(tip)
-                    .aria_selected(active)
-                    .relative()
-                    .size(px(32.0))
-                    .rounded(px(6.0))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .when(active, |d| d.bg(th.checked))
-                    .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
-                    .child(svg().path(icon(ic)).size(px(15.0)).text_color(fg))
-                    .when(show_dot && !active, |d| {
-                        d.child(
-                            div()
-                                .absolute()
-                                .top(px(2.0))
-                                .right(px(2.0))
-                                .size(px(6.0))
-                                .rounded(px(3.0))
-                                .bg(if is_err_dot { th.error } else { th.accent }),
-                        )
-                    })
-                    .on_click(cx.listener(move |ed, _, _, cx| {
-                        if ed.right_dock_visible() && ed.layout.right_dock_tab == tab {
-                            ed.toggle_right_dock(cx);
-                        } else {
-                            ed.open_right_dock(tab, cx);
-                        }
-                    }))
-            }))
     }
 
     /// Synthesizer V Studio-style Right Property Dock.
@@ -677,40 +565,54 @@ impl Editor {
             return div().into_any_element();
         };
         let tab = self.layout.right_dock_tab;
-        let (title, ic) = match tab {
-            RightDockTab::VoiceTimbre => ("声线与音色参数", "sparkles"),
-            RightDockTab::Dictionary => ("词典与多语言分段", "languages"),
-            RightDockTab::RenderInserts => ("合成诊断与效果器", "cpu"),
-            RightDockTab::HistorySystem => ("编辑历史与系统设置", "history"),
-        };
-
+        let errors = self.plans.iter().flat_map(|p| &p.diagnostics).filter(|d| d.severity == Severity::Error).count();
+        // A view switcher in the pane's own header (AdwViewSwitcher), so the
+        // pane needs no separate icon column.
+        let tabs = [
+            (RightDockTab::VoiceTimbre, "sparkles", "声线"),
+            (RightDockTab::Dictionary, "languages", "词典"),
+            (RightDockTab::RenderInserts, "cpu", "诊断"),
+            (RightDockTab::HistorySystem, "history", "历史"),
+        ];
         let header = div()
             .h(px(46.0))
             .flex_none()
-            .px(px(12.0))
+            .px(px(8.0))
             .flex()
             .items_center()
-            .gap(px(8.0))
+            .gap(px(6.0))
             .bg(th.surface)
             .border_b_1()
             .border_color(th.shade)
             .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
-            .child(svg().path(icon(ic)).size(px(14.0)).text_color(th.accent))
-            .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(title))
+            .child(div().id("dock-switcher").role(Role::TabList).flex_1().min_w_0().flex().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+                .children(tabs.into_iter().map(|(t, ic, label)| {
+                    let active = t == tab;
+                    div().id(SharedString::from(format!("dock-tab-{t:?}"))).role(Role::Tab).aria_label(label).aria_selected(active)
+                        .relative().flex_1().h(px(28.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
+                        .when(active, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
+                        .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
+                        .child(svg().path(icon(ic)).size(px(14.0)).text_color(th.text))
+                        .child(label)
+                        .when(t == RightDockTab::RenderInserts && errors > 0, |d| d.child(
+                            div().absolute().top(px(3.0)).right(px(5.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
+                        .on_click(cx.listener(move |ed, _, _, cx| ed.open_right_dock(t, cx)))
+                })))
             .child(
                 div()
                     .id("close-right-dock")
                     .role(Role::Button)
                     .aria_label("收起右侧面板")
                     .size(px(28.0))
-                    .rounded(px(4.0))
+                    .flex_none()
+                    .rounded(px(6.0))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .hover(move |s| s.bg(th.control_pressed))
-                    .child(svg().path(icon("x")).size(px(12.5)).text_color(th.text_secondary))
+                    .hover(move |s| s.bg(th.hover))
+                    .child(svg().path(icon("x")).size(px(13.0)).text_color(th.text_secondary))
                     .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
             );
 
@@ -926,7 +828,6 @@ impl Editor {
     ) -> Div {
         let th = self.theme;
         let route = self.route();
-        let param_data = self.active_param_data();
         let phoneme_timing = project.render_preferences.phoneme_timing.as_ref();
         let output_transients = project.render_preferences.output_transients.as_ref();
         let engine_sec = section("合成设置", th)
@@ -941,54 +842,8 @@ impl Editor {
                 }),
                 output_transients.is_some(), cx));
 
-        let synth_section = section("声线与表现力控制", th)
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(th.text_secondary)
-                        .child(if route == verdant_backend::Route::VerdantVoice {
-                            "verdant-voice 声库直接由谐波 + 滤波噪声模型驱动音色。点击下方任意声线维度即可在底部参数泳道直接绘制包络："
-                        } else {
-                            "当前歌手使用已校验并显式解锁的原始声库。选择下方参数可查看支持状态并编辑包络："
-                        }),
-                )
-                .child(
-                    div()
-                        .mt(px(4.0))
-                        .flex()
-                        .flex_wrap()
-                        .gap(px(5.0))
-                        .children(
-                            [
-                                (Param::Pit, "PIT 音高偏移"),
-                                (Param::Vibrato, "VIB 颤音深度"),
-                                (Param::Portamento, "POR 滑音过渡"),
-                                (Param::Dyn, "DYN 响度包络"),
-                                (Param::Breathiness, "BRE 气声度"),
-                                (Param::Brightness, "BRI 明亮度"),
-                                (Param::Clearness, "CLE 清晰度"),
-                                (Param::Gender, "GEN 性别因子"),
-                                (Param::Opening, "OPE 开口度"),
-                                (Param::Growl, "GWL 怒音颗粒"),
-                            ]
-                            .into_iter()
-                            .map(|(p, label)| {
-                                let has_data = params::ALL.iter().zip(param_data).any(|(&param, has_data)| param == p && has_data);
-                                let active = self.param == p;
-                                let display = if has_data { format!("{label} •") } else { label.to_string() };
-                                selectable_button(SharedString::from(format!("dock-param-{}", p.short())), display, active, th)
-                                    .on_click(cx.listener(move |ed, _, _, cx| {
-                                        ed.param = p;
-                                        ed.bottom = Bottom::Editor;
-                                        if ed.integrations.three_lanes {
-                                            ed.integrations.panel_params[ed.integrations.active_panel] = p;
-                                        }
-                                        cx.notify();
-                                    }))
-                            }),
-                        ),
-                );
-        div().flex().flex_col().child(engine_sec).child(synth_section)
+
+        div().flex().flex_col().child(engine_sec)
     }
 
     fn right_dock_dictionary_tab(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
@@ -1449,38 +1304,34 @@ impl Editor {
         // Parameter lanes: one toggle group (AdwToggleGroup).
         let mut group = div().id("lane-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control);
         for (param, has_data) in params::ALL.into_iter().zip(self.active_param_data()) {
-            let active = if self.integrations.three_lanes {
-                self.integrations.panel_params[self.integrations.active_panel] == param
-            } else {
-                param == self.param
-            };
+            let active = param == self.param;
+            let shown = self.integrations.lanes.contains(&param);
             let supported = params::support(param, route, caps).is_effective();
             let text_label = if has_data { format!("{} •", param.short()) } else { param.short().to_string() };
             let mut tab_btn = selectable_button(SharedString::from(format!("lane-{}", param.short())), text_label, active, th);
             if !supported && !active {
                 tab_btn = tab_btn.text_color(th.text_tertiary);
             }
+            // A parameter shown in another lane is marked; clicking it goes there.
+            if shown && !active { tab_btn = tab_btn.font_weight(FontWeight::SEMIBOLD); }
             group = group.child(tab_btn.h(px(24.0)).text_sm().on_click(cx.listener(move |ed, _, window, cx| {
                 ed.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
-                ed.param = param;
                 ed.point_selection.clear();
-                if ed.integrations.three_lanes {
-                    ed.integrations.panel_params[ed.integrations.active_panel] = param;
+                // Go to the lane that shows it, or show it in the active lane.
+                if let Some(slot) = ed.integrations.lanes.iter().position(|p| *p == param) {
+                    ed.integrations.active_panel = slot;
+                } else {
+                    let slot = ed.integrations.active_panel.min(ed.integrations.lanes.len() - 1);
+                    ed.integrations.lanes[slot] = param;
                 }
+                ed.param = param;
                 cx.notify();
             })));
         }
         tabs = tabs.child(group);
-        tabs.child(div().flex_1()).child(icon_command_button(
-            self,
-            Cmd::ToggleThreeLanes,
-            Arg::None,
-            "columns-3",
-            "三泳道并排",
-            "three-lanes-btn",
-            self.integrations.three_lanes,
-            cx,
-        ).flex_none())
+        tabs.child(div().flex_1()).child(
+            crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleThreeLanes, "plus", "添加泳道", "add-lane", false, cx)
+                .h(px(28.0)).flex_none())
     }
 
     fn curve_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1505,7 +1356,6 @@ impl Editor {
                 .children([
                     (Cmd::SetLanePencil, LaneTool::Pencil, Some("pencil"), "自由绘制", "curve-Pencil"),
                     (Cmd::SetLaneLine, LaneTool::Line, Some("spline"), "直线", "curve-Line"),
-                    (Cmd::SetLaneSmooth, LaneTool::Smooth, None, "平滑", "curve-Smooth"),
                     (Cmd::SetLaneEraser, LaneTool::Eraser, Some("eraser"), "擦除", "curve-Eraser"),
                     (Cmd::SetLaneSelect, LaneTool::Select, Some("mouse-pointer-2"), "框选点", "curve-Select"),
                 ].into_iter().map(|(cmd, tool, ic, label, key)| {
@@ -1700,12 +1550,9 @@ impl Editor {
         let lanes_semantics = Surface::Lanes.semantics(locale);
         let mixer_semantics = Surface::Mixer.semantics(locale);
         self.playback.clear_bottom_anchors();
-        let slot_count = if self.integrations.three_lanes { 3 } else { 1 };
-        let each_lane_h = if self.integrations.three_lanes {
-            (self.layout.lane_height / 2.2).clamp(84.0, 160.0)
-        } else {
-            self.layout.lane_height
-        };
+        let slot_count = self.integrations.lanes.len().max(1);
+        // The lane area keeps its height; lanes share it, each at least 72 px.
+        let each_lane_h = if slot_count == 1 { self.layout.lane_height } else { (self.layout.lane_height / slot_count as f32).max(72.0) };
 
         let bottom = match self.bottom {
             Bottom::Editor => Some(
@@ -1846,12 +1693,8 @@ impl Editor {
                     .child(self.lane_tabs(cx))
                     .child(self.curve_toolbar(cx))
                     .children((0..slot_count).map(|slot| {
-                        let param = if self.integrations.three_lanes {
-                            self.integrations.panel_params[slot]
-                        } else {
-                            self.param
-                        };
-                        let active_slot = self.integrations.three_lanes && self.integrations.active_panel == slot;
+                        let param = self.integrations.lanes.get(slot).copied().unwrap_or(self.param);
+                        let active_slot = slot_count > 1 && self.integrations.active_panel == slot;
                         div()
                             .id(("parameter-lane", slot))
                             .role(lanes_semantics.role)
@@ -1876,6 +1719,10 @@ impl Editor {
                                     .border_color(th.shade)
                                     .text_xs()
                                     .child(div().font_weight(FontWeight::SEMIBOLD).child(param.short()))
+                                    .when(slot_count > 1, |d| d.child(div().id(("remove-lane", slot)).role(Role::Button).aria_label(format!("移除 {} 泳道", param.short()))
+                                        .size(px(22.0)).rounded(px(11.0)).flex().items_center().justify_center().hover(move |s| s.bg(th.hover))
+                                        .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
+                                        .on_click(cx.listener(move |ed, _, _, cx| ed.remove_lane(slot, cx)))))
                                     .child(div().text_size(px(9.0)).text_color(th.text_tertiary).child(match param {
                                         Param::Pit => format!("±{:.0}¢", self.pit_range_cents),
                                         Param::Dyn => "dB".into(),
@@ -1990,7 +1837,7 @@ impl Editor {
                         d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th))
                             .when(has_track, |d| d.child(cached_view(&self.chrome.property_dock, column(self.layout.right_dock_width), a11y)))
                     })
-                    .child(cached_view(&self.chrome.icon_rail, column(RIGHT_RAIL_W), a11y)),
+
             )
             // No status bar, as in GNOME apps: transient messages are an
             // AdwToast at the bottom centre; project facts live in the title

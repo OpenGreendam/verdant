@@ -19,11 +19,12 @@ pub struct Recording {
 }
 pub struct IntegrationState {
     pub asset_policy:AssetPolicy,pub selected_clip:Option<(TrackId,String)>,pub recording:Option<Recording>,pub media_ready:bool,pub media_cache:verdant_media::WaveformCache,pub media_previews:HashMap<String,Arc<verdant_media::WaveformPreview>>,pub media_save_generation:u64,pub media_file_jobs:usize,
-    pub report:String,pub other_tracks:bool,pub three_lanes:bool,pub panel_params:[Param;3],pub active_panel:usize,pub scale_root:u8,pub scale_intervals:Vec<u8>,
+    pub report:String,pub other_tracks:bool,/// Parameter lanes shown under the roll, top to bottom; `active_panel` edits.
+    pub lanes:Vec<Param>,pub active_panel:usize,pub scale_root:u8,pub scale_intervals:Vec<u8>,
 }
 impl Default for IntegrationState {
     fn default()->Self{Self{asset_policy:AssetPolicy::new(Vec::<PathBuf>::new()).expect("empty asset policy"),selected_clip:None,recording:None,media_ready:false,media_cache:verdant_media::WaveformCache::default(),media_previews:HashMap::new(),media_save_generation:0,media_file_jobs:0,
-        report:String::new(),other_tracks:false,three_lanes:false,panel_params:[Param::Pit,Param::Dyn,Param::Gender],active_panel:0,scale_root:0,scale_intervals:Vec::new()}}
+        report:String::new(),other_tracks:false,lanes:vec![Param::Pit],active_panel:0,scale_root:0,scale_intervals:Vec::new()}}
 }
 fn action(label:impl Into<gpui::SharedString>,command:IntegrationAction)->crate::menu::MenuItem{
     crate::menu::MenuItem::action(label,MenuAction::Workflow(WorkflowAction::Integration(command)))
@@ -94,7 +95,7 @@ impl Editor {
             A::ExportScoreTrack(format,index)=>crate::files::export_score_with(self,format,Some(index),window,cx),
             A::VocaloidMetadata=>{let voice=self.project().extensions.get("vocaloid_voice").map(|v|serde_json::from_value::<verdant_exchange::VocaloidVoice>(v.clone())).transpose().map_err(|e|e.to_string())?;let text=voice.map(|v|format!("{} | {} | {} | {}",v.comp_id,v.name,v.language_id,v.program)).unwrap_or_default();self.prompt_integration("Vocaloid：真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",IntegrationPrompt::Vocaloid,&text,window,cx);}
             A::Scale=>self.open_scale_dialog(window,cx),
-            A::OtherTracks=>{self.integrations.other_tracks=!self.integrations.other_tracks;cx.notify();},A::ThreeLanes=>{self.integrations.three_lanes=!self.integrations.three_lanes;cx.notify();},
+            A::OtherTracks=>{self.integrations.other_tracks=!self.integrations.other_tracks;cx.notify();},A::ThreeLanes=>{self.add_lane(None,cx);},
             A::AuditionSelection=>{let pitch=self.selected_notes().first().map(|n|n.midi_note).ok_or("先选择音符")?;self.audition_pitch(pitch);}
             A::Report=>self.show_integration_report(cx),
         }Ok(())

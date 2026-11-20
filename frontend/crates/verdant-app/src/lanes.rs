@@ -837,7 +837,7 @@ fn up(ed:&mut Editor,param:Param,pointer: PointerId, window: &mut Window, cx: &m
                     line = [stroke.samples[0], *stroke.samples.last().unwrap()];
                     &line[..]
                 } else { &stroke.samples[..] };
-                if let Some(batch) = crate::curve_span::pitch_stroke_batch(track, &ed.tempo(), samples, stroke.tool == LaneTool::Smooth, stroke.erase) {
+                if let Some(batch) = crate::curve_span::pitch_stroke_batch(track, &ed.tempo(), samples, matches!(stroke.tool, LaneTool::Pencil | LaneTool::Smooth), stroke.erase) {
                     ed.commit(stroke.base, batch, cx);
                 }
             }
@@ -848,7 +848,7 @@ fn up(ed:&mut Editor,param:Param,pointer: PointerId, window: &mut Window, cx: &m
 fn context(ed: &mut Editor, tick: i64, window: &mut Window, cx: &mut Context<Editor>) {
     use crate::menu::MenuItem;
     let items = vec![MenuItem::action("自由绘制", MenuAction::SetLaneTool(LaneTool::Pencil)), MenuItem::action("直线", MenuAction::SetLaneTool(LaneTool::Line)),
-        MenuItem::action("平滑绘制", MenuAction::SetLaneTool(LaneTool::Smooth)), MenuItem::action("擦除", MenuAction::SetLaneTool(LaneTool::Eraser)), MenuItem::separator(),
+        MenuItem::action("擦除", MenuAction::SetLaneTool(LaneTool::Eraser)), MenuItem::separator(),
         MenuItem::action("框选控制点",MenuAction::SetLaneTool(LaneTool::Select)),
         MenuItem::action("选择所选音符的全部点",MenuAction::Workflow(crate::editor::WorkflowAction::SelectPoints)),
         MenuItem::action("变换选中点…",MenuAction::Workflow(crate::editor::WorkflowAction::TransformPoints)),

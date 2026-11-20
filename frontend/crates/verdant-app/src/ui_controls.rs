@@ -29,7 +29,6 @@ pub const TOP_BTN_H: f32 = 32.0;
 pub const BAR_BTN_H: f32 = 30.0;
 pub const PANEL_BTN_H: f32 = 34.0;
 pub const HDR_BTN_H: f32 = 22.0;
-pub const RIGHT_RAIL_W: f32 = 44.0;
 
 pub fn route_display_name(route: Route) -> &'static str {
     match route {

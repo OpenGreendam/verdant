@@ -1875,15 +1875,15 @@ impl Editor {
             cx.notify();
             return;
         }
-        // Line mode reduces the stroke to its endpoints; smooth replaces the
-        // freehand samples with a binomial-filtered version of them.
+        // Line mode reduces the stroke to its endpoints; freehand replaces
+        // the samples with a binomial-filtered version (removes hand jitter).
         let mut samples = stroke.samples.clone();
         match stroke.tool {
             LaneTool::Line if samples.len() > 2 => {
                 let (a, b) = (samples[0], *samples.last().unwrap());
                 samples = vec![a, b];
             }
-            LaneTool::Smooth if samples.len() > 4 => {
+            LaneTool::Pencil | LaneTool::Smooth if samples.len() > 4 => {
                 let mut out = samples.clone();
                 for i in 2..samples.len() - 2 {
                     out[i].1 = (samples[i - 2].1 + 4.0 * samples[i - 1].1 + 6.0 * samples[i].1 + 4.0 * samples[i + 1].1 + samples[i + 2].1) / 16.0;
@@ -2522,6 +2522,29 @@ impl Editor {
         // The editor window is the app (as with the Quit action); its tool
         // windows belong to it, so closing it ends the session.
         if self.shutdown(cx) { cx.quit(); }
+    }
+
+    /// Add a parameter lane (the first parameter not already shown, or
+    /// `param`) and make it the active one.
+    pub fn add_lane(&mut self, param: Option<Param>, cx: &mut Context<Self>) {
+        let lanes = &mut self.integrations.lanes;
+        let Some(param) = param.or_else(|| verdant_backend::params::ALL.into_iter().find(|p| !lanes.contains(p))) else { return };
+        if !lanes.contains(&param) { lanes.push(param); }
+        self.integrations.active_panel = lanes.iter().position(|p| *p == param).unwrap_or(0);
+        self.param = param;
+        self.point_selection.clear();
+        cx.notify();
+    }
+
+    /// Remove a lane; one lane always stays.
+    pub fn remove_lane(&mut self, slot: usize, cx: &mut Context<Self>) {
+        let lanes = &mut self.integrations.lanes;
+        if lanes.len() <= 1 || slot >= lanes.len() { return; }
+        lanes.remove(slot);
+        self.integrations.active_panel = self.integrations.active_panel.min(lanes.len() - 1);
+        self.param = lanes[self.integrations.active_panel];
+        self.point_selection.clear();
+        cx.notify();
     }
 
     pub fn left_panel_visible(&self) -> bool {

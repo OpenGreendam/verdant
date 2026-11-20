@@ -463,7 +463,7 @@ impl Editor {
             MenuItem::header("显示"),
             MenuItem::action("音素时序泳道", MenuAction::TogglePhonemeLane).checked(self.layout.show_phoneme_lane),
             MenuItem::action("BPM 速度泳道", MenuAction::ToggleTempoLane).checked(self.layout.show_tempo_lane),
-            MenuItem::action("并排三个参数泳道", MenuAction::Workflow(A::Integration(I::ThreeLanes))).checked(self.integrations.three_lanes),
+            MenuItem::action("添加参数泳道", MenuAction::Workflow(A::Integration(I::ThreeLanes))),
             MenuItem::action("叠加其他轨道重影音符", MenuAction::Workflow(A::Integration(I::OtherTracks))).checked(self.integrations.other_tracks),
             MenuItem::action("音阶与调式高亮…", MenuAction::Workflow(A::Integration(I::Scale))),
             MenuItem::separator(),
