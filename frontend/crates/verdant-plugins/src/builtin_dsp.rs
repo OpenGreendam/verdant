@@ -184,39 +184,72 @@ pub fn band_response_db(band: &Band, freq: f64, sample_rate: f64) -> f64 {
     20.0 * (num / den.max(1e-12)).max(1e-12).log10()
 }
 
+#[derive(Clone, Copy)]
+struct BiquadCoefficients {
+    k1: f64, k2: f64,
+    t1: f64, t2: f64,
+    b0: f64, c1: f64, c2: f64,
+}
+
+impl BiquadCoefficients {
+    fn new([b0, b1, b2, a1, a2]: [f64; 5]) -> Self {
+        // Schur reflection coefficients of the RBJ denominator. Its stable
+        // poles give |k1|, |k2| < 1; the t values normalize the lattice.
+        let k1 = a1 / (1.0 + a2);
+        let k2 = a2;
+        let t1 = ((1.0 - k1) * (1.0 + k1)).sqrt();
+        let t2 = ((1.0 - k2) * (1.0 + k2)).sqrt();
+        let residual2 = b2 - b0 * a2;
+        // Output taps recover the original numerator exactly in steady state.
+        let c1 = (b1 - b0 * a1 - k1 * residual2) / (t1 * t2);
+        let c2 = residual2 / t2;
+        Self { k1, k2, t1, t2, b0, c1, c2 }
+    }
+}
+
 #[derive(Clone, Copy, Default)]
-struct BiquadState { z1: f64, z2: f64 }
+struct BiquadState { s1: f64, s2: f64 }
 
 impl BiquadState {
     #[inline]
-    fn run(&mut self, c: &[f64; 5], x: f64) -> f64 {
-        // Transposed direct form II.
-        let y = c[0] * x + self.z1;
-        self.z1 = c[1] * x - c[3] * y + self.z2;
-        self.z2 = c[2] * x - c[4] * y;
+    fn run(&mut self, c: &BiquadCoefficients, x: f64) -> f64 {
+        let y = c.b0 * x + c.c1 * self.s1 + c.c2 * self.s2;
+        let reflected = c.t2 * x - c.k2 * self.s2;
+        // This is an orthogonal rotation/reflection of (s1, reflected).
+        // With x = 0, the squared state norm becomes s1² + k2²*s2²,
+        // so even sample-by-sample changes cannot amplify stored state energy.
+        let s1 = -c.k1 * self.s1 + c.t1 * reflected;
+        self.s2 = c.t1 * self.s1 + c.k1 * reflected;
+        self.s1 = s1;
         y
     }
 }
 
 /// Stereo EQ processor. Coefficients are recomputed only when a parameter
-/// changes, never per sample.
+/// changes. Automation takes effect on the next processed sample, retaining
+/// the normalized lattice state without interpolation or an extra audio path.
+/// Abrupt changes can produce a bounded transient/click. Bypassing a band
+/// discards its state immediately; re-enabling starts with an empty tail.
 pub struct EqProcessor {
     pub params: EqParams,
     sample_rate: f64,
-    coeffs: [[f64; 5]; EQ_BANDS],
+    coeffs: [BiquadCoefficients; EQ_BANDS],
     state: [[BiquadState; EQ_BANDS]; 2],
     output: f64,
 }
 
 impl EqProcessor {
     pub fn new(sample_rate: f64) -> Self {
-        let mut p = Self { params: EqParams::default(), sample_rate, coeffs: [[1.0, 0.0, 0.0, 0.0, 0.0]; EQ_BANDS], state: Default::default(), output: 1.0 };
+        let mut p = Self { params: EqParams::default(), sample_rate, coeffs: [BiquadCoefficients::new([1.0, 0.0, 0.0, 0.0, 0.0]); EQ_BANDS], state: Default::default(), output: 1.0 };
         p.refresh();
         p
     }
     pub fn set_sample_rate(&mut self, sample_rate: f64) { self.sample_rate = sample_rate; self.state = Default::default(); self.refresh(); }
     pub fn refresh(&mut self) {
-        for (c, b) in self.coeffs.iter_mut().zip(&self.params.bands) { *c = band_coefficients(b, self.sample_rate); }
+        for (i, (c, b)) in self.coeffs.iter_mut().zip(&self.params.bands).enumerate() {
+            *c = BiquadCoefficients::new(band_coefficients(b, self.sample_rate));
+            if !b.on { for channel in &mut self.state { channel[i] = BiquadState::default(); } }
+        }
         self.output = db_to_lin(self.params.output_db);
     }
     pub fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> {
@@ -226,6 +259,10 @@ impl EqProcessor {
     }
     pub fn process(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) {
         let on: [bool; EQ_BANDS] = std::array::from_fn(|i| self.params.bands[i].on);
+        // `params` is public: also honor bypass set directly before a block.
+        for (b, &enabled) in on.iter().enumerate() {
+            if !enabled { for channel in &mut self.state { channel[b] = BiquadState::default(); } }
+        }
         for i in 0..in_l.len() {
             let (mut l, mut r) = (in_l[i] as f64, in_r[i] as f64);
             for b in 0..EQ_BANDS {
@@ -385,6 +422,14 @@ mod tests {
         10.0 * s.max(1e-30).log10()
     }
 
+    fn single_band_eq(band: Band) -> EqProcessor {
+        let mut proc_ = EqProcessor::new(FS);
+        for b in &mut proc_.params.bands { b.on = false; }
+        proc_.params.bands[3] = band;
+        proc_.refresh();
+        proc_
+    }
+
     #[test]
     fn flat_eq_is_transparent_and_a_bell_boosts_its_frequency() {
         let p = EqParams::default();
@@ -402,6 +447,90 @@ mod tests {
         assert!((gain - 9.0).abs() < 0.1, "measured {gain}");
         // Far from the bell the level is unchanged.
         assert!(proc_.params.response_db(60.0, FS).abs() < 0.2);
+    }
+
+    #[test]
+    fn eq_frequency_switching_after_an_impulse_stays_bounded() {
+        let mut proc_ = single_band_eq(Band { kind: BandKind::Bell, on: true, freq: 6_000.0, gain_db: 24.0, q: 18.0 });
+        let freq_index = EqParams::index_of("b4_freq").unwrap();
+        let (mut l, mut r) = ([0.0], [0.0]);
+        proc_.process(&[1.0], &[-0.5], &mut l, &mut r);
+        for sample in 0..8_192 {
+            let freq = if sample % 2 == 0 { 18_000.0 } else { 6_000.0 };
+            proc_.set_index(freq_index, freq).unwrap();
+            proc_.process(&[0.0], &[0.0], &mut l, &mut r);
+            assert!(l[0].is_finite() && r[0].is_finite(), "non-finite tail at sample {sample}");
+            // A generous ceiling above the band's maximum static gain still
+            // catches the exponential growth of switched DF-II-T delays.
+            assert!(l[0].abs() < 32.0 && r[0].abs() < 32.0, "growing tail at sample {sample}: {l:?}, {r:?}");
+            if sample == 0 {
+                assert!(l[0].abs() > 1e-3 && r[0].abs() > 1e-3, "automation must retain the existing tail");
+            }
+        }
+        assert!(l[0].abs() < 1e-4 && r[0].abs() < 1e-4, "the switched tail must decay: {l:?}, {r:?}");
+    }
+
+    #[test]
+    fn eq_automation_applies_at_the_next_sample() {
+        let mut proc_ = single_band_eq(Band { kind: BandKind::Bell, on: true, freq: 6_000.0, gain_db: 0.0, q: 18.0 });
+        let (mut prefix_l, mut prefix_r) = ([0.0; 8], [0.0; 8]);
+        proc_.process(&[0.0; 8], &[0.0; 8], &mut prefix_l, &mut prefix_r);
+        proc_.set_index(EqParams::index_of("b4_freq").unwrap(), 18_000.0).unwrap();
+        proc_.set_index(EqParams::index_of("b4_gain").unwrap(), 24.0).unwrap();
+        let [b0, b1, _, a1, _] = band_coefficients(&proc_.params.bands[3], FS);
+        let (mut l, mut r) = ([0.0; 2], [0.0; 2]);
+        proc_.process(&[1.0, 0.0], &[-1.0, 0.0], &mut l, &mut r);
+        assert!((l[0] as f64 - b0).abs() < 1e-6, "the first sample uses the admitted gain");
+        assert!((l[1] as f64 - (b1 - a1 * b0)).abs() < 1e-6, "the next sample uses the admitted frequency");
+        assert_eq!(r, l.map(|v| -v));
+    }
+
+    #[test]
+    fn eq_bypassed_band_discards_its_tail() {
+        // Cover bypass/re-enable between samples, a dry interval, and direct
+        // mutation of the public parameter state before processing a block.
+        for (bypass_samples, use_setter) in [(0, true), (32, true), (32, false)] {
+            let mut proc_ = single_band_eq(Band { kind: BandKind::Bell, on: true, freq: 6_000.0, gain_db: 24.0, q: 18.0 });
+            let on_index = EqParams::index_of("b4_on").unwrap();
+            let (mut tail_l, mut tail_r) = ([0.0; 2], [0.0; 2]);
+            proc_.process(&[1.0, 0.0], &[-0.5, 0.0], &mut tail_l, &mut tail_r);
+            assert!(tail_l[1].abs() > 1e-3 && tail_r[1].abs() > 1e-3);
+            if use_setter { proc_.set_index(on_index, 0.0).unwrap(); }
+            else { proc_.params.bands[3].on = false; }
+            let (dry_l, dry_r) = ([0.25; 32], [-0.125; 32]);
+            let (mut bypass_l, mut bypass_r) = ([0.0; 32], [0.0; 32]);
+            proc_.process(&dry_l[..bypass_samples], &dry_r[..bypass_samples], &mut bypass_l[..bypass_samples], &mut bypass_r[..bypass_samples]);
+            assert_eq!(&bypass_l[..bypass_samples], &dry_l[..bypass_samples]);
+            assert_eq!(&bypass_r[..bypass_samples], &dry_r[..bypass_samples]);
+            proc_.set_index(on_index, 1.0).unwrap();
+            let (mut l, mut r) = ([0.0; 64], [0.0; 64]);
+            proc_.process(&[0.0; 64], &[0.0; 64], &mut l, &mut r);
+            assert_eq!(l, [0.0; 64], "a re-enabled band must not resurrect its left tail");
+            assert_eq!(r, [0.0; 64], "a re-enabled band must not resurrect its right tail");
+        }
+    }
+
+    #[test]
+    fn eq_steady_response_matches_the_curve_after_parameter_changes() {
+        let mut proc_ = single_band_eq(Band { kind: BandKind::Bell, on: true, freq: 1_500.0, gain_db: 9.0, q: 1.0 });
+        for (kind, freq, gain_db, q, probe) in [
+            (BandKind::LowCut, 1_000.0, 0.0, 0.1, 2_000.0),
+            (BandKind::LowShelf, 1_000.0, 24.0, 18.0, 500.0),
+            (BandKind::Bell, 6_000.0, 24.0, 18.0, 6_000.0),
+            (BandKind::HighShelf, 10_000.0, -24.0, 0.1, 16_000.0),
+            (BandKind::HighCut, 6_000.0, 0.0, 18.0, 3_000.0),
+        ] {
+            proc_.params.bands[3] = Band { kind, on: true, freq, gain_db, q };
+            proc_.refresh();
+            let x = sine(probe, 0.02, 48_000);
+            let (mut l, mut r) = (vec![0.0; x.len()], vec![0.0; x.len()]);
+            proc_.process(&x, &x, &mut l, &mut r);
+            let expected = proc_.params.response_db(probe, FS);
+            for out in [&l, &r] {
+                let measured = rms_db(&out[24_000..]) - rms_db(&x[24_000..]);
+                assert!((measured - expected).abs() < 0.02, "{kind:?}: measured {measured}, curve {expected}");
+            }
+        }
     }
 
     #[test]
