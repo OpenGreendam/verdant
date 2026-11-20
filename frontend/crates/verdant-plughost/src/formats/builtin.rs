@@ -133,6 +133,7 @@ use verdant_plugins::builtin_dsp::{self as dsp, CompParams, CompProcessor, EqPar
 
 /// What a built-in effect provides to the generic host adapter.
 pub trait Effect {
+    /// Automation indices and bounds remain fixed for the effect's lifetime.
     fn descs(&self) -> Vec<ParamDesc>;
     fn index_of(id: &str) -> Option<usize>;
     fn set_index(&mut self, index: usize, value: f64) -> Result<(), String>;
@@ -158,16 +159,23 @@ impl Effect for CompProcessor {
 
 /// Generic host adapter: parameters by id, automation by stable index,
 /// sample-accurate events and JSON state.
-pub struct Builtin<E: Effect> { fx: E }
+pub struct Builtin<E: Effect> {
+    fx: E,
+    /// Cache immutable validation metadata before entering the audio path.
+    /// Current values still come from the effect for parameter/state queries.
+    validation_descs: Vec<ParamDesc>,
+}
 
 impl<E: Effect> Builtin<E> {
-    pub fn new(fx: E) -> Self { Self { fx } }
+    pub fn new(fx: E) -> Self {
+        let validation_descs = fx.descs();
+        Self { fx, validation_descs }
+    }
 
     /// Check a whole set of (index, value) writes before applying any.
-    fn validate(&self, writes: &[(usize, f64)]) -> Result<(), String> {
-        let descs = self.fx.descs();
-        for &(index, value) in writes {
-            let d = descs.get(index).ok_or("unknown builtin parameter")?;
+    fn validate(&self, writes: impl IntoIterator<Item = (usize, f64)>) -> Result<(), String> {
+        for (index, value) in writes {
+            let d = self.validation_descs.get(index).ok_or("unknown builtin parameter")?;
             if !value.is_finite() || !(d.min..=d.max).contains(&value) {
                 return Err(format!("{} outside {}…{}", d.id, d.min, d.max));
             }
@@ -198,8 +206,7 @@ impl<E: Effect> HostedPlugin for Builtin<E> {
             if offset as usize >= in_l.len() || offset < previous { return Err("invalid builtin native parameter event".into()); }
             previous = offset;
         }
-        let writes: Vec<(usize, f64)> = events.iter().map(|&(id, _, v)| (id as usize, v)).collect();
-        self.validate(&writes)?;
+        self.validate(events.iter().map(|&(id, _, value)| (id as usize, value)))?;
         let mut start = 0usize;
         let mut next = 0usize;
         while start < in_l.len() {
@@ -225,7 +232,7 @@ impl<E: Effect> HostedPlugin for Builtin<E> {
 
     fn set_param(&mut self, id: &str, value: f64) -> Result<(), String> {
         let index = E::index_of(id).ok_or_else(|| format!("unknown param {id}"))?;
-        self.validate(&[(index, value)])?;
+        self.validate([(index, value)])?;
         self.fx.set_index(index, value)
     }
 
@@ -235,7 +242,7 @@ impl<E: Effect> HostedPlugin for Builtin<E> {
         let writes = dsp::parse_state(data)?.into_iter()
             .map(|(id, v)| E::index_of(&id).map(|i| (i, v)).ok_or_else(|| format!("unknown param {id} in state")))
             .collect::<Result<Vec<_>, String>>()?;
-        self.validate(&writes)?;
+        self.validate(writes.iter().copied())?;
         for (i, v) in writes { self.fx.set_index(i, v)?; }
         Ok(())
     }
@@ -336,6 +343,62 @@ mod tests {
         assert_eq!(gain.gain_db, 0.0);
         assert_eq!(l, [7.0; 8]);
         assert_eq!(r, [8.0; 8]);
+    }
+
+    #[test]
+    fn builtin_effect_automation_preserves_offsets_and_equal_offset_order() {
+        let mut processor = EqProcessor::new(48_000.0);
+        for band in &mut processor.params.bands { band.on = false; }
+        let mut eq = Builtin::new(processor);
+        let output = EqParams::index_of("output").unwrap() as u32;
+        let input_l = [0.125; 8];
+        let input_r = [-0.25; 8];
+        let mut l = [0.0; 8];
+        let mut r = [0.0; 8];
+        // Leave a prefix untouched, preserve the order of coincident writes,
+        // and apply the last event to the final sample of the block.
+        eq.process_events(&input_l, &input_r, &mut l, &mut r,
+            &[(output, 2, -6.0), (output, 5, -12.0), (output, 5, 6.0), (output, 7, 0.0)]).unwrap();
+        for sample in 0..8 {
+            let db = if sample < 2 { 0.0 } else if sample < 5 { -6.0 } else if sample < 7 { 6.0 } else { 0.0 };
+            let multiplier = 10.0f64.powf(db / 20.0);
+            assert_eq!(l[sample], (input_l[sample] as f64 * multiplier) as f32);
+            assert_eq!(r[sample], (input_r[sample] as f64 * multiplier) as f32);
+        }
+        assert_eq!(eq.params().unwrap()[output as usize].value, 0.0);
+        eq.process_events(&input_l, &input_r, &mut l, &mut r, &[]).unwrap();
+        assert_eq!(l, input_l);
+        assert_eq!(r, input_r);
+    }
+
+    #[test]
+    fn builtin_effect_validation_rejects_entire_automation_block() {
+        let effects: [Box<dyn HostedPlugin>; 2] = [
+            Box::new(Builtin::new(EqProcessor::new(48_000.0))),
+            Box::new(Builtin::new(CompProcessor::new(48_000.0))),
+        ];
+        for mut fx in effects {
+            let before = fx.params().unwrap();
+            let min = before[0].min;
+            let max = before[0].max;
+            let valid = if before[0].value == min { max } else { min };
+            let invalid_blocks = [
+                [(0, 0, valid), (u32::MAX, 4, min)],
+                [(0, 0, valid), (0, 4, max + 1.0)],
+                [(0, 0, valid), (0, 4, f64::NAN)],
+                [(0, 0, valid), (0, 4, f64::INFINITY)],
+                [(0, 4, valid), (0, 3, min)],
+                [(0, 0, valid), (0, 8, min)],
+            ];
+            for events in invalid_blocks {
+                let mut l = [7.0; 8];
+                let mut r = [8.0; 8];
+                assert!(fx.process_events(&[0.1; 8], &[-0.2; 8], &mut l, &mut r, &events).is_err());
+                assert_eq!(fx.params().unwrap(), before);
+                assert_eq!(l, [7.0; 8]);
+                assert_eq!(r, [8.0; 8]);
+            }
+        }
     }
 
     #[test]
