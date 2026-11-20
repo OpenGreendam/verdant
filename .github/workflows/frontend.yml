@@ -62,12 +62,17 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Preserve Git blob bytes on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - name: Fetch locked build inputs
         working-directory: frontend
         run: cargo fetch --locked
       - name: Build and test native executables
         working-directory: frontend
+        env:
+          VERDANT_VOICE_BANK_SHA256: e2415c3917dd102861ce8043b0c0daf497b18a0903f7255f314baf72cb73bbc1
         run: |
           cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
           cargo test --offline --locked --release -p verdant-app --bin verdant theme::tests
