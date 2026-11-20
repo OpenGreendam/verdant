@@ -386,8 +386,8 @@ impl Render for LcdView {
             .when(!compact, |d| d.child(div().id("transport-follow").role(Role::Button).aria_label("跟随播放头").aria_selected(follow)
                 .flex_none().px(px(5.0)).py(px(5.0)).rounded(px(4.0)).text_size(px(11.0))
                 .font_family(ui_font)
-                .bg(if follow { th.accent } else { th.lcd })
-                .text_color(if follow { th.accent_text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.accent } else { th.hover }))
+                .bg(if follow { th.checked } else { th.lcd })
+                .text_color(if follow { th.text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.checked } else { th.hover }))
                 .child("跟随")
                 .on_click(move |_, _, cx| editor.update(cx, toggle_follow)))).into_any_element()
     }

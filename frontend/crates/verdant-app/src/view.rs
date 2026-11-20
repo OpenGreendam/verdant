@@ -170,9 +170,9 @@ fn toggle(id: &'static str, name: &'static str, active: bool, size: f32, th: The
         .items_center()
         .justify_center()
         .rounded(px(6.0))
-        .when(active, |d| d.bg(th.accent))
-        .hover(move |s| s.bg(if active { th.accent } else { th.hover }))
-        .child(svg().path(icon(name)).size(px(16.0)).text_color(if active { th.accent_text } else { th.text }))
+        .when(active, |d| d.bg(th.checked))
+        .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
+        .child(svg().path(icon(name)).size(px(16.0)).text_color(th.text))
 }
 
 pub fn command_button(
@@ -202,7 +202,7 @@ fn command_icon(
         .flex()
         .items_center()
         .justify_center()
-        .child(svg().path(icon(name)).size(px(16.0)).text_color(if active { th.accent_text } else { th.text }))
+        .child(svg().path(icon(name)).size(px(16.0)).text_color(th.text))
 }
 
 pub fn numeric_field(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>, cx: &mut Context<Editor>) -> Stateful<Div> {
@@ -219,30 +219,80 @@ pub fn a11y_listener(
     }
 }
 
-/// A libadwaita-style preferences group: a heading over a rounded card.
-fn section(title: &str, th: Theme) -> Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(7.0))
-        .mx(px(8.0))
-        .mt(px(8.0))
-        .px(px(10.0))
-        .pt(px(8.0))
-        .pb(px(10.0))
-        .rounded(px(12.0))
-        .bg(th.card)
-        .child(div().text_xs().font_weight(FontWeight::BOLD).text_color(th.text_secondary).child(title.to_string()))
+/// libadwaita preferences group (AdwPreferencesGroup): a heading over a
+/// boxed list. Each child becomes a row of the rounded card, with a hairline
+/// between rows. Builder methods mirror `Div`, so call sites read the same.
+pub(crate) struct Group {
+    title: SharedString,
+    rows: Vec<AnyElement>,
+    th: Theme,
 }
 
+pub(crate) fn section(title: &str, th: Theme) -> Group {
+    Group { title: title.to_string().into(), rows: Vec::new(), th }
+}
+
+impl Group {
+    pub(crate) fn child(mut self, row: impl IntoElement) -> Self {
+        self.rows.push(row.into_any_element());
+        self
+    }
+    pub(crate) fn children(mut self, rows: impl IntoIterator<Item = impl IntoElement>) -> Self {
+        self.rows.extend(rows.into_iter().map(IntoElement::into_any_element));
+        self
+    }
+}
+
+impl IntoElement for Group {
+    type Element = AnyElement;
+    fn into_element(self) -> Self::Element {
+        let th = self.th;
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(6.0))
+            .mx(px(10.0))
+            .mt(px(14.0))
+            .child(div().px(px(4.0)).text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
+            .child(div().flex().flex_col().rounded(px(12.0)).bg(th.card).overflow_hidden()
+                .children(self.rows.into_iter().enumerate().map(|(i, row)| {
+                    div().min_h(px(42.0)).px(px(12.0)).py(px(7.0)).flex().flex_col().justify_center().gap(px(6.0))
+                        .when(i > 0, |d| d.border_t_1().border_color(th.shade))
+                        .child(row)
+                })))
+            .into_any_element()
+    }
+}
+
+/// AdwActionRow: title on the left, value (dimmed) on the right.
 fn row(name: &str, value: impl Into<SharedString>, th: Theme) -> Div {
     div()
         .flex()
         .items_center()
-        .gap(px(8.0))
-        .text_xs()
-        .child(div().w(px(84.0)).flex_none().truncate().text_color(th.text_secondary).child(name.to_string()))
-        .child(div().flex_1().min_w_0().truncate().text_color(th.text).child(value.into()))
+        .gap(px(12.0))
+        .text_sm()
+        .child(div().flex_1().min_w_0().truncate().text_color(th.text).child(name.to_string()))
+        .child(div().max_w(px(150.0)).flex_none().truncate().text_color(th.text_secondary).child(value.into()))
+}
+
+/// A GtkSwitch: 46×26 track, white knob, accent when on.
+pub(crate) fn switch(on: bool, th: Theme) -> Div {
+    div().w(px(46.0)).h(px(26.0)).flex_none().rounded(px(13.0)).p(px(3.0)).flex().items_center()
+        .when(on, |d| d.justify_end())
+        .bg(if on { th.accent } else { th.control_pressed })
+        .child(div().size(px(20.0)).rounded(px(10.0)).bg(gpui::rgb(0xffffff)).shadow_sm())
+}
+
+/// AdwSwitchRow: title (and optional subtitle) with a switch; the whole row toggles.
+fn switch_row(ed: &Editor, cmd: Cmd, key: &'static str, title: &str, subtitle: Option<String>, on: bool, cx: &mut Context<Editor>) -> Stateful<Div> {
+    let th = ed.theme;
+    div().id(key).role(Role::Switch).aria_label(title.to_string()).aria_selected(on)
+        .flex().items_center().gap(px(12.0)).cursor_pointer()
+        .child(div().flex_1().min_w_0().flex().flex_col()
+            .child(div().text_sm().text_color(th.text).child(title.to_string()))
+            .children(subtitle.map(|s| div().text_xs().text_color(th.text_secondary).child(s))))
+        .child(switch(on, th))
+        .on_click(cx.listener(move |ed, _, w, cx| controls::dispatch(ed, cmd, Arg::None, w, cx)))
 }
 
 fn support_text(support: Support) -> String {
@@ -303,6 +353,27 @@ impl Editor {
                 .when(wide, |d| d.child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary)))
         };
 
+        // Window title (AdwWindowTitle): the project, and render state as subtitle.
+        let title = self.project_path.as_ref()
+            .and_then(|p| p.file_stem()).map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "未命名工程".into());
+        let dirty = self.store().is_dirty();
+        let window_title = div().id("window-title").flex().flex_col().items_center().justify_center().min_w_0().max_w(px(220.0)).flex_shrink(1.0)
+            .child(div().max_w_full().truncate().text_sm().font_weight(FontWeight::BOLD).text_color(th.text)
+                .child(if dirty { format!("• {title}") } else { title }))
+            .child(div().max_w_full().truncate().text_xs().text_color(if errors > 0 { th.error } else { th.text_secondary })
+                .child(format!("{state} · {voice}")))
+            .on_click(cx.listener(|ed, _, _, cx| ed.open_right_dock(RightDockTab::RenderInserts, cx)));
+        // View switcher: a linked toggle group, like AdwToggleGroup.
+        let view_switcher = div().id("view-switcher").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+            .child(toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, btn - 4.0, th).aria_label("钢琴卷帘 (E)")
+                .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx))))
+            .child(toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn - 4.0, th).aria_label("混音器 (X)")
+                .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx))))
+            .child(toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn - 4.0, th).aria_label("音符表 (T)")
+                .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))));
+        let _ = top_menu_btn;
+
         div()
             .w_full()
             .min_w_0()
@@ -311,52 +382,24 @@ impl Editor {
             .flex_none()
             .flex()
             .items_center()
-            .gap(px(4.0))
-            .px(px(8.0))
+            .gap(px(6.0))
+            .px(px(6.0))
             .when(chrome.leading_inset() > 0.0, |bar| bar.pl(px(chrome.leading_inset())))
             .when(captions.is_some(), |bar| bar.pr_0())
             .bg(th.headerbar)
             .border_b_1()
             .border_color(th.shade)
-            // Left pane & view toggles (28 px, 36 px once touch is used)
-            .child(command_icon(self, Cmd::ToggleLeftPanel, "panel-left", "左侧轨道与声库栏 (I)", "inspector-toggle", self.left_panel_visible(), cx))
-            .when(!phone, |bar| bar.child(
-                toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, btn, th)
-                    .aria_label("钢琴卷帘 (E)")
-                    .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx))),
-            )
-            .child(
-                toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn, th)
-                    .aria_label("混音器 (X)")
-                    .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx))),
-            )
-            .child(
-                toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn, th)
-                    .aria_label("音符表 (T)")
-                    .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))),
-            ))
-            // Categorized DAW menubar
-            // Below the Medium width class the five menus fold into one.
-            .when(medium_up, |bar| bar
-                .child(top_menu_btn("menubar-file", "文件").on_click(cx.listener(|ed, _, w, cx| ed.file_menu(w, cx))))
-                .child(top_menu_btn("menubar-edit", "编辑").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.edit_menu(ev.position(), w, cx))))
-                .child(top_menu_btn("menubar-track", "轨道").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.track_part_menu(ev.position(), w, cx))))
-                .child(top_menu_btn("menubar-voice", "声库与词").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.voice_lyrics_menu(ev.position(), w, cx))))
-                .child(top_menu_btn("menubar-view", "视图").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.view_transport_menu(ev.position(), w, cx)))))
-            .when(!medium_up, |bar| bar.child(
-                top_menu_btn("menubar-main", "菜单").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.main_menu(ev.position(), w, cx)))))
-            .when(wide, |bar| bar.child(
-                crate::ui_controls::flat_icon_command_button(self, Cmd::AuditionProjects, "music-2", "试听曲", "audition-projects", false, cx)
-                    .h(px(btn)),
-            ))
-            .when(class == WidthClass::Medium, |bar| bar.child(command_icon(self, Cmd::AuditionProjects, "music-2", "试听曲", "audition-projects", false, cx)))
+            // Start: sidebar, views, history, title.
+            .child(command_icon(self, Cmd::ToggleLeftPanel, "panel-left", "侧边栏 (I)", "inspector-toggle", self.left_panel_visible(), cx))
+            .when(!phone, |bar| bar.child(view_switcher))
             .when(!phone, |bar| bar
                 .child(command_icon(self, Cmd::Undo, "undo-2", "撤销 (Ctrl+Z)", "undo", false, cx))
                 .child(command_icon(self, Cmd::Redo, "redo-2", "重做 (Ctrl+Shift+Z)", "redo", false, cx)))
-            // Empty toolbar stretches are the window's title bar.
+            .when(medium_up, |bar| bar.child(crate::window_chrome::drag_region("titlebar-drag-title-l", chrome, cx).max_w(px(24.0))).child(window_title))
+            // Empty header stretches move the window.
             .child(crate::window_chrome::drag_region("titlebar-drag-left", chrome, cx))
-            // Transport: one linked group, as in a GNOME header bar.
-            .child(div().id("transport").flex().flex_none().items_center().rounded(px(6.0)).bg(th.control).overflow_hidden()
+            // Centre: transport as one linked group, then the LCD.
+            .child(div().id("transport").flex().flex_none().items_center().rounded(px(8.0)).bg(th.control).overflow_hidden()
             .when(!phone, |bar| bar.child(command_icon(self, Cmd::GoToStart, "skip-back", "回到开头", "go-start", false, cx).rounded_none()))
             .child(command_icon(self, Cmd::TogglePlay, if playing { "pause" } else { "play" }, "播放 / 暂停 (Space)", "play", playing, cx).rounded_none())
             .child(command_icon(self, Cmd::Stop, "square", "停止", "stop", false, cx).rounded_none())
@@ -366,19 +409,13 @@ impl Editor {
                     .role(Role::Button)
                     .aria_label(if recording { "完成并提交 MIDI 录音" } else { "选择 MIDI 输入开始录音" })
                     .aria_selected(recording)
-                    .h(px(btn))
-                    .px(px(8.0))
+                    .size(px(btn))
                     .flex()
                     .items_center()
-                    .gap(px(5.0))
+                    .justify_center()
                     .when(recording, |d| d.bg(th.error))
-                    .text_sm()
-                    .font_weight(if recording { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-                    .text_color(if recording { th.accent_text } else { th.text })
                     .hover(move |s| s.bg(if recording { th.error } else { th.hover }))
-                    .when(!medium_up, |d| d.w(px(btn)).px_0().justify_center())
-                    .child(svg().path(icon("circle-dot")).size(px(13.5)).text_color(if recording { th.accent_text } else { th.error }))
-                    .when(medium_up, |d| d.child(if recording { "完成录音" } else { "录MIDI" }))
+                    .child(svg().path(icon("circle-dot")).size(px(16.0)).text_color(if recording { th.accent_text } else { th.error }))
                     .on_click(cx.listener(move |ed, _, w, cx| {
                         use crate::editor::integrations::IntegrationAction as I;
                         let act = if recording { I::FinishRecording } else { I::MidiPorts };
@@ -390,42 +427,18 @@ impl Editor {
             .child(div().h(px(36.0)).when(phone, |d| d.flex_1().min_w(px(112.0)).max_w(px(252.0))).when(!phone, |d| d.w(px(252.0)).flex_none())
                 .child(self.playback.anchor(crate::clock::Surface::Lcd)))
             .when(!phone, |bar| bar.child(command_icon(self, Cmd::ToggleLoop, "repeat", "循环播放", "transport-loop", pb.looping, cx)))
-            .when(wide, |bar| bar.child(
-                crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleMetronome, "bell", "节拍", "transport-click", pb.metronome, cx)
-                    .h(px(btn)),
-            ))
-            .when(!wide && !phone, |bar| bar.child(command_icon(self, Cmd::ToggleMetronome, "bell", "节拍器", "transport-click", pb.metronome, cx)))
-            .when(medium_up, |bar| bar.child(
-                generated_select_button(self, SelectId::CountInBars, Arg::None, "transport-countin", cx)
-                    .h(px(btn))
-                    .w(px(94.0)),
-            ))
+            .when(!phone, |bar| bar.child(command_icon(self, Cmd::ToggleMetronome, "bell", "节拍器", "transport-click", pb.metronome, cx)))
             .when(!phone, |bar| bar.child(crate::window_chrome::drag_region("titlebar-drag-right", chrome, cx)))
-            // Right render status & SynthV Right Dock toggle
-            .when(medium_up, |bar| bar.child(
-                div()
-                    .id("render-status")
-                    .role(Role::Button)
-                    .aria_label("查看渲染诊断")
-                    .flex()
-                    .flex_col()
-                    .items_end()
-                    .max_w(px(if wide { 196.0 } else { 132.0 }))
-                    .text_xs()
-                    .child(div().truncate().text_color(if errors > 0 { th.error } else { th.text }).child(state))
-                    .child(div().truncate().text_size(px(10.5)).text_color(th.text_secondary).child(voice))
-                    .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
-                        if ed.lyric.is_some() { window.prevent_default(); }
-                    }))
-                    .on_click(cx.listener(|ed, _, _, cx| ed.open_right_dock(RightDockTab::RenderInserts, cx))),
-            ))
-            // Without the status text, the render button carries the error
-            // count as a badge and opens the diagnostics on long press/click.
+            // End: render (badge carries errors), primary menu, dock.
             .when(!phone, |bar| bar.child(command_icon(self, Cmd::RenderNow, "audio-waveform", "立即渲染", "render", self.scheduler.active().is_some(), cx)
                 .relative()
-                .when(!medium_up && errors > 0, |d| d.aria_label(format!("立即渲染（{errors} 处错误）")).child(
-                    div().absolute().top(px(2.0)).right(px(2.0)).size(px(7.0)).rounded(px(3.5)).bg(th.error)))))
-            .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "右侧属性坞", "right-dock-toggle", self.right_dock_visible(), cx))
+                .when(errors > 0, |d| d.aria_label(format!("立即渲染（{errors} 处错误）")).child(
+                    div().absolute().top(px(4.0)).right(px(4.0)).size(px(7.0)).rounded(px(3.5)).bg(th.error)))))
+            .child(div().id("primary-menu").role(Role::Button).aria_label("主菜单").size(px(btn)).flex().items_center().justify_center().rounded(px(6.0))
+                .hover(move |s| s.bg(th.hover))
+                .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
+                .on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.main_menu(ev.position(), w, cx))))
+            .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "属性面板", "right-dock-toggle", self.right_dock_visible(), cx))
             .children(captions)
             .when(th.pride, |bar| bar.relative().child(
                 // Paint only: no hitbox, layout space, label or event handler.
@@ -615,7 +628,7 @@ impl Editor {
             }))
             .children(tabs.into_iter().map(|(tab, ic, tip, show_dot, is_err_dot)| {
                 let active = open && cur_tab == tab;
-                let fg = if active { th.accent_text } else { th.text_secondary };
+                let fg = if active { th.text } else { th.text_secondary };
                 div()
                     .id(SharedString::from(format!("rail-tab-{tab:?}")))
                     .role(Role::Button)
@@ -627,8 +640,8 @@ impl Editor {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .when(active, |d| d.bg(th.accent))
-                    .hover(move |s| s.bg(if active { th.accent } else { th.hover }))
+                    .when(active, |d| d.bg(th.checked))
+                    .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
                     .child(svg().path(icon(ic)).size(px(15.0)).text_color(fg))
                     .when(show_dot && !active, |d| {
                         d.child(
@@ -914,34 +927,14 @@ impl Editor {
         let engine_sec = section("合成设置", th)
             .child(row("合成引擎", route_short_name(route), th))
             .child(numeric_field(self, Num::TempoBpm, Arg::None, "tempo", cx))
-            .child(
-                selectable_command_button(
-                    self,
-                    Cmd::TogglePhonemeTiming,
-                    Arg::None,
-                    if phoneme_timing.is_some() { "元音对拍 (辅音先行) · 开" } else { "元音对拍 (辅音先行) · 关" },
-                    "phoneme-timing",
-                    phoneme_timing.is_some(),
-                    cx,
-                )
-                .h(px(PANEL_BTN_H)),
-            )
-            .child(
-                selectable_command_button(
-                    self,
-                    Cmd::ToggleOutputTransients,
-                    Arg::None,
-                    match output_transients {
-                        None => "尾辅音瞬态约束 · 关".to_string(),
-                        Some(d) if d.strength == 0. || d.max_attenuation_db == 0. => "尾辅音瞬态约束 · 旁路".to_string(),
-                        Some(d) => format!("尾辅音瞬态约束 · 开 ({:.0} dB)", d.max_attenuation_db),
-                    },
-                    "output-transients",
-                    output_transients.is_some(),
-                    cx,
-                )
-                .h(px(PANEL_BTN_H)),
-            );
+            .child(switch_row(self, Cmd::TogglePhonemeTiming, "phoneme-timing", "元音对拍", Some("辅音先行，元音落在拍点上".into()), phoneme_timing.is_some(), cx))
+            .child(switch_row(self, Cmd::ToggleOutputTransients, "output-transients", "尾辅音瞬态约束",
+                Some(match output_transients {
+                    None => "关闭".to_string(),
+                    Some(d) if d.strength == 0. || d.max_attenuation_db == 0. => "旁路".to_string(),
+                    Some(d) => format!("最多衰减 {:.0} dB", d.max_attenuation_db),
+                }),
+                output_transients.is_some(), cx));
 
         let synth_section = section("声线与表现力控制", th)
                 .child(
@@ -1331,6 +1324,9 @@ impl Editor {
             OutputKind::SilentClock { .. } => "静默时钟（不发声）".into(),
         };
         let audio = section("音频输出设备", th)
+            .child(row("当前输出", output_text(self), th))
+            .child(row("工程", format!("{}{} · {} 轨 · {} 音符", self.revision(), if self.store().is_dirty() { " · 未保存" } else { "" },
+                self.project().tracks.len(), self.project().note_count()), th))
             .child(
                 select_button("choose-device", Some("volume-2"), dev_summary, "选择音频输出设备", th).on_click(cx.listener(
                     |ed, ev: &gpui::ClickEvent, window, cx| {
@@ -1397,36 +1393,28 @@ impl Editor {
             .bg(th.surface)
             .border_b_1()
             .border_color(th.shade)
-            .children(
-                [
-                    (Cmd::SetToolPointer, Tool::Pointer, "mouse-pointer-2", "指针"),
-                    (Cmd::SetToolPencil, Tool::Pencil, "pencil", "铅笔"),
-                    (Cmd::SetToolEraser, Tool::Eraser, "eraser", "橡皮"),
+            // Tools: an icon toggle group (labels are the tooltips / names).
+            .child(div().id("tool-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+                .children([
+                    (Cmd::SetToolPointer, Tool::Pointer, "mouse-pointer-2", "指针 (V)"),
+                    (Cmd::SetToolPencil, Tool::Pencil, "pencil", "铅笔 (P)"),
+                    (Cmd::SetToolEraser, Tool::Eraser, "eraser", "橡皮 (E)"),
                     (Cmd::SetToolPitch, Tool::Pitch, "spline", "音高笔"),
-                ]
-                .into_iter()
-                .map(|(cmd, tool, icon_name, label)| {
-                    icon_command_button(
-                        self,
-                        cmd,
-                        Arg::None,
-                        icon_name,
-                        label,
-                        SharedString::from(format!("tool-{icon_name}")),
-                        self.tool == tool,
-                        cx,
-                    )
-                }),
-            )
+                ].into_iter().map(|(cmd, tool, icon_name, label)| {
+                    let on = self.tool == tool;
+                    crate::ui_controls::flat_command_button(self, cmd, Arg::None, "", SharedString::from(format!("tool-{icon_name}")), on, cx)
+                        .aria_label(label).size(px(26.0)).px_0()
+                        .child(svg().path(icon(icon_name)).size(px(15.0)).text_color(th.text))
+                })))
             .child(numeric_pill(self, Num::SnapGridTicks, Arg::None, "snap", true, cx))
             .child(numeric_pill(self, Num::DefaultNoteTicks, Arg::None, "new-note-length", true, cx))
-            .child(icon_command_button(self, Cmd::TogglePhonemeLane, Arg::None, "mic-vocal", "音素条", "roll-phoneme-toggle", self.layout.show_phoneme_lane, cx))
-            .child(selectable_command_button(self, Cmd::ToggleTempoLane, Arg::None, "BPM线", "roll-tempo-toggle", self.layout.show_tempo_lane, cx))
-            .child(icon_command_button(self, Cmd::OpenScaleDialog, Arg::None, "sliders-horizontal", scale_label, "roll-scale-btn", scale_active, cx))
-            .child(icon_command_button(self, Cmd::ToggleOtherTracks, Arg::None, "layers", "多轨重影", "roll-ghost-notes", self.integrations.other_tracks, cx))
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::TogglePhonemeLane, "mic-vocal", "音素条", "roll-phoneme-toggle", self.layout.show_phoneme_lane, cx).h(px(28.0)))
+            .child(crate::ui_controls::flat_command_button(self, Cmd::ToggleTempoLane, Arg::None, "BPM 线", "roll-tempo-toggle", self.layout.show_tempo_lane, cx).h(px(28.0)).px(px(9.0)).text_sm())
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenScaleDialog, "sliders-horizontal", scale_label, "roll-scale-btn", scale_active, cx).h(px(28.0)))
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleOtherTracks, "layers", "多轨重影", "roll-ghost-notes", self.integrations.other_tracks, cx).h(px(28.0)))
             .child(div().flex_1())
-            .child(icon_command_button(self, Cmd::FitView, Arg::None, "maximize-2", "适合音符", "fit-notes", false, cx))
-            .child(icon_command_button(self, Cmd::ToggleF0Overlay, Arg::None, "activity", "F0 对照", "show-f0", self.show_f0, cx))
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::FitView, "maximize-2", "适合音符", "fit-notes", false, cx).h(px(28.0)))
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleF0Overlay, "activity", "F0 对照", "show-f0", self.show_f0, cx).h(px(28.0)))
     }
 
     fn lane_tabs(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1443,6 +1431,8 @@ impl Editor {
             .bg(th.surface)
             .border_t_1()
             .border_color(th.shade);
+        // Parameter lanes: one toggle group (AdwToggleGroup).
+        let mut group = div().id("lane-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control);
         for (param, has_data) in params::ALL.into_iter().zip(self.active_param_data()) {
             let active = if self.integrations.three_lanes {
                 self.integrations.panel_params[self.integrations.active_panel] == param
@@ -1455,7 +1445,7 @@ impl Editor {
             if !supported && !active {
                 tab_btn = tab_btn.text_color(th.text_tertiary);
             }
-            tabs = tabs.child(tab_btn.on_click(cx.listener(move |ed, _, window, cx| {
+            group = group.child(tab_btn.h(px(24.0)).text_sm().on_click(cx.listener(move |ed, _, window, cx| {
                 ed.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
                 ed.param = param;
                 ed.point_selection.clear();
@@ -1465,6 +1455,7 @@ impl Editor {
                 cx.notify();
             })));
         }
+        tabs = tabs.child(group);
         tabs.child(div().flex_1()).child(icon_command_button(
             self,
             Cmd::ToggleThreeLanes,
@@ -1489,14 +1480,24 @@ impl Editor {
             .bg(th.surface)
             .border_b_1()
             .border_color(th.shade)
-            .child(icon_command_button(self, Cmd::SetLanePencil, Arg::None, "pencil", "自由绘制", "curve-Pencil", self.lane_tool == LaneTool::Pencil, cx))
-            .child(icon_command_button(self, Cmd::SetLaneLine, Arg::None, "spline", "直线", "curve-Line", self.lane_tool == LaneTool::Line, cx))
-            .child(selectable_command_button(self, Cmd::SetLaneSmooth, Arg::None, "平滑", "curve-Smooth", self.lane_tool == LaneTool::Smooth, cx))
-            .child(icon_command_button(self, Cmd::SetLaneEraser, Arg::None, "eraser", "擦除", "curve-Eraser", self.lane_tool == LaneTool::Eraser, cx))
-            .child(icon_command_button(self, Cmd::SetLaneSelect, Arg::None, "mouse-pointer-2", "框选点", "curve-Select", self.lane_tool == LaneTool::Select, cx))
-            .child(icon_command_button(self, Cmd::OpenTransformPoints, Arg::None, "sliders-horizontal", "点集变换…", "transform-points", false, cx))
-            .child(selectable_command_button(self, Cmd::CopyCurve, Arg::None, "复制曲线", "copy-curve", false, cx))
-            .child(selectable_command_button(self, Cmd::PasteCurve, Arg::None, "粘贴曲线", "paste-curve", false, cx))
+            // Lane tools: one toggle group.
+            .child(div().id("lane-tool-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+                .children([
+                    (Cmd::SetLanePencil, LaneTool::Pencil, Some("pencil"), "自由绘制", "curve-Pencil"),
+                    (Cmd::SetLaneLine, LaneTool::Line, Some("spline"), "直线", "curve-Line"),
+                    (Cmd::SetLaneSmooth, LaneTool::Smooth, None, "平滑", "curve-Smooth"),
+                    (Cmd::SetLaneEraser, LaneTool::Eraser, Some("eraser"), "擦除", "curve-Eraser"),
+                    (Cmd::SetLaneSelect, LaneTool::Select, Some("mouse-pointer-2"), "框选点", "curve-Select"),
+                ].into_iter().map(|(cmd, tool, ic, label, key)| {
+                    let on = self.lane_tool == tool;
+                    crate::ui_controls::flat_command_button(self, cmd, Arg::None, "", key, on, cx)
+                        .aria_label(label).h(px(24.0)).px(px(8.0)).gap(px(5.0)).text_sm()
+                        .children(ic.map(|ic| svg().path(icon(ic)).size(px(14.0)).text_color(th.text)))
+                        .child(label)
+                })))
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenTransformPoints, "sliders-horizontal", "点集变换…", "transform-points", false, cx).h(px(28.0)))
+            .child(crate::ui_controls::flat_command_button(self, Cmd::CopyCurve, Arg::None, "复制曲线", "copy-curve", false, cx).h(px(28.0)).px(px(9.0)).text_sm())
+            .child(crate::ui_controls::flat_command_button(self, Cmd::PasteCurve, Arg::None, "粘贴曲线", "paste-curve", false, cx).h(px(28.0)).px(px(9.0)).text_sm())
             .when(self.param == Param::Pit, |d| {
                 d.child(
                     generated_select_button(self, SelectId::PitchRangeCents, Arg::None, "pitch-range-select", cx)
@@ -1914,6 +1915,7 @@ impl Editor {
                 .child(splitter_bar(entity.clone(), SplitterKind::ArrangeHeight, th))
                 .child(div().flex_1().min_w_0().min_h_0().child(cached_view(&self.static_view, StyleRefinement::default().size_full(), a11y))));
         div()
+            .relative()
             .size_full()
             .flex()
             .flex_col()
@@ -1966,29 +1968,22 @@ impl Editor {
                     })
                     .child(cached_view(&self.chrome.icon_rail, column(RIGHT_RAIL_W), a11y)),
             )
-            .child(
-                div()
-                    .h(px(22.0))
-                    .flex_none()
-                    .px(px(10.0))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.0))
-                    .text_xs()
-                    .text_color(th.text_secondary)
-                    .bg(th.window)
-                    .border_t_1()
-                    .border_color(th.shade)
-                    .child(div().flex_1().truncate().child(self.notices.back().map(|n| n.text.clone()).unwrap_or_default()))
-                    .child(format!(
-                        "{}{} · {} 轨 · {} 音符",
-                        self.revision(),
-                        if self.store().is_dirty() { " · 未保存" } else { "" },
-                        self.project().tracks.len(),
-                        self.project().note_count()
-                    ))
-                    .child(output_text(self)),
-            )
+            // No status bar, as in GNOME apps: transient messages are an
+            // AdwToast at the bottom centre; project facts live in the title
+            // and the system tab.
+            .children(self.notices.back().map(|notice| {
+                div().absolute().bottom(px(18.0)).left_0().right_0().flex().justify_center()
+                    .child(div().id("toast").role(Role::Status).aria_label(notice.text.clone())
+                        .max_w(px(560.0)).min_h(px(40.0)).px(px(18.0)).py(px(9.0)).rounded(px(20.0))
+                        .flex().items_center().gap(px(12.0))
+                        .bg(if th.dark { gpui::rgb(0x3c3c40) } else { gpui::rgb(0x2e2e32) })
+                        .text_color(gpui::rgb(0xffffff)).text_sm().shadow_lg()
+                        .child(div().flex_1().min_w_0().child(notice.text.clone()))
+                        .child(div().id("toast-dismiss").role(Role::Button).aria_label("关闭通知").size(px(24.0)).rounded(px(12.0))
+                            .flex().items_center().justify_center().hover(|s| s.bg(gpui::rgba(0xffffff26)))
+                            .child(svg().path(icon("x")).size(px(13.0)).text_color(gpui::rgb(0xffffff)))
+                            .on_click(cx.listener(|ed, _, _, cx| { ed.notices.clear(); cx.notify(); }))))
+            }))
             .into_any_element()
     }
 }

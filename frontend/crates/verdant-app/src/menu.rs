@@ -74,18 +74,28 @@ pub(crate) fn remember_recent_file(prefs: &mut crate::files::Prefs, path: &Path)
     prefs.extra.insert("recent_projects".into(), serde_json::json!(paths));
 }
 
-pub(crate) fn main_menu_items(class: crate::ui_controls::WidthClass, bottom: crate::editor::Bottom) -> Vec<MenuItem> {
-    use crate::editor::{Bottom as B, TopMenu as T};
+/// The header bar's primary menu (GNOME "open-menu"): common file actions,
+/// the five menus as sections, playback options, then help. On phones it
+/// also carries the toolbar controls that do not fit.
+pub(crate) fn main_menu_items(class: crate::ui_controls::WidthClass, bottom: crate::editor::Bottom, count_in: u32) -> Vec<MenuItem> {
+    use crate::editor::{Bottom as B, TopMenu as T, WorkflowAction as W};
     use crate::generated::controls::CommandId as C;
-    use crate::ui_controls::WidthClass as W;
+    use crate::ui_controls::WidthClass as W2;
     let open = |label: &'static str, menu| MenuItem::action(label, MenuAction::OpenMenu(menu)).with_hint("›");
     let mut items = vec![
+        MenuItem::action("新建工程", MenuAction::Workflow(W::New)).with_hint("Ctrl+N"),
+        MenuItem::file("打开工程…", FileAction::Open).with_hint("Ctrl+O"),
+        MenuItem::action("保存", MenuAction::Save).with_hint("Ctrl+S"),
+        MenuItem::action("另存为…", MenuAction::SaveAs).with_hint("Ctrl+Shift+S"),
+        MenuItem::separator(),
         open("文件", T::File), open("编辑", T::Edit), open("轨道", T::Track),
         open("声库与词", T::VoiceLyrics), open("视图", T::ViewTransport),
         MenuItem::separator(),
+        MenuItem::submenu("预备拍", [(0, "无"), (1, "1 小节"), (2, "2 小节"), (4, "4 小节"), (8, "8 小节")].into_iter()
+            .map(|(bars, label)| MenuItem::action(label, MenuAction::Workflow(W::CountIn(bars))).checked(count_in == bars)).collect()),
         MenuItem::action("试听曲…", MenuAction::Run(C::AuditionProjects)),
     ];
-    if class <= W::Phone {
+    if class <= W2::Phone {
         items.extend([
             MenuItem::separator(),
             MenuItem::action("钢琴卷帘", MenuAction::ShowBottom(B::Editor)).with_hint("E").checked(bottom == B::Editor),
@@ -98,6 +108,11 @@ pub(crate) fn main_menu_items(class: crate::ui_controls::WidthClass, bottom: cra
             MenuItem::action("立即渲染", MenuAction::Run(C::RenderNow)),
         ]);
     }
+    items.extend([
+        MenuItem::separator(),
+        MenuItem::action("键盘快捷键", MenuAction::ShowShortcutsWindow).with_hint("F1"),
+        MenuItem::action("开源软件与研究引用", MenuAction::ShowDisclosuresWindow).with_hint("Shift+F1"),
+    ]);
     items
 }
 
@@ -303,7 +318,7 @@ impl Editor {
     /// One menu for narrow windows: the five toolbar menus plus the toolbar
     /// controls that were folded away, so nothing becomes unreachable.
     pub fn main_menu(&mut self, anchor: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        let items = main_menu_items(self.width_class, self.bottom);
+        let items = main_menu_items(self.width_class, self.bottom, self.playback_settings().count_in_bars);
         self.show_menu(anchor, items, window, cx);
     }
 

@@ -17,6 +17,7 @@ icons!(
     "pause",
     "square",
     "minus",
+    "menu",
     "copy",
     "skip-back",
     "repeat",

@@ -127,7 +127,7 @@ fn file_import_entry_preserves_duplicate_key_and_ust_encoding_admission() {
 #[test]
 fn folded_main_menu_keeps_every_hidden_toolbar_control_reachable() {
     use crate::ui_controls::WidthClass;
-    let labels = |class| main_menu_items(class, crate::editor::Bottom::Editor).into_iter().map(|i| i.label.to_string()).collect::<Vec<_>>();
+    let labels = |class| main_menu_items(class, crate::editor::Bottom::Editor, 0).into_iter().map(|i| i.label.to_string()).collect::<Vec<_>>();
     let compact = labels(WidthClass::Compact);
     for menu in ["文件", "编辑", "轨道", "声库与词", "视图", "试听曲…"] { assert!(compact.iter().any(|l| l == menu), "{menu}"); }
     let phone = labels(WidthClass::Phone);

@@ -110,6 +110,8 @@ pub struct Theme {
     pub shade: Rgba,
     /// Hover fill for flat buttons and menu rows.
     pub hover: Rgba,
+    /// A toggle that is on (GtkToggleButton:checked); carries primary text.
+    pub checked: Rgba,
     /// Raised controls (segmented buttons, slots).
     pub control: Rgba,
     pub control_pressed: Rgba,
@@ -213,6 +215,7 @@ impl Theme {
             popover: rgb(0x36363a),
             shade: rgb(0x18181b),
             hover: rgba(0xffffff17),
+            checked: rgb(0x6a6a6e),
             control: rgb(0x434347),
             control_pressed: rgb(0x4e4e52),
             separator: rgb(0x808086),
@@ -254,6 +257,7 @@ impl Theme {
             popover: rgb(0xffffff),
             shade: rgb(0xd6d6d9),
             hover: rgba(0x00000612),
+            checked: rgb(0xb4b4b7),
             control: rgb(0xdcdcde),
             control_pressed: rgb(0xcdcdcf),
             separator: rgb(0x7f7f85),

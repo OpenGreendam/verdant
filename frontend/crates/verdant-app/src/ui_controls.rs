@@ -177,13 +177,13 @@ pub fn selectable_button(
         .items_center()
         .justify_center()
         .rounded(px(6.0))
-        .bg(if active { th.accent } else { th.control })
+        .bg(if active { th.checked } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.control })
+        .border_color(if active { th.checked } else { th.control })
         .text_xs()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-        .text_color(if active { th.accent_text } else { th.text })
-        .hover(move |s| s.bg(if active { th.accent } else { th.control_pressed }))
+        .text_color(th.text)
+        .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
         .child(label)
 }
 
@@ -196,7 +196,7 @@ pub fn icon_selectable_button(
     th: Theme,
 ) -> Stateful<Div> {
     let label = label.into();
-    let fg = if active { th.accent_text } else { th.text };
+    let fg = th.text;
     div()
         .id(id.into())
         .role(Role::Button)
@@ -209,13 +209,13 @@ pub fn icon_selectable_button(
         .items_center()
         .justify_center()
         .rounded(px(6.0))
-        .bg(if active { th.accent } else { th.control })
+        .bg(if active { th.checked } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.control })
+        .border_color(if active { th.checked } else { th.control })
         .text_xs()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(fg)
-        .hover(move |s| s.bg(if active { th.accent } else { th.control_pressed }))
+        .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
         .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
         .child(label)
 }
@@ -269,9 +269,9 @@ pub fn selectable_command_button(
         arg,
         label.clone(),
         key,
-        if active { th.accent_text.into() } else { th.text.into() },
-        if active { th.accent.into() } else { th.control.into() },
-        if active { th.accent.into() } else { th.control_pressed.into() },
+        th.text.into(),
+        if active { th.checked.into() } else { th.control.into() },
+        if active { th.checked.into() } else { th.control_pressed.into() },
         cx,
     )
     .role(Role::Button)
@@ -282,7 +282,7 @@ pub fn selectable_command_button(
     .px(px(8.0))
     .rounded(px(6.0))
     .border_1()
-    .border_color(if active { th.accent } else { th.control })
+    .border_color(if active { th.checked } else { th.control })
     .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
 }
 
@@ -305,9 +305,9 @@ pub fn flat_command_button(
         arg,
         label.clone(),
         key,
-        if active { th.accent_text.into() } else { th.text.into() },
-        if active { th.accent.into() } else { clear.into() },
-        if active { th.accent.into() } else { th.hover.into() },
+        th.text.into(),
+        if active { th.checked.into() } else { clear.into() },
+        if active { th.checked.into() } else { th.hover.into() },
         cx,
     )
     .role(Role::Button)
@@ -330,7 +330,7 @@ pub fn icon_command_button(
 ) -> Stateful<Div> {
     let label = label.into();
     let th = ed.theme;
-    let fg = if active { th.accent_text } else { th.text };
+    let fg = th.text;
     selectable_command_button(ed, cmd, arg, "", key, active, cx)
         .aria_label(label.clone())
         .gap(px(5.0))
@@ -350,7 +350,7 @@ pub fn flat_icon_command_button(
 ) -> Stateful<Div> {
     let label = label.into();
     let th = ed.theme;
-    let fg = if active { th.accent_text } else { th.text };
+    let fg = th.text;
     flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
         .aria_label(label.clone())
         .px(px(9.0))
@@ -743,7 +743,7 @@ pub fn numeric_pill(
                 .relative()
                 .h_full()
                 .px(px(6.0))
-                .min_w(px(if compact { 76.0 } else { 96.0 }))
+                .min_w(px(if compact { 76.0 } else { 64.0 }))
                 .flex_1()
                 .flex()
                 .items_center()
@@ -764,8 +764,8 @@ pub fn numeric_pill(
         pill.flex()
             .items_center()
             .gap(px(8.0))
-            .child(div().w(px(64.0)).flex_none().text_xs().text_color(th.text_secondary).child(zh_label))
-            .child(div().flex_1().child(inner_box))
+            .child(div().flex_1().min_w(px(56.0)).text_sm().text_color(th.text).child(zh_label))
+            .child(div().flex_shrink_0().w(px(128.0)).child(inner_box))
     }
 }
 

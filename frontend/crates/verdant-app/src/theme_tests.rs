@@ -21,14 +21,14 @@ fn every_paint_token_resolves_in_both_appearances() {
     for theme in [Theme::dark(), Theme::light()] {
         // Exhaustive on purpose: a new paint token must also be checked here.
         let Theme {
-            dark: _, pride: _, window, surface, headerbar, view, card, popover, shade, hover,
+            dark: _, pride: _, window, surface, headerbar, view, card, popover, shade, hover, checked,
             control, control_pressed, separator,
             text, text_secondary, text_tertiary, accent, accent_text, selection,
             success, error, warning, roll_white, roll_black, grid_bar, grid_beat,
             grid_sub, key_white, key_black, playhead, lcd, meter_low, meter_high,
         } = theme;
         for color in [
-            window, surface, headerbar, view, card, popover, shade, hover, control, control_pressed, separator,
+            window, surface, headerbar, view, card, popover, shade, hover, checked, control, control_pressed, separator,
             text, text_secondary, text_tertiary, accent, accent_text, selection,
             success, error, warning, roll_white, roll_black, grid_bar, grid_beat,
             grid_sub, key_white, key_black, playhead, lcd, meter_low, meter_high,
@@ -47,6 +47,8 @@ fn every_paint_token_resolves_in_both_appearances() {
             }
         }
         assert!(contrast(accent_text, accent) >= 4.5);
+        // Checked toggles always carry primary text.
+        assert!(contrast(text, checked) >= 4.5, "unreadable checked toggle");
         for status in [success, warning, error] {
             for background in [surface, headerbar, card] {
                 assert!(contrast(status, background) >= 4.5, "unreadable status {status:?} on {background:?}");
