@@ -17,6 +17,7 @@ mod automation_lane;
 mod clock;
 mod commands;
 mod curve_span;
+mod devices;
 mod dialogs;
 mod disclosures;
 mod demos;

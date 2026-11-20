@@ -371,7 +371,9 @@ impl Editor {
             .child(toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn - 4.0, th).aria_label("混音器 (X)")
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx))))
             .child(toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn - 4.0, th).aria_label("音符表 (T)")
-                .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))));
+                .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))))
+            .child(toggle("devices-toggle", "sliders-horizontal", self.bottom == Bottom::Devices, btn - 4.0, th).aria_label("效果器链")
+                .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
         let _ = top_menu_btn;
 
         div()
@@ -1889,6 +1891,7 @@ impl Editor {
                     .into_any_element(),
             ),
             Bottom::Table => Some(div().flex_1().min_h_0().child(crate::table::note_table(self, entity.clone(), window, cx)).into_any_element()),
+            Bottom::Devices => Some(div().flex_1().min_h_0().child(crate::devices::device_view(self, &entity, cx)).into_any_element()),
             Bottom::Hidden => None,
         };
 

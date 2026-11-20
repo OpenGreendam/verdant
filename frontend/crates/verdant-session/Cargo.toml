@@ -8,7 +8,7 @@ description = "EditorSession: viewport, selection, headless gesture planning, ly
 
 [dependencies]
 verdant-domain = { path = "../verdant-domain" }
-verdant-pitch-gesture-surface = { package = "generated-gpui-f3fdabc574a223d49207e44a2417a77e", path = "../../proto-ui/generated/pitch-gesture-surface" }
+verdant-pitch-gesture-surface = { package = "generated-gpui-747190fccaf73db0fc7dec1a98598d3c", path = "../../proto-ui/generated/pitch-gesture-surface" }
 serde.workspace = true
 serde_json.workspace = true
 unicode-segmentation = "1.12"

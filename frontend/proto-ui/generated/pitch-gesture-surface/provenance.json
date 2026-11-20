@@ -2,7 +2,7 @@
   "source": {
     "file": "pitch-gesture-surface.proto.ts",
     "exportName": "default",
-    "sha256": "97ea1e8350504a07213fa6bcece92da816313592157a46bbd1bbffc9e3307900"
+    "sha256": "5a3a0f8a41876b1c5bfff90116767a7c9c2e330bbf48c07205d9ac5fb27e2806"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
@@ -74,20 +74,20 @@
   "sourceFiles": [
     {
       "file": "pitch-gesture-surface.proto.ts",
-      "sha256": "29b663e74e840e2c4c8a09e404d55c93eac1dfc9da358c8b34b103faf07582eb"
+      "sha256": "9e1add6f335945f024db95ecdde0b65b960f84f0c12d69995fdbb2971e5e5e78"
     }
   ],
-  "generatedSha256": "9f105d52252527a55f8d5d50787f1ce7178d97198ff23648dbd22c2a4de66a6d",
+  "generatedSha256": "554b6e508268c0f782195ad3f728fb2eabf44a10b3a7c9be95e710a772964dc4",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "9f105d52252527a55f8d5d50787f1ce7178d97198ff23648dbd22c2a4de66a6d"
+      "sha256": "554b6e508268c0f782195ad3f728fb2eabf44a10b3a7c9be95e710a772964dc4"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "185d41ad00c440930a126c0dfe851c3b99ad8c5312ea48ad55652ca222780df9"
+      "sha256": "b2426d7f08c376224a42606281cc2875658082808dd15146b6f8aedcdfe0fc5e"
     },
     {
       "path": ".proto-ui/gpui-native/LICENSE",
@@ -172,7 +172,7 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "8f5e5565f43a344c629cea74d0efda120b45978de5f2555b9705e45a27c071a2"
+      "sha256": "893edc7aeaaaf534056bbe2b096bc181e39e77b965a5f4ab23fd761fafa98aae"
     }
   ]
 }

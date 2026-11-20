@@ -57,6 +57,8 @@ pub enum Bottom {
     Mixer,
     /// Keyboard note table (TODO §3/§5): the AccessKit-bearing surface.
     Table,
+    /// The selected track's effect chain as device cards.
+    Devices,
     Hidden,
 }
 
@@ -330,6 +332,10 @@ pub struct Editor {
     pub window_chrome: crate::window_chrome::ChromeState,
     /// A press on an empty toolbar area that becomes a window move on drag.
     pub title_drag: bool,
+    /// A knob or curve handle being dragged in the device view.
+    pub device_drag: Option<crate::devices::DeviceDrag>,
+    /// The EQ band shown in the device view's band strip.
+    pub device_band: usize,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -532,6 +538,8 @@ impl Editor {
             touch_ui: false,
             window_chrome: Default::default(),
             title_drag: false,
+            device_drag: None,
+            device_band: 2,
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,

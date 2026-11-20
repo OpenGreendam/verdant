@@ -101,6 +101,7 @@ pub(crate) fn main_menu_items(class: crate::ui_controls::WidthClass, bottom: cra
             MenuItem::action("钢琴卷帘", MenuAction::ShowBottom(B::Editor)).with_hint("E").checked(bottom == B::Editor),
             MenuItem::action("混音器", MenuAction::ShowBottom(B::Mixer)).with_hint("X").checked(bottom == B::Mixer),
             MenuItem::action("音符表", MenuAction::ShowBottom(B::Table)).with_hint("T").checked(bottom == B::Table),
+            MenuItem::action("效果器链", MenuAction::ShowBottom(B::Devices)).checked(bottom == B::Devices),
             MenuItem::separator(),
             MenuItem::action("撤销", MenuAction::Run(C::Undo)).with_hint("Ctrl+Z"),
             MenuItem::action("重做", MenuAction::Run(C::Redo)).with_hint("Ctrl+Shift+Z"),
