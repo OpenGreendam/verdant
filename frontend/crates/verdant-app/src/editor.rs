@@ -336,6 +336,8 @@ pub struct Editor {
     pub device_drag: Option<crate::devices::DeviceDrag>,
     /// The EQ band shown in the device view's band strip.
     pub device_band: usize,
+    /// The saved insert state each cached parameter list was read against.
+    pub device_param_state: HashMap<verdant_plugins::InsertKey, String>,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -540,6 +542,7 @@ impl Editor {
             title_drag: false,
             device_drag: None,
             device_band: 2,
+            device_param_state: HashMap::new(),
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,

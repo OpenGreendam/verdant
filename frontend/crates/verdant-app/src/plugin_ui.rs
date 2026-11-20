@@ -1117,15 +1117,21 @@ impl Editor {
 
     /// Fetch a track insert's parameters for the device view, without
     /// opening the mixer's parameter panel.
+    /// Re-reads whenever the insert's saved state differs from the state the
+    /// cache was read against (undo/redo restore state into the same live
+    /// instance, so the key alone cannot tell the cache is stale).
     pub(crate) fn fetch_track_insert_params(&mut self, track: &TrackId, slot: usize, cx: &mut Context<Self>) {
-        if self.inserts_loading { return; }
+        if self.inserts_loading || self.device_drag.is_some() { return; }
         let Some(handle) = self.live_insert(track, slot) else { return };
         let key = handle.key();
-        if self.plugin_params.contains_key(&key) || !self.plugin_busy.insert(key) { return; }
+        let state = self.insert_specs(track).get(slot).map(|s| s.state_b64.clone()).unwrap_or_default();
+        let fresh = self.device_param_state.get(&key) == Some(&state);
+        if (self.plugin_params.contains_key(&key) && fresh) || !self.plugin_busy.insert(key) { return; }
         cx.spawn(async move |this, cx| {
             let result = cx.background_spawn(async move { handle.params() }).await;
             let _ = this.update(cx, |ed, cx| {
                 ed.plugin_busy.remove(&key);
+                ed.device_param_state.insert(key, state);
                 match result { Ok(params) => ed.cache_editor_params(key, params), Err(e) => ed.notice(format!("读取插件参数失败：{e}")) }
                 cx.notify();
             });
