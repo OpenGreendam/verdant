@@ -75,6 +75,34 @@ pub(crate) fn remember_recent_file(prefs: &mut crate::files::Prefs, path: &Path)
     prefs.extra.insert("recent_projects".into(), serde_json::json!(paths));
 }
 
+pub(crate) fn main_menu_items(class: crate::ui_controls::WidthClass, bottom: crate::editor::Bottom) -> Vec<MenuItem> {
+    use crate::editor::{Bottom as B, TopMenu as T};
+    use crate::generated::controls::CommandId as C;
+    use crate::ui_controls::WidthClass as W;
+    let open = |label: &'static str, menu| MenuItem::action(label, MenuAction::OpenMenu(menu)).with_hint("›");
+    let check = |on: bool, label: &str| if on { format!("✓ {label}") } else { label.to_string() };
+    let mut items = vec![
+        open("文件", T::File), open("编辑", T::Edit), open("轨道", T::Track),
+        open("声库与词", T::VoiceLyrics), open("视图与走带", T::ViewTransport),
+        MenuItem::separator(),
+        MenuItem::action("试听曲…", MenuAction::Run(C::AuditionProjects)),
+    ];
+    if class <= W::Phone {
+        items.extend([
+            MenuItem::separator(),
+            MenuItem::action(check(bottom == B::Editor, "钢琴卷帘"), MenuAction::ShowBottom(B::Editor)).with_hint("E"),
+            MenuItem::action(check(bottom == B::Mixer, "混音器"), MenuAction::ShowBottom(B::Mixer)).with_hint("X"),
+            MenuItem::action(check(bottom == B::Table, "音符表"), MenuAction::ShowBottom(B::Table)).with_hint("T"),
+            MenuItem::separator(),
+            MenuItem::action("撤销", MenuAction::Run(C::Undo)).with_hint("Ctrl+Z"),
+            MenuItem::action("重做", MenuAction::Run(C::Redo)).with_hint("Ctrl+Shift+Z"),
+            MenuItem::action("回到开头", MenuAction::Run(C::GoToStart)),
+            MenuItem::action("立即渲染", MenuAction::Run(C::RenderNow)),
+        ]);
+    }
+    items
+}
+
 pub(crate) fn file_menu_items(prefs: &crate::files::Prefs) -> Vec<MenuItem> {
     use crate::editor::WorkflowAction as W;
     use crate::editor::integrations::IntegrationAction as I;
@@ -253,6 +281,24 @@ impl Editor {
         self.show_menu(anchor, items, window, cx);
     }
 
+    pub fn open_top_menu(&mut self, menu: crate::editor::TopMenu, anchor: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::editor::TopMenu as T;
+        match menu {
+            T::File => self.show_menu(anchor, file_menu_items(&self.prefs), window, cx),
+            T::Edit => self.edit_menu(anchor, window, cx),
+            T::Track => self.track_part_menu(anchor, window, cx),
+            T::VoiceLyrics => self.voice_lyrics_menu(anchor, window, cx),
+            T::ViewTransport => self.view_transport_menu(anchor, window, cx),
+        }
+    }
+
+    /// One menu for narrow windows: the five toolbar menus plus the toolbar
+    /// controls that were folded away, so nothing becomes unreachable.
+    pub fn main_menu(&mut self, anchor: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let items = main_menu_items(self.width_class, self.bottom);
+        self.show_menu(anchor, items, window, cx);
+    }
+
     pub fn edit_menu(&mut self, anchor: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         use crate::editor::WorkflowAction as A;
         let tick = self.session.snap.snap(self.tempo().tick_at(self.playhead_seconds())).max(0);
@@ -310,7 +356,7 @@ impl Editor {
                 .enabled(self.integrations.selected_clip.is_some()),
             MenuItem::action("授权重新打开已保存音频…", MenuAction::Workflow(A::Integration(I::AuthorizeAudio))),
             MenuItem::separator(),
-            MenuItem::action("从选中音符创建片段 (Part)…", MenuAction::Workflow(A::CreatePart)),
+            MenuItem::action("从选中音符创建片段 (Part)", MenuAction::Workflow(A::CreatePart)),
             MenuItem::action("在播放头分割片段", MenuAction::Workflow(A::SplitPart(tick))).enabled(self.selected_part.is_some()),
             MenuItem::action("连接右侧片段", MenuAction::Workflow(A::JoinPart)).enabled(self.selected_part.is_some()),
             MenuItem::action("链接重复片段", MenuAction::Workflow(A::DuplicatePart(true))).enabled(self.selected_part.is_some()),

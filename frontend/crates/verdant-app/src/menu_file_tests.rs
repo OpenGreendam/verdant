@@ -124,3 +124,13 @@ fn file_import_entry_preserves_duplicate_key_and_ust_encoding_admission() {
     let (_, report) = import_score_bytes(Format::Ust, ambiguous_ust, None).unwrap();
     assert_eq!(report["source"]["encoding"], "cp932");
 }
+
+#[test]
+fn folded_main_menu_keeps_every_hidden_toolbar_control_reachable() {
+    use crate::ui_controls::WidthClass;
+    let labels = |class| main_menu_items(class, crate::editor::Bottom::Editor).into_iter().map(|i| i.label.to_string()).collect::<Vec<_>>();
+    let compact = labels(WidthClass::Compact);
+    for menu in ["文件", "编辑", "轨道", "声库与词", "视图与走带", "试听曲…"] { assert!(compact.iter().any(|l| l == menu), "{menu}"); }
+    let phone = labels(WidthClass::Phone);
+    for hidden in ["✓ 钢琴卷帘", "混音器", "音符表", "撤销", "重做", "回到开头", "立即渲染"] { assert!(phone.iter().any(|l| l == hidden), "{hidden}"); }
+}

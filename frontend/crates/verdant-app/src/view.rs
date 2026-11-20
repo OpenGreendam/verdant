@@ -26,13 +26,12 @@ use crate::generated::controls::{
 use crate::phoneme_lane::{PHONEME_LANE_H, timeline_phoneme_lane};
 use crate::theme::{Theme, mix};
 use crate::ui_controls::{
-    BAR_BTN_H, PANEL_BTN_H, RIGHT_RAIL_W, RightDockTab, SplitterKind, TOP_BTN_H,
+    BAR_BTN_H, Drawer, PANEL_BTN_H, RIGHT_RAIL_W, RightDockTab, SplitterKind, WidthClass,
     generated_select_button, horizontal_timeline_bar, icon_command_button, icon_selectable_button,
     numeric_pill, route_short_name, select_button, selectable_button, selectable_command_button,
     splitter_bar,
 };
 
-const BAR_H: f32 = 48.0;
 const RULER_H: f32 = 24.0;
 const KEYS_W: f32 = 52.0;
 
@@ -113,7 +112,7 @@ impl Render for ChromeView {
         editor.update(cx, |ed, cx| match self.pane {
             ChromePane::ControlBar => ed.control_bar(cx).into_any_element(),
             ChromePane::Inspector => ed.left_track_panel(cx).into_any_element(),
-            ChromePane::PropertyDock => ed.right_synthv_dock(editor.clone(), cx).into_any_element(),
+            ChromePane::PropertyDock => ed.right_synthv_dock(cx).into_any_element(),
             ChromePane::IconRail => ed.right_icon_rail(cx).into_any_element(),
             ChromePane::Arrangement => ed.arrangement_content(cx),
         })
@@ -158,13 +157,13 @@ fn button(id: impl Into<SharedString>, label: impl Into<SharedString>, th: Theme
     selectable_button(id, label, false, th)
 }
 
-fn toggle(id: &'static str, name: &'static str, active: bool, th: Theme) -> Stateful<Div> {
+fn toggle(id: &'static str, name: &'static str, active: bool, size: f32, th: Theme) -> Stateful<Div> {
     div()
         .id(id)
         .role(Role::Button)
         .aria_label(name)
         .aria_selected(active)
-        .size(px(28.0))
+        .size(px(size))
         .flex()
         .items_center()
         .justify_center()
@@ -199,8 +198,10 @@ fn command_icon(
     let th = ed.theme;
     selectable_command_button(ed, cmd, Arg::None, "", key, active, cx)
         .aria_label(label)
-        .size(px(28.0))
-        .p(px(5.0))
+        .size(px(crate::ui_controls::bar_button_size(ed.touch_ui)))
+        .flex()
+        .items_center()
+        .justify_center()
         .child(svg().path(icon(name)).size(px(15.0)).text_color(if active { th.accent_text } else { th.text }))
 }
 
@@ -250,6 +251,9 @@ fn support_text(support: Support) -> String {
 impl Editor {
     fn control_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
+        let class = self.width_class;
+        let btn = crate::ui_controls::bar_button_size(self.touch_ui);
+        let (wide, medium_up, phone) = (class == WidthClass::Wide, class >= WidthClass::Medium, class == WidthClass::Phone);
         let playing = self.audio.transport() == Transport::Playing;
         let pb = self.playback_settings();
         let recording = self.integrations.recording.is_some();
@@ -279,7 +283,7 @@ impl Editor {
                 .id(id)
                 .role(Role::Button)
                 .aria_label(label)
-                .h(px(TOP_BTN_H))
+                .h(px(btn))
                 .px(px(8.0))
                 .gap(px(4.0))
                 .flex()
@@ -292,11 +296,14 @@ impl Editor {
                 .text_color(th.text)
                 .hover(move |s| s.bg(th.control_pressed))
                 .child(label)
-                .child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary))
+                .when(wide, |d| d.child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary)))
         };
 
         div()
-            .h(px(BAR_H))
+            .w_full()
+            .min_w_0()
+            .overflow_hidden()
+            .h(px(crate::ui_controls::bar_height(self.touch_ui)))
             .flex_none()
             .flex()
             .items_center()
@@ -305,47 +312,53 @@ impl Editor {
             .bg(th.surface)
             .border_b_1()
             .border_color(th.separator)
-            // Left pane & view toggles (all strictly TOP_BTN_H = 28px)
-            .child(command_icon(self, Cmd::ToggleLeftPanel, "panel-left", "左侧轨道与声库栏 (I)", "inspector-toggle", self.show_inspector, cx))
-            .child(
-                toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, th)
+            // Left pane & view toggles (28 px, 36 px once touch is used)
+            .child(command_icon(self, Cmd::ToggleLeftPanel, "panel-left", "左侧轨道与声库栏 (I)", "inspector-toggle", self.left_panel_visible(), cx))
+            .when(!phone, |bar| bar.child(
+                toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, btn, th)
                     .aria_label("钢琴卷帘 (E)")
                     .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx))),
             )
             .child(
-                toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, th)
+                toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn, th)
                     .aria_label("混音器 (X)")
                     .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx))),
             )
             .child(
-                toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, th)
+                toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn, th)
                     .aria_label("音符表 (T)")
                     .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))),
-            )
-            // Categorized DAW Menubar (all strictly TOP_BTN_H = 28px)
-            .child(top_menu_btn("menubar-file", "文件").on_click(cx.listener(|ed, _, w, cx| ed.file_menu(w, cx))))
-            .child(top_menu_btn("menubar-edit", "编辑").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.edit_menu(ev.position(), w, cx))))
-            .child(top_menu_btn("menubar-track", "轨道").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.track_part_menu(ev.position(), w, cx))))
-            .child(top_menu_btn("menubar-voice", "声库与词").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.voice_lyrics_menu(ev.position(), w, cx))))
-            .child(top_menu_btn("menubar-view", "视图").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.view_transport_menu(ev.position(), w, cx))))
-            .child(
+            ))
+            // Categorized DAW menubar
+            // Below the Medium width class the five menus fold into one.
+            .when(medium_up, |bar| bar
+                .child(top_menu_btn("menubar-file", "文件").on_click(cx.listener(|ed, _, w, cx| ed.file_menu(w, cx))))
+                .child(top_menu_btn("menubar-edit", "编辑").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.edit_menu(ev.position(), w, cx))))
+                .child(top_menu_btn("menubar-track", "轨道").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.track_part_menu(ev.position(), w, cx))))
+                .child(top_menu_btn("menubar-voice", "声库与词").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.voice_lyrics_menu(ev.position(), w, cx))))
+                .child(top_menu_btn("menubar-view", "视图").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.view_transport_menu(ev.position(), w, cx)))))
+            .when(!medium_up, |bar| bar.child(
+                top_menu_btn("menubar-main", "菜单").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.main_menu(ev.position(), w, cx)))))
+            .when(wide, |bar| bar.child(
                 icon_command_button(self, Cmd::AuditionProjects, Arg::None, "music-2", "试听曲", "audition-projects", false, cx)
-                    .h(px(TOP_BTN_H)),
-            )
-            .child(command_icon(self, Cmd::Undo, "undo-2", "撤销 (Ctrl+Z)", "undo", false, cx))
-            .child(command_icon(self, Cmd::Redo, "redo-2", "重做 (Ctrl+Shift+Z)", "redo", false, cx))
+                    .h(px(btn)),
+            ))
+            .when(class == WidthClass::Medium, |bar| bar.child(command_icon(self, Cmd::AuditionProjects, "music-2", "试听曲", "audition-projects", false, cx)))
+            .when(!phone, |bar| bar
+                .child(command_icon(self, Cmd::Undo, "undo-2", "撤销 (Ctrl+Z)", "undo", false, cx))
+                .child(command_icon(self, Cmd::Redo, "redo-2", "重做 (Ctrl+Shift+Z)", "redo", false, cx)))
             .child(div().flex_1())
-            // Transport cluster (all buttons strictly TOP_BTN_H = 28px)
-            .child(command_icon(self, Cmd::GoToStart, "skip-back", "回到开头", "go-start", false, cx))
+            // Transport cluster
+            .when(!phone, |bar| bar.child(command_icon(self, Cmd::GoToStart, "skip-back", "回到开头", "go-start", false, cx)))
             .child(command_icon(self, Cmd::TogglePlay, if playing { "pause" } else { "play" }, "播放 / 暂停 (Space)", "play", playing, cx))
             .child(command_icon(self, Cmd::Stop, "square", "停止", "stop", false, cx))
-            .child(
+            .when(!phone, |bar| bar.child(
                 div()
                     .id("transport-record")
                     .role(Role::Button)
                     .aria_label(if recording { "完成并提交 MIDI 录音" } else { "选择 MIDI 输入开始录音" })
                     .aria_selected(recording)
-                    .h(px(TOP_BTN_H))
+                    .h(px(btn))
                     .px(px(8.0))
                     .rounded(px(5.0))
                     .flex()
@@ -358,28 +371,33 @@ impl Editor {
                     .font_weight(if recording { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
                     .text_color(if recording { th.accent_text } else { th.text })
                     .hover(move |s| s.bg(if recording { th.error } else { th.control_pressed }))
+                    .when(!medium_up, |d| d.w(px(btn)).px_0().justify_center())
                     .child(svg().path(icon("circle-dot")).size(px(13.5)).text_color(if recording { th.accent_text } else { th.error }))
-                    .child(if recording { "完成录音" } else { "录MIDI" })
+                    .when(medium_up, |d| d.child(if recording { "完成录音" } else { "录MIDI" }))
                     .on_click(cx.listener(move |ed, _, w, cx| {
                         use crate::editor::integrations::IntegrationAction as I;
                         let act = if recording { I::FinishRecording } else { I::MidiPorts };
                         ed.run_workflow(WorkflowAction::Integration(act), w, cx);
                     })),
-            )
-            .child(div().w(px(252.0)).h(px(36.0)).flex_none().child(self.playback.anchor(crate::clock::Surface::Lcd)))
-            .child(command_icon(self, Cmd::ToggleLoop, "repeat", "循环播放", "transport-loop", pb.looping, cx))
-            .child(
+            ))
+            // The LCD keeps its full width until phones, where it takes the
+            // space that is left and shows the position only.
+            .child(div().h(px(36.0)).when(phone, |d| d.flex_1().min_w(px(112.0)).max_w(px(252.0))).when(!phone, |d| d.w(px(252.0)).flex_none())
+                .child(self.playback.anchor(crate::clock::Surface::Lcd)))
+            .when(!phone, |bar| bar.child(command_icon(self, Cmd::ToggleLoop, "repeat", "循环播放", "transport-loop", pb.looping, cx)))
+            .when(wide, |bar| bar.child(
                 icon_command_button(self, Cmd::ToggleMetronome, Arg::None, "bell", "节拍", "transport-click", pb.metronome, cx)
-                    .h(px(TOP_BTN_H)),
-            )
-            .child(
+                    .h(px(btn)),
+            ))
+            .when(!wide && !phone, |bar| bar.child(command_icon(self, Cmd::ToggleMetronome, "bell", "节拍器", "transport-click", pb.metronome, cx)))
+            .when(medium_up, |bar| bar.child(
                 generated_select_button(self, SelectId::CountInBars, Arg::None, "transport-countin", cx)
-                    .h(px(TOP_BTN_H))
+                    .h(px(btn))
                     .w(px(94.0)),
-            )
-            .child(div().flex_1())
+            ))
+            .when(!phone, |bar| bar.child(div().flex_1()))
             // Right render status & SynthV Right Dock toggle
-            .child(
+            .when(medium_up, |bar| bar.child(
                 div()
                     .id("render-status")
                     .role(Role::Button)
@@ -387,23 +405,22 @@ impl Editor {
                     .flex()
                     .flex_col()
                     .items_end()
-                    .max_w(px(196.0))
+                    .max_w(px(if wide { 196.0 } else { 132.0 }))
                     .text_xs()
                     .child(div().truncate().text_color(if errors > 0 { th.error } else { th.text }).child(state))
                     .child(div().truncate().text_size(px(10.5)).text_color(th.text_secondary).child(voice))
                     .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                         if ed.lyric.is_some() { window.prevent_default(); }
                     }))
-                    .on_click(cx.listener(|ed, _, _, cx| {
-                        ed.layout.show_right_dock = true;
-                        ed.layout.right_dock_tab = RightDockTab::RenderInserts;
-                        ed.layout.store(&mut ed.prefs);
-                        ed.prefs_dirty = true;
-                        cx.notify();
-                    })),
-            )
-            .child(command_icon(self, Cmd::RenderNow, "audio-waveform", "立即渲染", "render", self.scheduler.active().is_some(), cx))
-            .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "右侧属性坞", "right-dock-toggle", self.layout.show_right_dock, cx))
+                    .on_click(cx.listener(|ed, _, _, cx| ed.open_right_dock(RightDockTab::RenderInserts, cx))),
+            ))
+            // Without the status text, the render button carries the error
+            // count as a badge and opens the diagnostics on long press/click.
+            .when(!phone, |bar| bar.child(command_icon(self, Cmd::RenderNow, "audio-waveform", "立即渲染", "render", self.scheduler.active().is_some(), cx)
+                .relative()
+                .when(!medium_up && errors > 0, |d| d.aria_label(format!("立即渲染（{errors} 处错误）")).child(
+                    div().absolute().top(px(2.0)).right(px(2.0)).size(px(7.0)).rounded(px(3.5)).bg(th.error)))))
+            .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "右侧属性坞", "right-dock-toggle", self.right_dock_visible(), cx))
             .when(th.pride, |bar| bar.relative().child(
                 // Paint only: no hitbox, layout space, label or event handler.
                 gpui::canvas(|_, _, _| (), |bounds, (), window, _| {
@@ -430,6 +447,7 @@ impl Editor {
             return div().into_any_element();
         };
         let caps = self.scheduler.capabilities.as_ref();
+        let selection = self.selection_inspector(track, cx.entity(), cx);
         let rename_id = track.id.clone();
         let auto_open = self.automation_ui.expanded_tracks.contains(&track.id);
 
@@ -552,7 +570,7 @@ impl Editor {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .child(div().flex().flex_col().child(track_section).child(mix_section).child(list_section)),
+                    .child(div().flex().flex_col().children(selection).child(track_section).child(mix_section).child(list_section)),
             )
             .into_any_element()
     }
@@ -560,13 +578,11 @@ impl Editor {
     /// Far-right Synthesizer V Studio-style vertical icon rail (`36px` wide).
     fn right_icon_rail(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
-        let open = self.layout.show_right_dock;
+        let open = self.right_dock_visible();
         let cur_tab = self.layout.right_dock_tab;
-        let has_notes = !self.session.selection.is_empty();
         let error_count = self.plans.iter().flat_map(|p| &p.diagnostics).filter(|d| d.severity == Severity::Error).count();
 
         let tabs = [
-            (RightDockTab::NotePhoneme, "music-2", "音符与发音属性", has_notes, false),
             (RightDockTab::VoiceTimbre, "sparkles", "声线与音色参数", false, false),
             (RightDockTab::Dictionary, "languages", "词典与多语言分段", false, false),
             (RightDockTab::RenderInserts, "cpu", "合成诊断与插入效果器", error_count > 0, error_count > 0),
@@ -620,21 +636,17 @@ impl Editor {
                         )
                     })
                     .on_click(cx.listener(move |ed, _, _, cx| {
-                        if ed.layout.show_right_dock && ed.layout.right_dock_tab == tab {
-                            ed.layout.show_right_dock = false;
+                        if ed.right_dock_visible() && ed.layout.right_dock_tab == tab {
+                            ed.toggle_right_dock(cx);
                         } else {
-                            ed.layout.show_right_dock = true;
-                            ed.layout.right_dock_tab = tab;
+                            ed.open_right_dock(tab, cx);
                         }
-                        ed.layout.store(&mut ed.prefs);
-                        ed.prefs_dirty = true;
-                        cx.notify();
                     }))
             }))
     }
 
     /// Synthesizer V Studio-style Right Property Dock.
-    fn right_synthv_dock(&self, entity: Entity<Self>, cx: &mut Context<Self>) -> impl IntoElement {
+    fn right_synthv_dock(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let project = self.store().snapshot();
         let Some(track) = project.track(&self.session.track) else {
@@ -642,7 +654,6 @@ impl Editor {
         };
         let tab = self.layout.right_dock_tab;
         let (title, ic) = match tab {
-            RightDockTab::NotePhoneme => ("音符与发音属性", "music-2"),
             RightDockTab::VoiceTimbre => ("声线与音色参数", "sparkles"),
             RightDockTab::Dictionary => ("词典与多语言分段", "languages"),
             RightDockTab::RenderInserts => ("合成诊断与效果器", "cpu"),
@@ -676,16 +687,10 @@ impl Editor {
                     .justify_center()
                     .hover(move |s| s.bg(th.control_pressed))
                     .child(svg().path(icon("x")).size(px(12.5)).text_color(th.text_secondary))
-                    .on_click(cx.listener(|ed, _, _, cx| {
-                        ed.layout.show_right_dock = false;
-                        ed.layout.store(&mut ed.prefs);
-                        ed.prefs_dirty = true;
-                        cx.notify();
-                    })),
+                    .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
             );
 
         let body = match tab {
-            RightDockTab::NotePhoneme => self.right_dock_note_tab(track, entity, cx),
             RightDockTab::VoiceTimbre => self.right_dock_voice_tab(&project, cx),
             RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
             RightDockTab::RenderInserts => self.right_dock_render_inserts_tab(track, cx),
@@ -705,10 +710,16 @@ impl Editor {
             .into_any_element()
     }
 
-    fn right_dock_note_tab(&self, track: &verdant_domain::Track, entity: Entity<Self>, cx: &mut Context<Self>) -> Div {
+    /// Properties of the current selection (notes or an audio clip). Shown
+    /// at the top of the left inspector only while something is selected, so
+    /// the inspector follows what the user is working on.
+    fn selection_inspector(&self, track: &verdant_domain::Track, entity: Entity<Self>, cx: &mut Context<Self>) -> Option<Div> {
+        if self.session.selection.is_empty() {
+            return audio_clip_inspector_section(self, entity, cx);
+        }
         let th = self.theme;
         let caps = self.scheduler.capabilities.as_ref();
-        let mut notes = section("音符基本属性", th).child(row("当前选区", format!("{} 个音符", self.session.selection.len()), th));
+        let mut notes = section("选中音符", th).child(row("当前选区", format!("{} 个音符", self.session.selection.len()), th));
         let first = self
             .session
             .selection
@@ -872,22 +883,15 @@ impl Editor {
                 );
             }
 
-            div()
+            Some(div()
                 .flex()
                 .flex_col()
                 .children(audio_clip_inspector_section(self, entity, cx))
                 .child(notes)
                 .child(mod_sec)
-                .child(phone_sec)
+                .child(phone_sec))
         } else {
-            notes = notes.child(
-                div()
-                    .py(px(8.0))
-                    .text_xs()
-                    .text_color(th.text_tertiary)
-                    .child("在钢琴卷帘中点击任意音符，即可在此编辑歌词、多音字候选、音高微调、滑音时长、颤音包络与音素切分比例。"),
-            );
-            div().flex().flex_col().children(audio_clip_inspector_section(self, entity, cx)).child(notes)
+            Some(div().flex().flex_col().children(audio_clip_inspector_section(self, entity, cx)).child(notes))
         }
     }
 
@@ -1886,6 +1890,7 @@ impl Editor {
         let entity = cx.entity();
         let a11y = window.is_a11y_active();
         let has_track = self.active_track().is_some();
+        let docked = self.width_class.docks_panels();
         let column = |width| StyleRefinement::default().w(px(width)).h_full().flex_none();
         let fixed_arrangement = self.bottom != Bottom::Hidden;
         let arrange_height = px(self.arrange_pane_height());
@@ -1906,7 +1911,7 @@ impl Editor {
             .size_full()
             .flex()
             .flex_col()
-            .child(cached_view(&self.chrome.control_bar, StyleRefinement::default().w_full().h(px(BAR_H)).flex_none(), a11y))
+            .child(cached_view(&self.chrome.control_bar, StyleRefinement::default().w_full().h(px(crate::ui_controls::bar_height(self.touch_ui))).flex_none(), a11y))
             .children(self.recovered.as_ref().map(|text| {
                 div()
                     .flex()
@@ -1927,12 +1932,29 @@ impl Editor {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .when(self.show_inspector, |d| {
+                    .when(docked && self.show_inspector, |d| {
                         d.when(has_track, |d| d.child(cached_view(&self.chrome.inspector, column(self.layout.inspector_width), a11y)))
                             .child(splitter_bar(entity.clone(), SplitterKind::InspectorWidth, th))
                     })
-                    .child(center)
-                    .when(self.layout.show_right_dock, |d| {
+                    .child(
+                        // Narrow windows: panels open as drawers over the
+                        // timeline; a tap on the dimmed area closes them.
+                        div().relative().flex_1().min_w_0().min_h_0().flex().child(center)
+                            .when(!docked && has_track && self.drawer.is_some(), |d| d
+                                .child(div().id("drawer-scrim").absolute().inset_0().bg(gpui::rgba(0x0000_0066)).occlude()
+                                    .on_click(cx.listener(|ed, _, _, cx| { ed.drawer = None; cx.notify(); })))
+                                .child({
+                                    let left = self.drawer == Some(Drawer::Left);
+                                    let width = if left { self.layout.inspector_width } else { self.layout.right_dock_width };
+                                    let pane = if left { &self.chrome.inspector } else { &self.chrome.property_dock };
+                                    div().id("side-drawer").absolute().top_0().bottom_0().when(left, |d| d.left_0()).when(!left, |d| d.right_0())
+                                        .w(px(width)).max_w(gpui::relative(0.92)).flex().occlude()
+                                        .when(left, |d| d.border_r_1()).when(!left, |d| d.border_l_1()).border_color(th.separator)
+                                        .shadow_lg()
+                                        .child(cached_view(pane, StyleRefinement::default().size_full(), a11y))
+                                })),
+                    )
+                    .when(docked && self.layout.show_right_dock, |d| {
                         d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th))
                             .when(has_track, |d| d.child(cached_view(&self.chrome.property_dock, column(self.layout.right_dock_width), a11y)))
                     })
@@ -1968,6 +1990,13 @@ impl Render for Editor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.theme = Theme::resolve_appearance(window.appearance(), self.appearance_override, &self.prefs)
             .with_pride(self.theme.pride);
+        let class = WidthClass::of(window.viewport_size().width.as_f32());
+        if class != self.width_class {
+            // Drawers belong to narrow layouts; docked panels keep their prefs.
+            self.width_class = class;
+            self.drawer = None;
+            cx.notify();
+        }
         let th = self.theme;
         let entity = cx.entity();
         let static_content = self.static_shell(window, cx);
@@ -2042,10 +2071,7 @@ impl Render for Editor {
             }))
             .on_action(cx.listener(|ed, _: &BackBar, _, cx| seek_bar(ed, false, cx)))
             .on_action(cx.listener(|ed, _: &ForwardBar, _, cx| seek_bar(ed, true, cx)))
-            .on_action(cx.listener(|ed, _: &ToggleInspector, _, cx| {
-                ed.show_inspector = !ed.show_inspector;
-                cx.notify();
-            }))
+            .on_action(cx.listener(|ed, _: &ToggleInspector, _, cx| ed.toggle_left_panel(cx)))
             .on_action(cx.listener(|ed, _: &ToggleEditor, w, cx| ed.show_bottom(Bottom::Editor, w, cx)))
             .on_action(cx.listener(|ed, _: &ToggleMixer, w, cx| ed.show_bottom(Bottom::Mixer, w, cx)))
             .on_action(cx.listener(|ed, _: &ToggleTable, w, cx| ed.show_bottom(Bottom::Table, w, cx)))
@@ -2125,7 +2151,7 @@ impl Render for Editor {
             }))
             .child(self.playback.driver.clone())
             .child(static_content)
-            .child(crate::clock::playback_layer(entity))
+            .child(crate::clock::playback_layer(entity, self.touch_ui))
             .children(modal)
             .children(menu)
             .children(text_prompt)

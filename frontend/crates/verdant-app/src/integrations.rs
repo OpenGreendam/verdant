@@ -103,11 +103,7 @@ impl Editor {
     pub(crate) fn show_integration_report(&mut self, cx: &mut Context<Self>) {
         // Read-only diagnostics stay in the same window and never borrow the
         // lyric input handle or confirm an active lyric/IME session.
-        self.layout.show_right_dock = true;
-        self.layout.right_dock_tab = crate::ui_controls::RightDockTab::RenderInserts;
-        self.layout.store(&mut self.prefs);
-        self.prefs_dirty = true;
-        cx.notify();
+        self.open_right_dock(crate::ui_controls::RightDockTab::RenderInserts, cx);
     }
     pub(super) fn apply_integration_prompt(&mut self,purpose:&IntegrationPrompt,text:&str,cx:&mut Context<Self>)->Result<(),String>{
         match purpose{

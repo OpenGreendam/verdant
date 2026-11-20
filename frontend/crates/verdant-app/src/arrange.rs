@@ -402,9 +402,62 @@ fn paint_regions(editor: &Entity<Editor>, bounds: Bounds<Pixels>, window: &mut W
 }
 
 
+/// Movement (px) before a region press turns into a drag.
+pub(crate) const DRAG_THRESHOLD: f64 = 3.0;
+pub(crate) fn crossed_drag_threshold(press:(f64,f64),at:(f64,f64))->bool{
+    let(dx,dy)=(at.0-press.0,at.1-press.1);dx*dx+dy*dy>=DRAG_THRESHOLD*DRAG_THRESHOLD
+}
+/// Smallest on-screen beat before arrangement snapping moves to whole bars.
+const MIN_BEAT_PX: f64 = 14.0;
+/// Track-area snapping follows the meter at the current zoom: beats when a
+/// beat is wide enough to target, otherwise bars. (The piano-roll grid is
+/// far too fine for regions.)
+pub(crate) fn snap_to_meter(meter:&verdant_domain::MeterMap,tick:f64,px_per_tick:f64)->i64{
+    let t=tick.max(0.);let bar=meter.bar_start(t.floor()as i64);let next=meter.next_bar(bar);
+    let beat=meter.beat_ticks_at(bar).max(1);
+    let unit=if beat as f64*px_per_tick>=MIN_BEAT_PX{beat}else{(next-bar).max(1)};
+    (bar+((t-bar as f64)/unit as f64).round()as i64*unit).min(next)
+}
+fn arrange_snap(ed:&Editor,tick:f64)->i64{snap_to_meter(&ed.meter(),tick,ed.arrange.px_per_tick)}
+
+/// The free span for a new one-bar part at `tick`: the bar around it, trimmed
+/// to neighbouring parts on the same track. None if the spot is occupied.
+pub(crate) fn new_part_span(meter:&verdant_domain::MeterMap,parts:&verdant_domain::parts::Parts,track:&TrackId,tick:f64)->Option<(i64,i64)>{
+    let t=tick.max(0.).floor()as i64;let mut start=meter.bar_start(t);let mut end=meter.next_bar(start);
+    for p in parts.instances.iter().filter(|p|&p.track==track){
+        let(a,b)=(p.start_tick,p.start_tick+p.duration_tick);
+        if a<=t&&t<b{return None;}
+        if b<=t{start=start.max(b);}else if a>t{end=end.min(a);}
+    }
+    (end>start).then_some((start,end))
+}
+
+/// Double-click on an empty lane: an empty one-bar part named "片段 N",
+/// selected and opened in the piano roll so notes can be drawn into it.
+fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut Window,cx:&mut Context<Editor>){
+    let result=(||->Result<String,String>{
+        let mut parts=verdant_domain::parts::Parts::load(ed.project())?;
+        let(start,end)=new_part_span(&ed.meter(),&parts,track,tick).ok_or("此处已有片段")?;
+        let name=parts.next_name("片段");let id=parts.create_empty(ed.project(),track,start,end-start,name)?;
+        if !ed.commit(ed.revision(),CommandBatch::single("新建片段",parts.command()),cx){return Err("片段未提交".into());}
+        Ok(id)
+    })();
+    match result{
+        Ok(id)=>{
+            ed.integrations.selected_clip=None;ed.session.selection.clear();ed.selected_part=Some(id.clone());
+            if let Some(part)=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(&id).cloned()){
+                ed.bottom=Bottom::Editor;let vp=&mut ed.session.viewport;
+                let target=(part.start_tick as f64-vp.width*0.1/vp.px_per_tick).max(0.);let dx=(target-vp.start_tick)*vp.px_per_tick;vp.pan_px(dx,0.);
+            }
+        }
+        Err(e)=>ed.notice(e),
+    }
+    window.focus(&ed.focus_arrange,cx);cx.notify();
+}
+
 impl AuthoredTarget{fn same(&self,other:&Self)->bool{match(self,other){(Self::Part(a),Self::Part(b))|(Self::Audio(a),Self::Audio(b))=>a==b,_=>false}}}
 #[derive(Clone,Copy,PartialEq)]enum RegionDragMode{Move,Left,Right,FadeIn,FadeOut}
-pub struct RegionDrag{pointer:PointerId,base:Revision,target:AuthoredTarget,source_track:TrackId,destination_track:TrackId,mode:RegionDragMode,origin_tick:i64,original_start:i64,original_end:i64,start:i64,end:i64,min_left:i64,max_right:i64,audio_seconds:Option<f64>,fade_frames:u64,original_fade_frames:u64}
+pub struct RegionDrag{pointer:PointerId,press:(f64,f64),armed:bool,base:Revision,target:AuthoredTarget,source_track:TrackId,destination_track:TrackId,mode:RegionDragMode,origin_tick:i64,original_start:i64,original_end:i64,start:i64,end:i64,min_left:i64,max_right:i64,audio_seconds:Option<f64>,fade_frames:u64,original_fade_frames:u64}
 fn authored_hit(ed:&Editor,track:&TrackId,tick:f64,row_y:f64)->Option<AuthoredTarget>{
     let index=ed.arrange_cache.tracks.get(track)?;let has_parts=index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_)));
     index.authored.iter().rev().find(|region|tick>=region.start as f64&&tick<region.end as f64&&match region.target{AuthoredTarget::Part(_)=>row_y<27.,AuthoredTarget::Audio(_)=>!has_parts||row_y>=27.}).map(|region|region.target.clone())
@@ -413,7 +466,7 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
     let row=(y/ed.arrange_track_height).floor()as usize;let Some(track)=ed.project().tracks.get(row).map(|t|t.id.clone())else{return false;};
     if !matches!(button,MouseButton::Left|MouseButton::Right)||!ed.select_track(track.clone(),cx){return false;}
     let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);window.focus(&ed.focus_arrange,cx);
-    let Some(target)=hit else{if button==MouseButton::Right{ed.track_menu(track,position,window,cx);}else if clicks>=2{ed.bottom=Bottom::Editor;let dx=ed.session.viewport.tick_to_x(tick)-ed.session.viewport.width*0.2;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);}cx.notify();return false;};
+    let Some(target)=hit else{if button==MouseButton::Right{ed.track_menu(track,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}cx.notify();return false;};
     use crate::editor::WorkflowAction as A;use crate::editor::integrations::IntegrationAction as IA;use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
     let(start,end,min_left,max_right,audio_seconds)=match &target{
         AuthoredTarget::Part(id)=>{
@@ -427,10 +480,10 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
         }
     };
     if button==MouseButton::Right{
-        let items=match &target{AuthoredTarget::Part(_)=>vec![I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("移动片段…",M::Workflow(A::MovePart)),I::action("裁剪片段…",M::Workflow(A::TrimPart)),I::action("在此分割片段",M::Workflow(A::SplitPart(ed.session.snap.snap(tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制",M::Workflow(A::DuplicatePart(true))),I::action("独立复制",M::Workflow(A::DuplicatePart(false))),I::action("取消链接",M::Workflow(A::UnlinkPart)),I::action("片段静音",M::Workflow(A::MutePart)),I::action("删除片段",M::Workflow(A::DeletePart))],AuthoredTarget::Audio(_)=>vec![I::action("位置 / 裁剪 / 音量…",M::Workflow(A::Integration(IA::EditClip))),I::action("复制音频片段",M::Workflow(A::Integration(IA::DuplicateClip))),I::action("重新定位音源…",M::Workflow(A::Integration(IA::RelinkClip))),I::action("删除音频片段",M::Workflow(A::Integration(IA::DeleteClip)))]};ed.show_menu(position,items,window,cx);return false;
+        let items=match &target{AuthoredTarget::Part(_)=>vec![I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("移动片段…",M::Workflow(A::MovePart)),I::action("裁剪片段…",M::Workflow(A::TrimPart)),I::action("在此分割片段",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制",M::Workflow(A::DuplicatePart(true))),I::action("独立复制",M::Workflow(A::DuplicatePart(false))),I::action("取消链接",M::Workflow(A::UnlinkPart)),I::action("片段静音",M::Workflow(A::MutePart)),I::action("删除片段",M::Workflow(A::DeletePart))],AuthoredTarget::Audio(_)=>vec![I::action("位置 / 裁剪 / 音量…",M::Workflow(A::Integration(IA::EditClip))),I::action("复制音频片段",M::Workflow(A::Integration(IA::DuplicateClip))),I::action("重新定位音源…",M::Workflow(A::Integration(IA::RelinkClip))),I::action("删除音频片段",M::Workflow(A::Integration(IA::DeleteClip)))]};ed.show_menu(position,items,window,cx);return false;
     }
     if split_at_click && matches!(target,AuthoredTarget::Audio(_)) {
-        edit_audio_region(ed,AudioRegionEdit::Split(ed.session.snap.snap(tick)),cx);return false;
+        edit_audio_region(ed,AudioRegionEdit::Split(arrange_snap(ed,tick)),cx);return false;
     }
     if clicks>=2{ed.bottom=Bottom::Editor;let target=(start as f64-ed.session.viewport.width*0.1/ed.session.viewport.px_per_tick).max(0.);let dx=(target-ed.session.viewport.start_tick)*ed.session.viewport.px_per_tick;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);cx.notify();return false;}
     let mut mode=if (x-ed.arrange.tick_to_x(start as f64)).abs()<7.{RegionDragMode::Left}else if(x-ed.arrange.tick_to_x(end as f64)).abs()<7.{RegionDragMode::Right}else{RegionDragMode::Move};
@@ -448,10 +501,13 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
             }
         }
     }
-    ed.arrange_drag=Some(RegionDrag{pointer,base:ed.revision(),target,source_track:track.clone(),destination_track:track,mode,origin_tick:ed.session.snap.snap(tick),original_start:start,original_end:end,start,end,min_left,max_right,audio_seconds,fade_frames,original_fade_frames:fade_frames});cx.notify();true
+    ed.arrange_drag=Some(RegionDrag{pointer,press:(x,y),armed:false,base:ed.revision(),target,source_track:track.clone(),destination_track:track,mode,origin_tick:arrange_snap(ed,tick),original_start:start,original_end:end,start,end,min_left,max_right,audio_seconds,fade_frames,original_fade_frames:fade_frames});cx.notify();true
 }
 fn region_moved(ed:&mut Editor,pointer:PointerId,x:f64,y:f64,unsnapped:bool,cx:&mut Context<Editor>){
-    let tick=ed.arrange.x_to_tick(x);let at=if unsnapped{tick.round()as i64}else{ed.session.snap.snap(tick)};let tempo=ed.tempo();let destination=ed.project().tracks.get((y.max(0.)/ed.arrange_track_height).floor()as usize).map(|t|t.id.clone());
+    // A press only becomes a drag after DRAG_THRESHOLD px, so a click selects.
+    let Some(drag)=ed.arrange_drag.as_mut().filter(|drag|drag.pointer==pointer)else{return;};
+    if !drag.armed{if !crossed_drag_threshold(drag.press,(x,y)){return;}drag.armed=true;}
+    let tick=ed.arrange.x_to_tick(x);let at=if unsnapped{tick.round()as i64}else{arrange_snap(ed,tick)};let tempo=ed.tempo();let destination=ed.project().tracks.get((y.max(0.)/ed.arrange_track_height).floor()as usize).map(|t|t.id.clone());
     let fades=ed.arrange_drag.as_ref().and_then(|drag|ed.arrange_cache.tracks.get(&drag.source_track)
         .and_then(|index|index.authored.iter().find(|region|region.target.same(&drag.target))).and_then(|region|region.fades));
     let Some(drag)=ed.arrange_drag.as_mut().filter(|drag|drag.pointer==pointer)else{return;};let delta=at.saturating_sub(drag.origin_tick);
@@ -522,5 +578,55 @@ mod blocked_label_tests {
         let mut cache = ArrangeCache::default();
         cache.rebuild(&project, Revision::new(1).unwrap(), Some(std::slice::from_ref(&plan)));
         assert_eq!(cache.tracks[&track_id].blocked_labels, vec!["预检未通过 · 含错误".to_string()]);
+    }
+}
+
+#[cfg(test)]
+mod part_gesture_tests {
+    use super::*;
+    use verdant_domain::model::TimeSignature;
+    use verdant_domain::parts::{PartInstance, Parts};
+
+    fn meter() -> verdant_domain::MeterMap {
+        let sig = |tick, numerator, denominator| TimeSignature { tick, numerator, denominator, unknown: Default::default() };
+        // 4/4 bars of 3840 ticks, then 3/4 from bar 3 (tick 7680).
+        verdant_domain::MeterMap::new(&[sig(0, 4, 4), sig(7680, 3, 4)], 960).unwrap()
+    }
+
+    #[test]
+    fn arrangement_snap_uses_beats_or_bars_by_zoom() {
+        let m = meter();
+        // Zoomed in: a beat is 960 * 0.05 = 48 px, so snap to beats.
+        assert_eq!(snap_to_meter(&m, 1500.0, 0.05), 1920);
+        assert_eq!(snap_to_meter(&m, 1300.0, 0.05), 960);
+        // Zoomed out: a beat is ~5 px, so snap to bars (meter-aware).
+        assert_eq!(snap_to_meter(&m, 1500.0, 0.005), 0);
+        assert_eq!(snap_to_meter(&m, 2000.0, 0.005), 3840);
+        assert_eq!(snap_to_meter(&m, 7680.0 + 1500.0, 0.005), 7680 + 2880);
+        assert_eq!(snap_to_meter(&m, -50.0, 0.005), 0);
+    }
+
+    #[test]
+    fn region_press_becomes_a_drag_only_after_the_threshold() {
+        assert!(!crossed_drag_threshold((10.0, 10.0), (12.0, 11.0)));
+        assert!(crossed_drag_threshold((10.0, 10.0), (13.0, 10.0)));
+        assert!(crossed_drag_threshold((10.0, 10.0), (10.0, 6.5)));
+    }
+
+    #[test]
+    fn new_part_fills_the_free_part_of_the_bar() {
+        let m = meter();
+        let track = TrackId::from("t");
+        let part = |start: i64, duration: i64| PartInstance { id: format!("p{start}"), content_id: "c".into(), name: "x".into(),
+            track: track.clone(), start_tick: start, duration_tick: duration, source_offset_tick: 0, muted: false, bindings: Default::default() };
+        let mut parts = Parts::default();
+        assert_eq!(new_part_span(&m, &parts, &track, 4000.0), Some((3840, 7680)));
+        assert_eq!(new_part_span(&m, &parts, &track, 8000.0), Some((7680, 7680 + 2880)), "3/4 bar");
+        parts.instances.push(part(3840, 960));
+        parts.instances.push(part(6720, 960));
+        assert_eq!(new_part_span(&m, &parts, &track, 5000.0), Some((4800, 6720)), "trimmed to neighbours");
+        assert_eq!(new_part_span(&m, &parts, &track, 4000.0), None, "occupied");
+        let other = TrackId::from("u");
+        assert_eq!(new_part_span(&m, &parts, &other, 4000.0), Some((3840, 7680)), "other tracks ignored");
     }
 }

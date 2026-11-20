@@ -155,8 +155,17 @@ pub enum MenuAction {
     ShowHistoryWindow,
     ShowShortcutsWindow,
     ShowDisclosuresWindow,
+    /// Open one of the toolbar menus (from the folded menu in narrow windows).
+    OpenMenu(TopMenu),
+    ShowBottom(Bottom),
+    /// Run a toolbar command that is folded away in narrow windows.
+    Run(crate::generated::controls::CommandId),
     Workflow(WorkflowAction),
 }
+
+/// The toolbar's menus.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TopMenu { File, Edit, Track, VoiceLyrics, ViewTransport }
 
 /// A pencil stroke in a parameter lane, not yet committed.
 #[derive(Clone, Debug)]
@@ -284,6 +293,8 @@ pub struct Editor {
     pub needs_fit: bool,
     /// Audio clock sampled once per frame so every canvas draws the same playhead.
     pub frame_playhead: f64,
+    /// Smooths the buffer-stepped audio clock into a steady playhead.
+    pub playhead_smoother: crate::clock::PlayheadSmoother,
     pub ui_font: gpui::SharedString,
     /// Bounded note lookup index for the active track (rebuilt per revision).
     pub index: crate::index::NoteIndex,
@@ -306,6 +317,12 @@ pub struct Editor {
     pub lane_tool: LaneTool,
     pub bottom: Bottom,
     pub show_inspector: bool,
+    /// Current window-width class (updated every render).
+    pub width_class: crate::ui_controls::WidthClass,
+    /// The side panel open as a drawer while panels are not docked.
+    pub drawer: Option<crate::ui_controls::Drawer>,
+    /// Touch input has been used: toolbar controls grow to touch size.
+    pub touch_ui: bool,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -483,6 +500,7 @@ impl Editor {
             lyric_bounds: None,
             needs_fit: true,
             frame_playhead: 0.0,
+            playhead_smoother: Default::default(),
             ui_font: pick_ui_font(cx),
             index: crate::index::NoteIndex::default(),
             roll_pitch: crate::roll::RenderedPitchCache::default(),
@@ -502,6 +520,9 @@ impl Editor {
             lane_tool: LaneTool::default(),
             bottom: Bottom::Editor,
             show_inspector: true,
+            width_class: Default::default(),
+            drawer: None,
+            touch_ui: false,
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,
@@ -1463,6 +1484,9 @@ impl Editor {
             MenuAction::ShowHistoryWindow => self.show_history_panel(window, cx),
             MenuAction::ShowShortcutsWindow => crate::shortcuts::open(cx),
             MenuAction::ShowDisclosuresWindow => crate::disclosures::open(cx),
+            MenuAction::OpenMenu(menu) => self.open_top_menu(menu, window.mouse_position(), window, cx),
+            MenuAction::ShowBottom(bottom) => self.show_bottom(bottom, window, cx),
+            MenuAction::Run(command) => crate::generated::controls::dispatch(self, command, crate::generated::controls::CommandArg::None, window, cx),
             MenuAction::GeneratedSelect { id, arg, option } => {
                 crate::generated::controls::dispatch_select(self, id, arg, option, window, cx);
             }
@@ -2467,6 +2491,49 @@ impl Editor {
         cx.notify();
     }
 
+    pub fn left_panel_visible(&self) -> bool {
+        if self.width_class.docks_panels() { self.show_inspector } else { self.drawer == Some(crate::ui_controls::Drawer::Left) }
+    }
+
+    pub fn right_dock_visible(&self) -> bool {
+        if self.width_class.docks_panels() { self.layout.show_right_dock } else { self.drawer == Some(crate::ui_controls::Drawer::Right) }
+    }
+
+    pub fn toggle_left_panel(&mut self, cx: &mut Context<Self>) {
+        use crate::ui_controls::Drawer;
+        if self.width_class.docks_panels() {
+            self.show_inspector = !self.show_inspector;
+        } else {
+            self.drawer = (self.drawer != Some(Drawer::Left)).then_some(Drawer::Left);
+        }
+        cx.notify();
+    }
+
+    pub fn toggle_right_dock(&mut self, cx: &mut Context<Self>) {
+        use crate::ui_controls::Drawer;
+        if self.width_class.docks_panels() {
+            self.layout.show_right_dock = !self.layout.show_right_dock;
+            self.layout.store(&mut self.prefs);
+            self.prefs_dirty = true;
+        } else {
+            self.drawer = (self.drawer != Some(Drawer::Right)).then_some(Drawer::Right);
+        }
+        cx.notify();
+    }
+
+    /// Show `tab` in the right dock (as a drawer in narrow windows).
+    pub fn open_right_dock(&mut self, tab: crate::ui_controls::RightDockTab, cx: &mut Context<Self>) {
+        self.layout.right_dock_tab = tab;
+        if self.width_class.docks_panels() {
+            self.layout.show_right_dock = true;
+        } else {
+            self.drawer = Some(crate::ui_controls::Drawer::Right);
+        }
+        self.layout.store(&mut self.prefs);
+        self.prefs_dirty = true;
+        cx.notify();
+    }
+
     pub fn playhead_seconds(&self) -> f64 {
         if let Some(seconds)=self.recording_seconds(){return seconds;}
         self.audio.position() as f64 / self.audio_info.sample_rate as f64
@@ -2484,6 +2551,7 @@ impl Editor {
     /// Sample the audio atomics once (used after seek/stop so the LCD and
     /// playhead update while stopped).
     fn clock_sample_once(&mut self) {
+        self.playhead_smoother.reset();
         self.frame_playhead = self.playhead_seconds();
     }
 
@@ -2494,7 +2562,9 @@ impl Editor {
     pub fn clock_pump(&mut self, _window: &mut Window, _edcx: &mut Context<Self>) -> bool {
         self.audio.maintain();
         self.update_meters();
-        self.frame_playhead = self.playhead_seconds();
+        let raw = self.playhead_seconds();
+        let smooth = self.audio.transport() == Transport::Playing && self.recording_seconds().is_none();
+        self.frame_playhead = self.playhead_smoother.sample(raw, Instant::now(), smooth);
         let playing = self.audio.transport() == Transport::Playing;
         playing || self.meters.iter().any(|m| m.0.max(m.1) > 1e-4) || self.master_meter.0.max(self.master_meter.1) > 1e-4
     }
@@ -2677,8 +2747,8 @@ impl Editor {
 
 fn recovery_text(report: &verdant_domain::RecoveryReport) -> Option<String> {
     report.recovered_anything().then(|| format!(
-        "已恢复 r{} → r{}，{} 条提交；恢复时间 {} ms（Unix）{}{}。最后手动保存的文件未被覆盖。",
-        report.saved_revision, report.recovered_revision, report.replayed_commits, report.recovered_at_ms,
+        "已恢复自动保存（{}，{} 步编辑）{}{}。最后手动保存的文件未被覆盖。",
+        crate::files::relative_time_text(report.recovered_at_ms, chrono::Utc::now().timestamp_millis()), report.replayed_commits,
         if report.torn_tail_bytes > 0 { format!("；丢弃中断尾部 {} 字节", report.torn_tail_bytes) } else { String::new() },
         if report.completed_interrupted_save { "；已完成中断保存的恢复登记" } else { "" },
     ))

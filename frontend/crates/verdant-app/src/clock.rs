@@ -2,7 +2,7 @@
 //! records their exact bounds/masks; the playback layer uses those anchors
 //! after static prepaint, including scroll clipping and same-frame resizing.
 use std::{cell::RefCell, rc::Rc, time::Instant};
-use gpui::{AnyElement, AppContext, Bounds, ContentMask, Context, Entity, IntoElement, Pixels, Render, Role, WeakEntity, Window, canvas, div, fill, prelude::*, px};
+use gpui::{AnyElement, App, AppContext, Bounds, ContentMask, Context, Entity, IntoElement, Pixels, Render, Role, WeakEntity, Window, canvas, div, fill, prelude::*, px};
 use verdant_domain::timing::{MeterMap, TempoMap};
 use verdant_session::{EditorSession, viewport::Viewport};
 use crate::editor::Editor;
@@ -40,7 +40,8 @@ impl PlaybackViews {
             observe(&editor, cx);
             ClockDriver { editor: editor.clone(), transport: None, follow_frame: None }
         });
-        let lcd = cx.new(|cx| { observe(&editor, cx); LcdView { editor: editor.clone() } });
+        let mono: gpui::SharedString = crate::theme::system_mono_font(&cx.text_system().all_font_names()).into();
+        let lcd = cx.new(|cx| { observe(&editor, cx); LcdView { editor: editor.clone(), mono } });
         let mut meter = |slot, vertical| cx.new(|cx| { observe(&editor, cx); MeterView { editor: editor.clone(), slot, vertical } });
         let meters = (0..verdant_audio::MAX_TRACKS).map(|i| meter(Some(i), true)).collect();
         let header_meters = (0..verdant_audio::MAX_TRACKS).map(|i| meter(Some(i), false)).collect();
@@ -94,7 +95,8 @@ fn is_arrangement_anchor(surface: Surface) -> bool {
 /// This canvas is a sibling of StaticEditor under the action-owning Editor.
 /// Build child layout during prepaint, after the static sibling has updated
 /// its anchors; reusing a static cache leaves the recorded anchors intact.
-pub fn playback_layer(editor: Entity<Editor>) -> impl IntoElement {
+pub fn playback_layer(editor: Entity<Editor>, touch_seen: bool) -> impl IntoElement {
+    let touch_editor = editor.clone();
     canvas(move |_, window, cx| {
         let ed = editor.read(cx);
         let anchors = ed.playback.anchors.borrow().clone();
@@ -129,7 +131,15 @@ pub fn playback_layer(editor: Entity<Editor>) -> impl IntoElement {
             }
         }
         (elements, editor_x, arrange_x, playhead)
-    }, |_, (mut elements, editor_x, arrange_x, playhead), window, cx| {
+    }, move |_, (mut elements, editor_x, arrange_x, playhead), window, cx| {
+        // The first touch anywhere switches the toolbar to touch-sized targets.
+        if !touch_seen {
+            let mark = |editor: &Entity<Editor>, cx: &mut App| editor.update(cx, |ed, cx| if !ed.touch_ui { ed.touch_ui = true; cx.notify(); });
+            let editor = touch_editor.clone();
+            window.on_mouse_event(move |_: &gpui::TouchDragEvent, phase, _, cx| if phase == gpui::DispatchPhase::Capture { mark(&editor, cx) });
+            let editor = touch_editor.clone();
+            window.on_mouse_event(move |_: &gpui::LongPressEvent, phase, _, cx| if phase == gpui::DispatchPhase::Capture { mark(&editor, cx) });
+        }
         for (anchor, element) in &mut elements {
             window.with_content_mask(Some(anchor.mask), |window| {
                 if let Some(element) = element {
@@ -240,6 +250,54 @@ fn follow_playhead(session: &mut EditorSession, arrange: &mut Viewport, tick: f6
     settling
 }
 
+/// The audio thread publishes its position once per device buffer, so the
+/// raw clock is a staircase (often 10–20 ms steps). Drawing it directly makes
+/// the playhead stutter. This phase-locked estimator advances with wall time
+/// between buffers and is pulled gently toward each new audio position: it
+/// never runs backwards while playing, never leads the audio by more than
+/// `MAX_LEAD`, and snaps on seeks, stops and large discontinuities.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PlayheadSmoother {
+    state: Option<SmootherState>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SmootherState { estimate: f64, at: Instant, raw: f64 }
+
+impl PlayheadSmoother {
+    /// Larger corrections are treated as a seek or device reset.
+    const SNAP: f64 = 0.25;
+    /// Fraction of the phase error removed at each new audio position.
+    const GAIN: f64 = 0.2;
+    const MAX_LEAD: f64 = 0.06;
+
+    pub fn reset(&mut self) { self.state = None; }
+
+    pub fn sample(&mut self, raw: f64, now: Instant, playing: bool) -> f64 {
+        let Some(mut st) = self.state.filter(|_| playing) else {
+            self.state = playing.then_some(SmootherState { estimate: raw, at: now, raw });
+            return raw;
+        };
+        let predicted = st.estimate + now.saturating_duration_since(st.at).as_secs_f64();
+        let mut estimate = predicted;
+        let mut snapped = false;
+        if raw != st.raw {
+            let error = raw - predicted;
+            // Loop wraps and seeks move the audio clock backwards: follow them.
+            snapped = error.abs() > Self::SNAP || raw < st.raw;
+            estimate = if snapped { raw } else { predicted + error * Self::GAIN };
+            st.raw = raw;
+        }
+        // Monotonic while playing, and bounded around the audible position.
+        if !snapped { estimate = estimate.max(st.estimate); }
+        estimate = estimate.clamp(raw - Self::SNAP, raw + Self::MAX_LEAD);
+        st.estimate = estimate;
+        st.at = now;
+        self.state = Some(st);
+        estimate
+    }
+}
+
 struct LcdPosition { musical: String, time: String, signature: String, bpm: f64 }
 
 /// Derive both readouts from one source frame. Musical boundaries use the
@@ -260,7 +318,7 @@ fn lcd_position(frame: u64, sample_rate: u32, tempo: &TempoMap, meter: &MeterMap
     }
 }
 
-pub struct LcdView { editor: WeakEntity<Editor> }
+pub struct LcdView { editor: WeakEntity<Editor>, mono: gpui::SharedString }
 
 /// Keep the LCD's four one-based fields aligned with the ruler's meter map.
 pub(crate) fn position_label(meter: &verdant_domain::MeterMap, tick: f64) -> String {
@@ -290,20 +348,28 @@ impl Render for LcdView {
         let frame = (seconds.max(0.0) * ed.audio_info.sample_rate as f64).round() as u64;
         let position = lcd_position(frame, ed.audio_info.sample_rate, &ed.tempo(), &ed.meter());
         let follow = ed.session.follow_playhead;
-        div().h(px(40.0)).w_full().flex().items_center().gap(px(8.0)).px(px(10.0)).rounded(px(7.0)).bg(th.lcd)
-            .child(div().id("lcd-position").flex_1().flex().flex_col().font_family("monospace")
+        let ui_font = ed.ui_font.clone();
+        let compact = ed.width_class == crate::ui_controls::WidthClass::Phone;
+        // Every readout uses a fixed-pitch face with tabular figures and a
+        // fixed-width, centred column, so running digits never shift.
+        div().size_full().flex().items_center().gap(px(6.0)).px(px(8.0)).rounded(px(7.0)).bg(th.lcd)
+            .font_family(self.mono.clone()).font_features(crate::theme::tabular_figures())
+            .child(div().id("lcd-position").flex_1().min_w_0().h_full().flex().flex_col().items_center().justify_center()
                 .aria_label(format!("播放位置，小节:拍:细分:刻度 {}，时间 {}", position.musical, position.time))
-                .child(div().text_size(px(14.0)).child(position.musical))
-                .child(div().text_size(px(11.0)).text_color(th.text_secondary).child(position.time)))
-            .child(div().flex_none().flex().flex_col().text_size(px(11.0))
+                .child(div().text_size(px(14.0)).line_height(px(17.0)).whitespace_nowrap().child(position.musical))
+                .child(div().text_size(px(11.0)).line_height(px(13.0)).whitespace_nowrap().text_color(th.text_secondary).child(position.time)))
+            .when(!compact, |d| d.child(div().w(px(1.0)).h(px(22.0)).flex_none().bg(th.separator))
+            .child(div().w(px(66.0)).h_full().flex_none().flex().flex_col().items_center().justify_center()
+                .text_size(px(11.0)).line_height(px(14.0)).whitespace_nowrap()
                 .child(format!("{:.1} BPM", position.bpm))
-                .child(div().text_color(th.text_secondary).child(position.signature)))
-            .child(div().id("transport-follow").role(Role::Button).aria_label("跟随播放头").aria_selected(follow)
-                .flex_none().px(px(5.0)).py(px(6.0)).rounded(px(4.0)).text_size(px(11.0))
+                .child(div().text_color(th.text_secondary).child(position.signature))))
+            .when(!compact, |d| d.child(div().id("transport-follow").role(Role::Button).aria_label("跟随播放头").aria_selected(follow)
+                .flex_none().px(px(5.0)).py(px(5.0)).rounded(px(4.0)).text_size(px(11.0))
+                .font_family(ui_font)
                 .bg(if follow { th.control_pressed } else { th.lcd })
                 .text_color(if follow { th.accent } else { th.text_secondary }).hover(|s| s.bg(th.control))
                 .child("跟随")
-                .on_click(move |_, _, cx| editor.update(cx, toggle_follow))).into_any_element()
+                .on_click(move |_, _, cx| editor.update(cx, toggle_follow)))).into_any_element()
     }
 }
 

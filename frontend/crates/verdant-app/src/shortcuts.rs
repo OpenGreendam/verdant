@@ -246,7 +246,7 @@ shortcuts![
     ("secondary-k a m", Workspace, "三次插值", WorkflowShortcut::CubicPoints),
     ],
     "声部片段" => [
-    ("secondary-k p n", Workspace, "创建片段…", WorkflowShortcut::CreatePart),
+    ("secondary-k p n", Workspace, "从选中音符创建片段", WorkflowShortcut::CreatePart),
     ("secondary-k p r", Workspace, "片段重命名…", WorkflowShortcut::RenamePart),
     ("secondary-k p m", Workspace, "片段开始位置…", WorkflowShortcut::MovePart),
     ("secondary-k p t", Workspace, "裁剪片段…", WorkflowShortcut::TrimPart),

@@ -49,12 +49,50 @@ pub enum InspectorTab {
     SystemHistory,
 }
 
+/// Window-width classes. Below `Medium` the side panels stop being columns
+/// and open as drawers over the timeline, and the toolbar folds its menus.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum WidthClass {
+    /// Phones and very narrow windows.
+    Phone,
+    /// Tablets in portrait, half-screen windows.
+    Compact,
+    /// Laptops and tablets in landscape.
+    Medium,
+    #[default]
+    Wide,
+}
+
+impl WidthClass {
+    pub fn of(width: f32) -> Self {
+        match width {
+            w if w < 760.0 => Self::Phone,
+            w if w < 1100.0 => Self::Compact,
+            w if w < 1440.0 => Self::Medium,
+            _ => Self::Wide,
+        }
+    }
+    /// Side panels are docked columns; otherwise they open as drawers.
+    pub fn docks_panels(self) -> bool { self >= Self::Medium }
+}
+
+/// A side panel shown as an overlay in narrow windows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drawer { Left, Right }
+
+/// Toolbar control size: 28 px for a pointer, 36 px once touch input is seen
+/// (close to the 44 pt / 48 dp platform guidance within a dense toolbar).
+pub fn bar_button_size(touch: bool) -> f32 { if touch { 36.0 } else { TOP_BTN_H } }
+pub fn bar_height(touch: bool) -> f32 { if touch { 56.0 } else { 48.0 } }
+
 /// Synthesizer V Studio-style right property dock tabs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RightDockTab {
+    /// Note properties now live in the left inspector; layouts saved with the
+    /// retired note tab open on the voice tab.
     #[default]
-    NotePhoneme,
+    #[serde(alias = "note_phoneme")]
     VoiceTimbre,
     Dictionary,
     RenderInserts,
@@ -81,7 +119,7 @@ impl Default for LayoutPrefs {
             inspector_width: 242.0,
             right_dock_width: 292.0,
             show_right_dock: true,
-            right_dock_tab: RightDockTab::NotePhoneme,
+            right_dock_tab: RightDockTab::VoiceTimbre,
             arrange_height: 160.0,
             lane_height: 184.0,
             inspector_tab: InspectorTab::TrackNote,
@@ -1124,5 +1162,27 @@ mod tests {
         assert_eq!(route_display_name(Route::C0), "原始声库");
         assert_eq!(route_short_name(Route::VerdantVoice), "verdant-voice");
         assert_eq!(route_short_name(Route::C0), "原始声库");
+    }
+}
+
+#[cfg(test)]
+mod width_class_tests {
+    use super::*;
+
+    #[test]
+    fn width_classes_cover_phone_to_desktop() {
+        assert_eq!(WidthClass::of(390.0), WidthClass::Phone);
+        assert_eq!(WidthClass::of(820.0), WidthClass::Compact);
+        assert_eq!(WidthClass::of(1180.0), WidthClass::Medium);
+        assert_eq!(WidthClass::of(1920.0), WidthClass::Wide);
+        assert!(!WidthClass::Compact.docks_panels() && WidthClass::Medium.docks_panels());
+        assert!(bar_button_size(true) > bar_button_size(false));
+    }
+
+    #[test]
+    fn layouts_saved_with_the_retired_note_tab_still_load() {
+        let layout: LayoutPrefs = serde_json::from_value(serde_json::json!({"right_dock_tab": "note_phoneme", "inspector_width": 300.0})).unwrap();
+        assert_eq!(layout.right_dock_tab, RightDockTab::VoiceTimbre);
+        assert_eq!(layout.inspector_width, 300.0);
     }
 }

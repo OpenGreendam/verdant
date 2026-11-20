@@ -177,3 +177,19 @@ fn retired_projects_are_rejected_by_open_and_import_without_touching_source() {
         assert!(!documents.exists());
     }
 }
+
+#[test]
+fn recovery_prompt_uses_relative_time_and_file_name() {
+    let now = 1_800_000_000_000;
+    assert_eq!(relative_time_text(now - 20_000, now), "刚刚");
+    assert_eq!(relative_time_text(now + 5_000, now), "刚刚");
+    assert!(relative_time_text(now - 5 * 60_000, now).starts_with("5 分钟前（"));
+    assert!(relative_time_text(now - 3 * 3_600_000, now).starts_with("3 小时前（"));
+    assert!(relative_time_text(now - 30 * 3_600_000, now).starts_with("昨天 "));
+    assert_eq!(relative_time_text(now - 3 * 86_400_000, now).len(), "2027-01-12 08:00".len());
+    let report = verdant_domain::RecoveryReport { saved_revision: 4, recovered_revision: 9, recovered_at_ms: now - 120_000, ..Default::default() };
+    let detail = recovery_prompt_detail(Path::new("/very/long/folder/that/would/overflow/歌.verp"), &report, now);
+    assert!(detail.starts_with("「歌.verp」"), "{detail}");
+    assert!(detail.contains("2 分钟前") && detail.contains("5 步编辑"), "{detail}");
+    assert!(!detail.contains("/very/long") && !detail.contains("Unix"), "{detail}");
+}

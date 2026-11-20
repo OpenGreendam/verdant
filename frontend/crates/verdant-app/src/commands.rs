@@ -286,14 +286,8 @@ impl CommandTarget for Editor {
             (C::OpenTransformPoints, A::None) => { self.open_transform_points_dialog(window, cx); return; }
             (C::OpenScaleDialog, A::None) => { self.open_scale_dialog(window, cx); return; }
             (C::OpenVibratoDialog, A::None) => { self.open_vibrato_dialog(window, cx); return; }
-            (C::ToggleLeftPanel, A::None) => { self.show_inspector = !self.show_inspector; cx.notify(); return; }
-            (C::ToggleRightDock, A::None) => {
-                self.layout.show_right_dock = !self.layout.show_right_dock;
-                self.layout.store(&mut self.prefs);
-                self.prefs_dirty = true;
-                cx.notify();
-                return;
-            }
+            (C::ToggleLeftPanel, A::None) => { self.toggle_left_panel(cx); return; }
+            (C::ToggleRightDock, A::None) => { self.toggle_right_dock(cx); return; }
             (C::TogglePhonemeLane, A::None) => MenuAction::TogglePhonemeLane,
             (C::ToggleTempoLane, A::None) => MenuAction::ToggleTempoLane,
             (C::ToggleOtherTracks, A::None) => { self.integrations.other_tracks = !self.integrations.other_tracks; cx.notify(); return; }

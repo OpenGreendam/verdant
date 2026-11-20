@@ -243,20 +243,44 @@ pub fn capture_bounds(prefs: &mut Prefs, window: &Window) {
 /// Call after constructing an editor or replacing its project. Periodic
 /// autosave already checkpoints the sidecar every 45 seconds in the slow pump;
 /// opening that sidecar must also offer a deliberate accept/discard choice.
+/// Human-readable age of a timestamp: "刚刚", "5 分钟前", "3 小时前",
+/// "昨天 14:05" or a full local date. Future times (clock skew) read "刚刚".
+pub(crate) fn relative_time_text(at_ms: i64, now_ms: i64) -> String {
+    use chrono::{Local, TimeZone};
+    let seconds = (now_ms - at_ms).max(0) / 1000;
+    let local = Local.timestamp_millis_opt(at_ms).single();
+    let clock = local.map(|t| t.format("%H:%M").to_string()).unwrap_or_default();
+    match seconds {
+        0..60 => "刚刚".into(),
+        60..3600 => format!("{} 分钟前（{clock}）", seconds / 60),
+        3600..86_400 => format!("{} 小时前（{clock}）", seconds / 3600),
+        86_400..172_800 => format!("昨天 {clock}"),
+        _ => local.map(|t| t.format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "未知时间".into()),
+    }
+}
+
+/// The dialog shows the file name (not a long path that overflows the
+/// native prompt), how long ago the autosave happened and what each choice does.
+pub(crate) fn recovery_prompt_detail(path: &Path, report: &verdant_domain::RecoveryReport, now_ms: i64) -> String {
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
+    let edits = report.recovered_revision.saturating_sub(report.saved_revision);
+    format!(
+        "「{name}」有一份较新的自动保存（{}），比手动保存的版本多 {edits} 步编辑。\n\n恢复：继续自动保存的内容，撤销历史也会保留。\n放弃：打开上次手动保存的版本。\n\n两种选择都不会覆盖已保存的文件。",
+        relative_time_text(report.recovered_at_ms, now_ms),
+    )
+}
+
 pub fn prompt_recovery(ed: &mut Editor, window: &mut Window, cx: &mut Context<Editor>) {
     let Some(report) = ed.persistence.pending_recovery().cloned() else { return };
     let path = ed.persistence.project_path().to_path_buf();
     let project_id = ed.project().project_id.clone();
     let revision = ed.revision();
-    let detail = format!(
-        "{}\n手动保存版本 r{}，可恢复版本 r{}。恢复时间：{} ms（Unix）。\n恢复将保留自动保存的工程和撤销历史；放弃恢复将打开最后手动保存的版本。两种选择都不会覆盖已保存的工程文件。",
-        path.display(), report.saved_revision, report.recovered_revision, report.recovered_at_ms,
-    );
+    let detail = recovery_prompt_detail(&path, &report, chrono::Utc::now().timestamp_millis());
     let answer = window.prompt(
         gpui::PromptLevel::Warning,
         "发现较新的自动保存，是否恢复？",
         Some(&detail),
-        &["恢复自动保存", "放弃恢复，打开已保存版本"],
+        &["恢复", "放弃"],
         cx,
     );
     cx.spawn_in(window, async move |this, cx| {
