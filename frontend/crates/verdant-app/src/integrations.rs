@@ -157,20 +157,20 @@ impl Editor {
         use IntegrationAction as A;
         let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;
         let has_segments=self.active_track().is_some_and(|track|settings.segments.values().any(|entry|entry.track==track.id));
-        let mut items=vec![crate::menu::MenuItem::disabled(if has_segments{"工程默认读音器（未设歌手覆盖且不在分段映射区间时使用）"}else{"工程默认读音器（未设歌手覆盖时使用）"})];
+        let mut items=vec![crate::menu::MenuItem::header(if has_segments{"工程默认读音器（未设歌手覆盖且不在分段映射区间时使用）"}else{"工程默认读音器（未设歌手覆盖时使用）"})];
         if self.active_track().is_some_and(|track|track.unknown.contains_key("voice_language")){items.push(crate::menu::MenuItem::disabled(if has_segments{"当前轨道已指定语言，除分段映射覆盖的音符外优先使用该语言读音器；清除轨道语言后恢复以下设置"}else{"当前轨道已指定语言，优先使用该语言读音器；清除轨道语言后恢复以下设置"}));}
-        for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("{}工程 · {}",if settings.selected==p.id{"✓ "}else{""},p.name),A::ChoosePhonemizer(p.id.into())));}
+        for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("工程 · {}",p.name),A::ChoosePhonemizer(p.id.into())).checked(settings.selected==p.id));}
         if let Some(reference)=self.active_track().and_then(|track|track.voice_ref.as_ref()){
             let selected=settings.singer_selections.get(reference);
-            items.push(crate::menu::MenuItem::disabled(format!("歌手 {reference} · 此工程所有同歌手轨道")));
-            items.push(action(format!("{}歌手 · 跟随工程默认",if selected.is_none(){"✓ "}else{""}),A::ChooseSingerPhonemizer(reference.clone(),None)));
-            for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("{}歌手 · {}",if selected.is_some_and(|id|id.as_str()==p.id){"✓ "}else{""},p.name),A::ChooseSingerPhonemizer(reference.clone(),Some(p.id.into()))));}
+            items.push(crate::menu::MenuItem::header(format!("歌手 {reference} · 此工程所有同歌手轨道")));
+            items.push(action("歌手 · 跟随工程默认",A::ChooseSingerPhonemizer(reference.clone(),None)).checked(selected.is_none()));
+            for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("歌手 · {}",p.name),A::ChooseSingerPhonemizer(reference.clone(),Some(p.id.into()))).checked(selected.is_some_and(|id|id.as_str()==p.id)));}
         }else{items.push(crate::menu::MenuItem::disabled("先选择轨道歌手，可为该歌手设置读音器"));}
         items.push(action("分段映射…",A::Segments));
         self.show_menu(window.mouse_position(),items,window,cx);Ok(())
     }
     fn dictionary_menu(&mut self,window:&mut Window,cx:&mut Context<Self>)->Result<(),String>{
-        let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;let mut items=vec![crate::menu::MenuItem::disabled("工程词典 · 显式音符优先，其次词组、词条，再使用内置读音"),action("添加歌词 / 词组读音…",IntegrationAction::AddDictionaryEntry)];
+        let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;let mut items=vec![crate::menu::MenuItem::header("工程词典 · 显式音符优先，其次词组、词条，再使用内置读音"),action("添加歌词 / 词组读音…",IntegrationAction::AddDictionaryEntry)];
         for(key,entry)in &settings.dictionary.lyrics{items.push(action(format!("编辑 · {}",reading_text(key,&entry.reading)),IntegrationAction::EditDictionaryEntry(key.clone(),false)));items.push(action(format!("删除 · {key}"),IntegrationAction::RemoveDictionaryEntry(key.clone(),false)));}
         for(key,entry)in &settings.dictionary.phrases{let text=entry.lyrics.iter().zip(&entry.readings).map(|(lyric,reading)|reading_text(lyric,reading)).collect::<Vec<_>>().join(" ");items.push(action(format!("编辑词组 · {text}"),IntegrationAction::EditDictionaryEntry(key.clone(),true)));items.push(action(format!("删除词组 · {key}"),IntegrationAction::RemoveDictionaryEntry(key.clone(),true)));}
         items.push(action("导入词典文件…",IntegrationAction::ImportDictionary));items.push(action("导出词典文件…",IntegrationAction::ExportDictionary));self.show_menu(window.mouse_position(),items,window,cx);Ok(())

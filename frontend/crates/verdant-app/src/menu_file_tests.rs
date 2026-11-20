@@ -26,14 +26,11 @@ fn file_menu_routes_all_formats_through_real_score_codecs() {
         }),
         ..Default::default()
     };
-    let mut groups = items.iter().filter_map(|item| match &item.command {
-        Some(MenuCommand::Submenu(children)) => Some((item.label.to_string(), children)),
+    let submenu = |label: &str| items.iter().find_map(|item| match &item.command {
+        Some(MenuCommand::Submenu(children)) if item.label.as_ref() == label => Some(children),
         _ => None,
-    });
-    let (import_label, imports) = groups.next().unwrap();
-    let (export_label, exports) = groups.next().unwrap();
-    assert!(groups.next().is_none());
-    assert_eq!([import_label.as_str(), export_label.as_str()], ["导入", "导出"]);
+    }).unwrap();
+    let (imports, exports) = (submenu("导入"), submenu("导出"));
     assert_eq!((imports.len(), exports.len()), (7, 7));
     assert!(!items.iter().any(|item| matches!(&item.command,
         Some(MenuCommand::File(FileAction::Import(_) | FileAction::Export(_))))));
@@ -82,7 +79,9 @@ fn recent_file_preferences_persist_order_dedupe_and_menu_destinations() {
     assert_eq!(recent[1], Path::new("/scores/24.verp"));
     assert_eq!(recent.iter().filter(|p| p.as_path() == Path::new("/scores/20.verp")).count(), 1);
     assert_eq!(restored.extra["other_setting"]["keep"], true);
-    let destinations = file_menu_items(&restored).into_iter().filter_map(|i| match i.command {
+    let destinations = file_menu_items(&restored).into_iter().flat_map(|i| match i.command {
+        Some(MenuCommand::Submenu(children)) => children, _ => vec![i],
+    }).filter_map(|i| match i.command {
         Some(MenuCommand::File(FileAction::Recent(path))) => Some(path), _ => None,
     }).collect::<Vec<_>>();
     assert_eq!(destinations, recent);
@@ -130,7 +129,7 @@ fn folded_main_menu_keeps_every_hidden_toolbar_control_reachable() {
     use crate::ui_controls::WidthClass;
     let labels = |class| main_menu_items(class, crate::editor::Bottom::Editor).into_iter().map(|i| i.label.to_string()).collect::<Vec<_>>();
     let compact = labels(WidthClass::Compact);
-    for menu in ["文件", "编辑", "轨道", "声库与词", "视图与走带", "试听曲…"] { assert!(compact.iter().any(|l| l == menu), "{menu}"); }
+    for menu in ["文件", "编辑", "轨道", "声库与词", "视图", "试听曲…"] { assert!(compact.iter().any(|l| l == menu), "{menu}"); }
     let phone = labels(WidthClass::Phone);
-    for hidden in ["✓ 钢琴卷帘", "混音器", "音符表", "撤销", "重做", "回到开头", "立即渲染"] { assert!(phone.iter().any(|l| l == hidden), "{hidden}"); }
+    for hidden in ["钢琴卷帘", "混音器", "音符表", "撤销", "重做", "回到开头", "立即渲染"] { assert!(phone.iter().any(|l| l == hidden), "{hidden}"); }
 }

@@ -38,10 +38,10 @@ impl Editor {
                 let declared = voice.languages.iter().map(|(language, support)| language_label(language, support)).collect::<Vec<_>>().join(" / ");
                 let selected = self.active_track().and_then(|track| verdant_backend::adapter::desktop_voice(self.project(), track, caps).ok().flatten())
                     .is_some_and(|(effective, _)| effective == reference);
-                let label = format!("{}{} · {reference} · {}", if selected { "✓ " } else { "" }, voice.display_name,
+                let label = format!("{} · {reference} · {}", voice.display_name,
                     if declared.is_empty() { "语言未声明" } else { &declared });
                 let command = MenuAction::Workflow(WorkflowAction::Integration(IntegrationAction::ChooseSinger(reference.clone())));
-                items.push(if voice.available { crate::menu::MenuItem::action(label, command) }
+                items.push(if voice.available { crate::menu::MenuItem::action(label, command).checked(selected) }
                     else { crate::menu::MenuItem::disabled(format!("{label} · 不可用")) });
             }
             if items.is_empty() { items.push(crate::menu::MenuItem::disabled("尚未安装本地歌手")); }
@@ -89,15 +89,15 @@ impl Editor {
         let (tid_click, langs_click, cur_click) = (track_id.clone(), declared_languages.clone(), current_language.clone());
         let open_lang_menu = move |ed: &mut Editor, anchor: gpui::Point<gpui::Pixels>, window: &mut gpui::Window, cx: &mut Context<Editor>| {
             let mut items = vec![crate::menu::MenuItem::action(
-                format!("{}跟随读音器（默认）", if cur_click.is_none() { "✓ " } else { "   " }),
+                "跟随读音器（默认）",
                 crate::editor::MenuAction::SetTrackLanguage { track: tid_click.clone(), language: None },
-            )];
+            ).checked(cur_click.is_none())];
             if !langs_click.is_empty() {
                 items.push(crate::menu::MenuItem::separator());
                 for (code, sup) in &langs_click {
                     let enabled = matches!(code.as_str(), "zh" | "en" | "ja");
                     let sel = cur_click.as_deref() == Some(code.as_str());
-                    let lbl = format!("{}{}", if sel { "✓ " } else { "   " }, language_label(code, sup));
+                    let lbl = language_label(code, sup);
                     items.push(
                         crate::menu::MenuItem::action(
                             lbl,
@@ -106,7 +106,8 @@ impl Editor {
                                 language: Some(code.clone()),
                             },
                         )
-                        .enabled(enabled),
+                        .enabled(enabled)
+                        .checked(sel),
                     );
                 }
             } else {

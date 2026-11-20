@@ -153,6 +153,8 @@ fn cached_view<V: Render>(view: &Entity<V>, style: StyleRefinement, a11y: bool) 
     if a11y { view.clone().into_any_element() } else { view.clone().cached(style).into_any_element() }
 }
 
+fn th_for_frame(ed: &Editor) -> Theme { ed.theme }
+
 fn button(id: impl Into<SharedString>, label: impl Into<SharedString>, th: Theme) -> Stateful<Div> {
     selectable_button(id, label, false, th)
 }
@@ -254,6 +256,9 @@ impl Editor {
         let class = self.width_class;
         let btn = crate::ui_controls::bar_button_size(self.touch_ui);
         let (wide, medium_up, phone) = (class == WidthClass::Wide, class >= WidthClass::Medium, class == WidthClass::Phone);
+        let chrome = self.window_chrome;
+        let bar_h = crate::ui_controls::bar_height(self.touch_ui);
+        let captions = crate::window_chrome::caption_buttons(chrome, bar_h, th, cx);
         let playing = self.audio.transport() == Transport::Playing;
         let pb = self.playback_settings();
         let recording = self.integrations.recording.is_some();
@@ -303,12 +308,14 @@ impl Editor {
             .w_full()
             .min_w_0()
             .overflow_hidden()
-            .h(px(crate::ui_controls::bar_height(self.touch_ui)))
+            .h(px(bar_h))
             .flex_none()
             .flex()
             .items_center()
             .gap(px(4.0))
             .px(px(8.0))
+            .when(chrome.leading_inset() > 0.0, |bar| bar.pl(px(chrome.leading_inset())))
+            .when(captions.is_some(), |bar| bar.pr_0())
             .bg(th.surface)
             .border_b_1()
             .border_color(th.separator)
@@ -347,7 +354,8 @@ impl Editor {
             .when(!phone, |bar| bar
                 .child(command_icon(self, Cmd::Undo, "undo-2", "撤销 (Ctrl+Z)", "undo", false, cx))
                 .child(command_icon(self, Cmd::Redo, "redo-2", "重做 (Ctrl+Shift+Z)", "redo", false, cx)))
-            .child(div().flex_1())
+            // Empty toolbar stretches are the window's title bar.
+            .child(crate::window_chrome::drag_region("titlebar-drag-left", chrome, cx))
             // Transport cluster
             .when(!phone, |bar| bar.child(command_icon(self, Cmd::GoToStart, "skip-back", "回到开头", "go-start", false, cx)))
             .child(command_icon(self, Cmd::TogglePlay, if playing { "pause" } else { "play" }, "播放 / 暂停 (Space)", "play", playing, cx))
@@ -395,7 +403,7 @@ impl Editor {
                     .h(px(btn))
                     .w(px(94.0)),
             ))
-            .when(!phone, |bar| bar.child(div().flex_1()))
+            .when(!phone, |bar| bar.child(crate::window_chrome::drag_region("titlebar-drag-right", chrome, cx)))
             // Right render status & SynthV Right Dock toggle
             .when(medium_up, |bar| bar.child(
                 div()
@@ -421,6 +429,7 @@ impl Editor {
                 .when(!medium_up && errors > 0, |d| d.aria_label(format!("立即渲染（{errors} 处错误）")).child(
                     div().absolute().top(px(2.0)).right(px(2.0)).size(px(7.0)).rounded(px(3.5)).bg(th.error)))))
             .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "右侧属性坞", "right-dock-toggle", self.right_dock_visible(), cx))
+            .children(captions)
             .when(th.pride, |bar| bar.relative().child(
                 // Paint only: no hitbox, layout space, label or event handler.
                 gpui::canvas(|_, _, _| (), |bounds, (), window, _| {
@@ -1990,6 +1999,12 @@ impl Render for Editor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.theme = Theme::resolve_appearance(window.appearance(), self.appearance_override, &self.prefs)
             .with_pride(self.theme.pride);
+        let chrome = crate::window_chrome::ChromeState::read(window);
+        if chrome != self.window_chrome {
+            self.window_chrome = chrome;
+            cx.notify();
+        }
+        let frame = crate::window_chrome::client_frame(chrome, th_for_frame(self), window);
         let class = WidthClass::of(window.viewport_size().width.as_f32());
         if class != self.width_class {
             // Drawers belong to narrow layouts; docked panels keep their prefs.
@@ -2003,8 +2018,7 @@ impl Render for Editor {
         let modal = modal_dialog_layer(self, &entity, cx);
         let text_prompt = crate::lyric_view::prompt_overlay(self, &entity, cx);
         let menu = self.menu.as_ref().map(|menu| gpui::deferred(crate::menu::context_menu_layer(self, menu, window, cx)).into_any_element());
-        div()
-            .id("verdant")
+        crate::window_chrome::track_title_drag(div().id("verdant"), cx)
             .relative()
             .size_full()
             .flex()
@@ -2152,6 +2166,7 @@ impl Render for Editor {
             .child(self.playback.driver.clone())
             .child(static_content)
             .child(crate::clock::playback_layer(entity, self.touch_ui))
+            .children(frame)
             .children(modal)
             .children(menu)
             .children(text_prompt)

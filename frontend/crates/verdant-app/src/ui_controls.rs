@@ -729,9 +729,10 @@ pub fn show_grid_preset_menu(
     if is_snap {
         items.push(
             MenuItem::action(
-                format!("{}关 · 不吸附网格", if current == 0 { "✓ " } else { "" }),
+                "关 · 不吸附网格",
                 crate::editor::MenuAction::SetGridTicks { snap: true, ticks: 0 },
             )
+            .checked(current == 0)
             .with_hint("Alt 临时不吸附"),
         );
         items.push(MenuItem::separator());
@@ -751,9 +752,10 @@ pub fn show_grid_preset_menu(
         if let Some(ticks) = subdivision_ticks(ppq, num, den) {
             items.push(
                 MenuItem::action(
-                    format!("{}{name}", if current == ticks { "✓ " } else { "" }),
+                    name,
                     crate::editor::MenuAction::SetGridTicks { snap: is_snap, ticks },
                 )
+                .checked(current == ticks)
                 .with_hint(format!("{ticks}t")),
             );
         }

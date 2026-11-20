@@ -481,9 +481,9 @@ impl SelectTarget for Editor {
             .map(|opt| {
                 let selected = opt.id == current;
                 let mut item = crate::menu::MenuItem::action(
-                    format!("{}{}", if selected { "✓ " } else { "   " }, opt.label),
+                    opt.label,
                     MenuAction::GeneratedSelect { id, arg: arg.clone(), option: opt.id },
-                );
+                ).checked(selected);
                 if let Some(hint) = opt.hint {
                     item = item.with_hint(hint);
                 }

@@ -42,6 +42,8 @@ Windows PowerShell：`& 'C:\path\bin\verdant.exe' 'C:\songs\song.verp'`。macOS 
 | `--repo DIR` | 覆盖 `VERDANT_REPO` 指定工作根；平台默认见[运行配置](../backend/RUNTIME.md#文件与目录)。 |
 | `--runtime-features` | stdout 输出版本、资源目录和声库支持的 JSON 后退出。 |
 
+工具栏兼作窗口标题栏：空白处拖动移动窗口、双击最大化。macOS 保留红绿灯；Windows 与支持客户端装饰的 Linux 桌面（Wayland 或带合成器的 X11）由 Verdant 绘制最小化、最大化和关闭按钮，Linux 另可拖动窗口边缘调整大小。设置 `VERDANT_WINDOW_DECORATIONS=server` 可改用系统标题栏。
+
 ONNX 库由包布局或 `VERDANT_ONNXRUNTIME_LIBRARY` 提供。开发诊断时可逐项传入 `--worker-arg --onnxruntime-library --worker-arg /path/to/library`。来源选项、平台目录及独立 worker 参数见[运行配置](../backend/RUNTIME.md)。
 
 ## 工程与恢复

@@ -480,7 +480,10 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
         }
     };
     if button==MouseButton::Right{
-        let items=match &target{AuthoredTarget::Part(_)=>vec![I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("移动片段…",M::Workflow(A::MovePart)),I::action("裁剪片段…",M::Workflow(A::TrimPart)),I::action("在此分割片段",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制",M::Workflow(A::DuplicatePart(true))),I::action("独立复制",M::Workflow(A::DuplicatePart(false))),I::action("取消链接",M::Workflow(A::UnlinkPart)),I::action("片段静音",M::Workflow(A::MutePart)),I::action("删除片段",M::Workflow(A::DeletePart))],AuthoredTarget::Audio(_)=>vec![I::action("位置 / 裁剪 / 音量…",M::Workflow(A::Integration(IA::EditClip))),I::action("复制音频片段",M::Workflow(A::Integration(IA::DuplicateClip))),I::action("重新定位音源…",M::Workflow(A::Integration(IA::RelinkClip))),I::action("删除音频片段",M::Workflow(A::Integration(IA::DeleteClip)))]};ed.show_menu(position,items,window,cx);return false;
+        let items=match &target{AuthoredTarget::Part(id)=>{let muted=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(id).map(|p|p.muted)).unwrap_or(false);vec![
+            I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("精确位置…",M::Workflow(A::MovePart)),I::action("精确裁剪…",M::Workflow(A::TrimPart)),I::separator(),
+            I::action("在此分割",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制片段",M::Workflow(A::DuplicatePart(true))),I::action("独立复制片段",M::Workflow(A::DuplicatePart(false))),I::action("取消片段链接",M::Workflow(A::UnlinkPart)),I::separator(),
+            I::action("静音",M::Workflow(A::MutePart)).checked(muted),I::action("删除片段",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>vec![I::action("位置 / 裁剪 / 音量…",M::Workflow(A::Integration(IA::EditClip))),I::action("重新定位音源…",M::Workflow(A::Integration(IA::RelinkClip))),I::separator(),I::action("复制音频片段",M::Workflow(A::Integration(IA::DuplicateClip))),I::action("删除音频片段",M::Workflow(A::Integration(IA::DeleteClip)))]};ed.show_menu(position,items,window,cx);return false;
     }
     if split_at_click && matches!(target,AuthoredTarget::Audio(_)) {
         edit_audio_region(ed,AudioRegionEdit::Split(arrange_snap(ed,tick)),cx);return false;

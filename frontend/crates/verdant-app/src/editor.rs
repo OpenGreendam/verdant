@@ -323,6 +323,10 @@ pub struct Editor {
     pub drawer: Option<crate::ui_controls::Drawer>,
     /// Touch input has been used: toolbar controls grow to touch size.
     pub touch_ui: bool,
+    /// How the toolbar acts as the window title bar (updated every render).
+    pub window_chrome: crate::window_chrome::ChromeState,
+    /// A press on an empty toolbar area that becomes a window move on drag.
+    pub title_drag: bool,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -523,6 +527,8 @@ impl Editor {
             width_class: Default::default(),
             drawer: None,
             touch_ui: false,
+            window_chrome: Default::default(),
+            title_drag: false,
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,
@@ -2489,6 +2495,15 @@ impl Editor {
         self.seek_insert_transport(self.audio.position());
         self.clock_sample_once();
         cx.notify();
+    }
+
+    /// Close from Verdant's own title-bar button: same checks as the system close
+    /// and the Quit action.
+    pub fn close_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        crate::files::capture_bounds(&mut self.prefs, window);
+        // The editor window is the app (as with the Quit action); its tool
+        // windows belong to it, so closing it ends the session.
+        if self.shutdown(cx) { cx.quit(); }
     }
 
     pub fn left_panel_visible(&self) -> bool {

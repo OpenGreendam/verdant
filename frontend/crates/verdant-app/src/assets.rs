@@ -16,6 +16,8 @@ icons!(
     "play",
     "pause",
     "square",
+    "minus",
+    "copy",
     "skip-back",
     "repeat",
     "undo-2",
