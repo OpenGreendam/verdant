@@ -72,6 +72,8 @@ fn device_status_text(status: DeviceStatus) -> String {
 /// Timeline layout and drawing, cached independently of the surrounding controls.
 pub struct StaticEditor {
     editor: WeakEntity<Editor>,
+    lane_scroll: gpui::ScrollHandle,
+    active_lane: Option<(usize, Param)>,
 }
 
 impl StaticEditor {
@@ -79,7 +81,7 @@ impl StaticEditor {
         if let Some(owner) = editor.upgrade() {
             cx.observe(&owner, |_, _, cx| cx.notify()).detach();
         }
-        Self { editor }
+        Self { editor, lane_scroll: gpui::ScrollHandle::new(), active_lane: None }
     }
 }
 
@@ -88,7 +90,17 @@ impl Render for StaticEditor {
         let Some(editor) = self.editor.upgrade() else {
             return div().into_any_element();
         };
-        editor.update(cx, |ed, cx| ed.bottom_content(window, cx))
+        let active_lane = {
+            let ed = editor.read(cx);
+            (ed.bottom == Bottom::Editor).then_some((ed.integrations.active_panel, ed.param))
+        };
+        if self.active_lane != active_lane {
+            if let Some((slot, _)) = active_lane {
+                self.lane_scroll.scroll_to_item(slot);
+            }
+            self.active_lane = active_lane;
+        }
+        editor.update(cx, |ed, cx| ed.bottom_content(window, &self.lane_scroll, cx))
     }
 }
 
@@ -1292,7 +1304,7 @@ impl Editor {
             .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleF0Overlay, "activity", "F0 对照", "show-f0", self.show_f0, cx).h(px(28.0)).flex_none())
     }
 
-    fn lane_tabs(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn lane_tabs(&self, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let route = self.route();
         let caps = self.scheduler.capabilities.as_ref();
@@ -1324,6 +1336,7 @@ impl Editor {
             }
             // A parameter shown in another lane is marked; clicking it goes there.
             if shown && !active { tab_btn = tab_btn.font_weight(FontWeight::SEMIBOLD); }
+            let lane_scroll = lane_scroll.clone();
             group = group.child(tab_btn.h(px(24.0)).text_sm().on_click(cx.listener(move |ed, _, window, cx| {
                 ed.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
                 ed.point_selection.clear();
@@ -1335,6 +1348,7 @@ impl Editor {
                     ed.integrations.lanes[slot] = param;
                 }
                 ed.param = param;
+                lane_scroll.scroll_to_item(ed.integrations.active_panel);
                 cx.notify();
             })));
         }
@@ -1547,7 +1561,7 @@ impl Editor {
             .into_any_element()
     }
 
-    fn bottom_content(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn bottom_content(&mut self, window: &mut Window, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> AnyElement {
         let th = self.theme;
         let entity = cx.entity();
         let locale = i18n::current(cx);
@@ -1556,7 +1570,7 @@ impl Editor {
         let mixer_semantics = Surface::Mixer.semantics(locale);
         self.playback.clear_bottom_anchors();
         let slot_count = self.integrations.lanes.len().max(1);
-        // The lane area keeps its height; lanes share it, each at least 72 px.
+        // Lanes keep usable drawing heights inside one bounded vertical viewport.
         let each_lane_h = if slot_count == 1 { self.layout.lane_height } else { (self.layout.lane_height / slot_count as f32).max(72.0) };
 
         let bottom = match self.bottom {
@@ -1695,9 +1709,21 @@ impl Editor {
                     )
                     // Resizable Splitter between Roll and Parameter Lanes
                     .child(splitter_bar(entity.clone(), SplitterKind::LaneHeight, th))
-                    .child(self.lane_tabs(cx))
+                    .child(self.lane_tabs(lane_scroll, cx))
                     .child(self.curve_toolbar(cx))
-                    .children((0..slot_count).map(|slot| {
+                    .child(div()
+                        .id("parameter-lanes-scroll")
+                        .h(px(self.layout.lane_height))
+                        .max_h(gpui::relative(0.4))
+                        .min_h_0()
+                        .flex_none()
+                        .flex()
+                        .flex_col()
+                        .overflow_y_scroll()
+                        .track_scroll(lane_scroll)
+                        // Headers scroll the lane stack; canvases retain their
+                        // shared timeline wheel/zoom handling.
+                        .children((0..slot_count).map(|slot| {
                         let param = self.integrations.lanes.get(slot).copied().unwrap_or(self.param);
                         let active_slot = slot_count > 1 && self.integrations.active_panel == slot;
                         div()
@@ -1743,7 +1769,7 @@ impl Editor {
                                     .child(crate::lanes::lane(self, entity.clone(), param, slot))
                                     .when(slot == 0, |d| d.child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Lane)))),
                             )
-                    }))
+                    })))
                     .into_any_element(),
             ),
             Bottom::Mixer => Some(
