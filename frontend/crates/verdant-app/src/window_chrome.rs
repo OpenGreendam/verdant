@@ -117,8 +117,11 @@ pub fn drag_region(id: impl Into<SharedString>, chrome: ChromeState, cx: &mut Co
     if chrome.style == ChromeStyle::Native {
         return region;
     }
+    let region = region.window_control_area(WindowControlArea::Drag);
+    if chrome.style == ChromeStyle::Windows {
+        return region;
+    }
     region
-        .window_control_area(WindowControlArea::Drag)
         .on_mouse_down(MouseButton::Left, cx.listener(|ed, ev: &MouseDownEvent, window, _| {
             if ev.click_count >= 2 {
                 ed.title_drag = false;
@@ -137,8 +140,7 @@ pub fn track_title_drag(root: gpui::Stateful<gpui::Div>, cx: &mut Context<Editor
     root.on_mouse_move(cx.listener(|ed, ev: &gpui::MouseMoveEvent, window, _| {
         if !ed.title_drag { return; }
         ed.title_drag = false;
-        // Windows moves through the Drag hit-test area instead.
-        if ev.pressed_button == Some(MouseButton::Left) && !cfg!(target_os = "windows") { window.start_window_move(); }
+        if ev.pressed_button == Some(MouseButton::Left) { window.start_window_move(); }
     }))
     .on_mouse_up(MouseButton::Left, cx.listener(|ed, _, _, _| ed.title_drag = false))
 }
@@ -153,8 +155,8 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
     }
     let windows = chrome.style == ChromeStyle::Windows;
     let mut row = div().id("window-controls").flex().flex_none().h(px(height)).ml(px(4.0))
-        // Keep presses on the buttons from starting a title-bar drag.
-        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation());
+        // Windows must receive the non-client mouse-down to arm the caption button.
+        .when(!windows, |d| d.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()));
     for caption in [Caption::Minimize, Caption::Maximize, Caption::Close] {
         let enabled = match caption {
             Caption::Minimize => chrome.can_minimize,
@@ -177,7 +179,9 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
             .when(enabled, |b| b.hover(move |s| s.bg(hover)));
         if windows {
             // Native hit-testing performs the action (and shows snap layouts).
-            button = button.window_control_area(area);
+            if enabled {
+                button = button.window_control_area(area);
+            }
         } else {
             button = button.on_click(cx.listener(move |ed, _, window, cx| match caption {
                 Caption::Minimize => window.minimize_window(),
