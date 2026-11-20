@@ -77,6 +77,9 @@ jobs:
           cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
           cargo test --offline --locked --release -p verdant-app --bin verdant theme::tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
+          if [ "$RUNNER_OS" = Windows ]; then
+            cargo test --offline --locked --release -p verdant-cli windows_path_tests
+          fi
       - name: Assemble and check the native package
         env:
           VERDANT_PACKAGE_TARGET: ${{ matrix.target }}
