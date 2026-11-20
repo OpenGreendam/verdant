@@ -745,6 +745,7 @@ impl Editor {
     pub(crate) fn has_control_drag(&self, cx: &Context<Self>) -> bool {
         self.master_drag.is_some()
             || self.numeric_preview.is_some()
+            || self.device_drag.is_some()
             || crate::ui_controls::has_numeric_scrub(cx.entity().entity_id(), cx)
             || crate::roll::has_extra_drag(cx.entity().entity_id(), cx)
     }
@@ -752,6 +753,7 @@ impl Editor {
     pub(crate) fn cancel_control_drags(&mut self, cx: &mut Context<Self>) {
         self.master_drag = None;
         self.numeric_preview = None;
+        self.cancel_device_drag(cx);
         let editor = cx.entity().entity_id();
         crate::ui_controls::cancel_numeric_scrub(editor, cx);
         crate::roll::cancel_extra_drag(editor, cx);
@@ -1641,6 +1643,7 @@ impl Editor {
         if !self.commit_pending_lyric(cx) {
             return false;
         }
+        self.cancel_device_drag(cx);
         self.change_active_track(id);
         self.sync_index();
         self.sync_mixer();

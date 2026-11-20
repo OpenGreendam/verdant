@@ -8,7 +8,8 @@
 //! (`planControlGesture`, `dragNormalized` in the pitch-gesture unit): a
 //! press selects, only a drag past the threshold edits, the edit previews
 //! locally and is committed once on release as a single undo step; double
-//! click or Alt-click restores the default.
+//! click or Alt-click restores the default. Cancellation drops only the local
+//! preview and releases its pointer capture, without writing plug-in state.
 
 use gpui::{
     App, Bounds, Context, DispatchPhase, Entity, FontWeight, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent,
@@ -38,6 +39,8 @@ pub struct DeviceDrag {
     control: Control,
     phase: String,
     origin: (f64, f64),
+    window: gpui::AnyWindowHandle,
+    hitbox: gpui::HitboxId,
     /// Normalized (0…1) start positions of the edited values.
     start: Vec<f64>,
     preview: Vec<(String, f64)>,
@@ -141,6 +144,28 @@ fn band_label(kind: BandKind) -> &'static str {
 
 struct Target { track: TrackId, slot: usize, key: InsertKey }
 
+impl Editor {
+    /// Device previews never reach the plug-in until release. Discarding one
+    /// restores the cached values and lets parameter refresh resume immediately.
+    pub(crate) fn cancel_device_drag(&mut self, cx: &mut Context<Self>) {
+        let Some(drag) = self.device_drag.take() else { return };
+        let decision = plan(&drag.phase, "Cancel", false, false, false, false);
+        if decision.effects.iter().any(|effect| effect == "Host.ReleasePointer") {
+            // Undo and track changes do not have a Window borrow. Defer until
+            // the current update returns, and release only this drag's capture.
+            let (window, hitbox) = (drag.window, drag.hitbox);
+            cx.defer(move |cx| {
+                let _ = window.update(cx, |_, window, _| {
+                    if window.captured_hitbox() == Some(hitbox) {
+                        window.release_pointer();
+                    }
+                });
+            });
+        }
+        cx.notify();
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, initial: Vec<(String, f64)>, defaults: Vec<(String, f64)>,
     ev: &MouseDownEvent, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Editor>) {
@@ -153,6 +178,7 @@ fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, in
             "Control.Begin" => ed.device_drag = Some(DeviceDrag {
                 track: target.track.clone(), slot: target.slot, key: target.key, control: control.clone(),
                 phase: decision.next_phase.clone(), origin: (f64::from(ev.position.x), f64::from(ev.position.y)),
+                window: window.window_handle(), hitbox,
                 start: start.clone(), preview: initial.clone(),
             }),
             "Host.CapturePointer" => window.capture_pointer(hitbox),
@@ -586,7 +612,7 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, cx: &mut Context<Ed
             .child(svg().path(icon("sliders-horizontal")).size(px(15.0)).text_color(th.text_secondary))
             .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))
             .child(div().text_sm().text_color(th.text_secondary).child(if empty { "· 还没有效果器".to_string() } else { format!("· {count} 个效果器，信号从左到右") })))
-        .child(div().id("device-chain").flex_1().min_h_0().overflow_x_scroll().flex().items_start().gap(px(10.0)).px(px(12.0)).pb(px(12.0))
+        .child(div().id("device-chain").flex_1().min_h_0().overflow_x_scroll().overflow_y_scroll().flex().items_start().gap(px(10.0)).px(px(12.0)).pb(px(12.0))
             .children(cards)
             .child(add_card(ed, &track, count, cx)))
         .into_any_element()
@@ -635,5 +661,20 @@ mod tests {
         assert_eq!(drag_normalized(0.5, 90.0, 180.0, false), 1.0);
         assert!((drag_normalized(0.5, 90.0, 180.0, true) - 0.55).abs() < 1e-9, "Shift is ten times finer");
         assert_eq!(drag_normalized(0.2, -500.0, 180.0, false), 0.0);
+    }
+
+    #[test]
+    fn compiled_control_cancel_discards_armed_and_previewed_edits() {
+        for phase in ["armed", "dragging"] {
+            let cancel = plan(phase, "Cancel", false, false, false, false);
+            assert_eq!(cancel.next_phase, "idle");
+            assert_eq!(cancel.effects, ["Control.Discard", "Host.ReleasePointer"]);
+            assert!(plan(&cancel.next_phase, "PointerUp", true, false, false, false).effects.is_empty(),
+                "a late release must not commit a cancelled preview");
+            let next = plan(&cancel.next_phase, "PointerDown", true, false, false, false);
+            assert_eq!(next.next_phase, "armed");
+            assert!(next.effects.iter().any(|effect| effect == "Control.Begin"),
+                "cancellation must allow the next control edit");
+        }
     }
 }
