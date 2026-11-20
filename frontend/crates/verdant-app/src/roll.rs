@@ -1154,39 +1154,66 @@ fn cancel(ed: &mut Editor, pointer: PointerId, reason: CancelReason, window: &mu
 /// Right-click in the roll: note menu on a note, background menu otherwise.
 /// Anchored at the pointer (window coordinates); items feed
 /// `Editor::run_menu_action`.
+/// Right-click in the roll. On a note: act on it (it joins or becomes the
+/// selection first, as in every desktop editor). On empty space: actions at
+/// that time and pitch, then tools.
 fn roll_context_menu(ed: &mut Editor, position: gpui::Point<Pixels>, x: f64, y: f64, window: &mut Window, cx: &mut gpui::Context<Editor>) {
-    use crate::editor::MenuAction as A;
+    use crate::editor::{MenuAction as A, WorkflowAction as W};
     use crate::menu::MenuItem;
     let project = ed.store().snapshot();
     let Some(track) = project.track(&ed.session.track) else { return };
     let vp = &ed.session.viewport;
     let hit = ed.index.hit_test(track, vp, &ed.session.selection, x, y, 7.0, 4.0);
     let music = vp.to_music(x, y);
+    let tick = music.tick.floor().max(0.0) as i64;
+    let snapped = ed.session.snap.snap(music.tick).max(0);
     if let Hit::Body(id) | Hit::Handle(id, _) = &hit { if !ed.session.selection.contains(id) { ed.session.selection = [id.clone()].into(); } }
-    let has_selection = !ed.session.selection.is_empty();
+    let count = ed.session.selection.len();
     let has_notes = !ed.note_clipboard.is_empty();
+    let tool = ed.tool;
     let items = match &hit {
         Hit::Body(id) | Hit::Handle(id, _) => {
             let id = id.clone();
             vec![
-                MenuItem::action("剪切", A::Cut).enabled(has_selection),
-                MenuItem::action("复制", A::Copy).enabled(has_selection),
-                MenuItem::action("复制一份", A::Duplicate).enabled(has_selection),
-                MenuItem::action("编辑歌词", A::EditLyric(id)),
-                MenuItem::action("删除", A::DeleteSelection).enabled(has_selection),
+                MenuItem::action("编辑歌词", A::EditLyric(id)).with_hint("Enter"),
+                MenuItem::action("属性", A::ShowProperties).with_hint("I"),
+                MenuItem::separator(),
+                MenuItem::action("剪切", A::Cut).with_hint("Ctrl+X"),
+                MenuItem::action("复制", A::Copy).with_hint("Ctrl+C"),
+                MenuItem::action("粘贴", A::PasteAtTick(snapped)).with_hint("Ctrl+V").enabled(has_notes),
+                MenuItem::action("重复", A::Duplicate).with_hint("Ctrl+D"),
+                MenuItem::action("删除", A::DeleteSelection).with_hint("Del"),
+                MenuItem::separator(),
+                MenuItem::action("在此分割", A::Workflow(W::Split(snapped))),
+                MenuItem::action("连接相邻音符", A::Workflow(W::Join)).with_hint("Ctrl+J").enabled(count >= 2),
+                MenuItem::action("量化到网格", A::Workflow(W::Quantize)).with_hint("Q"),
+                MenuItem::action("静音 / 取消静音", A::Workflow(W::MuteNotes)),
+                MenuItem::separator(),
+                MenuItem::submenu("歌词", vec![
+                    MenuItem::action("批量填写歌词…", A::Workflow(W::BatchLyrics(false))).with_hint("Ctrl+L"),
+                    MenuItem::action("逐字填写歌词…", A::Workflow(W::BatchLyrics(true))),
+                    MenuItem::action("设为同音节延音 (+)", A::Workflow(W::ContinueSyllable)).enabled(count >= 2),
+                ]),
+                MenuItem::action("颤音包络与滑音曲率…", A::Workflow(W::VibratoShape)),
+                MenuItem::action("从选中音符创建片段", A::Workflow(W::CreatePart)),
             ]
         }
         Hit::Background => {
-            let tick = music.tick.floor() as i64;
             let midi = music.pitch.round() as i32;
             vec![
-                MenuItem::action(format!("在光标处粘贴"), A::PasteAtTick(tick)).enabled(has_notes),
-                MenuItem::action("添加音符", A::AddNoteAt(tick, midi)),
-                MenuItem::action("全选", A::SelectAll),
+                MenuItem::action("在此添加音符", A::AddNoteAt(snapped, midi)),
+                MenuItem::action("在此粘贴", A::PasteAtTick(snapped)).with_hint("Ctrl+V").enabled(has_notes),
+                MenuItem::action("全选", A::SelectAll).with_hint("Ctrl+A"),
                 MenuItem::separator(),
-                MenuItem::action("指针", A::SetTool(Tool::Pointer)),
-                MenuItem::action("铅笔", A::SetTool(Tool::Pencil)),
-                MenuItem::action("橡皮", A::SetTool(Tool::Eraser)),
+                MenuItem::action("播放头移到此处", A::SeekTick(tick)),
+                MenuItem::action("循环起点设在此处", A::Workflow(W::LoopStart(snapped))),
+                MenuItem::action("循环终点设在此处", A::Workflow(W::LoopEnd(snapped))),
+                MenuItem::separator(),
+                MenuItem::header("工具"),
+                MenuItem::action("指针", A::SetTool(Tool::Pointer)).checked(tool == Tool::Pointer),
+                MenuItem::action("铅笔", A::SetTool(Tool::Pencil)).checked(tool == Tool::Pencil),
+                MenuItem::action("橡皮", A::SetTool(Tool::Eraser)).checked(tool == Tool::Eraser),
+                MenuItem::action("音高笔", A::SetTool(Tool::Pitch)).checked(tool == Tool::Pitch),
             ]
         }
     };
@@ -1319,7 +1346,7 @@ pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
                         }
                     }
                 }
-                window.paint_quad(fill(b(0.0, hgt - 1.0, w, 1.0, o), th.separator));
+                window.paint_quad(fill(b(0.0, hgt - 1.0, w, 1.0, o), th.shade));
             }
             flush_texts(window, cx, bounds, texts);
             if over_loop_handle || cx.global::<RollExtraDragState>().loop_drag.is_some_and(|(eid, arr, _, _, _)| eid == editor.entity_id() && arr == arrange) {
@@ -1349,7 +1376,12 @@ pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
                         use crate::menu::MenuItem as I;use crate::editor::{MenuAction as M,WorkflowAction as A};
                         let tempo=ed.project().tempo_map.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
                         let meter=ed.project().time_signatures.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
-                        let mut items=vec![I::action("在此处编辑 / 新增速度…",M::Workflow(A::EditTempo(tick))),I::action("删除前一速度事件",M::Workflow(A::DeleteTempo(tempo))).enabled(tempo>0),I::action("在此处编辑 / 新增拍号…",M::Workflow(A::EditMeter(tick))),I::action("删除前一拍号事件",M::Workflow(A::DeleteMeter(meter))).enabled(meter>0),I::separator(),I::action("设循环起点",M::Workflow(A::LoopStart(tick))),I::action("设循环终点",M::Workflow(A::LoopEnd(tick))),I::action("循环播放开关",M::Workflow(A::ToggleLoop))];
+                        let looping=ed.playback_settings().looping;
+                        let mut items=vec![
+                            I::action("播放头移到此处",M::SeekTick(tick)),I::action("跳转到小节…",M::Workflow(A::GoToBar)),I::separator(),
+                            I::action("循环起点设在此处",M::Workflow(A::LoopStart(tick))),I::action("循环终点设在此处",M::Workflow(A::LoopEnd(tick))),I::action("循环播放",M::Workflow(A::ToggleLoop)).checked(looping),I::separator(),
+                            I::header("速度与拍号"),I::action("在此处编辑 / 新增速度…",M::Workflow(A::EditTempo(tick))),I::action("删除前一速度事件",M::Workflow(A::DeleteTempo(tempo))).enabled(tempo>0),
+                            I::action("在此处编辑 / 新增拍号…",M::Workflow(A::EditMeter(tick))),I::action("删除前一拍号事件",M::Workflow(A::DeleteMeter(meter))).enabled(meter>0)];
                         if !arrange {
                             items.push(I::separator());
                             items.push(I::action("添加多语言读音器分段…", M::Workflow(A::Integration(crate::editor::integrations::IntegrationAction::AddSegment))));
@@ -1524,7 +1556,7 @@ pub fn keyboard(editor: Entity<Editor>) -> impl IntoElement {
                         }
                     }
                 });
-                window.paint_quad(fill(b(w - 1.0, 0.0, 1.0, bounds.size.height.as_f32() as f64, o), th.separator));
+                window.paint_quad(fill(b(w - 1.0, 0.0, 1.0, bounds.size.height.as_f32() as f64, o), th.shade));
             }
             flush_texts(window, cx, bounds, texts);
             let (e, h, key) = (editor.clone(), hitbox.clone(), pressed.clone());

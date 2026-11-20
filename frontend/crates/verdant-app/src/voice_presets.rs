@@ -38,10 +38,10 @@ impl Editor {
                 let declared = voice.languages.iter().map(|(language, support)| language_label(language, support)).collect::<Vec<_>>().join(" / ");
                 let selected = self.active_track().and_then(|track| verdant_backend::adapter::desktop_voice(self.project(), track, caps).ok().flatten())
                     .is_some_and(|(effective, _)| effective == reference);
-                let label = format!("{}{} · {reference} · {}", if selected { "✓ " } else { "" }, voice.display_name,
+                let label = format!("{} · {reference} · {}", voice.display_name,
                     if declared.is_empty() { "语言未声明" } else { &declared });
                 let command = MenuAction::Workflow(WorkflowAction::Integration(IntegrationAction::ChooseSinger(reference.clone())));
-                items.push(if voice.available { crate::menu::MenuItem::action(label, command) }
+                items.push(if voice.available { crate::menu::MenuItem::action(label, command).checked(selected) }
                     else { crate::menu::MenuItem::disabled(format!("{label} · 不可用")) });
             }
             if items.is_empty() { items.push(crate::menu::MenuItem::disabled("尚未安装本地歌手")); }
@@ -89,15 +89,15 @@ impl Editor {
         let (tid_click, langs_click, cur_click) = (track_id.clone(), declared_languages.clone(), current_language.clone());
         let open_lang_menu = move |ed: &mut Editor, anchor: gpui::Point<gpui::Pixels>, window: &mut gpui::Window, cx: &mut Context<Editor>| {
             let mut items = vec![crate::menu::MenuItem::action(
-                format!("{}跟随读音器（默认）", if cur_click.is_none() { "✓ " } else { "   " }),
+                "跟随读音器（默认）",
                 crate::editor::MenuAction::SetTrackLanguage { track: tid_click.clone(), language: None },
-            )];
+            ).checked(cur_click.is_none())];
             if !langs_click.is_empty() {
                 items.push(crate::menu::MenuItem::separator());
                 for (code, sup) in &langs_click {
                     let enabled = matches!(code.as_str(), "zh" | "en" | "ja");
                     let sel = cur_click.as_deref() == Some(code.as_str());
-                    let lbl = format!("{}{}", if sel { "✓ " } else { "   " }, language_label(code, sup));
+                    let lbl = language_label(code, sup);
                     items.push(
                         crate::menu::MenuItem::action(
                             lbl,
@@ -106,7 +106,8 @@ impl Editor {
                                 language: Some(code.clone()),
                             },
                         )
-                        .enabled(enabled),
+                        .enabled(enabled)
+                        .checked(sel),
                     );
                 }
             } else {
@@ -131,6 +132,7 @@ impl Editor {
 mod tests {
     use super::*;
     use serde_json::json;
+    use verdant_backend::{voices::PACKAGE_FILES, wire::FileStatus};
     use verdant_domain::{ProjectStore, Track};
 
     #[test]
@@ -139,28 +141,18 @@ mod tests {
         project.tracks[0].voice_ref = Some("local".into());
         project.tracks.push(Track::new("Other", "blue"));
         let track = project.tracks[0].id.clone();
-        let caps: Capabilities = serde_json::from_value(json!({"voices":{"version":1,"voices":{
+        let mut caps: Capabilities = serde_json::from_value(json!({"voices":{"version":1,"voices":{
             "local":{"display_name":"Local", "available":true, "cache_identity":"admitted-source",
                 "voice_package":{"name":"verdant-voice","version":"0.1.0"},
                 "source_sha256":{"token":"a".repeat(64),"model":"b".repeat(64)},
-                "languages":{"zh":"native","ja":"approximate"},
-                "files":{"voice_source_manifest":{"available":true,"sha256":"a".repeat(64)},
-                    "voice_source_admission":{"available":true,"sha256":"a".repeat(64)},
-                    "bank_json":{"available":true,"sha256":"c".repeat(64)},
-                    "bank_tensors":{"available":true,"sha256":"c".repeat(64)},
-                    "bank_topology":{"available":true,"sha256":"c".repeat(64)},
-                    "bank_token":{"available":true,"sha256":"c".repeat(64)},
-                    "source_controller":{"available":true,"sha256":"c".repeat(64)},
-                    "source_decoder":{"available":true,"sha256":"c".repeat(64)},
-                    "source_rights":{"available":true,"sha256":"c".repeat(64)},
-                    "source_export":{"available":true,"sha256":"c".repeat(64)},
-                    "source_contracts":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_manifest":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_context_controller":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_local_controller":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_decoder":{"available":true,"sha256":"c".repeat(64)},
-                    "verdant_voice_phone_table":{"available":true,"sha256":"c".repeat(64)}}}
+                "languages":{"zh":"native","ja":"approximate"}}
         }}})).unwrap();
+        let files = &mut caps.voices.as_mut().unwrap().voices.get_mut("local").unwrap().files;
+        let manifest = FileStatus { available: true, sha256: Some("c".repeat(64)) };
+        for (role, _) in PACKAGE_FILES {
+            files.insert((*role).into(), manifest.clone());
+        }
+        files.insert("voice_source_admission".into(), manifest);
         let before = project.clone();
         let mut store = ProjectStore::new(project);
         let batch = language_choice_batch(store.project(), &track, Some("ja"), &caps).unwrap();

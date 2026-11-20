@@ -93,10 +93,14 @@ fn browser_matches_native_host_report_and_inserted_handle_identity() {
     assert_eq!(report.error, None);
     assert!(!report.plugins.is_empty());
     let mut browser = PluginBrowser::new(client.catalog());
-    // The catalog explicitly includes Verdant's real diagnostic plugin.
-    assert_eq!(browser.entries().len(), report.plugins.len() + 1);
-    assert_eq!(browser.entries().iter().filter(|row| row.format == PluginFormat::Builtin
-        && row.id == verdant_plugins::BUILTIN_GAIN_ID).count(), 1);
+    // The catalog includes each of Verdant's built-in effects exactly once.
+    let builtin_ids = [verdant_plugins::BUILTIN_GAIN_ID,
+        verdant_plugins::builtin_dsp::EQ_ID, verdant_plugins::builtin_dsp::COMPRESSOR_ID];
+    assert_eq!(browser.entries().len(), report.plugins.len() + builtin_ids.len());
+    for id in builtin_ids {
+        assert_eq!(browser.entries().iter().filter(|row| row.format == PluginFormat::Builtin
+            && row.id == id).count(), 1, "expected exactly one built-in effect {id}");
+    }
     for reported in &report.plugins {
         let rows = browser.entries();
         let row = rows.iter().find(|row| row.id == reported.id && row.format.tag() == reported.format).unwrap();

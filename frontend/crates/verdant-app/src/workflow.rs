@@ -14,6 +14,7 @@ pub enum WorkflowAction {
     VibratoShape, SelectPoints, ClearPoints, TransformPoints, Interpolation(Interpolation),
     CreatePart, SelectPart(String), RenamePart, MovePart, TrimPart, SplitPart(i64), JoinPart,
     DuplicatePart(bool), UnlinkPart, MutePart, DeletePart,
+    GoToBar, CreatePartAt(TrackId,i64),
     RepeatSelection, ToggleLoop, LoopStart(i64), LoopEnd(i64), ToggleMetronome, CountIn(u32), ToggleExportClick,
     ExportSettings, ExportSetting(crate::export::ExportSetting), Integration(super::integrations::IntegrationAction),
 }
@@ -27,7 +28,6 @@ pub enum PromptPurpose {
     GoToBar,
     Vibrato,
     Points(TrackId),
-    CreatePart,
     RenamePart(String),
     MovePart(String),
     TrimPart(String),
@@ -134,7 +134,6 @@ impl Editor {
                 let scales=parse_values(&fields[1..].join(","),3)?;
                 self.transform_selected_points(offset,scales[0]/100.,scales[1],scales[2]/100.,cx)?;
             }
-            PromptPurpose::CreatePart=>{let mut parts=Parts::load(self.project())?;let id=parts.create(self.project(),&self.session.track,&self.session.selection_in_order(self.project()),text.into())?;if self.commit(self.revision(),CommandBatch::single("创建声部片段",parts.command()),cx){self.selected_part=Some(id);}}
             PromptPurpose::RenamePart(id)=>{if text.is_empty(){return Err("片段名称不能为空".into());}self.edit_part(id,"片段名称",cx,|p|{p.name=text.into();Ok(())})?;}
             PromptPurpose::MovePart(id)=>{let v=parse_values(text,1)?;self.edit_part(id,"移动片段",cx,|p|{p.start_tick=v[0].round()as i64;Ok(())})?;}
             PromptPurpose::TrimPart(id)=>{let v=parse_values(text,2)?;self.edit_part(id,"裁剪片段",cx,|p|{p.source_offset_tick=v[0].round()as i64;p.duration_tick=v[1].round()as i64;Ok(())})?;}
@@ -183,7 +182,9 @@ impl Editor {
                 A::ClearPoints=>{self.point_selection.clear();cx.notify();}
                 A::TransformPoints=>self.open_transform_points_dialog(window,cx),
                 A::Interpolation(mode)=>{let mut notes=self.selected_notes();for n in &mut notes{n.curves.set_interpolation(self.param.short(),mode);}self.replace_selected_notes("曲线插值",notes,cx);}
-                A::CreatePart=>self.prompt_text("新建片段名称",PromptPurpose::CreatePart,"新片段",window,cx),
+                A::CreatePartAt(track,tick)=>crate::arrange::create_part_at(self,&track,tick as f64,window,cx),
+                A::GoToBar=>self.prompt_text("跳转到小节（从 1 开始）",PromptPurpose::GoToBar,"",window,cx),
+                A::CreatePart=>{let mut parts=Parts::load(self.project())?;let name=parts.next_name("片段");let id=parts.create(self.project(),&self.session.track,&self.session.selection_in_order(self.project()),name)?;if self.commit(self.revision(),CommandBatch::single("创建声部片段",parts.command()),cx){self.selected_part=Some(id);}}
                 A::SelectPart(id)=>{let parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("片段已不存在")?;if !self.select_track(p.track.clone(),cx){return Err("先完成当前歌词编辑".into());}self.session.selection=p.bindings.values().filter(|id|self.project().track(&p.track).is_some_and(|t|t.note(id).is_some())).cloned().collect();self.selected_part=Some(id);self.sync_index();cx.notify();}
                 A::RenamePart|A::MovePart|A::TrimPart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let p=Parts::load(self.project())?.instance(&id).cloned().ok_or("片段已不存在")?;let(title,purpose,current)=match action{A::RenamePart=>("片段名称",PromptPurpose::RenamePart(id),p.name),A::MovePart=>("片段开始 tick",PromptPurpose::MovePart(id),p.start_tick.to_string()),_=>("源偏移 tick、片段长度 tick",PromptPurpose::TrimPart(id),format!("{}, {}",p.source_offset_tick,p.duration_tick))};self.prompt_text(title,purpose,&current,window,cx);}
                 A::DuplicatePart(linked)=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let mut parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("片段已不存在")?;let at=p.start_tick+p.duration_tick;let id=parts.duplicate(&id,at,linked)?;if self.commit(self.revision(),CommandBatch::single(if linked{"链接重复片段"}else{"独立复制片段"},parts.command()),cx){self.selected_part=Some(id);}}
@@ -289,17 +290,35 @@ impl Editor {
         }).detach();
         Ok(())
     }
+    /// The workflow palette, grouped like the toolbar menus so it stays short.
     pub fn workflow_menu(&mut self,window:&mut Window,cx:&mut Context<Self>){
-        use crate::menu::MenuItem as I;use WorkflowAction as A;let tick=self.session.snap.snap(self.tempo().tick_at(self.playhead_seconds())).max(0);let track=self.session.track.clone();let mut items=vec![
-            I::action("新建工程",MenuAction::Workflow(A::New)),I::action("最近工程…",MenuAction::Workflow(A::Recent)),I::action("恢复工程…",MenuAction::Workflow(A::Recovery)),I::action("还原到手动保存版本",MenuAction::Workflow(A::Revert)),I::separator(),
-            I::action("编辑 / 新增当前位置速度…",MenuAction::Workflow(A::EditTempo(tick))),I::action("编辑 / 新增当前位置拍号…",MenuAction::Workflow(A::EditMeter(tick))),
-            I::action("重命名轨道…",MenuAction::Workflow(A::RenameTrack(track.clone()))),I::action("轨道上移",MenuAction::Workflow(A::MoveTrack(track.clone(),-1))),I::action("轨道下移",MenuAction::Workflow(A::MoveTrack(track.clone(),1))),I::action("复制轨道",MenuAction::Workflow(A::DuplicateTrack(track))),I::separator(),
-            I::action("在播放头分割音符",MenuAction::Workflow(A::Split(tick))),I::action("连接选中音符",MenuAction::Workflow(A::Join)),I::action("量化选中音符",MenuAction::Workflow(A::Quantize)),I::action("闭合一格内间隙",MenuAction::Workflow(A::CloseGaps)),I::action("消除重叠",MenuAction::Workflow(A::RemoveOverlaps)),I::action("音符静音 / 取消",MenuAction::Workflow(A::MuteNotes)),
-            I::action("批量歌词…",MenuAction::Workflow(A::BatchLyrics(false))),I::action("逐字歌词…",MenuAction::Workflow(A::BatchLyrics(true))),I::action("歌词循环左移",MenuAction::Workflow(A::ShiftLyrics(false))),I::action("歌词循环右移",MenuAction::Workflow(A::ShiftLyrics(true))),I::action("将选择设为同音节延续",MenuAction::Workflow(A::ContinueSyllable)),I::action("颤音淡入淡出和相位…",MenuAction::Workflow(A::VibratoShape)),I::separator(),
-            I::action("创建片段…",MenuAction::Workflow(A::CreatePart)),I::action("片段重命名…",MenuAction::Workflow(A::RenamePart)),I::action("片段开始位置…",MenuAction::Workflow(A::MovePart)),I::action("裁剪片段…",MenuAction::Workflow(A::TrimPart)),I::action("分割片段",MenuAction::Workflow(A::SplitPart(tick))),I::action("连接右侧片段",MenuAction::Workflow(A::JoinPart)),I::action("链接重复片段",MenuAction::Workflow(A::DuplicatePart(true))),I::action("独立复制片段",MenuAction::Workflow(A::DuplicatePart(false))),I::action("取消片段链接",MenuAction::Workflow(A::UnlinkPart)),I::action("片段静音 / 取消",MenuAction::Workflow(A::MutePart)),I::action("删除片段",MenuAction::Workflow(A::DeletePart)),I::separator(),
-            I::action("循环选中音符",MenuAction::Workflow(A::RepeatSelection)),I::action("循环播放开关",MenuAction::Workflow(A::ToggleLoop)),I::action("设循环起点",MenuAction::Workflow(A::LoopStart(tick))),I::action("设循环终点",MenuAction::Workflow(A::LoopEnd(tick))),I::action("节拍器开关",MenuAction::Workflow(A::ToggleMetronome)),I::action("无预备拍",MenuAction::Workflow(A::CountIn(0))),I::action("一小节预备拍",MenuAction::Workflow(A::CountIn(1))),I::action("两小节预备拍",MenuAction::Workflow(A::CountIn(2))),I::action("四小节预备拍",MenuAction::Workflow(A::CountIn(4))),I::action("八小节预备拍",MenuAction::Workflow(A::CountIn(8))),I::action(if self.playback_settings().export_click{"导出时排除节拍器"}else{"导出时包含节拍器"},MenuAction::Workflow(A::ToggleExportClick)),I::action("音频导出选项…",MenuAction::Workflow(A::ExportSettings))];
-        items.push(I::action("歌手 / 词典 / MIDI / 音频 / 自动化 / 交换格式…",MenuAction::Workflow(A::Integration(super::integrations::IntegrationAction::Menu))));
-        if let Ok(parts)=Parts::load(self.project()){for p in parts.instances{items.push(I::action(format!("选择片段 · {}",p.name),MenuAction::Workflow(A::SelectPart(p.id))));}}self.show_menu(window.mouse_position(),items,window,cx);
+        use crate::menu::MenuItem as I;use WorkflowAction as A;
+        let tick=self.session.snap.snap(self.tempo().tick_at(self.playhead_seconds())).max(0);let track=self.session.track.clone();
+        let pb=self.playback_settings();let w=|label:&'static str,action|I::action(label,MenuAction::Workflow(action));
+        let mut parts=vec![
+            w("从选中音符创建片段",A::CreatePart),w("片段名称…",A::RenamePart),w("精确位置…",A::MovePart),w("精确裁剪…",A::TrimPart),
+            w("在播放头分割片段",A::SplitPart(tick)),w("连接右侧片段",A::JoinPart),w("链接复制片段",A::DuplicatePart(true)),w("独立复制片段",A::DuplicatePart(false)),
+            w("取消片段链接",A::UnlinkPart),w("片段静音 / 取消",A::MutePart),w("删除片段",A::DeletePart)];
+        if let Ok(all)=Parts::load(self.project()){if !all.instances.is_empty(){parts.push(I::separator());parts.push(I::header("定位片段"));
+            for p in all.instances{parts.push(I::action(p.name,MenuAction::Workflow(A::SelectPart(p.id))));}}}
+        let items=vec![
+            I::submenu("工程",vec![w("新建工程",A::New),w("最近工程…",A::Recent),w("恢复工程…",A::Recovery),w("还原到手动保存版本",A::Revert)]),
+            I::submenu("轨道",vec![w("重命名轨道…",A::RenameTrack(track.clone())),w("轨道上移",A::MoveTrack(track.clone(),-1)),w("轨道下移",A::MoveTrack(track.clone(),1)),w("复制轨道",A::DuplicateTrack(track))]),
+            I::submenu("音符",vec![w("在播放头分割",A::Split(tick)),w("连接选中音符",A::Join),w("量化到网格",A::Quantize),w("闭合一格内间隙",A::CloseGaps),w("消除重叠",A::RemoveOverlaps),w("静音 / 取消静音",A::MuteNotes)]),
+            I::submenu("歌词与颤音",vec![w("批量填写歌词…",A::BatchLyrics(false)),w("逐字填写歌词…",A::BatchLyrics(true)),w("歌词循环左移",A::ShiftLyrics(false)),w("歌词循环右移",A::ShiftLyrics(true)),w("设为同音节延音",A::ContinueSyllable),w("颤音淡入淡出和相位…",A::VibratoShape)]),
+            I::submenu("片段 (Part)",parts),
+            I::submenu("速度与拍号",vec![w("当前位置速度…",A::EditTempo(tick)),w("当前位置拍号…",A::EditMeter(tick))]),
+            I::submenu("循环与节拍器",vec![
+                w("循环播放",A::ToggleLoop).checked(pb.looping),w("以选中音符设为循环",A::RepeatSelection),w("在播放头设循环起点",A::LoopStart(tick)),w("在播放头设循环终点",A::LoopEnd(tick)),
+                I::separator(),w("节拍器",A::ToggleMetronome).checked(pb.metronome),w("离线导出包含节拍器",A::ToggleExportClick).checked(pb.export_click),
+                I::separator(),I::header("预备拍"),
+                w("无",A::CountIn(0)).checked(pb.count_in_bars==0),w("1 小节",A::CountIn(1)).checked(pb.count_in_bars==1),w("2 小节",A::CountIn(2)).checked(pb.count_in_bars==2),
+                w("4 小节",A::CountIn(4)).checked(pb.count_in_bars==4),w("8 小节",A::CountIn(8)).checked(pb.count_in_bars==8)]),
+            I::separator(),
+            w("音频导出选项…",A::ExportSettings),
+            w("歌手 / 词典 / MIDI / 音频 / 自动化 / 交换格式…",A::Integration(super::integrations::IntegrationAction::Menu)),
+        ];
+        self.show_menu(window.mouse_position(),items,window,cx);
     }
 }
 pub(super) fn parse_values(text:&str,count:usize)->Result<Vec<f64>,String>{let values=text.split(|c:char|c==','||c=='，'||c.is_whitespace()).filter(|s|!s.is_empty()).map(|s|s.parse::<f64>().map_err(|_|format!("无法读取数值 {s}"))).collect::<Result<Vec<_>,_>>()?;if values.len()!=count||values.iter().any(|v|!v.is_finite()){return Err(format!("需要 {count} 个有限数值"));}Ok(values)}

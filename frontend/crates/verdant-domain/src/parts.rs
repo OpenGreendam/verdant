@@ -35,6 +35,20 @@ impl Parts {
         self.contents.insert(content_id.clone(),PartContent{id:content_id.clone(),notes});
         self.instances.push(PartInstance{id:id.clone(),content_id,name,track:track.clone(),start_tick:start,duration_tick:end-start,source_offset_tick:0,muted:false,bindings});Ok(id)
     }
+    /// An empty part over `[start, start+duration)`. Notes later inserted
+    /// wholly inside it join its content (see `synchronize`).
+    pub fn create_empty(&mut self,project:&Project,track:&TrackId,start:i64,duration:i64,name:String)->Result<String,String>{
+        project.track(track).ok_or("track no longer exists")?;
+        if start<0||duration<1{return Err("part needs a positive length".into());}
+        if self.instances.iter().any(|p|p.track==*track&&p.start_tick<start+duration&&start<p.start_tick+p.duration_tick){return Err("parts on one track cannot overlap".into());}
+        let content_id=NoteId::generate().to_string();let id=NoteId::generate().to_string();
+        self.contents.insert(content_id.clone(),PartContent{id:content_id.clone(),notes:Vec::new()});
+        self.instances.push(PartInstance{id:id.clone(),content_id,name,track:track.clone(),start_tick:start,duration_tick:duration,source_offset_tick:0,muted:false,bindings:BTreeMap::new()});Ok(id)
+    }
+    /// The first "片段 N" name not used by any part.
+    pub fn next_name(&self,prefix:&str)->String{
+        (1..).map(|n|format!("{prefix} {n}")).find(|name|!self.instances.iter().any(|p|&p.name==name)).expect("unbounded")
+    }
     pub fn duplicate(&mut self,id:&str,at:i64,linked:bool)->Result<String,String>{
         let mut copy=self.instance(id).cloned().ok_or("part no longer exists")?;copy.id=NoteId::generate().to_string();copy.start_tick=at.max(0);
         copy.name=format!("{} 副本",copy.name);
@@ -145,4 +159,27 @@ pub(crate) fn synchronize(before:&Project,project:&mut Project,commands:&[Comman
     let before=project.extensions.get(KEY).cloned();let after=Some(serde_json::to_value(parts).map_err(|e|e.to_string())?);
     if before!=after{project.extensions.insert(KEY.into(),after.clone().expect("parts"));meta.push(MetaPatch::ProjectExtension{key:KEY.into(),before,after});}
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CommandBatch, ProjectStore};
+
+    #[test]
+    fn empty_part_absorbs_notes_drawn_inside_it() {
+        let project=Project::new_empty();let track=project.tracks[0].id.clone();
+        let mut store=ProjectStore::new(project);
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        assert_eq!(parts.next_name("片段"),"片段 1");
+        let id=parts.create_empty(&store.snapshot(),&track,1920,1920,parts.next_name("片段")).unwrap();
+        assert_eq!(parts.next_name("片段"),"片段 2");
+        assert!(parts.clone().create_empty(&store.snapshot(),&track,3000,960,"x".into()).is_err(),"overlap rejected");
+        store.apply(store.revision(),CommandBatch::single("新建片段",parts.command())).unwrap();
+        let note=Note::new(2400,480,60);let note_id=note.id.clone();
+        store.apply(store.revision(),CommandBatch::single("画音符",Command::InsertNotes{track:track.clone(),notes:vec![note]})).unwrap();
+        let parts=Parts::load(&store.snapshot()).unwrap();let part=parts.instance(&id).unwrap();
+        assert!(part.bindings.values().any(|n|n==&note_id));
+        assert_eq!(parts.contents[&part.content_id].notes[0].start_tick,480);
+    }
 }

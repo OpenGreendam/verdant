@@ -213,7 +213,7 @@ impl Render for HistoryPanel {
                 .child(uniform_list("history-rows", count + 1, move |range, _, cx| {
                     panel.update(cx, |view, cx| view.rows(range, cx))
                 }).track_scroll(&self.scroll).size_full()))
-            .child(div().p(px(12.0)).border_t_1().border_color(th.separator).text_xs().text_color(th.text_secondary)
+            .child(div().p(px(12.0)).border_t_1().border_color(th.shade).text_xs().text_color(th.text_secondary)
                 .child("点击状态跳转；撤销后进行新编辑会清除后续历史。"))
             .into_any_element()
     }
@@ -278,7 +278,8 @@ impl CommandTarget for Editor {
             (C::SetToolPitch, A::None) => MenuAction::SetTool(Tool::Pitch),
             (C::SetLanePencil, A::None) => { self.cancel_edits(verdant_session::CancelReason::Escape, window, cx); self.lane_tool = LaneTool::Pencil; cx.notify(); return; }
             (C::SetLaneLine, A::None) => { self.cancel_edits(verdant_session::CancelReason::Escape, window, cx); self.lane_tool = LaneTool::Line; cx.notify(); return; }
-            (C::SetLaneSmooth, A::None) => { self.cancel_edits(verdant_session::CancelReason::Escape, window, cx); self.lane_tool = LaneTool::Smooth; cx.notify(); return; }
+            // Freehand already smooths hand jitter; the old Smooth command selects it.
+            (C::SetLaneSmooth, A::None) => { self.cancel_edits(verdant_session::CancelReason::Escape, window, cx); self.lane_tool = LaneTool::Pencil; cx.notify(); return; }
             (C::SetLaneEraser, A::None) => { self.cancel_edits(verdant_session::CancelReason::Escape, window, cx); self.lane_tool = LaneTool::Eraser; cx.notify(); return; }
             (C::SetLaneSelect, A::None) => { self.cancel_edits(verdant_session::CancelReason::Escape, window, cx); self.lane_tool = LaneTool::Select; cx.notify(); return; }
             (C::CopyCurve, A::None) => MenuAction::CopyCurve,
@@ -286,18 +287,12 @@ impl CommandTarget for Editor {
             (C::OpenTransformPoints, A::None) => { self.open_transform_points_dialog(window, cx); return; }
             (C::OpenScaleDialog, A::None) => { self.open_scale_dialog(window, cx); return; }
             (C::OpenVibratoDialog, A::None) => { self.open_vibrato_dialog(window, cx); return; }
-            (C::ToggleLeftPanel, A::None) => { self.show_inspector = !self.show_inspector; cx.notify(); return; }
-            (C::ToggleRightDock, A::None) => {
-                self.layout.show_right_dock = !self.layout.show_right_dock;
-                self.layout.store(&mut self.prefs);
-                self.prefs_dirty = true;
-                cx.notify();
-                return;
-            }
+            (C::ToggleLeftPanel, A::None) => { self.toggle_left_panel(cx); return; }
+            (C::ToggleRightDock, A::None) => { self.toggle_right_dock(cx); return; }
             (C::TogglePhonemeLane, A::None) => MenuAction::TogglePhonemeLane,
             (C::ToggleTempoLane, A::None) => MenuAction::ToggleTempoLane,
             (C::ToggleOtherTracks, A::None) => { self.integrations.other_tracks = !self.integrations.other_tracks; cx.notify(); return; }
-            (C::ToggleThreeLanes, A::None) => { self.integrations.three_lanes = !self.integrations.three_lanes; cx.notify(); return; }
+            (C::ToggleThreeLanes, A::None) => { self.add_lane(None, cx); return; }
             (C::ToggleF0Overlay, A::None) => { self.show_f0 = !self.show_f0; cx.notify(); return; }
             (C::ResetPhonemeDurations, A::Note(id)) => { self.reset_phoneme_durations(&id, cx); return; }
             (C::TogglePhonemeApproximation, A::Note(id)) => { self.toggle_phoneme_approximation(&id, cx); return; }
@@ -487,9 +482,9 @@ impl SelectTarget for Editor {
             .map(|opt| {
                 let selected = opt.id == current;
                 let mut item = crate::menu::MenuItem::action(
-                    format!("{}{}", if selected { "✓ " } else { "   " }, opt.label),
+                    opt.label,
                     MenuAction::GeneratedSelect { id, arg: arg.clone(), option: opt.id },
-                );
+                ).checked(selected);
                 if let Some(hint) = opt.hint {
                     item = item.with_hint(hint);
                 }

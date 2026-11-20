@@ -64,7 +64,7 @@ impl Editor {
             .aria_numeric_value(param.value).aria_min_numeric_value(param.min).aria_max_numeric_value(param.max)
             .aria_value(format!("{} {}", param.value, param.unit))
             .a11y_synthetic_children(move |builder| { if busy { builder.parent_node().set_disabled(); } })
-            .flex().flex_col().gap(px(4.)).border_b_1().border_color(th.separator).pb(px(8.))
+            .flex().flex_col().gap(px(4.)).border_b_1().border_color(th.shade).pb(px(8.))
             .child(div().flex().items_center().justify_between().gap(px(6.))
                 .child(div().text_sm().truncate().child(param.name.clone()))
                 .child(div().text_xs().font_family("monospace").child(format!("{:.3} {}", param.value, param.unit))))
@@ -1109,6 +1109,91 @@ impl Editor {
                     Err(e) => {
                         ed.notice(format!("插件参数未保存：{e}"));
                     }
+                }
+                cx.notify();
+            });
+        }).detach();
+    }
+
+    /// Fetch a track insert's parameters for the device view, without
+    /// opening the mixer's parameter panel.
+    /// Re-reads whenever the insert's saved state differs from the state the
+    /// cache was read against (undo/redo restore state into the same live
+    /// instance, so the key alone cannot tell the cache is stale).
+    pub(crate) fn fetch_track_insert_params(&mut self, track: &TrackId, slot: usize, cx: &mut Context<Self>) {
+        if self.inserts_loading || self.device_drag.is_some() { return; }
+        let Some(handle) = self.live_insert(track, slot) else { return };
+        let key = handle.key();
+        let state = self.insert_specs(track).get(slot).map(|s| s.state_b64.clone()).unwrap_or_default();
+        let fresh = self.device_param_state.get(&key) == Some(&state);
+        if (self.plugin_params.contains_key(&key) && fresh) || !self.plugin_busy.insert(key) { return; }
+        cx.spawn(async move |this, cx| {
+            let result = cx.background_spawn(async move { handle.params() }).await;
+            let _ = this.update(cx, |ed, cx| {
+                ed.plugin_busy.remove(&key);
+                ed.device_param_state.insert(key, state);
+                match result { Ok(params) => ed.cache_editor_params(key, params), Err(e) => ed.notice(format!("读取插件参数失败：{e}")) }
+                cx.notify();
+            });
+        }).detach();
+    }
+
+    /// Set several parameters of one track insert as a single edit: one host
+    /// round trip, one state capture and one undo step (a curve handle moves
+    /// frequency and gain together). Rolls back like a single-parameter edit.
+    pub(crate) fn set_track_insert_params(&mut self, track: TrackId, slot: usize, values: Vec<(String, f64)>, cx: &mut Context<Self>) {
+        let owner = InsertOwner::Track(track);
+        let Some(handle) = self.live_owned_insert(&owner, slot) else { return };
+        let key = handle.key();
+        let Some(current) = self.plugin_params.get(&key).cloned() else { return };
+        let mut changes = Vec::new();
+        for (id, value) in values {
+            let Some(desc) = current.iter().find(|d| d.id == id) else { continue };
+            match verdant_plugins::insert::parameter_editor_value(desc, value) {
+                Ok(v) if v != desc.value => changes.push((id, v)),
+                Ok(_) => {}
+                Err(error) => { self.notice(format!("参数值无效：{error}")); cx.notify(); return; }
+            }
+        }
+        if changes.is_empty() || !self.flush_insert_edits(cx) { return; }
+        if !self.plugin_busy.insert(key) { return; }
+        cx.notify();
+        let before = self.owned_insert_specs(&owner);
+        cx.spawn(async move |this, cx| {
+            let h = handle.clone();
+            let result = cx.background_spawn(async move {
+                let previous = h.get_state_b64()?;
+                let changed = (|| {
+                    let descs = h.params()?;
+                    for (id, value) in &changes {
+                        let desc = descs.iter().find(|d| &d.id == id).ok_or(verdant_plugins::AutomationError::UnknownParameter)?;
+                        let value = verdant_plugins::insert::parameter_editor_value(desc, *value)?;
+                        h.set_param(id, value)?;
+                    }
+                    Ok::<_, verdant_plugins::PluginError>((h.get_state_b64()?, h.params()?))
+                })();
+                Ok::<_, verdant_plugins::PluginError>((previous, changed))
+            }).await;
+            let _ = this.update(cx, |ed, cx| {
+                ed.plugin_busy.remove(&key);
+                match result {
+                    Ok((previous, Ok((state, params)))) => {
+                        if ed.owned_insert_specs(&owner) != before || ed.live_owned_insert(&owner, slot).is_none_or(|h| h.key() != key) {
+                            ed.notice("参数编辑期间插入配置已改变；恢复本次修改前的实时状态");
+                            ed.rollback_plugin_param(handle.clone(), previous, cx);
+                        } else {
+                            let mut specs = before;
+                            if let Some(spec) = specs.get_mut(slot) { spec.state_b64 = state; }
+                            if ed.commit_live_insert_specs(&owner, specs, "效果器参数", cx) {
+                                ed.cache_editor_params(key, params);
+                            } else { ed.rollback_plugin_param(handle.clone(), previous, cx); }
+                        }
+                    }
+                    Ok((previous, Err(e))) => {
+                        ed.notice(format!("效果器参数未保存：{e}；正在恢复修改前的实时状态"));
+                        ed.rollback_plugin_param(handle.clone(), previous, cx);
+                    }
+                    Err(e) => ed.notice(format!("效果器参数未保存：{e}")),
                 }
                 cx.notify();
             });

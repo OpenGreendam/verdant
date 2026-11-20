@@ -19,11 +19,12 @@ pub struct Recording {
 }
 pub struct IntegrationState {
     pub asset_policy:AssetPolicy,pub selected_clip:Option<(TrackId,String)>,pub recording:Option<Recording>,pub media_ready:bool,pub media_cache:verdant_media::WaveformCache,pub media_previews:HashMap<String,Arc<verdant_media::WaveformPreview>>,pub media_save_generation:u64,pub media_file_jobs:usize,
-    pub report:String,pub other_tracks:bool,pub three_lanes:bool,pub panel_params:[Param;3],pub active_panel:usize,pub scale_root:u8,pub scale_intervals:Vec<u8>,
+    pub report:String,pub other_tracks:bool,/// Parameter lanes shown under the roll, top to bottom; `active_panel` edits.
+    pub lanes:Vec<Param>,pub active_panel:usize,pub scale_root:u8,pub scale_intervals:Vec<u8>,
 }
 impl Default for IntegrationState {
     fn default()->Self{Self{asset_policy:AssetPolicy::new(Vec::<PathBuf>::new()).expect("empty asset policy"),selected_clip:None,recording:None,media_ready:false,media_cache:verdant_media::WaveformCache::default(),media_previews:HashMap::new(),media_save_generation:0,media_file_jobs:0,
-        report:String::new(),other_tracks:false,three_lanes:false,panel_params:[Param::Pit,Param::Dyn,Param::Gender],active_panel:0,scale_root:0,scale_intervals:Vec::new()}}
+        report:String::new(),other_tracks:false,lanes:vec![Param::Pit],active_panel:0,scale_root:0,scale_intervals:Vec::new()}}
 }
 fn action(label:impl Into<gpui::SharedString>,command:IntegrationAction)->crate::menu::MenuItem{
     crate::menu::MenuItem::action(label,MenuAction::Workflow(WorkflowAction::Integration(command)))
@@ -94,7 +95,7 @@ impl Editor {
             A::ExportScoreTrack(format,index)=>crate::files::export_score_with(self,format,Some(index),window,cx),
             A::VocaloidMetadata=>{let voice=self.project().extensions.get("vocaloid_voice").map(|v|serde_json::from_value::<verdant_exchange::VocaloidVoice>(v.clone())).transpose().map_err(|e|e.to_string())?;let text=voice.map(|v|format!("{} | {} | {} | {}",v.comp_id,v.name,v.language_id,v.program)).unwrap_or_default();self.prompt_integration("Vocaloid：真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",IntegrationPrompt::Vocaloid,&text,window,cx);}
             A::Scale=>self.open_scale_dialog(window,cx),
-            A::OtherTracks=>{self.integrations.other_tracks=!self.integrations.other_tracks;cx.notify();},A::ThreeLanes=>{self.integrations.three_lanes=!self.integrations.three_lanes;cx.notify();},
+            A::OtherTracks=>{self.integrations.other_tracks=!self.integrations.other_tracks;cx.notify();},A::ThreeLanes=>{self.add_lane(None,cx);},
             A::AuditionSelection=>{let pitch=self.selected_notes().first().map(|n|n.midi_note).ok_or("先选择音符")?;self.audition_pitch(pitch);}
             A::Report=>self.show_integration_report(cx),
         }Ok(())
@@ -103,11 +104,7 @@ impl Editor {
     pub(crate) fn show_integration_report(&mut self, cx: &mut Context<Self>) {
         // Read-only diagnostics stay in the same window and never borrow the
         // lyric input handle or confirm an active lyric/IME session.
-        self.layout.show_right_dock = true;
-        self.layout.right_dock_tab = crate::ui_controls::RightDockTab::RenderInserts;
-        self.layout.store(&mut self.prefs);
-        self.prefs_dirty = true;
-        cx.notify();
+        self.open_right_dock(crate::ui_controls::RightDockTab::RenderInserts, cx);
     }
     pub(super) fn apply_integration_prompt(&mut self,purpose:&IntegrationPrompt,text:&str,cx:&mut Context<Self>)->Result<(),String>{
         match purpose{
@@ -161,20 +158,20 @@ impl Editor {
         use IntegrationAction as A;
         let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;
         let has_segments=self.active_track().is_some_and(|track|settings.segments.values().any(|entry|entry.track==track.id));
-        let mut items=vec![crate::menu::MenuItem::disabled(if has_segments{"工程默认读音器（未设歌手覆盖且不在分段映射区间时使用）"}else{"工程默认读音器（未设歌手覆盖时使用）"})];
+        let mut items=vec![crate::menu::MenuItem::header(if has_segments{"工程默认读音器（未设歌手覆盖且不在分段映射区间时使用）"}else{"工程默认读音器（未设歌手覆盖时使用）"})];
         if self.active_track().is_some_and(|track|track.unknown.contains_key("voice_language")){items.push(crate::menu::MenuItem::disabled(if has_segments{"当前轨道已指定语言，除分段映射覆盖的音符外优先使用该语言读音器；清除轨道语言后恢复以下设置"}else{"当前轨道已指定语言，优先使用该语言读音器；清除轨道语言后恢复以下设置"}));}
-        for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("{}工程 · {}",if settings.selected==p.id{"✓ "}else{""},p.name),A::ChoosePhonemizer(p.id.into())));}
+        for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("工程 · {}",p.name),A::ChoosePhonemizer(p.id.into())).checked(settings.selected==p.id));}
         if let Some(reference)=self.active_track().and_then(|track|track.voice_ref.as_ref()){
             let selected=settings.singer_selections.get(reference);
-            items.push(crate::menu::MenuItem::disabled(format!("歌手 {reference} · 此工程所有同歌手轨道")));
-            items.push(action(format!("{}歌手 · 跟随工程默认",if selected.is_none(){"✓ "}else{""}),A::ChooseSingerPhonemizer(reference.clone(),None)));
-            for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("{}歌手 · {}",if selected.is_some_and(|id|id.as_str()==p.id){"✓ "}else{""},p.name),A::ChooseSingerPhonemizer(reference.clone(),Some(p.id.into()))));}
+            items.push(crate::menu::MenuItem::header(format!("歌手 {reference} · 此工程所有同歌手轨道")));
+            items.push(action("歌手 · 跟随工程默认",A::ChooseSingerPhonemizer(reference.clone(),None)).checked(selected.is_none()));
+            for p in verdant_backend::phonemizer::capabilities(){items.push(action(format!("歌手 · {}",p.name),A::ChooseSingerPhonemizer(reference.clone(),Some(p.id.into()))).checked(selected.is_some_and(|id|id.as_str()==p.id)));}
         }else{items.push(crate::menu::MenuItem::disabled("先选择轨道歌手，可为该歌手设置读音器"));}
         items.push(action("分段映射…",A::Segments));
         self.show_menu(window.mouse_position(),items,window,cx);Ok(())
     }
     fn dictionary_menu(&mut self,window:&mut Window,cx:&mut Context<Self>)->Result<(),String>{
-        let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;let mut items=vec![crate::menu::MenuItem::disabled("工程词典 · 显式音符优先，其次词组、词条，再使用内置读音"),action("添加歌词 / 词组读音…",IntegrationAction::AddDictionaryEntry)];
+        let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;let mut items=vec![crate::menu::MenuItem::header("工程词典 · 显式音符优先，其次词组、词条，再使用内置读音"),action("添加歌词 / 词组读音…",IntegrationAction::AddDictionaryEntry)];
         for(key,entry)in &settings.dictionary.lyrics{items.push(action(format!("编辑 · {}",reading_text(key,&entry.reading)),IntegrationAction::EditDictionaryEntry(key.clone(),false)));items.push(action(format!("删除 · {key}"),IntegrationAction::RemoveDictionaryEntry(key.clone(),false)));}
         for(key,entry)in &settings.dictionary.phrases{let text=entry.lyrics.iter().zip(&entry.readings).map(|(lyric,reading)|reading_text(lyric,reading)).collect::<Vec<_>>().join(" ");items.push(action(format!("编辑词组 · {text}"),IntegrationAction::EditDictionaryEntry(key.clone(),true)));items.push(action(format!("删除词组 · {key}"),IntegrationAction::RemoveDictionaryEntry(key.clone(),true)));}
         items.push(action("导入词典文件…",IntegrationAction::ImportDictionary));items.push(action("导出词典文件…",IntegrationAction::ExportDictionary));self.show_menu(window.mouse_position(),items,window,cx);Ok(())

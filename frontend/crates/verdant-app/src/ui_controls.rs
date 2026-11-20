@@ -23,11 +23,12 @@ use crate::theme::{Theme, with_alpha};
 pub const LAYOUT_PREFS_KEY: &str = "ui_layout";
 
 /// Design-system uniform row height tokens so horizontal toolbars/rows never stair-step.
-pub const TOP_BTN_H: f32 = 28.0;
-pub const BAR_BTN_H: f32 = 26.0;
-pub const PANEL_BTN_H: f32 = 28.0;
+/// libadwaita metrics: header bar buttons 32 px, toolbar controls 30 px,
+/// fields and buttons in panes 34 px.
+pub const TOP_BTN_H: f32 = 32.0;
+pub const BAR_BTN_H: f32 = 30.0;
+pub const PANEL_BTN_H: f32 = 34.0;
 pub const HDR_BTN_H: f32 = 22.0;
-pub const RIGHT_RAIL_W: f32 = 36.0;
 
 pub fn route_display_name(route: Route) -> &'static str {
     match route {
@@ -49,12 +50,50 @@ pub enum InspectorTab {
     SystemHistory,
 }
 
+/// Window-width classes. Below `Medium` the side panels stop being columns
+/// and open as drawers over the timeline, and the toolbar folds its menus.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum WidthClass {
+    /// Phones and very narrow windows.
+    Phone,
+    /// Tablets in portrait, half-screen windows.
+    Compact,
+    /// Laptops and tablets in landscape.
+    Medium,
+    #[default]
+    Wide,
+}
+
+impl WidthClass {
+    pub fn of(width: f32) -> Self {
+        match width {
+            w if w < 760.0 => Self::Phone,
+            w if w < 1100.0 => Self::Compact,
+            w if w < 1440.0 => Self::Medium,
+            _ => Self::Wide,
+        }
+    }
+    /// Side panels are docked columns; otherwise they open as drawers.
+    pub fn docks_panels(self) -> bool { self >= Self::Medium }
+}
+
+/// A side panel shown as an overlay in narrow windows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drawer { Left, Right }
+
+/// Toolbar control size: 28 px for a pointer, 36 px once touch input is seen
+/// (close to the 44 pt / 48 dp platform guidance within a dense toolbar).
+pub fn bar_button_size(touch: bool) -> f32 { if touch { 36.0 } else { TOP_BTN_H } }
+pub fn bar_height(touch: bool) -> f32 { if touch { 56.0 } else { 48.0 } }
+
 /// Synthesizer V Studio-style right property dock tabs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RightDockTab {
+    /// Note properties now live in the left inspector; layouts saved with the
+    /// retired note tab open on the voice tab.
     #[default]
-    NotePhoneme,
+    #[serde(alias = "note_phoneme")]
     VoiceTimbre,
     Dictionary,
     RenderInserts,
@@ -78,10 +117,10 @@ pub struct LayoutPrefs {
 impl Default for LayoutPrefs {
     fn default() -> Self {
         Self {
-            inspector_width: 242.0,
-            right_dock_width: 292.0,
+            inspector_width: 300.0,
+            right_dock_width: 340.0,
             show_right_dock: true,
-            right_dock_tab: RightDockTab::NotePhoneme,
+            right_dock_tab: RightDockTab::VoiceTimbre,
             arrange_height: 160.0,
             lane_height: 184.0,
             inspector_tab: InspectorTab::TrackNote,
@@ -94,8 +133,8 @@ impl Default for LayoutPrefs {
 impl LayoutPrefs {
     pub fn clamped(self) -> Self {
         Self {
-            inspector_width: if self.inspector_width.is_finite() { self.inspector_width.clamp(210.0, 420.0) } else { 242.0 },
-            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(244.0, 440.0) } else { 292.0 },
+            inspector_width: if self.inspector_width.is_finite() { self.inspector_width.clamp(260.0, 440.0) } else { 300.0 },
+            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, 480.0) } else { 340.0 },
             show_right_dock: self.show_right_dock,
             right_dock_tab: self.right_dock_tab,
             arrange_height: if self.arrange_height.is_finite() { self.arrange_height.clamp(92.0, 460.0) } else { 160.0 },
@@ -134,18 +173,18 @@ pub fn selectable_button(
         .aria_label(label.clone())
         .aria_selected(active)
         .h(px(BAR_BTN_H))
-        .px(px(8.0))
+        .px(px(11.0))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(5.0))
-        .bg(if active { th.accent } else { th.control })
+        .rounded(px(6.0))
+        .bg(if active { th.checked } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.separator })
-        .text_xs()
+        .border_color(if active { th.checked } else { th.control })
+        .text_sm()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-        .text_color(if active { th.accent_text } else { th.text })
-        .hover(move |s| s.bg(if active { th.accent } else { th.control_pressed }))
+        .text_color(th.text)
+        .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
         .child(label)
 }
 
@@ -158,26 +197,26 @@ pub fn icon_selectable_button(
     th: Theme,
 ) -> Stateful<Div> {
     let label = label.into();
-    let fg = if active { th.accent_text } else { th.text };
+    let fg = th.text;
     div()
         .id(id.into())
         .role(Role::Button)
         .aria_label(label.clone())
         .aria_selected(active)
         .h(px(BAR_BTN_H))
-        .px(px(8.0))
-        .gap(px(5.0))
+        .px(px(11.0))
+        .gap(px(6.0))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(5.0))
-        .bg(if active { th.accent } else { th.control })
+        .rounded(px(6.0))
+        .bg(if active { th.checked } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.separator })
-        .text_xs()
+        .border_color(if active { th.checked } else { th.control })
+        .text_sm()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(fg)
-        .hover(move |s| s.bg(if active { th.accent } else { th.control_pressed }))
+        .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
         .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
         .child(label)
 }
@@ -196,15 +235,15 @@ pub fn select_button(
         .role(Role::Button)
         .aria_label(aria_name.into())
         .h(px(PANEL_BTN_H))
-        .px(px(8.0))
-        .gap(px(6.0))
+        .px(px(12.0))
+        .gap(px(8.0))
         .flex()
         .items_center()
-        .rounded(px(5.0))
+        .rounded(px(6.0))
         .bg(th.control)
         .border_1()
-        .border_color(th.separator)
-        .text_xs()
+        .border_color(th.control)
+        .text_sm()
         .text_color(th.text)
         .hover(move |s| s.bg(th.control_pressed))
         .when_some(leading_icon, |d, ic| {
@@ -231,9 +270,9 @@ pub fn selectable_command_button(
         arg,
         label.clone(),
         key,
-        if active { th.accent_text.into() } else { th.text.into() },
-        if active { th.accent.into() } else { th.control.into() },
-        if active { th.accent.into() } else { th.control_pressed.into() },
+        th.text.into(),
+        if active { th.checked.into() } else { th.control.into() },
+        if active { th.checked.into() } else { th.control_pressed.into() },
         cx,
     )
     .role(Role::Button)
@@ -241,11 +280,43 @@ pub fn selectable_command_button(
     .aria_selected(active)
     .h(px(BAR_BTN_H))
     .py(px(0.0))
-    .px(px(8.0))
-    .rounded(px(5.0))
+    .px(px(11.0))
+    .rounded(px(6.0))
+    .text_sm()
     .border_1()
-    .border_color(if active { th.accent } else { th.separator })
+    .border_color(if active { th.checked } else { th.control })
     .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+}
+
+/// libadwaita "flat" button for header bars: no fill until hovered; the
+/// accent fill marks a toggle that is on.
+pub fn flat_command_button(
+    ed: &Editor,
+    cmd: Cmd,
+    arg: Arg,
+    label: impl Into<SharedString>,
+    key: impl Into<gpui::ElementId>,
+    active: bool,
+    cx: &mut Context<Editor>,
+) -> Stateful<Div> {
+    let label = label.into();
+    let th = ed.theme;
+    let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
+    controls::command_button(
+        cmd,
+        arg,
+        label.clone(),
+        key,
+        th.text.into(),
+        if active { th.checked.into() } else { clear.into() },
+        if active { th.checked.into() } else { th.hover.into() },
+        cx,
+    )
+    .role(Role::Button)
+    .aria_label(label)
+    .aria_selected(active)
+    .py(px(0.0))
+    .rounded(px(6.0))
 }
 
 /// Command button with a leading Lucide SVG icon, text label, and uniform `BAR_BTN_H` height.
@@ -261,11 +332,33 @@ pub fn icon_command_button(
 ) -> Stateful<Div> {
     let label = label.into();
     let th = ed.theme;
-    let fg = if active { th.accent_text } else { th.text };
+    let fg = th.text;
     selectable_command_button(ed, cmd, arg, "", key, active, cx)
         .aria_label(label.clone())
         .gap(px(5.0))
         .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
+        .child(label)
+}
+
+/// Flat header-bar button with a leading icon and a text label.
+pub fn flat_icon_command_button(
+    ed: &Editor,
+    cmd: Cmd,
+    icon_name: &'static str,
+    label: impl Into<SharedString>,
+    key: impl Into<gpui::ElementId>,
+    active: bool,
+    cx: &mut Context<Editor>,
+) -> Stateful<Div> {
+    let label = label.into();
+    let th = ed.theme;
+    let fg = th.text;
+    flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
+        .aria_label(label.clone())
+        .px(px(9.0))
+        .gap(px(6.0))
+        .text_sm()
+        .child(svg().path(icon(icon_name)).size(px(15.0)).flex_none().text_color(fg))
         .child(label)
 }
 
@@ -294,9 +387,12 @@ pub fn generated_select_button(
     .aria_label(spec.label)
     .h(px(PANEL_BTN_H))
     .py(px(0.0))
-    .gap(px(6.0))
+    .px(px(12.0))
+    .gap(px(8.0))
+    .text_sm()
+    .rounded(px(6.0))
     .border_1()
-    .border_color(th.separator)
+    .border_color(th.control)
     .child(svg().path(icon("chevron-down")).size(px(13.0)).flex_none().text_color(th.text_secondary))
 }
 
@@ -485,15 +581,17 @@ pub fn numeric_pill(
     let stepper = |btn_id: SharedString, direction: f64, symbol: &'static str, step_arg: Arg| {
         div()
             .id(btn_id)
-            .px(px(6.0))
+            .w(px(if compact { 24.0 } else { 30.0 }))
             .h_full()
+            .flex_none()
             .flex()
             .items_center()
             .justify_center()
-            .text_xs()
-            .text_color(th.text_secondary)
-            .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
-            .child(symbol)
+            .border_l_1()
+            .border_color(th.shade)
+            .text_color(th.text)
+            .hover(move |s| s.bg(th.control_pressed))
+            .child(svg().path(icon(symbol)).size(px(13.0)).text_color(th.text))
             .on_click(cx.listener(move |target, ev: &ClickEvent, _, cx| {
                 let cur = target.numeric_value(id, step_arg.clone());
                 if let Some(next) = spec.stepped(cur, direction, ev.modifiers().shift) {
@@ -640,40 +738,38 @@ pub fn numeric_pill(
         .h(px(if compact { BAR_BTN_H } else { PANEL_BTN_H }))
         .flex()
         .items_center()
-        .rounded(px(5.0))
+        .rounded(px(6.0))
         .bg(th.control)
         .border_1()
-        .border_color(if scrubbing { th.accent } else { th.separator })
+        .border_color(if scrubbing { th.accent } else { th.control })
         .overflow_hidden()
-        .child(stepper(dec_id, -1.0, "−", dec_arg))
+        // GtkSpinButton: the value (drag to scrub) then − and + on the right.
         .child(
             div()
                 .relative()
                 .h_full()
-                .px(px(6.0))
-                .min_w(px(if compact { 76.0 } else { 96.0 }))
+                .px(px(if compact { 8.0 } else { 10.0 }))
+                .min_w(px(if compact { 76.0 } else { 64.0 }))
                 .flex_1()
                 .flex()
                 .items_center()
-                .justify_center()
-                .border_l_1()
-                .border_r_1()
-                .border_color(th.separator)
-                .text_xs()
+                .when(compact, |d| d.justify_center())
+                .text_sm()
                 .text_color(th.text)
                 .child(display_text)
                 .child(div().absolute().inset_0().child(center)),
         )
-        .child(stepper(inc_id, 1.0, "+", inc_arg));
+        .child(stepper(dec_id, -1.0, "minus", dec_arg))
+        .child(stepper(inc_id, 1.0, "plus", inc_arg));
 
     if compact {
         pill.flex().items_center().child(inner_box)
     } else {
         pill.flex()
             .items_center()
-            .gap(px(8.0))
-            .child(div().w(px(64.0)).flex_none().text_xs().text_color(th.text_secondary).child(zh_label))
-            .child(div().flex_1().child(inner_box))
+            .gap(px(12.0))
+            .child(div().flex_1().min_w(px(56.0)).text_sm().text_color(th.text).child(zh_label))
+            .child(div().flex_shrink_0().w(px(150.0)).child(inner_box))
     }
 }
 
@@ -691,9 +787,10 @@ pub fn show_grid_preset_menu(
     if is_snap {
         items.push(
             MenuItem::action(
-                format!("{}关 · 不吸附网格", if current == 0 { "✓ " } else { "" }),
+                "关 · 不吸附网格",
                 crate::editor::MenuAction::SetGridTicks { snap: true, ticks: 0 },
             )
+            .checked(current == 0)
             .with_hint("Alt 临时不吸附"),
         );
         items.push(MenuItem::separator());
@@ -713,9 +810,10 @@ pub fn show_grid_preset_menu(
         if let Some(ticks) = subdivision_ticks(ppq, num, den) {
             items.push(
                 MenuItem::action(
-                    format!("{}{name}", if current == ticks { "✓ " } else { "" }),
+                    name,
                     crate::editor::MenuAction::SetGridTicks { snap: is_snap, ticks },
                 )
+                .checked(current == ticks)
                 .with_hint(format!("{ticks}t")),
             );
         }
@@ -784,7 +882,7 @@ pub fn splitter_bar(editor: Entity<Editor>, kind: SplitterKind, th: Theme) -> im
                     } else if hovered {
                         with_alpha(th.accent, 0.7)
                     } else {
-                        th.separator
+                        th.shade
                     };
                     if vertical {
                         window.paint_quad(fill(b((w - 1.0) / 2.0, 0.0, if dragging { 2.0 } else { 1.0 }, h, o), line_color));
@@ -908,7 +1006,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
         .items_center()
         .bg(th.surface)
         .border_t_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex_1()
@@ -1015,7 +1113,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .items_center()
                 .justify_center()
                 .border_l_1()
-                .border_color(th.separator)
+                .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
@@ -1043,7 +1141,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .items_center()
                 .justify_center()
                 .border_l_1()
-                .border_color(th.separator)
+                .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
@@ -1106,8 +1204,8 @@ mod tests {
         };
         custom.store(&mut prefs);
         let loaded = LayoutPrefs::from_prefs(&prefs);
-        assert_eq!(loaded.inspector_width, 420.0);
-        assert_eq!(loaded.right_dock_width, 244.0);
+        assert_eq!(loaded.inspector_width, 440.0);
+        assert_eq!(loaded.right_dock_width, 280.0);
         assert!(!loaded.show_right_dock);
         assert_eq!(loaded.right_dock_tab, RightDockTab::Dictionary);
         assert_eq!(loaded.arrange_height, 92.0);
@@ -1124,5 +1222,27 @@ mod tests {
         assert_eq!(route_display_name(Route::C0), "原始声库");
         assert_eq!(route_short_name(Route::VerdantVoice), "verdant-voice");
         assert_eq!(route_short_name(Route::C0), "原始声库");
+    }
+}
+
+#[cfg(test)]
+mod width_class_tests {
+    use super::*;
+
+    #[test]
+    fn width_classes_cover_phone_to_desktop() {
+        assert_eq!(WidthClass::of(390.0), WidthClass::Phone);
+        assert_eq!(WidthClass::of(820.0), WidthClass::Compact);
+        assert_eq!(WidthClass::of(1180.0), WidthClass::Medium);
+        assert_eq!(WidthClass::of(1920.0), WidthClass::Wide);
+        assert!(!WidthClass::Compact.docks_panels() && WidthClass::Medium.docks_panels());
+        assert!(bar_button_size(true) > bar_button_size(false));
+    }
+
+    #[test]
+    fn layouts_saved_with_the_retired_note_tab_still_load() {
+        let layout: LayoutPrefs = serde_json::from_value(serde_json::json!({"right_dock_tab": "note_phoneme", "inspector_width": 300.0})).unwrap();
+        assert_eq!(layout.right_dock_tab, RightDockTab::VoiceTimbre);
+        assert_eq!(layout.inspector_width, 300.0);
     }
 }

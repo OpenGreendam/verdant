@@ -87,7 +87,7 @@ fn license_block(title: &'static str, text: &'static str, th: Theme) -> gpui::Di
     div().flex_none().flex().flex_col().gap(px(4.0))
         .child(div().flex_none().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(th.text).child(title))
         .child(
-            div().flex_none().w_full().p(px(8.0)).rounded(px(5.0)).bg(th.control).border_1().border_color(th.separator)
+            div().flex_none().w_full().p(px(8.0)).rounded(px(5.0)).bg(th.control).border_1().border_color(th.shade)
                 .text_xs().text_color(th.text_secondary).font_family("monospace")
                 .child(text),
         )
@@ -220,7 +220,7 @@ impl Render for Disclosures {
                     .child(div().flex().gap(px(8.0)).children(Locale::ALL.into_iter().map(|choice| {
                         div().id(choice.code()).role(Role::Button).aria_label(choice.native_name())
                             .aria_selected(choice == locale).tab_index(0)
-                            .px(px(10.0)).py(px(6.0)).rounded(px(4.0)).border_1().border_color(th.separator)
+                            .px(px(10.0)).py(px(6.0)).rounded(px(4.0)).border_1().border_color(th.shade)
                             .bg(if choice == locale { th.control_pressed } else { th.control })
                             .focus(|style| style.border_color(th.accent))
                             .text_sm().child(choice.native_name())

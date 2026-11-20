@@ -24,6 +24,7 @@
 
 #[cfg(feature = "client")]
 pub mod bridge;
+pub mod builtin_dsp;
 pub mod error;
 #[cfg(feature = "client")]
 pub mod insert;

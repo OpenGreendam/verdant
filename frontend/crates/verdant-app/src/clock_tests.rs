@@ -1,4 +1,4 @@
-use super::{follow_playhead, lcd_position};
+use super::{PlayheadSmoother, follow_playhead, lcd_position};
 use verdant_audio::engine::{Clip, Timeline, Transport, channel};
 use verdant_domain::{TrackId, model::{TempoPoint, TimeSignature}, timing::{MeterMap, TempoMap}};
 use verdant_session::{EditorSession, Viewport};
@@ -156,4 +156,46 @@ fn lcd_changes_meter_on_the_rounded_seek_frame_and_carries_minutes() {
     assert_eq!(boundary.musical, "002:01:01:001");
     assert_eq!(boundary.signature, "7/8");
     assert_eq!(lcd_position(2_879_981, 48_000, &tempo, &meter).time, "01:00.000");
+}
+
+#[test]
+fn playhead_smoother_turns_buffer_steps_into_steady_motion() {
+    use std::time::{Duration, Instant};
+    let t0 = Instant::now();
+    let mut smoother = PlayheadSmoother::default();
+    // 60 Hz frames over an audio clock that only advances every 20 ms.
+    let (mut previous, mut worst_step, mut worst_lag) = (smoother.sample(0.0, t0, true), 0.0f64, 0.0f64);
+    for frame in 1..=240u32 {
+        let t = frame as f64 / 60.0;
+        let raw = (t / 0.02).floor() * 0.02;
+        let shown = smoother.sample(raw, t0 + Duration::from_secs_f64(t), true);
+        assert!(shown >= previous, "never runs backwards while playing");
+        assert!(shown <= raw + PlayheadSmoother::MAX_LEAD + 1e-9);
+        if frame > 60 {
+            worst_step = worst_step.max(((shown - previous) - 1.0 / 60.0).abs());
+            worst_lag = worst_lag.max((t - shown).abs());
+        }
+        previous = shown;
+    }
+    // Raw stepping alternates 0 ms and 20 ms advances per frame (±16.7 ms
+    // error); the smoothed playhead stays within a few ms of even motion.
+    assert!(worst_step < 0.006, "frame-to-frame jitter {worst_step}");
+    assert!(worst_lag < 0.03, "lag {worst_lag}");
+}
+
+#[test]
+fn playhead_smoother_follows_seeks_loops_and_stops() {
+    use std::time::{Duration, Instant};
+    let t0 = Instant::now();
+    let mut smoother = PlayheadSmoother::default();
+    smoother.sample(4.0, t0, true);
+    smoother.sample(4.02, t0 + Duration::from_millis(20), true);
+    // Loop wrap: audio jumps backwards and the playhead follows at once.
+    assert_eq!(smoother.sample(1.0, t0 + Duration::from_millis(40), true), 1.0);
+    // Large forward jump snaps too.
+    assert_eq!(smoother.sample(9.0, t0 + Duration::from_millis(60), true), 9.0);
+    // Stopped: always the exact audio position.
+    assert_eq!(smoother.sample(2.5, t0 + Duration::from_millis(80), false), 2.5);
+    smoother.reset();
+    assert_eq!(smoother.sample(3.0, t0 + Duration::from_millis(100), true), 3.0);
 }

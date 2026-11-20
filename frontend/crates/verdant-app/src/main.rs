@@ -17,6 +17,7 @@ mod automation_lane;
 mod clock;
 mod commands;
 mod curve_span;
+mod devices;
 mod dialogs;
 mod disclosures;
 mod demos;
@@ -43,6 +44,7 @@ mod table;
 mod theme;
 mod ui_controls;
 mod view;
+mod window_chrome;
 mod voice_presets;
 
 use std::path::PathBuf;
@@ -267,7 +269,9 @@ fn main() {
         cx.set_menus(actions::menus());
         crate::disclosures::i18n::initialize(&startup.prefs, cx);
         let bounds = files::remembered_bounds(&startup.prefs, cx);
-        let options = WindowOptions { window_bounds: Some(bounds), app_id: Some("verdant".into()), ..Default::default() };
+        let mut options = WindowOptions { window_bounds: Some(bounds), app_id: Some("verdant".into()), ..Default::default() };
+        // The toolbar is the title bar (see window_chrome).
+        window_chrome::apply(&mut options, ui_controls::bar_height(false));
         match document {
             files::StartupOpen::Opened(document) => {
                 cx.open_window(options, |window, cx| {

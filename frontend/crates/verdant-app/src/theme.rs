@@ -95,8 +95,23 @@ pub struct Theme {
     pub pride: bool,
     /// Window background (behind panes).
     pub window: Rgba,
-    /// Pane surfaces: control bar, inspector, track headers, mixer.
+    /// Pane surfaces (sidebars): inspector, track headers, mixer.
     pub surface: Rgba,
+    /// Toolbar / title bar.
+    pub headerbar: Rgba,
+    /// Content views: timeline fields, lists, the LCD.
+    pub view: Rgba,
+    /// Grouped rows on a sidebar (preference-group cards).
+    pub card: Rgba,
+    /// Menus, popovers and dialogs.
+    pub popover: Rgba,
+    /// Quiet hairline between panes (decorative; `separator` is the
+    /// 3:1 outline for boundaries a user must see).
+    pub shade: Rgba,
+    /// Hover fill for flat buttons and menu rows.
+    pub hover: Rgba,
+    /// A toggle that is on (GtkToggleButton:checked); carries primary text.
+    pub checked: Rgba,
     /// Raised controls (segmented buttons, slots).
     pub control: Rgba,
     pub control_pressed: Rgba,
@@ -184,71 +199,88 @@ impl Theme {
         }
     }
 
+    /// GNOME HIG / libadwaita dark palette (window, view, header bar, card,
+    /// popover), with every text ramp kept at WCAG AA on every surface.
     pub fn dark() -> Self {
-        let success = rgb(0x59d987);
-        let warning = rgb(0xff9f0a);
+        let success = rgb(0x8ff0a4);
+        let warning = rgb(0xf8e45c);
         Theme {
             dark: true,
             pride: false,
-            window: rgb(0x1c1c1e),
-            surface: rgb(0x262628),
-            control: rgb(0x3a3a3c),
-            control_pressed: rgb(0x4c4c50),
-            separator: rgb(0x787880),
-            text: rgb(0xebebf0),
-            text_secondary: rgb(0xc3c3ca),
-            text_tertiary: rgb(0xbdbdc6),
-            accent: rgb(0x076bd0),
+            window: rgb(0x222226),
+            surface: rgb(0x2e2e32),
+            headerbar: rgb(0x2e2e32),
+            view: rgb(0x1d1d20),
+            card: rgb(0x38383c),
+            popover: rgb(0x36363a),
+            shade: rgb(0x18181b),
+            hover: rgba(0xffffff17),
+            checked: rgb(0x6a6a6e),
+            control: rgb(0x434347),
+            control_pressed: rgb(0x4e4e52),
+            separator: rgb(0x808086),
+            text: rgb(0xffffff),
+            text_secondary: rgb(0xc8c8cc),
+            text_tertiary: rgb(0xc0c0c5),
+            accent: rgb(0x1c71d8),
             accent_text: rgb(0xffffff),
-            selection: rgba(0x0a84ff40),
+            selection: rgba(0x3584e440),
             success,
-            error: rgb(0xff7268),
+            error: rgb(0xff7b63),
             warning,
-            roll_white: rgb(0x2a2a2d),
-            roll_black: rgb(0x232326),
-            grid_bar: rgb(0x4b4b50),
-            grid_beat: rgb(0x38383c),
-            grid_sub: rgb(0x303033),
-            key_white: rgb(0xd9d9de),
-            key_black: rgb(0x1a1a1c),
-            playhead: rgb(0xf2f2f7),
-            lcd: rgb(0x141416),
+            roll_white: rgb(0x1d1d20),
+            roll_black: rgb(0x19191c),
+            grid_bar: rgb(0x48484d),
+            grid_beat: rgb(0x323236),
+            grid_sub: rgb(0x26262a),
+            key_white: rgb(0xdedee2),
+            key_black: rgb(0x1d1d20),
+            playhead: rgb(0xffffff),
+            lcd: rgb(0x1a1a1d),
             meter_low: success,
             meter_high: warning,
         }
     }
 
+    /// GNOME HIG / libadwaita light palette.
     pub fn light() -> Self {
-        let success = rgb(0x18733b);
-        let warning = rgb(0xc93400);
+        let success = rgb(0x16733f);
+        let warning = rgb(0x8a6102);
         Theme {
             dark: false,
             pride: false,
-            window: rgb(0xe8e8ed),
-            surface: rgb(0xf5f5f7),
-            control: rgb(0xffffff),
-            control_pressed: rgb(0xd8d8de),
-            separator: rgb(0x898990),
-            text: rgb(0x1d1d1f),
-            // Keep every text ramp above the 4.5 contrast floor on the
-            // darkest light background (control_pressed 0xd8d8de).
-            text_secondary: rgb(0x575760),
-            text_tertiary: rgb(0x5e5e66),
-            accent: rgb(0x0065cf),
+            window: rgb(0xfafafb),
+            surface: rgb(0xebebed),
+            headerbar: rgb(0xffffff),
+            view: rgb(0xffffff),
+            card: rgb(0xffffff),
+            popover: rgb(0xffffff),
+            shade: rgb(0xd6d6d9),
+            hover: rgba(0x00000612),
+            checked: rgb(0xb4b4b7),
+            control: rgb(0xdcdcde),
+            control_pressed: rgb(0xcdcdcf),
+            separator: rgb(0x7f7f85),
+            text: rgb(0x2e2e32),
+            // Every text ramp stays above 4.5 on the darkest light
+            // background (control_pressed).
+            text_secondary: rgb(0x4f4f54),
+            text_tertiary: rgb(0x56565b),
+            accent: rgb(0x1c71d8),
             accent_text: rgb(0xffffff),
-            selection: rgba(0x007aff33),
+            selection: rgba(0x3584e433),
             success,
-            error: rgb(0xd70015),
+            error: rgb(0xc01c28),
             warning,
             roll_white: rgb(0xffffff),
-            roll_black: rgb(0xf2f2f5),
-            grid_bar: rgb(0xb4b4bb),
-            grid_beat: rgb(0xdcdce1),
-            grid_sub: rgb(0xececf0),
+            roll_black: rgb(0xf4f4f6),
+            grid_bar: rgb(0xb8b8bd),
+            grid_beat: rgb(0xdedee2),
+            grid_sub: rgb(0xededf0),
             key_white: rgb(0xffffff),
-            key_black: rgb(0x2c2c2e),
-            playhead: rgb(0x1d1d1f),
-            lcd: rgb(0xe0e0e5),
+            key_black: rgb(0x2e2e32),
+            playhead: rgb(0x2e2e32),
+            lcd: rgb(0xe4e4e7),
             meter_low: success,
             meter_high: warning,
         }
@@ -322,7 +354,7 @@ pub fn appearance_controls(editor: &crate::editor::Editor, cx: &mut gpui::Contex
                 .aria_selected(active).cursor_pointer().h(px(crate::ui_controls::BAR_BTN_H)).px(px(8.0)).flex().items_center().justify_center().rounded(px(5.0))
                 .bg(if active { theme.accent } else { theme.control })
                 .text_color(if active { theme.accent_text } else { theme.text })
-                .border_1().border_color(if active { theme.accent } else { theme.separator })
+                .border_1().border_color(if active { theme.accent } else { theme.control })
                 .on_click(cx.listener(move |ed, _, window, cx| ed.set_appearance_preference(preference, window, cx)))
                 .child(label)
         }))
@@ -346,7 +378,7 @@ pub fn pride_controls(editor: &crate::editor::Editor, cx: &mut gpui::Context<cra
                 .flex().items_center().justify_center().rounded(px(5.0))
                 .bg(if active { theme.accent } else { theme.control })
                 .text_color(if active { theme.accent_text } else { theme.text })
-                .border_1().border_color(if active { theme.accent } else { theme.separator })
+                .border_1().border_color(if active { theme.accent } else { theme.control })
                 .hover(move |s| s.bg(if active { theme.accent } else { theme.control_pressed }))
                 .on_click(cx.listener(move |ed, _, window, cx| ed.set_pride_preference(preference, window, cx)))
                 .child(label)
@@ -386,6 +418,12 @@ pub fn system_ui_font(available: &[String]) -> String {
             }
         }
     }
+    // GNOME's own UI faces first, so Verdant matches libadwaita apps.
+    for f in ["Adwaita Sans", "Cantarell"] {
+        if has(f) {
+            return f.into();
+        }
+    }
     if let Ok(out) = std::process::Command::new("fc-match").args(["-f", "%{family[0]}", "sans-serif"]).output() {
         let fam = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if !fam.is_empty() && has(&fam) {
@@ -398,6 +436,11 @@ pub fn system_ui_font(available: &[String]) -> String {
         }
     }
     ".SystemUIFont".into()
+}
+
+/// Tabular (equal-advance) figures, for faces that default to proportional digits.
+pub fn tabular_figures() -> gpui::FontFeatures {
+    gpui::FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)]))
 }
 
 #[cfg(test)]

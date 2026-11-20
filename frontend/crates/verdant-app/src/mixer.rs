@@ -60,8 +60,10 @@ pub fn mixer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) -> 
         .id("mixer")
         .size_full()
         .flex()
-        .bg(th.window)
-        .child(div().id("mixer-strips").flex_1().min_w_0().h_full().overflow_x_scroll().flex().children(strips))
+        .bg(th.view)
+        .p(px(8.0))
+        .gap(px(8.0))
+        .child(div().id("mixer-strips").flex_1().min_w_0().h_full().overflow_x_scroll().flex().gap(px(8.0)).children(strips))
         .child(master_strip(ed, entity, cx))
         .children(parameter_panel(ed, cx))
 }
@@ -106,7 +108,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                 .flex()
                 .flex_col()
                 .gap(px(3.0))
-                .rounded(px(4.0))
+                .rounded(px(8.0))
                 .bg(th.control)
                 .p(px(4.0))
                 .child(
@@ -159,23 +161,22 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
         .h_full()
         .flex()
         .flex_col()
-        .gap(px(5.0))
-        .p(px(8.0))
-        .bg(th.surface)
-        .border_l_1()
-        .border_color(th.separator)
+        .gap(px(6.0))
+        .p(px(10.0))
+        .rounded(px(12.0))
+        .bg(th.card)
         .child(
             div()
                 .flex()
                 .items_center()
                 .justify_between()
-                .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child("主总线 Master"))
+                .child(div().text_sm().font_weight(FontWeight::BOLD).child("主总线"))
                 .child(
                     div()
                         .px(px(5.0))
                         .py(px(1.0))
-                        .rounded(px(3.0))
-                        .bg(if clipped { th.error } else { th.lcd })
+                        .rounded(px(6.0))
+                        .bg(if clipped { th.error } else { th.view })
                         .text_size(px(10.0))
                         .font_family("monospace")
                         .text_color(if clipped { th.accent_text } else { th.text_secondary })
@@ -193,7 +194,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                 })),
         )
         .child(numeric_pill(ed, NumericId::MasterPan, CommandArg::None, "mix-master-pan", true, cx))
-        .child(div().h(px(18.0)).flex_none().child(master_pan_control(entity.clone(), master.pan_permille)))
+        .child(div().h(px(22.0)).flex_none().child(master_pan_control(entity.clone(), master.pan_permille)))
         .child(
             div()
                 .flex_1()
@@ -207,7 +208,10 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
         .child(
             div()
                 .flex()
-                .gap(px(4.0))
+                .p(px(2.0))
+                .gap(px(2.0))
+                .rounded(px(8.0))
+                .bg(th.control)
                 .child(
                     selectable_command_button(
                         ed,
@@ -300,7 +304,7 @@ fn strip(
                 .min_h(px(38.0))
                 .px(px(6.0))
                 .py(px(3.0))
-                .rounded(px(4.0))
+                .rounded(px(8.0))
                 .bg(th.control)
                 .flex()
                 .flex_col()
@@ -342,11 +346,10 @@ fn strip(
         .h_full()
         .flex()
         .flex_col()
-        .gap(px(5.0))
-        .p(px(8.0))
-        .bg(if selected { mix(th.surface, th.accent, 0.1) } else { th.surface })
-        .border_r_1()
-        .border_color(th.separator)
+        .gap(px(6.0))
+        .p(px(10.0))
+        .rounded(px(12.0))
+        .bg(if selected { mix(th.card, th.accent, 0.14) } else { th.card })
         .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
             if !ed.select_track(select.clone(), cx) {
                 cx.stop_propagation();
@@ -364,14 +367,14 @@ fn strip(
                 .flex()
                 .items_center()
                 .gap(px(5.0))
-                .child(div().size(px(10.0)).rounded(px(2.0)).bg(color))
-                .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::SEMIBOLD).child(header.name.clone()))
+                .child(div().size(px(10.0)).rounded(px(5.0)).bg(color))
+                .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).child(header.name.clone()))
                 .child(
                     div()
                         .px(px(4.0))
                         .py(px(1.0))
-                        .rounded(px(3.0))
-                        .bg(if clipped { th.error } else { th.lcd })
+                        .rounded(px(6.0))
+                        .bg(if clipped { th.error } else { th.view })
                         .text_size(px(9.5))
                         .font_family("monospace")
                         .text_color(if clipped { th.accent_text } else { th.text_secondary })
@@ -383,14 +386,14 @@ fn strip(
                         .role(Role::Button)
                         .aria_label(format!("{}：轨道菜单", header.name))
                         .aria_description("重命名、上移、下移或复制轨道")
-                        .size(px(22.0))
+                        .size(px(26.0))
                         .flex_none()
                         .flex()
                         .items_center()
                         .justify_center()
-                        .rounded(px(4.0))
-                        .hover(|s| s.bg(th.control))
-                        .child("⋯")
+                        .rounded(px(6.0))
+                        .hover(move |s| s.bg(th.hover))
+                        .child(gpui::svg().path(crate::assets::icon("menu")).size(px(14.0)).text_color(th.text))
                         .on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
                             ed.track_menu(header_menu.clone(), window.mouse_position(), window, cx);
                             cx.stop_propagation();
@@ -406,7 +409,7 @@ fn strip(
         .child(slots)
         .child(command_button(ed, CommandId::PluginAdd, CommandArg::TrackSlot(id.clone(), specs.len() as u32), "+ 插入效果…", SharedString::from(format!("add-insert-{id}")), cx))
         .child(numeric_pill(ed, NumericId::TrackPan, CommandArg::Track(id.clone()), format!("mix-pan-{id}"), true, cx))
-        .child(div().h(px(18.0)).flex_none().child(pan_control(entity.clone(), id.clone(), header.pan_permille)))
+        .child(div().h(px(22.0)).flex_none().child(pan_control(entity.clone(), id.clone(), header.pan_permille)))
         .child(
             div()
                 .flex_1()
@@ -420,14 +423,18 @@ fn strip(
         .child(
             div()
                 .flex()
-                .gap(px(4.0))
+                .p(px(2.0))
+                .gap(px(2.0))
+                .rounded(px(8.0))
+                .bg(th.control)
                 .child(selectable_command_button(ed, CommandId::ToggleMute, CommandArg::Track(id.clone()), "M", SharedString::from(format!("mix-mute-{id}")), header.muted, cx).flex_1())
                 .child(
                     command_button(ed, CommandId::ToggleSolo, CommandArg::Track(id.clone()), "S", SharedString::from(format!("mix-solo-{id}")), cx)
                         .flex_1()
                         .aria_selected(header.solo)
                         .border_1()
-                        .border_color(if header.solo { th.warning } else { th.separator })
+                        .rounded(px(6.0))
+                        .border_color(if header.solo { th.warning } else { th.control })
                         .when(header.solo, |d| d.bg(th.warning).text_color(th.on_track()).font_weight(FontWeight::SEMIBOLD)),
                 )
                 .child(
@@ -456,14 +463,12 @@ fn route_button(key: &'static str, label: &'static str, selected: bool, th: Them
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(4.0))
-        .bg(if selected { th.accent } else { th.control })
-        .border_1()
-        .border_color(if selected { th.accent } else { th.separator })
+        .rounded(px(6.0))
+        .bg(if selected { th.checked } else { th.control })
         .text_xs()
         .font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-        .text_color(if selected { th.accent_text } else { th.text })
-        .hover(move |s| s.bg(if selected { th.accent } else { th.control_pressed }))
+        .text_color(th.text)
+        .hover(move |s| s.bg(if selected { th.checked } else { th.control_pressed }))
         .child(label)
 }
 
@@ -486,7 +491,7 @@ fn parameter_panel(ed: &Editor, cx: &mut Context<Editor>) -> Option<gpui::AnyEle
         .p(px(12.0))
         .bg(th.surface)
         .border_l_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex()
@@ -581,7 +586,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
         .p(px(12.0))
         .bg(th.surface)
         .border_l_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex()
@@ -678,11 +683,12 @@ fn paint_fader_surface(window: &mut gpui::Window, cx: &mut gpui::App, bounds: gp
             texts.push((lbl.into(), point(o.x + px((x - 38.0).max(1.0) as f32), o.y + px((y - 5.5) as f32)), 8.5, if is_zero { th.text_secondary } else { th.text_tertiary }));
         }
     }
-    window.paint_quad(quad(b(x - 2.0, 7.0, 4.0, usable, o), px(2.0), th.lcd, px(0.0), th.lcd, BorderStyle::Solid));
+    // GtkScale: a rounded trough, the accent highlight up to the value, a
+    // round white slider with a hairline outline.
+    window.paint_quad(quad(b(x - 3.0, 7.0, 6.0, usable, o), px(3.0), th.control_pressed, px(0.0), th.control_pressed, BorderStyle::Solid));
     let y = 7.0 + (1.0 - fader_pos(mdb)) * usable;
-    window.paint_quad(fill(b(x - 1.5, y, 3.0, (7.0 + usable - y).max(0.0), o), th.accent));
-    window.paint_quad(quad(b(x - 11.0, y - 6.0, 22.0, 12.0, o), px(3.0), th.control, px(1.0), th.text_secondary, BorderStyle::Solid));
-    window.paint_quad(fill(b(x - 8.0, y, 16.0, 1.5, o), th.text));
+    window.paint_quad(quad(b(x - 3.0, y, 6.0, (7.0 + usable - y).max(0.0), o), px(3.0), th.accent, px(0.0), th.accent, BorderStyle::Solid));
+    window.paint_quad(quad(b(x - 10.0, y - 10.0, 20.0, 20.0, o), px(10.0), gpui::rgb(0xffffff), px(1.0), th.shade, BorderStyle::Solid));
     flush_texts(window, cx, bounds, texts);
 }
 
@@ -691,12 +697,13 @@ fn pan_control(editor: Entity<Editor>, id: TrackId, pan: i32) -> impl IntoElemen
         let th = editor.read(cx).theme;
         let o = bounds.origin;
         let (w, h) = (bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
-        window.paint_quad(quad(b(0.0, h / 2.0 - 2.0, w, 4.0, o), px(2.0), th.control, px(0.0), th.separator, BorderStyle::Solid));
-        window.paint_quad(fill(b(w / 2.0, h / 2.0 - 5.0, 1.0, 10.0, o), th.text_tertiary));
-        let x = (pan as f64 / 1000.0 + 1.0) / 2.0 * (w - 10.0) + 5.0;
+        // GtkScale (horizontal, centre mark): trough, accent from centre, round slider.
+        window.paint_quad(quad(b(0.0, h / 2.0 - 3.0, w, 6.0, o), px(3.0), th.control_pressed, px(0.0), th.control_pressed, BorderStyle::Solid));
+        window.paint_quad(fill(b(w / 2.0 - 0.5, h / 2.0 - 6.0, 1.0, 12.0, o), th.text_tertiary));
+        let x = (pan as f64 / 1000.0 + 1.0) / 2.0 * (w - 16.0) + 8.0;
         let (a, z) = if x < w / 2.0 { (x, w / 2.0) } else { (w / 2.0, x) };
-        window.paint_quad(fill(b(a, h / 2.0 - 2.0, z - a, 4.0, o), th.accent));
-        window.paint_quad(quad(b(x - 5.0, h / 2.0 - 5.0, 10.0, 10.0, o), px(5.0), th.text, px(0.0), th.text, BorderStyle::Solid));
+        window.paint_quad(quad(b(a, h / 2.0 - 3.0, z - a, 6.0, o), px(3.0), th.accent, px(0.0), th.accent, BorderStyle::Solid));
+        window.paint_quad(quad(b(x - 8.0, h / 2.0 - 8.0, 16.0, 16.0, o), px(8.0), gpui::rgb(0xffffff), px(1.0), th.shade, BorderStyle::Solid));
         let (e, h1, id1) = (editor.clone(), hitbox.clone(), id.clone());
         window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble || !h1.is_hovered(window) || ev.button != MouseButton::Left { return; }
@@ -716,7 +723,7 @@ fn pan_control(editor: Entity<Editor>, id: TrackId, pan: i32) -> impl IntoElemen
             e.update(cx, |ed, cx| {
                 let Some(drag) = ed.mixer_drag.as_ref().filter(|d| d.track == id2 && d.control == MixerControl::Pan) else { return };
                 let fine = if ev.modifiers.shift { 0.1 } else { 1.0 };
-                let value = (drag.origin_value + (x - drag.origin_pos) / (w - 10.0).max(1.0) * 2000.0 * fine).round().clamp(-1000.0, 1000.0) as i32;
+                let value = (drag.origin_value + (x - drag.origin_pos) / (w - 16.0).max(1.0) * 2000.0 * fine).round().clamp(-1000.0, 1000.0) as i32;
                 ed.update_mixer_drag(|h| h.pan_permille = value);
                 cx.notify();
             });
@@ -784,12 +791,13 @@ fn master_pan_control(editor: Entity<Editor>, pan: i32) -> impl IntoElement {
         let th = editor.read(cx).theme;
         let o = bounds.origin;
         let (w, h) = (bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
-        window.paint_quad(quad(b(0.0, h / 2.0 - 2.0, w, 4.0, o), px(2.0), th.control, px(0.0), th.separator, BorderStyle::Solid));
-        window.paint_quad(fill(b(w / 2.0, h / 2.0 - 5.0, 1.0, 10.0, o), th.text_tertiary));
-        let x = (pan as f64 / 1000.0 + 1.0) / 2.0 * (w - 10.0) + 5.0;
+        // GtkScale (horizontal, centre mark): trough, accent from centre, round slider.
+        window.paint_quad(quad(b(0.0, h / 2.0 - 3.0, w, 6.0, o), px(3.0), th.control_pressed, px(0.0), th.control_pressed, BorderStyle::Solid));
+        window.paint_quad(fill(b(w / 2.0 - 0.5, h / 2.0 - 6.0, 1.0, 12.0, o), th.text_tertiary));
+        let x = (pan as f64 / 1000.0 + 1.0) / 2.0 * (w - 16.0) + 8.0;
         let (a, z) = if x < w / 2.0 { (x, w / 2.0) } else { (w / 2.0, x) };
-        window.paint_quad(fill(b(a, h / 2.0 - 2.0, z - a, 4.0, o), th.accent));
-        window.paint_quad(quad(b(x - 5.0, h / 2.0 - 5.0, 10.0, 10.0, o), px(5.0), th.text, px(0.0), th.text, BorderStyle::Solid));
+        window.paint_quad(quad(b(a, h / 2.0 - 3.0, z - a, 6.0, o), px(3.0), th.accent, px(0.0), th.accent, BorderStyle::Solid));
+        window.paint_quad(quad(b(x - 8.0, h / 2.0 - 8.0, 16.0, 16.0, o), px(8.0), gpui::rgb(0xffffff), px(1.0), th.shade, BorderStyle::Solid));
         let (e, h1) = (editor.clone(), hitbox.clone());
         window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble || !h1.is_hovered(window) || ev.button != MouseButton::Left { return; }
@@ -809,7 +817,7 @@ fn master_pan_control(editor: Entity<Editor>, pan: i32) -> impl IntoElement {
             e.update(cx, |ed, cx| {
                 let Some(drag) = ed.master_drag.as_ref().filter(|d| d.control == MixerControl::Pan) else { return };
                 let fine = if ev.modifiers.shift { 0.1 } else { 1.0 };
-                let value = (drag.origin_value + (x - drag.origin_pos) / (w - 10.0).max(1.0) * 2000.0 * fine).round().clamp(-1000.0, 1000.0) as i32;
+                let value = (drag.origin_value + (x - drag.origin_pos) / (w - 16.0).max(1.0) * 2000.0 * fine).round().clamp(-1000.0, 1000.0) as i32;
                 ed.update_master_drag(|m| m.pan_permille = value);
                 cx.notify();
             });

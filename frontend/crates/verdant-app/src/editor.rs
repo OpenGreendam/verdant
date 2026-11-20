@@ -57,6 +57,8 @@ pub enum Bottom {
     Mixer,
     /// Keyboard note table (TODO §3/§5): the AccessKit-bearing surface.
     Table,
+    /// The selected track's effect chain as device cards.
+    Devices,
     Hidden,
 }
 
@@ -155,8 +157,20 @@ pub enum MenuAction {
     ShowHistoryWindow,
     ShowShortcutsWindow,
     ShowDisclosuresWindow,
+    /// Open one of the toolbar menus (from the folded menu in narrow windows).
+    OpenMenu(TopMenu),
+    /// Show the left inspector (the selection's properties live there).
+    ShowProperties,
+    ToggleFollow,
+    ShowBottom(Bottom),
+    /// Run a toolbar command that is folded away in narrow windows.
+    Run(crate::generated::controls::CommandId),
     Workflow(WorkflowAction),
 }
+
+/// The toolbar's menus.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TopMenu { File, Edit, Track, VoiceLyrics, ViewTransport }
 
 /// A pencil stroke in a parameter lane, not yet committed.
 #[derive(Clone, Debug)]
@@ -284,6 +298,8 @@ pub struct Editor {
     pub needs_fit: bool,
     /// Audio clock sampled once per frame so every canvas draws the same playhead.
     pub frame_playhead: f64,
+    /// Smooths the buffer-stepped audio clock into a steady playhead.
+    pub playhead_smoother: crate::clock::PlayheadSmoother,
     pub ui_font: gpui::SharedString,
     /// Bounded note lookup index for the active track (rebuilt per revision).
     pub index: crate::index::NoteIndex,
@@ -306,6 +322,22 @@ pub struct Editor {
     pub lane_tool: LaneTool,
     pub bottom: Bottom,
     pub show_inspector: bool,
+    /// Current window-width class (updated every render).
+    pub width_class: crate::ui_controls::WidthClass,
+    /// The side panel open as a drawer while panels are not docked.
+    pub drawer: Option<crate::ui_controls::Drawer>,
+    /// Touch input has been used: toolbar controls grow to touch size.
+    pub touch_ui: bool,
+    /// How the toolbar acts as the window title bar (updated every render).
+    pub window_chrome: crate::window_chrome::ChromeState,
+    /// A press on an empty toolbar area that becomes a window move on drag.
+    pub title_drag: bool,
+    /// A knob or curve handle being dragged in the device view.
+    pub device_drag: Option<crate::devices::DeviceDrag>,
+    /// The EQ band shown in the device view's band strip.
+    pub device_band: usize,
+    /// The saved insert state each cached parameter list was read against.
+    pub device_param_state: HashMap<verdant_plugins::InsertKey, String>,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -483,6 +515,7 @@ impl Editor {
             lyric_bounds: None,
             needs_fit: true,
             frame_playhead: 0.0,
+            playhead_smoother: Default::default(),
             ui_font: pick_ui_font(cx),
             index: crate::index::NoteIndex::default(),
             roll_pitch: crate::roll::RenderedPitchCache::default(),
@@ -502,6 +535,14 @@ impl Editor {
             lane_tool: LaneTool::default(),
             bottom: Bottom::Editor,
             show_inspector: true,
+            width_class: Default::default(),
+            drawer: None,
+            touch_ui: false,
+            window_chrome: Default::default(),
+            title_drag: false,
+            device_drag: None,
+            device_band: 2,
+            device_param_state: HashMap::new(),
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,
@@ -704,6 +745,7 @@ impl Editor {
     pub(crate) fn has_control_drag(&self, cx: &Context<Self>) -> bool {
         self.master_drag.is_some()
             || self.numeric_preview.is_some()
+            || self.device_drag.is_some()
             || crate::ui_controls::has_numeric_scrub(cx.entity().entity_id(), cx)
             || crate::roll::has_extra_drag(cx.entity().entity_id(), cx)
     }
@@ -711,6 +753,7 @@ impl Editor {
     pub(crate) fn cancel_control_drags(&mut self, cx: &mut Context<Self>) {
         self.master_drag = None;
         self.numeric_preview = None;
+        self.cancel_device_drag(cx);
         let editor = cx.entity().entity_id();
         crate::ui_controls::cancel_numeric_scrub(editor, cx);
         crate::roll::cancel_extra_drag(editor, cx);
@@ -1463,6 +1506,13 @@ impl Editor {
             MenuAction::ShowHistoryWindow => self.show_history_panel(window, cx),
             MenuAction::ShowShortcutsWindow => crate::shortcuts::open(cx),
             MenuAction::ShowDisclosuresWindow => crate::disclosures::open(cx),
+            MenuAction::OpenMenu(menu) => self.open_top_menu(menu, window.mouse_position(), window, cx),
+            MenuAction::ShowProperties => {
+                if !self.left_panel_visible() { self.toggle_left_panel(cx); }
+            }
+            MenuAction::ToggleFollow => crate::clock::toggle_follow(self, cx),
+            MenuAction::ShowBottom(bottom) => self.show_bottom(bottom, window, cx),
+            MenuAction::Run(command) => crate::generated::controls::dispatch(self, command, crate::generated::controls::CommandArg::None, window, cx),
             MenuAction::GeneratedSelect { id, arg, option } => {
                 crate::generated::controls::dispatch_select(self, id, arg, option, window, cx);
             }
@@ -1593,6 +1643,7 @@ impl Editor {
         if !self.commit_pending_lyric(cx) {
             return false;
         }
+        self.cancel_device_drag(cx);
         self.change_active_track(id);
         self.sync_index();
         self.sync_mixer();
@@ -1827,15 +1878,15 @@ impl Editor {
             cx.notify();
             return;
         }
-        // Line mode reduces the stroke to its endpoints; smooth replaces the
-        // freehand samples with a binomial-filtered version of them.
+        // Line mode reduces the stroke to its endpoints; freehand replaces
+        // the samples with a binomial-filtered version (removes hand jitter).
         let mut samples = stroke.samples.clone();
         match stroke.tool {
             LaneTool::Line if samples.len() > 2 => {
                 let (a, b) = (samples[0], *samples.last().unwrap());
                 samples = vec![a, b];
             }
-            LaneTool::Smooth if samples.len() > 4 => {
+            LaneTool::Pencil | LaneTool::Smooth if samples.len() > 4 => {
                 let mut out = samples.clone();
                 for i in 2..samples.len() - 2 {
                     out[i].1 = (samples[i - 2].1 + 4.0 * samples[i - 1].1 + 6.0 * samples[i].1 + 4.0 * samples[i + 1].1 + samples[i + 2].1) / 16.0;
@@ -2467,6 +2518,81 @@ impl Editor {
         cx.notify();
     }
 
+    /// Close from Verdant's own title-bar button: same checks as the system close
+    /// and the Quit action.
+    pub fn close_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        crate::files::capture_bounds(&mut self.prefs, window);
+        // The editor window is the app (as with the Quit action); its tool
+        // windows belong to it, so closing it ends the session.
+        if self.shutdown(cx) { cx.quit(); }
+    }
+
+    /// Add a parameter lane (the first parameter not already shown, or
+    /// `param`) and make it the active one.
+    pub fn add_lane(&mut self, param: Option<Param>, cx: &mut Context<Self>) {
+        let lanes = &mut self.integrations.lanes;
+        let Some(param) = param.or_else(|| verdant_backend::params::ALL.into_iter().find(|p| !lanes.contains(p))) else { return };
+        if !lanes.contains(&param) { lanes.push(param); }
+        self.integrations.active_panel = lanes.iter().position(|p| *p == param).unwrap_or(0);
+        self.param = param;
+        self.point_selection.clear();
+        cx.notify();
+    }
+
+    /// Remove a lane; one lane always stays.
+    pub fn remove_lane(&mut self, slot: usize, cx: &mut Context<Self>) {
+        let lanes = &mut self.integrations.lanes;
+        if lanes.len() <= 1 || slot >= lanes.len() { return; }
+        lanes.remove(slot);
+        self.integrations.active_panel = self.integrations.active_panel.min(lanes.len() - 1);
+        self.param = lanes[self.integrations.active_panel];
+        self.point_selection.clear();
+        cx.notify();
+    }
+
+    pub fn left_panel_visible(&self) -> bool {
+        if self.width_class.docks_panels() { self.show_inspector } else { self.drawer == Some(crate::ui_controls::Drawer::Left) }
+    }
+
+    pub fn right_dock_visible(&self) -> bool {
+        if self.width_class.docks_panels() { self.layout.show_right_dock } else { self.drawer == Some(crate::ui_controls::Drawer::Right) }
+    }
+
+    pub fn toggle_left_panel(&mut self, cx: &mut Context<Self>) {
+        use crate::ui_controls::Drawer;
+        if self.width_class.docks_panels() {
+            self.show_inspector = !self.show_inspector;
+        } else {
+            self.drawer = (self.drawer != Some(Drawer::Left)).then_some(Drawer::Left);
+        }
+        cx.notify();
+    }
+
+    pub fn toggle_right_dock(&mut self, cx: &mut Context<Self>) {
+        use crate::ui_controls::Drawer;
+        if self.width_class.docks_panels() {
+            self.layout.show_right_dock = !self.layout.show_right_dock;
+            self.layout.store(&mut self.prefs);
+            self.prefs_dirty = true;
+        } else {
+            self.drawer = (self.drawer != Some(Drawer::Right)).then_some(Drawer::Right);
+        }
+        cx.notify();
+    }
+
+    /// Show `tab` in the right dock (as a drawer in narrow windows).
+    pub fn open_right_dock(&mut self, tab: crate::ui_controls::RightDockTab, cx: &mut Context<Self>) {
+        self.layout.right_dock_tab = tab;
+        if self.width_class.docks_panels() {
+            self.layout.show_right_dock = true;
+        } else {
+            self.drawer = Some(crate::ui_controls::Drawer::Right);
+        }
+        self.layout.store(&mut self.prefs);
+        self.prefs_dirty = true;
+        cx.notify();
+    }
+
     pub fn playhead_seconds(&self) -> f64 {
         if let Some(seconds)=self.recording_seconds(){return seconds;}
         self.audio.position() as f64 / self.audio_info.sample_rate as f64
@@ -2484,6 +2610,7 @@ impl Editor {
     /// Sample the audio atomics once (used after seek/stop so the LCD and
     /// playhead update while stopped).
     fn clock_sample_once(&mut self) {
+        self.playhead_smoother.reset();
         self.frame_playhead = self.playhead_seconds();
     }
 
@@ -2494,7 +2621,9 @@ impl Editor {
     pub fn clock_pump(&mut self, _window: &mut Window, _edcx: &mut Context<Self>) -> bool {
         self.audio.maintain();
         self.update_meters();
-        self.frame_playhead = self.playhead_seconds();
+        let raw = self.playhead_seconds();
+        let smooth = self.audio.transport() == Transport::Playing && self.recording_seconds().is_none();
+        self.frame_playhead = self.playhead_smoother.sample(raw, Instant::now(), smooth);
         let playing = self.audio.transport() == Transport::Playing;
         playing || self.meters.iter().any(|m| m.0.max(m.1) > 1e-4) || self.master_meter.0.max(self.master_meter.1) > 1e-4
     }
@@ -2677,8 +2806,8 @@ impl Editor {
 
 fn recovery_text(report: &verdant_domain::RecoveryReport) -> Option<String> {
     report.recovered_anything().then(|| format!(
-        "已恢复 r{} → r{}，{} 条提交；恢复时间 {} ms（Unix）{}{}。最后手动保存的文件未被覆盖。",
-        report.saved_revision, report.recovered_revision, report.replayed_commits, report.recovered_at_ms,
+        "已恢复自动保存（{}，{} 步编辑）{}{}。最后手动保存的文件未被覆盖。",
+        crate::files::relative_time_text(report.recovered_at_ms, chrono::Utc::now().timestamp_millis()), report.replayed_commits,
         if report.torn_tail_bytes > 0 { format!("；丢弃中断尾部 {} 字节", report.torn_tail_bytes) } else { String::new() },
         if report.completed_interrupted_save { "；已完成中断保存的恢复登记" } else { "" },
     ))

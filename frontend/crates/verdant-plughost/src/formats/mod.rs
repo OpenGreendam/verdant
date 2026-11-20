@@ -129,6 +129,11 @@ pub fn instantiate(
                 },
             ))
         }
+        "builtin" if builtin::effect(plugin_id, sample_rate).is_some() => {
+            let p = builtin::effect(plugin_id, sample_rate).expect("checked builtin effect");
+            let name = verdant_plugins::builtin_dsp::display_name(plugin_id).unwrap_or(plugin_id).to_string();
+            Ok((p, InstDesc { id: plugin_id.into(), name }))
+        }
         #[cfg(feature = "clap")]
         "clap" => clap::instantiate(path, plugin_id, sample_rate, max_frames, events),
         #[cfg(feature = "vst3")]

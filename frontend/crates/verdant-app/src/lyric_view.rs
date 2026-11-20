@@ -95,7 +95,7 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, cx: &mut Context<Edit
                 .rounded(px(4.0))
                 .bg(th.control)
                 .border_1()
-                .border_color(th.separator)
+                .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
@@ -165,7 +165,7 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, cx: &mut Context<Edit
                     .on_action(cx.listener(|ed, _: &crate::actions::Home, _, cx| edit(ed, cx, |s| s.home())))
                     .on_action(cx.listener(|ed, _: &crate::actions::End, _, cx| edit(ed, cx, |s| s.end())))
                     .on_action(cx.listener(|ed, _: &crate::actions::SelectAllText, _, cx| edit(ed, cx, |s| s.select_all())))
-                    .rounded(px(5.0))
+                    .rounded(px(9.0))
                     .bg(th.control)
                     .border_1()
                     .border_color(if composing { th.warning } else { th.accent })
@@ -180,10 +180,10 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, cx: &mut Context<Edit
                     .gap(px(4.0))
                     .px(px(5.0))
                     .py(px(4.0))
-                    .rounded(px(5.0))
-                    .bg(th.surface)
+                    .rounded(px(9.0))
+                    .bg(th.popover)
                     .border_1()
-                    .border_color(th.separator)
+                    .border_color(th.shade)
                     .shadow_md()
                     .children(quick_pills),
             ),
@@ -211,7 +211,7 @@ pub(crate) fn edit_unmarked_text(state: &mut verdant_session::TextEditState, f: 
 pub fn prompt_overlay(ed:&Editor,editor:&Entity<Editor>,cx:&mut Context<Editor>)->Option<gpui::AnyElement>{
     let prompt=ed.text_prompt.as_ref()?;let title=prompt.title.clone();let e=editor.clone();let th=ed.theme;
     Some(div().absolute().inset_0().flex().items_center().justify_center().bg(with_alpha(th.window,0.78)).occlude()
-        .child(div().id("workflow-prompt").role(gpui::Role::Dialog).aria_label(title.clone()).w(px(560.)).p(px(18.)).rounded(px(8.)).bg(th.surface).border_1().border_color(th.separator).shadow_lg().flex().flex_col().gap(px(12.))
+        .child(div().id("workflow-prompt").role(gpui::Role::Dialog).aria_label(title.clone()).w(px(560.)).p(px(18.)).rounded(px(12.)).bg(th.popover).border_1().border_color(th.shade).shadow_lg().flex().flex_col().gap(px(12.))
             .key_context("TextPrompt").track_focus(&ed.focus_lyric)
             .on_action(cx.listener(|ed,_:&crate::actions::LyricConfirm,w,cx|ed.finish_prompt(true,w,cx)))
             .on_action(cx.listener(|ed,_:&crate::actions::LyricCancel,w,cx|{if !ed.text_state().is_some_and(|s|s.is_composing()){ed.finish_prompt(false,w,cx);}}))

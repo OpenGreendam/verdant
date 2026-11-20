@@ -169,7 +169,7 @@ fn note_row(ed: &Editor, index: usize, cx: &mut Context<Editor>) -> Option<gpui:
         .aria_size_of_set(ed.active_track()?.notes.len()).when(current, |d| d.aria_active_descendant())
         .h(px(34.0)).px(px(12.0)).flex().items_center().gap(px(12.0)).text_sm()
         .bg(if selected { crate::theme::mix(ed.theme.surface, ed.theme.accent, 0.18) } else { ed.theme.surface })
-        .border_b_1().border_color(ed.theme.separator)
+        .border_b_1().border_color(ed.theme.shade)
         .on_a11y_action(AccessibleAction::Focus, crate::view::a11y_listener(cx, move |ed, _, window, cx| {
             if let Some(i) = ed.index.position(&focus_id) { ed.table_select(i, false, cx); window.focus(&ed.focus_table, cx); }
         }))

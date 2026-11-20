@@ -62,12 +62,16 @@ fn reserved_original_admission_rejects_named_wrong_bytes_without_mutating_regist
     use verdant_backend::voices::{VoiceRegistry,VoiceAssets,DESKTOP_ORIGINAL_REFERENCE};
     let f=Fixture::new()?;let token=f.root.join("sn16k.tkn");let model=f.root.join("sn16k.bin");
     fs::write(&token,b"not the original token")?;fs::write(&model,b"not the original model")?;
-    let assets=VoiceAssets{token:Some(token),model:Some(model),..Default::default()};
+    let assets=VoiceAssets{token:Some(token.clone()),model:Some(model.clone()),..Default::default()};
     let mut registry=VoiceRegistry::new();let path=f.root.join("voices.json");
     let rejected=registry.install_with(&path,DESKTOP_ORIGINAL_REFERENCE,"Original",assets.clone(),|_|panic!("wrong bytes reached loader"));
     ensure!(rejected.is_err()&&registry.references().is_empty()&&!path.exists(),"wrong bytes changed registry");
-    let rejected = registry.admit_with("research-raw", "Research", assets, |_| panic!("unreserved raw voice reached loader"));
-    ensure!(rejected.is_err() && registry.references().is_empty(), "unreserved raw admission changed registry");
+    let mut worker = Worker::start(&f)?;
+    worker.send(json!({"request_id":"unreserved-raw","op":"admit_voice",
+        "reference":"research-raw","display_name":"Research","assets":{"token":token,"model":model}}))?;
+    let rejected = worker.next()?;
+    ensure!(rejected["event"] == "rejected" && !path.exists(),
+        "unreserved raw admission changed registry or failed to reject: {rejected}");
     Ok(())
 }
 

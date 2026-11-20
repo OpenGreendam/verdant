@@ -109,6 +109,68 @@ function finishWith(effect: string): NoteGestureDecision {
   return handled('idle', [effect, 'Session.ClearGesturePreview', 'Host.ReleasePointer']);
 }
 
+// ---------------------------------------------------------------------------
+// Built-in effect editors (knobs, curve handles, threshold handles).
+//
+// The same compiled root also hosts those editors: the pinned GPUI target
+// vendors one native SDK crate per compiled unit under a fixed name, so a
+// second unit cannot share the Cargo workspace yet. The native slot draws the
+// editor; this protocol owns when a press becomes an edit, how a drag maps to
+// a value, and when the edit is committed, reset or discarded.
+
+type ControlGuards = {
+  hit_control: boolean;
+  threshold_crossed: boolean;
+  reset_modifier: boolean;
+  double_click: boolean;
+};
+
+type ControlDecision = {
+  nextPhase: string;
+  consumed: boolean;
+  effects: string[];
+};
+
+function planControlGesture(phase: string, event: string, guards: ControlGuards): ControlDecision {
+  if (phase === 'idle' && event === 'PointerDown') {
+    if (!guards.hit_control) return { nextPhase: 'idle', consumed: false, effects: [] };
+    // Double click, or Alt / Option click, restores the default; it never drags.
+    if (guards.double_click || guards.reset_modifier) {
+      return { nextPhase: 'idle', consumed: true, effects: ['Control.Select', 'Control.Reset'] };
+    }
+    return { nextPhase: 'armed', consumed: true, effects: ['Control.Select', 'Control.Begin', 'Host.CapturePointer'] };
+  }
+  if (phase === 'armed' && event === 'PointerMove') {
+    // A click selects; only movement past the threshold edits the value.
+    if (!guards.threshold_crossed) return { nextPhase: 'armed', consumed: true, effects: [] };
+    return { nextPhase: 'dragging', consumed: true, effects: ['Control.Preview'] };
+  }
+  if (phase === 'dragging' && event === 'PointerMove') {
+    return { nextPhase: 'dragging', consumed: true, effects: ['Control.Preview'] };
+  }
+  if (phase === 'dragging' && event === 'PointerUp') {
+    return { nextPhase: 'idle', consumed: true, effects: ['Control.Commit', 'Host.ReleasePointer'] };
+  }
+  if (phase === 'armed' && event === 'PointerUp') {
+    return { nextPhase: 'idle', consumed: true, effects: ['Control.Discard', 'Host.ReleasePointer'] };
+  }
+  if ((phase === 'armed' || phase === 'dragging') && event === 'Cancel') {
+    return { nextPhase: 'idle', consumed: true, effects: ['Control.Discard', 'Host.ReleasePointer'] };
+  }
+  return { nextPhase: phase, consumed: false, effects: [] };
+}
+
+// A drag of `travel` pixels sweeps the whole range; the fine modifier
+// (Shift) divides the rate by ten. Values are normalized to 0…1.
+function dragNormalized(start: number, delta: number, travel: number, fine: boolean): number {
+  const span = travel > 1 ? travel : 1;
+  const rate = fine ? 0.1 : 1;
+  const next = start + (delta / span) * rate;
+  if (next < 0) return 0;
+  if (next > 1) return 1;
+  return next;
+}
+
 export default definePrototype({
   name: 'verdant-pitch-gesture-surface',
   setup(def) {
@@ -116,6 +178,8 @@ export default definePrototype({
     // the roll and translates pointer coordinates into the score's units.
     def.feedback.style.use(tw('w-full h-full overflow-hidden'));
     def.expose.method('planNoteGesture', planNoteGesture);
+    def.expose.method('planControlGesture', planControlGesture);
+    def.expose.method('dragNormalized', dragNormalized);
     return (renderer) => renderer.slot();
   },
 });

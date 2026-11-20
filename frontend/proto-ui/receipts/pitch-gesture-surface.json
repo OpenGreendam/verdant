@@ -2,7 +2,7 @@
   "schema": "verdant.proto-ui.receipt.v1",
   "unit": "pitch-gesture-surface",
   "source": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
-  "sourceSha256": "29b663e74e840e2c4c8a09e404d55c93eac1dfc9da358c8b34b103faf07582eb",
+  "sourceSha256": "9e1add6f335945f024db95ecdde0b65b960f84f0c12d69995fdbb2971e5e5e78",
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
     "revision": "e56b2d1a3d6b688a1cbc6930dab1d6757304d733"
@@ -105,22 +105,22 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "185d41ad00c440930a126c0dfe851c3b99ad8c5312ea48ad55652ca222780df9"
+      "sha256": "b2426d7f08c376224a42606281cc2875658082808dd15146b6f8aedcdfe0fc5e"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "9f105d52252527a55f8d5d50787f1ce7178d97198ff23648dbd22c2a4de66a6d"
+      "sha256": "554b6e508268c0f782195ad3f728fb2eabf44a10b3a7c9be95e710a772964dc4"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "8f5e5565f43a344c629cea74d0efda120b45978de5f2555b9705e45a27c071a2"
+      "sha256": "893edc7aeaaaf534056bbe2b096bc181e39e77b965a5f4ab23fd761fafa98aae"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "3eb5ec0b5b9fdb0cefc58865e901807dfd85d0b8642aae02ab8ae5f0dfdd4412"
+      "sha256": "e41740062c9cd04345802968978978ded62388014b4df717b1d70d58c27fd7ca"
     }
   ]
 }

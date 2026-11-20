@@ -181,6 +181,7 @@ impl PluginClient {
     pub fn catalog(&self) -> Vec<PluginDesc> {
         let mut v: Vec<PluginDesc> = self.catalog.lock().unwrap().values().cloned().collect();
         v.push(Self::builtin_desc());
+        v.extend(crate::builtin_dsp::EFFECT_IDS.iter().filter_map(|id| Self::builtin_effect_desc(id)));
         v
     }
 
@@ -261,6 +262,20 @@ impl PluginClient {
         }
     }
 
+    /// Built-in mixing effects (EQ, compressor) run inside the host process.
+    pub fn builtin_effect_desc(id: &str) -> Option<PluginDesc> {
+        Some(PluginDesc {
+            format: PluginFormat::Builtin,
+            id: id.into(),
+            name: crate::builtin_dsp::display_name(id)?.into(),
+            vendor: "Verdant".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            path: String::new(),
+            has_editor: false,
+            features: vec!["audio-effect".into()],
+        })
+    }
+
     /// A spec targeting the builtin gain (test/verification insert).
     pub fn builtin_gain_spec() -> InsertSpec {
         InsertSpec::new(
@@ -336,6 +351,9 @@ impl PluginClient {
         let format = PluginFormat::from_tag(&spec.format);
         if format == PluginFormat::Builtin && spec.id == crate::BUILTIN_GAIN_ID {
             return Ok(Self::builtin_desc());
+        }
+        if format == PluginFormat::Builtin {
+            if let Some(desc) = Self::builtin_effect_desc(&spec.id) { return Ok(desc); }
         }
         if matches!(format, PluginFormat::Unknown | PluginFormat::Builtin) {
             return Err(PluginError::NotInCatalog(format!("{}:{}", spec.format, spec.id)));

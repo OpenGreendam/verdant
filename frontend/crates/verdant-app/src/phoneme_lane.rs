@@ -281,7 +281,7 @@ pub fn timeline_phoneme_lane(editor: Entity<Editor>) -> impl IntoElement {
                         }
                     }
                 });
-                window.paint_quad(fill(b(0.0, h - 1.0, w, 1.0, o), th.separator));
+                window.paint_quad(fill(b(0.0, h - 1.0, w, 1.0, o), th.shade));
             }
             flush_texts(window, cx, bounds, texts);
 

@@ -190,7 +190,7 @@ pub fn automation_header(
         .bg(th.lcd)
         .border_b_1()
         .border_r_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex()
@@ -207,7 +207,7 @@ pub fn automation_header(
                         .rounded(px(4.0))
                         .bg(th.control)
                         .border_1()
-                        .border_color(th.separator)
+                        .border_color(th.shade)
                         .flex()
                         .items_center()
                         .justify_between()
@@ -434,7 +434,7 @@ pub fn automation_curve_canvas(editor: Entity<Editor>, target: AutomationTarget)
                         ));
                     }
                 });
-                window.paint_quad(fill(b(0.0, h - 1.0, w, 1.0, o), th.separator));
+                window.paint_quad(fill(b(0.0, h - 1.0, w, 1.0, o), th.shade));
             }
             flush_texts(window, cx, bounds, texts);
 
