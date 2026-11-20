@@ -73,7 +73,7 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
     let th = ed.theme;
     let key_editor = editor.clone();
     let mut panel = gpui::div().id("phoneme-timing-panel").flex().flex_col().gap(px(4.0))
-        .mt(px(8.0)).pt(px(8.0)).border_t_1().border_color(th.separator)
+        .mt(px(8.0)).pt(px(8.0)).border_t_1().border_color(th.shade)
         .on_key_down(move |ev: &gpui::KeyDownEvent, window, cx| {
             if ev.keystroke.key == "escape" {
                 let pointer = cx.try_global::<PhonemePanelState>().and_then(|state| state.drag.as_ref())
@@ -373,13 +373,13 @@ fn region_controls(ed: &Editor, editor: Entity<Editor>, param: Param, slot: usiz
         .items_center()
         .bg(if active { th.accent } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.separator })
+        .border_color(if active { th.accent } else { th.control })
         .text_xs()
         .text_color(if active { th.accent_text } else { th.text })
         .child(label.to_owned());
     let toggle_editor = editor.clone();
     let delete_editor = editor.clone();
-    gpui::div().h(px(26.0)).px(px(8.0)).flex_none().flex().items_center().gap(px(4.0)).bg(th.surface).border_b_1().border_color(th.separator)
+    gpui::div().h(px(26.0)).px(px(8.0)).flex_none().flex().items_center().gap(px(4.0)).bg(th.surface).border_b_1().border_color(th.shade)
         .child(gpui::div().text_xs().text_color(th.text_secondary).child("所选音符区域："))
         .child(button("enable", if enabled { "已启用" } else { "已旁路" }, enabled).on_click(move |_, window, cx| {
             toggle_editor.update(cx, |ed, cx| {
@@ -493,7 +493,7 @@ fn paint_tempo(editor: &Entity<Editor>, bounds: Bounds<Pixels>, drag: Option<&Te
     let range = drag.map_or_else(|| tempo_range(&ed.project().tempo_map), |drag| drag.range);
     let origin = bounds.origin;
     window.paint_quad(fill(bounds, th.surface));
-    window.paint_quad(fill(b(0.0, height - 1.0, width, 1.0, origin), th.separator));
+    window.paint_quad(fill(b(0.0, height - 1.0, width, 1.0, origin), th.shade));
     text.push(("速度 BPM · 拖动移动 / 调速 · Shift 微调 · Alt 不吸附 · 双击输入 · 右键增删".into(),
         gpui::point(origin.x + px(6.0), origin.y + px(2.0)), 10.0, th.text_tertiary));
     window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {

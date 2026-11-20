@@ -226,7 +226,7 @@ pub fn client_frame(chrome: ChromeState, th: crate::theme::Theme, window: &mut W
         .when(!chrome.maximized, |d| d
             .when(!tiling.top, |d| d.border_t_1()).when(!tiling.bottom, |d| d.border_b_1())
             .when(!tiling.left, |d| d.border_l_1()).when(!tiling.right, |d| d.border_r_1())
-            .border_color(th.separator))
+            .border_color(th.shade))
         .when(resizable, |d| d.child(canvas(
             |bounds: Bounds<Pixels>, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
             move |_, hitbox, window, _| {

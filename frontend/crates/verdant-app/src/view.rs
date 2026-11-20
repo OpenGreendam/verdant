@@ -169,12 +169,10 @@ fn toggle(id: &'static str, name: &'static str, active: bool, size: f32, th: The
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(5.0))
-        .border_1()
-        .border_color(if active { th.accent } else { th.separator })
-        .bg(if active { th.accent } else { th.control })
-        .hover(move |s| s.bg(if active { th.accent } else { th.control_pressed }))
-        .child(svg().path(icon(name)).size(px(15.0)).text_color(if active { th.accent_text } else { th.text }))
+        .rounded(px(6.0))
+        .when(active, |d| d.bg(th.accent))
+        .hover(move |s| s.bg(if active { th.accent } else { th.hover }))
+        .child(svg().path(icon(name)).size(px(16.0)).text_color(if active { th.accent_text } else { th.text }))
 }
 
 pub fn command_button(
@@ -198,13 +196,13 @@ fn command_icon(
     cx: &mut Context<Editor>,
 ) -> Stateful<Div> {
     let th = ed.theme;
-    selectable_command_button(ed, cmd, Arg::None, "", key, active, cx)
+    crate::ui_controls::flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
         .aria_label(label)
         .size(px(crate::ui_controls::bar_button_size(ed.touch_ui)))
         .flex()
         .items_center()
         .justify_center()
-        .child(svg().path(icon(name)).size(px(15.0)).text_color(if active { th.accent_text } else { th.text }))
+        .child(svg().path(icon(name)).size(px(16.0)).text_color(if active { th.accent_text } else { th.text }))
 }
 
 pub fn numeric_field(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>, cx: &mut Context<Editor>) -> Stateful<Div> {
@@ -221,16 +219,20 @@ pub fn a11y_listener(
     }
 }
 
+/// A libadwaita-style preferences group: a heading over a rounded card.
 fn section(title: &str, th: Theme) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(px(6.0))
-        .px(px(12.0))
-        .py(px(10.0))
-        .border_b_1()
-        .border_color(th.separator)
-        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(th.text_secondary).child(title.to_string()))
+        .gap(px(7.0))
+        .mx(px(8.0))
+        .mt(px(8.0))
+        .px(px(10.0))
+        .pt(px(8.0))
+        .pb(px(10.0))
+        .rounded(px(12.0))
+        .bg(th.card)
+        .child(div().text_xs().font_weight(FontWeight::BOLD).text_color(th.text_secondary).child(title.to_string()))
 }
 
 fn row(name: &str, value: impl Into<SharedString>, th: Theme) -> Div {
@@ -293,13 +295,10 @@ impl Editor {
                 .gap(px(4.0))
                 .flex()
                 .items_center()
-                .rounded(px(5.0))
-                .bg(th.control)
-                .border_1()
-                .border_color(th.separator)
-                .text_xs()
+                .rounded(px(6.0))
+                .text_sm()
                 .text_color(th.text)
-                .hover(move |s| s.bg(th.control_pressed))
+                .hover(move |s| s.bg(th.hover))
                 .child(label)
                 .when(wide, |d| d.child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary)))
         };
@@ -316,9 +315,9 @@ impl Editor {
             .px(px(8.0))
             .when(chrome.leading_inset() > 0.0, |bar| bar.pl(px(chrome.leading_inset())))
             .when(captions.is_some(), |bar| bar.pr_0())
-            .bg(th.surface)
+            .bg(th.headerbar)
             .border_b_1()
-            .border_color(th.separator)
+            .border_color(th.shade)
             // Left pane & view toggles (28 px, 36 px once touch is used)
             .child(command_icon(self, Cmd::ToggleLeftPanel, "panel-left", "左侧轨道与声库栏 (I)", "inspector-toggle", self.left_panel_visible(), cx))
             .when(!phone, |bar| bar.child(
@@ -347,7 +346,7 @@ impl Editor {
             .when(!medium_up, |bar| bar.child(
                 top_menu_btn("menubar-main", "菜单").on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.main_menu(ev.position(), w, cx)))))
             .when(wide, |bar| bar.child(
-                icon_command_button(self, Cmd::AuditionProjects, Arg::None, "music-2", "试听曲", "audition-projects", false, cx)
+                crate::ui_controls::flat_icon_command_button(self, Cmd::AuditionProjects, "music-2", "试听曲", "audition-projects", false, cx)
                     .h(px(btn)),
             ))
             .when(class == WidthClass::Medium, |bar| bar.child(command_icon(self, Cmd::AuditionProjects, "music-2", "试听曲", "audition-projects", false, cx)))
@@ -356,10 +355,11 @@ impl Editor {
                 .child(command_icon(self, Cmd::Redo, "redo-2", "重做 (Ctrl+Shift+Z)", "redo", false, cx)))
             // Empty toolbar stretches are the window's title bar.
             .child(crate::window_chrome::drag_region("titlebar-drag-left", chrome, cx))
-            // Transport cluster
-            .when(!phone, |bar| bar.child(command_icon(self, Cmd::GoToStart, "skip-back", "回到开头", "go-start", false, cx)))
-            .child(command_icon(self, Cmd::TogglePlay, if playing { "pause" } else { "play" }, "播放 / 暂停 (Space)", "play", playing, cx))
-            .child(command_icon(self, Cmd::Stop, "square", "停止", "stop", false, cx))
+            // Transport: one linked group, as in a GNOME header bar.
+            .child(div().id("transport").flex().flex_none().items_center().rounded(px(6.0)).bg(th.control).overflow_hidden()
+            .when(!phone, |bar| bar.child(command_icon(self, Cmd::GoToStart, "skip-back", "回到开头", "go-start", false, cx).rounded_none()))
+            .child(command_icon(self, Cmd::TogglePlay, if playing { "pause" } else { "play" }, "播放 / 暂停 (Space)", "play", playing, cx).rounded_none())
+            .child(command_icon(self, Cmd::Stop, "square", "停止", "stop", false, cx).rounded_none())
             .when(!phone, |bar| bar.child(
                 div()
                     .id("transport-record")
@@ -368,17 +368,14 @@ impl Editor {
                     .aria_selected(recording)
                     .h(px(btn))
                     .px(px(8.0))
-                    .rounded(px(5.0))
                     .flex()
                     .items_center()
                     .gap(px(5.0))
-                    .bg(if recording { th.error } else { th.control })
-                    .border_1()
-                    .border_color(if recording { th.error } else { th.separator })
-                    .text_xs()
+                    .when(recording, |d| d.bg(th.error))
+                    .text_sm()
                     .font_weight(if recording { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
                     .text_color(if recording { th.accent_text } else { th.text })
-                    .hover(move |s| s.bg(if recording { th.error } else { th.control_pressed }))
+                    .hover(move |s| s.bg(if recording { th.error } else { th.hover }))
                     .when(!medium_up, |d| d.w(px(btn)).px_0().justify_center())
                     .child(svg().path(icon("circle-dot")).size(px(13.5)).text_color(if recording { th.accent_text } else { th.error }))
                     .when(medium_up, |d| d.child(if recording { "完成录音" } else { "录MIDI" }))
@@ -387,14 +384,14 @@ impl Editor {
                         let act = if recording { I::FinishRecording } else { I::MidiPorts };
                         ed.run_workflow(WorkflowAction::Integration(act), w, cx);
                     })),
-            ))
+            )))
             // The LCD keeps its full width until phones, where it takes the
             // space that is left and shows the position only.
             .child(div().h(px(36.0)).when(phone, |d| d.flex_1().min_w(px(112.0)).max_w(px(252.0))).when(!phone, |d| d.w(px(252.0)).flex_none())
                 .child(self.playback.anchor(crate::clock::Surface::Lcd)))
             .when(!phone, |bar| bar.child(command_icon(self, Cmd::ToggleLoop, "repeat", "循环播放", "transport-loop", pb.looping, cx)))
             .when(wide, |bar| bar.child(
-                icon_command_button(self, Cmd::ToggleMetronome, Arg::None, "bell", "节拍", "transport-click", pb.metronome, cx)
+                crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleMetronome, "bell", "节拍", "transport-click", pb.metronome, cx)
                     .h(px(btn)),
             ))
             .when(!wide && !phone, |bar| bar.child(command_icon(self, Cmd::ToggleMetronome, "bell", "节拍器", "transport-click", pb.metronome, cx)))
@@ -509,7 +506,7 @@ impl Editor {
                             .flex_1()
                             .aria_selected(track.solo)
                             .border_1()
-                            .border_color(if track.solo { th.warning } else { th.separator })
+                            .border_color(if track.solo { th.warning } else { th.control })
                             .when(track.solo, |d| d.bg(th.warning).text_color(th.on_track()).font_weight(FontWeight::SEMIBOLD)),
                     )
                     .child(
@@ -537,13 +534,11 @@ impl Editor {
                     .id(SharedString::from(format!("left-track-row-{idx}")))
                     .role(Role::Button)
                     .aria_selected(is_sel)
-                    .h(px(PANEL_BTN_H))
+                    .h(px(PANEL_BTN_H + 4.0))
                     .px(px(8.0))
-                    .rounded(px(5.0))
-                    .bg(if is_sel { mix(th.surface, th.accent, 0.18) } else { th.control })
-                    .border_1()
-                    .border_color(if is_sel { th.accent } else { th.separator })
-                    .hover(move |s| s.bg(th.control_pressed))
+                    .rounded(px(6.0))
+                    .when(is_sel, |d| d.bg(mix(th.card, th.accent, 0.24)))
+                    .hover(move |s| s.bg(if is_sel { mix(th.card, th.accent, 0.3) } else { th.hover }))
                     .flex()
                     .items_center()
                     .gap(px(6.0))
@@ -552,8 +547,12 @@ impl Editor {
                     .child(div().size(px(8.0)).rounded(px(2.0)).bg(th.track(t.color.as_deref())))
                     .child(div().flex_1().truncate().font_weight(if is_sel { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).child(t.name.clone()))
                     .child(div().text_size(px(10.0)).text_color(th.text_secondary).child(tr_route))
-                    .on_click(cx.listener(move |ed, _, _, cx| {
+                    .on_click({ let tid = tid.clone(); cx.listener(move |ed, _, _, cx| {
                         let _ = ed.select_track(tid.clone(), cx);
+                    }) })
+                    .on_mouse_down(gpui::MouseButton::Right, cx.listener(move |ed, ev: &gpui::MouseDownEvent, window, cx| {
+                        if ed.select_track(tid.clone(), cx) { ed.track_menu(tid.clone(), ev.position, window, cx); }
+                        cx.stop_propagation();
                     })),
             );
         }
@@ -610,7 +609,7 @@ impl Editor {
             .gap(px(6.0))
             .bg(th.surface)
             .border_l_1()
-            .border_color(th.separator)
+            .border_color(th.shade)
             .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
@@ -624,15 +623,13 @@ impl Editor {
                     .aria_selected(active)
                     .relative()
                     .size(px(28.0))
-                    .rounded(px(5.0))
+                    .rounded(px(6.0))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .bg(if active { th.accent } else { th.control })
-                    .border_1()
-                    .border_color(if active { th.accent } else { th.separator })
-                    .hover(move |s| s.bg(if active { th.accent } else { th.control_pressed }))
-                    .child(svg().path(icon(ic)).size(px(14.5)).text_color(fg))
+                    .when(active, |d| d.bg(th.accent))
+                    .hover(move |s| s.bg(if active { th.accent } else { th.hover }))
+                    .child(svg().path(icon(ic)).size(px(15.0)).text_color(fg))
                     .when(show_dot && !active, |d| {
                         d.child(
                             div()
@@ -678,7 +675,7 @@ impl Editor {
             .gap(px(6.0))
             .bg(th.surface)
             .border_b_1()
-            .border_color(th.separator)
+            .border_color(th.shade)
             .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
@@ -1307,7 +1304,7 @@ impl Editor {
                     .rounded(px(5.0))
                     .bg(if is_cur { th.selection } else { th.control })
                     .border_1()
-                    .border_color(if is_cur { th.accent } else { th.separator })
+                    .border_color(if is_cur { th.accent } else { th.control })
                     .hover(move |s| s.bg(th.control_pressed))
                     .flex()
                     .items_center()
@@ -1399,7 +1396,7 @@ impl Editor {
             .px(px(8.0))
             .bg(th.surface)
             .border_b_1()
-            .border_color(th.separator)
+            .border_color(th.shade)
             .children(
                 [
                     (Cmd::SetToolPointer, Tool::Pointer, "mouse-pointer-2", "指针"),
@@ -1445,7 +1442,7 @@ impl Editor {
             .px(px(8.0))
             .bg(th.surface)
             .border_t_1()
-            .border_color(th.separator);
+            .border_color(th.shade);
         for (param, has_data) in params::ALL.into_iter().zip(self.active_param_data()) {
             let active = if self.integrations.three_lanes {
                 self.integrations.panel_params[self.integrations.active_panel] == param
@@ -1491,7 +1488,7 @@ impl Editor {
             .px(px(8.0))
             .bg(th.surface)
             .border_b_1()
-            .border_color(th.separator)
+            .border_color(th.shade)
             .child(icon_command_button(self, Cmd::SetLanePencil, Arg::None, "pencil", "自由绘制", "curve-Pencil", self.lane_tool == LaneTool::Pencil, cx))
             .child(icon_command_button(self, Cmd::SetLaneLine, Arg::None, "spline", "直线", "curve-Line", self.lane_tool == LaneTool::Line, cx))
             .child(selectable_command_button(self, Cmd::SetLaneSmooth, Arg::None, "平滑", "curve-Smooth", self.lane_tool == LaneTool::Smooth, cx))
@@ -1623,7 +1620,7 @@ impl Editor {
                             .gap(px(4.0))
                             .bg(th.surface)
                             .border_b_1()
-                            .border_color(th.separator)
+                            .border_color(th.shade)
                             .child(icon_command_button(self, Cmd::AddTrack, Arg::None, "plus", "轨道", "add-track", false, cx).h(px(21.0)).px(px(6.0)))
                             .child(icon_command_button(self, Cmd::FitArrange, Arg::None, "maximize-2", "全局", "fit-arrange", false, cx).h(px(21.0)).px(px(6.0))),
                     )
@@ -1667,7 +1664,7 @@ impl Editor {
             .child(
                 div()
                     .flex()
-                    .child(div().w(px(crate::arrange::HEADER_W)).h(px(16.0)).bg(th.surface).border_t_1().border_color(th.separator))
+                    .child(div().w(px(crate::arrange::HEADER_W)).h(px(16.0)).bg(th.surface).border_t_1().border_color(th.shade))
                     .child(div().flex_1().min_w_0().child(horizontal_timeline_bar(entity.clone(), true, th, cx))),
             )
             .into_any_element()
@@ -1704,7 +1701,7 @@ impl Editor {
                                 .flex_none()
                                 .flex()
                                 .border_b_1()
-                                .border_color(th.separator)
+                                .border_color(th.shade)
                                 .child(
                                     div()
                                         .w(px(KEYS_W))
@@ -1714,7 +1711,7 @@ impl Editor {
                                         .justify_center()
                                         .bg(th.surface)
                                         .border_r_1()
-                                        .border_color(th.separator)
+                                        .border_color(th.shade)
                                         .text_xs()
                                         .font_weight(FontWeight::SEMIBOLD)
                                         .text_color(th.accent)
@@ -1742,7 +1739,7 @@ impl Editor {
                                     .flex_none()
                                     .flex()
                                     .flex_col()
-                                    .child(div().h(px(RULER_H)).bg(th.surface).border_b_1().border_r_1().border_color(th.separator))
+                                    .child(div().h(px(RULER_H)).bg(th.surface).border_b_1().border_r_1().border_color(th.shade))
                                     .child(div().flex_1().child(crate::roll::keyboard(entity.clone()))),
                             )
                             .child(
@@ -1789,7 +1786,7 @@ impl Editor {
                                 .flex_none()
                                 .flex()
                                 .border_t_1()
-                                .border_color(th.separator)
+                                .border_color(th.shade)
                                 .child(
                                     div()
                                         .w(px(KEYS_W))
@@ -1799,7 +1796,7 @@ impl Editor {
                                         .justify_center()
                                         .bg(th.surface)
                                         .border_r_1()
-                                        .border_color(th.separator)
+                                        .border_color(th.shade)
                                         .text_xs()
                                         .text_color(th.text_secondary)
                                         .child("音素"),
@@ -1819,7 +1816,7 @@ impl Editor {
                         div()
                             .flex_none()
                             .flex()
-                            .child(div().w(px(KEYS_W)).h(px(16.0)).bg(th.surface).border_t_1().border_r_1().border_color(th.separator))
+                            .child(div().w(px(KEYS_W)).h(px(16.0)).bg(th.surface).border_t_1().border_r_1().border_color(th.shade))
                             .child(div().flex_1().min_w_0().child(horizontal_timeline_bar(entity.clone(), false, th, cx))),
                     )
                     // Resizable Splitter between Roll and Parameter Lanes
@@ -1842,7 +1839,7 @@ impl Editor {
                             .flex_none()
                             .flex()
                             .border_t_1()
-                            .border_color(th.separator)
+                            .border_color(th.shade)
                             .child(
                                 div()
                                     .w(px(KEYS_W))
@@ -1854,7 +1851,7 @@ impl Editor {
                                     .justify_between()
                                     .bg(if active_slot { mix(th.surface, th.accent, 0.16) } else { th.surface })
                                     .border_r_1()
-                                    .border_color(th.separator)
+                                    .border_color(th.shade)
                                     .text_xs()
                                     .child(div().font_weight(FontWeight::SEMIBOLD).child(param.short()))
                                     .child(div().text_size(px(9.0)).text_color(th.text_tertiary).child(match param {
@@ -1958,7 +1955,7 @@ impl Editor {
                                     let pane = if left { &self.chrome.inspector } else { &self.chrome.property_dock };
                                     div().id("side-drawer").absolute().top_0().bottom_0().when(left, |d| d.left_0()).when(!left, |d| d.right_0())
                                         .w(px(width)).max_w(gpui::relative(0.92)).flex().occlude()
-                                        .when(left, |d| d.border_r_1()).when(!left, |d| d.border_l_1()).border_color(th.separator)
+                                        .when(left, |d| d.border_r_1()).when(!left, |d| d.border_l_1()).border_color(th.shade)
                                         .shadow_lg()
                                         .child(cached_view(pane, StyleRefinement::default().size_full(), a11y))
                                 })),
@@ -1978,9 +1975,10 @@ impl Editor {
                     .items_center()
                     .gap(px(12.0))
                     .text_xs()
-                    .bg(th.surface)
+                    .text_color(th.text_secondary)
+                    .bg(th.window)
                     .border_t_1()
-                    .border_color(th.separator)
+                    .border_color(th.shade)
                     .child(div().flex_1().truncate().child(self.notices.back().map(|n| n.text.clone()).unwrap_or_default()))
                     .child(format!(
                         "{}{} · {} 轨 · {} 音符",

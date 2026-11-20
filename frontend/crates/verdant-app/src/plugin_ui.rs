@@ -64,7 +64,7 @@ impl Editor {
             .aria_numeric_value(param.value).aria_min_numeric_value(param.min).aria_max_numeric_value(param.max)
             .aria_value(format!("{} {}", param.value, param.unit))
             .a11y_synthetic_children(move |builder| { if busy { builder.parent_node().set_disabled(); } })
-            .flex().flex_col().gap(px(4.)).border_b_1().border_color(th.separator).pb(px(8.))
+            .flex().flex_col().gap(px(4.)).border_b_1().border_color(th.shade).pb(px(8.))
             .child(div().flex().items_center().justify_between().gap(px(6.))
                 .child(div().text_sm().truncate().child(param.name.clone()))
                 .child(div().text_xs().font_family("monospace").child(format!("{:.3} {}", param.value, param.unit))))

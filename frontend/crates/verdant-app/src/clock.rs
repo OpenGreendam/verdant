@@ -352,13 +352,33 @@ impl Render for LcdView {
         let compact = ed.width_class == crate::ui_controls::WidthClass::Phone;
         // Every readout uses a fixed-pitch face with tabular figures and a
         // fixed-width, centred column, so running digits never shift.
-        div().size_full().flex().items_center().gap(px(6.0)).px(px(8.0)).rounded(px(7.0)).bg(th.lcd)
+        div().size_full().flex().items_center().gap(px(6.0)).px(px(8.0)).rounded(px(9.0)).bg(th.lcd)
             .font_family(self.mono.clone()).font_features(crate::theme::tabular_figures())
-            .child(div().id("lcd-position").flex_1().min_w_0().h_full().flex().flex_col().items_center().justify_center()
+            .child(div().id("lcd-position").flex_1()
+                .on_mouse_down(gpui::MouseButton::Right, {
+                    let editor = editor.clone();
+                    move |ev: &gpui::MouseDownEvent, window, cx| editor.update(cx, |ed, cx| {
+                        use crate::editor::{MenuAction as M, WorkflowAction as A};
+                        use crate::menu::MenuItem as I;
+                        let pb = ed.playback_settings();
+                        let items = vec![
+                            I::action("跳转到小节…", M::Workflow(A::GoToBar)),
+                            I::action("回到开头", M::SeekTick(0)),
+                            I::separator(),
+                            I::action("跟随播放头", M::ToggleFollow).checked(ed.session.follow_playhead),
+                            I::action("循环播放", M::Workflow(A::ToggleLoop)).checked(pb.looping),
+                            I::action("节拍器", M::Workflow(A::ToggleMetronome)).checked(pb.metronome),
+                            I::separator(),
+                            I::action("在播放头编辑 / 新增速度…", M::Workflow(A::EditTempo(ed.tempo().tick_at(ed.frame_playhead).max(0.0) as i64))),
+                            I::action("在播放头编辑 / 新增拍号…", M::Workflow(A::EditMeter(ed.tempo().tick_at(ed.frame_playhead).max(0.0) as i64))),
+                        ];
+                        ed.show_menu(ev.position, items, window, cx);
+                    })
+                }).min_w_0().h_full().flex().flex_col().items_center().justify_center()
                 .aria_label(format!("播放位置，小节:拍:细分:刻度 {}，时间 {}", position.musical, position.time))
                 .child(div().text_size(px(14.0)).line_height(px(17.0)).whitespace_nowrap().child(position.musical))
                 .child(div().text_size(px(11.0)).line_height(px(13.0)).whitespace_nowrap().text_color(th.text_secondary).child(position.time)))
-            .when(!compact, |d| d.child(div().w(px(1.0)).h(px(22.0)).flex_none().bg(th.separator))
+            .when(!compact, |d| d.child(div().w(px(1.0)).h(px(22.0)).flex_none().bg(th.shade))
             .child(div().w(px(66.0)).h_full().flex_none().flex().flex_col().items_center().justify_center()
                 .text_size(px(11.0)).line_height(px(14.0)).whitespace_nowrap()
                 .child(format!("{:.1} BPM", position.bpm))
@@ -366,8 +386,8 @@ impl Render for LcdView {
             .when(!compact, |d| d.child(div().id("transport-follow").role(Role::Button).aria_label("跟随播放头").aria_selected(follow)
                 .flex_none().px(px(5.0)).py(px(5.0)).rounded(px(4.0)).text_size(px(11.0))
                 .font_family(ui_font)
-                .bg(if follow { th.control_pressed } else { th.lcd })
-                .text_color(if follow { th.accent } else { th.text_secondary }).hover(|s| s.bg(th.control))
+                .bg(if follow { th.accent } else { th.lcd })
+                .text_color(if follow { th.accent_text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.accent } else { th.hover }))
                 .child("跟随")
                 .on_click(move |_, _, cx| editor.update(cx, toggle_follow)))).into_any_element()
     }

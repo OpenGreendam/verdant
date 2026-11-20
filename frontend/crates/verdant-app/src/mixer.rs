@@ -163,7 +163,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
         .p(px(8.0))
         .bg(th.surface)
         .border_l_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex()
@@ -346,7 +346,7 @@ fn strip(
         .p(px(8.0))
         .bg(if selected { mix(th.surface, th.accent, 0.1) } else { th.surface })
         .border_r_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
             if !ed.select_track(select.clone(), cx) {
                 cx.stop_propagation();
@@ -427,7 +427,7 @@ fn strip(
                         .flex_1()
                         .aria_selected(header.solo)
                         .border_1()
-                        .border_color(if header.solo { th.warning } else { th.separator })
+                        .border_color(if header.solo { th.warning } else { th.control })
                         .when(header.solo, |d| d.bg(th.warning).text_color(th.on_track()).font_weight(FontWeight::SEMIBOLD)),
                 )
                 .child(
@@ -459,7 +459,7 @@ fn route_button(key: &'static str, label: &'static str, selected: bool, th: Them
         .rounded(px(4.0))
         .bg(if selected { th.accent } else { th.control })
         .border_1()
-        .border_color(if selected { th.accent } else { th.separator })
+        .border_color(if selected { th.accent } else { th.control })
         .text_xs()
         .font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(if selected { th.accent_text } else { th.text })
@@ -486,7 +486,7 @@ fn parameter_panel(ed: &Editor, cx: &mut Context<Editor>) -> Option<gpui::AnyEle
         .p(px(12.0))
         .bg(th.surface)
         .border_l_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex()
@@ -581,7 +581,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
         .p(px(12.0))
         .bg(th.surface)
         .border_l_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex()

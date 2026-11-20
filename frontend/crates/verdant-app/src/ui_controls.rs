@@ -176,10 +176,10 @@ pub fn selectable_button(
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(5.0))
+        .rounded(px(6.0))
         .bg(if active { th.accent } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.separator })
+        .border_color(if active { th.accent } else { th.control })
         .text_xs()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(if active { th.accent_text } else { th.text })
@@ -208,10 +208,10 @@ pub fn icon_selectable_button(
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(5.0))
+        .rounded(px(6.0))
         .bg(if active { th.accent } else { th.control })
         .border_1()
-        .border_color(if active { th.accent } else { th.separator })
+        .border_color(if active { th.accent } else { th.control })
         .text_xs()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(fg)
@@ -238,10 +238,10 @@ pub fn select_button(
         .gap(px(6.0))
         .flex()
         .items_center()
-        .rounded(px(5.0))
+        .rounded(px(6.0))
         .bg(th.control)
         .border_1()
-        .border_color(th.separator)
+        .border_color(th.control)
         .text_xs()
         .text_color(th.text)
         .hover(move |s| s.bg(th.control_pressed))
@@ -280,10 +280,41 @@ pub fn selectable_command_button(
     .h(px(BAR_BTN_H))
     .py(px(0.0))
     .px(px(8.0))
-    .rounded(px(5.0))
+    .rounded(px(6.0))
     .border_1()
-    .border_color(if active { th.accent } else { th.separator })
+    .border_color(if active { th.accent } else { th.control })
     .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+}
+
+/// libadwaita "flat" button for header bars: no fill until hovered; the
+/// accent fill marks a toggle that is on.
+pub fn flat_command_button(
+    ed: &Editor,
+    cmd: Cmd,
+    arg: Arg,
+    label: impl Into<SharedString>,
+    key: impl Into<gpui::ElementId>,
+    active: bool,
+    cx: &mut Context<Editor>,
+) -> Stateful<Div> {
+    let label = label.into();
+    let th = ed.theme;
+    let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
+    controls::command_button(
+        cmd,
+        arg,
+        label.clone(),
+        key,
+        if active { th.accent_text.into() } else { th.text.into() },
+        if active { th.accent.into() } else { clear.into() },
+        if active { th.accent.into() } else { th.hover.into() },
+        cx,
+    )
+    .role(Role::Button)
+    .aria_label(label)
+    .aria_selected(active)
+    .py(px(0.0))
+    .rounded(px(6.0))
 }
 
 /// Command button with a leading Lucide SVG icon, text label, and uniform `BAR_BTN_H` height.
@@ -304,6 +335,28 @@ pub fn icon_command_button(
         .aria_label(label.clone())
         .gap(px(5.0))
         .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
+        .child(label)
+}
+
+/// Flat header-bar button with a leading icon and a text label.
+pub fn flat_icon_command_button(
+    ed: &Editor,
+    cmd: Cmd,
+    icon_name: &'static str,
+    label: impl Into<SharedString>,
+    key: impl Into<gpui::ElementId>,
+    active: bool,
+    cx: &mut Context<Editor>,
+) -> Stateful<Div> {
+    let label = label.into();
+    let th = ed.theme;
+    let fg = if active { th.accent_text } else { th.text };
+    flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
+        .aria_label(label.clone())
+        .px(px(9.0))
+        .gap(px(6.0))
+        .text_sm()
+        .child(svg().path(icon(icon_name)).size(px(15.0)).flex_none().text_color(fg))
         .child(label)
 }
 
@@ -333,8 +386,9 @@ pub fn generated_select_button(
     .h(px(PANEL_BTN_H))
     .py(px(0.0))
     .gap(px(6.0))
+    .rounded(px(6.0))
     .border_1()
-    .border_color(th.separator)
+    .border_color(th.control)
     .child(svg().path(icon("chevron-down")).size(px(13.0)).flex_none().text_color(th.text_secondary))
 }
 
@@ -678,10 +732,10 @@ pub fn numeric_pill(
         .h(px(if compact { BAR_BTN_H } else { PANEL_BTN_H }))
         .flex()
         .items_center()
-        .rounded(px(5.0))
+        .rounded(px(6.0))
         .bg(th.control)
         .border_1()
-        .border_color(if scrubbing { th.accent } else { th.separator })
+        .border_color(if scrubbing { th.accent } else { th.control })
         .overflow_hidden()
         .child(stepper(dec_id, -1.0, "−", dec_arg))
         .child(
@@ -696,7 +750,7 @@ pub fn numeric_pill(
                 .justify_center()
                 .border_l_1()
                 .border_r_1()
-                .border_color(th.separator)
+                .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text)
                 .child(display_text)
@@ -824,7 +878,7 @@ pub fn splitter_bar(editor: Entity<Editor>, kind: SplitterKind, th: Theme) -> im
                     } else if hovered {
                         with_alpha(th.accent, 0.7)
                     } else {
-                        th.separator
+                        th.shade
                     };
                     if vertical {
                         window.paint_quad(fill(b((w - 1.0) / 2.0, 0.0, if dragging { 2.0 } else { 1.0 }, h, o), line_color));
@@ -948,7 +1002,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
         .items_center()
         .bg(th.surface)
         .border_t_1()
-        .border_color(th.separator)
+        .border_color(th.shade)
         .child(
             div()
                 .flex_1()
@@ -1055,7 +1109,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .items_center()
                 .justify_center()
                 .border_l_1()
-                .border_color(th.separator)
+                .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
@@ -1083,7 +1137,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .items_center()
                 .justify_center()
                 .border_l_1()
-                .border_color(th.separator)
+                .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))

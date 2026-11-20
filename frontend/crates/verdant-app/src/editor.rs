@@ -157,6 +157,9 @@ pub enum MenuAction {
     ShowDisclosuresWindow,
     /// Open one of the toolbar menus (from the folded menu in narrow windows).
     OpenMenu(TopMenu),
+    /// Show the left inspector (the selection's properties live there).
+    ShowProperties,
+    ToggleFollow,
     ShowBottom(Bottom),
     /// Run a toolbar command that is folded away in narrow windows.
     Run(crate::generated::controls::CommandId),
@@ -1491,6 +1494,10 @@ impl Editor {
             MenuAction::ShowShortcutsWindow => crate::shortcuts::open(cx),
             MenuAction::ShowDisclosuresWindow => crate::disclosures::open(cx),
             MenuAction::OpenMenu(menu) => self.open_top_menu(menu, window.mouse_position(), window, cx),
+            MenuAction::ShowProperties => {
+                if !self.left_panel_visible() { self.toggle_left_panel(cx); }
+            }
+            MenuAction::ToggleFollow => crate::clock::toggle_follow(self, cx),
             MenuAction::ShowBottom(bottom) => self.show_bottom(bottom, window, cx),
             MenuAction::Run(command) => crate::generated::controls::dispatch(self, command, crate::generated::controls::CommandArg::None, window, cx),
             MenuAction::GeneratedSelect { id, arg, option } => {

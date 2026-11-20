@@ -575,7 +575,7 @@ impl ScoreExportDialog{
             .aria_label(if kind==ScoreOptionControl::Ppq{format!("MIDI PPQ：{label}")}else{label.clone()})
             .aria_selected(selected).track_focus(&focus)
             .when(kind==ScoreOptionControl::Ppq,|d|d.aria_value(label.clone()).aria_min_numeric_value(1.).aria_max_numeric_value(32767.).aria_numeric_value_step(1.))
-            .p(px(8.)).rounded(px(4.)).border_1().border_color(if focused{th.accent}else{th.separator})
+            .p(px(8.)).rounded(px(4.)).border_1().border_color(if focused{th.accent}else{th.control})
             .bg(if selected{th.selection}else{th.control}).text_sm().text_color(th.text)
             .child(label).on_click(cx.listener(move|view,_,window,cx|{window.focus(&focus,cx);view.activate(kind,window,cx);} ))
     }

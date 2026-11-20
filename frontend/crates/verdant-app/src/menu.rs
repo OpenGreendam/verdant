@@ -6,7 +6,6 @@
 //! moves and capacity-limited actions remain visible but cannot be activated.
 use gpui::{Context, FocusHandle, IntoElement, KeyDownEvent, Pixels, Point, SharedString, Window, div, prelude::*, px};
 use crate::editor::{Editor, MenuAction};
-use crate::theme::mix;
 use std::path::{Path, PathBuf};
 use verdant_exchange::Format;
 
@@ -515,7 +514,7 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
     let th = ed.theme;
     let win = window.viewport_size();
     let width = px(328.0).min(win.width);
-    let height = px((menu.rows().map(|(_, _, item)| item.row_height()).sum::<f32>() + 8.0).min(win.height.as_f32() - 8.0).max(0.0));
+    let height = px((menu.rows().map(|(_, _, item)| item.row_height()).sum::<f32>() + 14.0).min(win.height.as_f32() - 8.0).max(0.0));
     // Reserve a check column only in menus that contain toggles.
     let checks = menu.rows().any(|(_, _, item)| item.checked.is_some());
     let x = menu.anchor.x.min((win.width - width).max(px(0.0))).max(px(0.0));
@@ -524,7 +523,7 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
     div().id("context-menu").role(gpui::Role::Menu).aria_label("上下文菜单")
         .key_context("ContextMenu").track_focus(&ed.focus_menu).occlude()
         .absolute().left(x).top(y).w(width).max_h(height).overflow_y_scroll()
-        .py(px(4.0)).rounded(px(7.0)).bg(th.surface).border_1().border_color(th.separator).shadow_lg()
+        .p(px(6.0)).rounded(px(12.0)).bg(th.popover).border_1().border_color(th.shade).shadow_lg()
         .text_sm().text_color(th.text)
         .on_key_down(cx.listener(|ed, ev: &KeyDownEvent, window, cx| {
             let key = ev.keystroke.key.as_str();
@@ -562,7 +561,7 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
         .children(menu.rows().enumerate().map(|(i, (index, child, item))| {
             if item.is_separator() {
                 return div().h(px(9.0)).mx(px(8.0)).flex().items_center()
-                    .child(div().w_full().h(px(1.0)).bg(th.separator)).into_any_element();
+                    .child(div().w_full().h(px(1.0)).bg(th.shade)).into_any_element();
             }
             if item.header {
                 return div().h(px(22.0)).mx(px(4.0)).px(px(10.0)).when(checks, |d| d.pl(px(28.0))).when(child, |d| d.pl(px(if checks { 44.0 } else { 26.0 })))
@@ -579,8 +578,8 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
                     if !enabled { builder.parent_node().set_disabled(); }
                     if submenu { builder.parent_node().set_expanded(expanded); }
                 })
-                .when(i == selected && enabled, |d| d.aria_active_descendant().bg(mix(th.surface, th.accent, 0.18)))
-                .h(px(26.0)).mx(px(4.0)).px(px(10.0)).flex().items_center().rounded(px(4.0))
+                .when(i == selected && enabled, |d| d.aria_active_descendant().bg(th.hover))
+                .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0))
                 .text_color(if enabled { th.text } else { th.text_tertiary })
                 .when(checks, |d| d.child(div().w(px(18.0)).flex_none().text_color(th.accent).child(if item.checked == Some(true) { "✓" } else { "" })))
                 .child(div().when(child, |d| d.pl(px(16.0))).flex_1().truncate().child(item.label.clone()))

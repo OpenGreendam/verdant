@@ -122,12 +122,12 @@ pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement 
         let hdr_h = px(crate::ui_controls::HDR_BTN_H);
         div().id(SharedString::from(format!("track-{}", track.id))).role(gpui::Role::Button).aria_label(track.name.clone()).aria_selected(selected)
             .h(px(ed.arrange_track_height as f32)).flex_none().w_full().flex().flex_col().justify_center().gap(px(4.0)).px(px(10.0))
-            .bg(if selected { mix(th.surface, th.accent, 0.14) } else { th.surface }).border_b_1().border_color(th.separator)
+            .bg(if selected { mix(th.surface, th.accent, 0.14) } else { th.surface }).border_b_1().border_color(th.shade)
             .on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
                 if ed.select_track(select.clone(), cx) { window.focus(&ed.focus_arrange, cx); }
                 else { cx.stop_propagation(); }
             }))
-            .on_mouse_down(MouseButton::Right, cx.listener(move |ed, ev: &MouseDownEvent, window, cx| { ed.track_menu(menu.clone(), ev.position, window, cx); cx.stop_propagation(); }))
+            .on_mouse_down(MouseButton::Right, cx.listener(move |ed, ev: &MouseDownEvent, window, cx| { if ed.select_track(menu.clone(), cx) { ed.track_menu(menu.clone(), ev.position, window, cx); } cx.stop_propagation(); }))
             .child(div().flex().items_center().gap(px(5.0))
                 .child(div().text_size(px(10.5)).text_color(th.text_tertiary).w(px(15.0)).flex_none().child(format!("{:02}", i + 1)))
                 .child(div().id("color").role(gpui::Role::Button).aria_label("切换轨道颜色").size(px(11.0)).rounded(px(3.0)).bg(th.track(track.color.as_deref()))
@@ -140,7 +140,7 @@ pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement 
                 .child(crate::view::command_button(ed, CommandId::ToggleSolo, CommandArg::Track(track.id.clone()), "S", SharedString::from(format!("hdr-solo-{}", track.id)), cx)
                     .h(hdr_h).w(px(23.0)).px(px(0.0)).rounded(px(4.0))
                     .aria_selected(track.solo)
-                    .border_1().border_color(if track.solo { th.warning } else { th.separator })
+                    .border_1().border_color(if track.solo { th.warning } else { th.control })
                     .when(track.solo, |d| d.bg(th.warning).text_color(th.on_track()).font_weight(FontWeight::SEMIBOLD))))
             .child(div().flex().items_center().gap(px(8.0)).text_xs().text_color(th.text_secondary)
                 .child(format!("{route_label} · {}", ed.scheduler.capabilities.as_ref()
@@ -288,7 +288,7 @@ fn paint_regions(editor: &Entity<Editor>, bounds: Bounds<Pixels>, window: &mut W
             let y = row as f64 * ed.arrange_track_height;
             if y > height { break; }
             if track.id == ed.session.track { window.paint_quad(fill(b(0.0, y, w, ed.arrange_track_height, o), with_alpha(th.accent, 0.06))); }
-            window.paint_quad(fill(b(0.0, y + ed.arrange_track_height - 1.0, w, 1.0, o), th.separator));
+            window.paint_quad(fill(b(0.0, y + ed.arrange_track_height - 1.0, w, 1.0, o), th.shade));
             let Some(index) = ed.arrange_cache.tracks.get(&track.id) else { continue };
             let low = index.prefix_ends.partition_point(|end| *end <= from);
             let high = index.regions.partition_point(|span| span.start < to);
@@ -402,6 +402,20 @@ fn paint_regions(editor: &Entity<Editor>, bounds: Bounds<Pixels>, window: &mut W
 }
 
 
+/// Right-click on empty lane space: what can be made here, then the track.
+fn lane_menu(ed:&mut Editor,track:TrackId,tick:f64,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>){
+    use crate::editor::{MenuAction as M,WorkflowAction as A};use crate::menu::MenuItem as I;
+    let free=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|parts|new_part_span(&ed.meter(),&parts,&track,tick)).is_some();
+    let mut items=vec![
+        I::action("在此新建片段",M::Workflow(A::CreatePartAt(track.clone(),tick.max(0.).floor()as i64))).with_hint("双击").enabled(free),
+        I::action("播放头移到此处",M::SeekTick(tick.max(0.).floor()as i64)),
+        I::action("导入音频到此轨…",M::Workflow(A::Integration(crate::editor::integrations::IntegrationAction::ImportAudio))),
+        I::separator(),I::header("轨道"),
+    ];
+    items.extend(crate::menu::track_menu_items(ed.project(),&track));
+    ed.show_menu(position,items,window,cx);
+}
+
 /// Movement (px) before a region press turns into a drag.
 pub(crate) const DRAG_THRESHOLD: f64 = 3.0;
 pub(crate) fn crossed_drag_threshold(press:(f64,f64),at:(f64,f64))->bool{
@@ -434,7 +448,7 @@ pub(crate) fn new_part_span(meter:&verdant_domain::MeterMap,parts:&verdant_domai
 
 /// Double-click on an empty lane: an empty one-bar part named "片段 N",
 /// selected and opened in the piano roll so notes can be drawn into it.
-fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut Window,cx:&mut Context<Editor>){
+pub(crate) fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut Window,cx:&mut Context<Editor>){
     let result=(||->Result<String,String>{
         let mut parts=verdant_domain::parts::Parts::load(ed.project())?;
         let(start,end)=new_part_span(&ed.meter(),&parts,track,tick).ok_or("此处已有片段")?;
@@ -466,7 +480,7 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
     let row=(y/ed.arrange_track_height).floor()as usize;let Some(track)=ed.project().tracks.get(row).map(|t|t.id.clone())else{return false;};
     if !matches!(button,MouseButton::Left|MouseButton::Right)||!ed.select_track(track.clone(),cx){return false;}
     let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);window.focus(&ed.focus_arrange,cx);
-    let Some(target)=hit else{if button==MouseButton::Right{ed.track_menu(track,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}cx.notify();return false;};
+    let Some(target)=hit else{if button==MouseButton::Right{lane_menu(ed,track,tick,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}cx.notify();return false;};
     use crate::editor::WorkflowAction as A;use crate::editor::integrations::IntegrationAction as IA;use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
     let(start,end,min_left,max_right,audio_seconds)=match &target{
         AuthoredTarget::Part(id)=>{

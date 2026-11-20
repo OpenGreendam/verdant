@@ -14,6 +14,7 @@ pub enum WorkflowAction {
     VibratoShape, SelectPoints, ClearPoints, TransformPoints, Interpolation(Interpolation),
     CreatePart, SelectPart(String), RenamePart, MovePart, TrimPart, SplitPart(i64), JoinPart,
     DuplicatePart(bool), UnlinkPart, MutePart, DeletePart,
+    GoToBar, CreatePartAt(TrackId,i64),
     RepeatSelection, ToggleLoop, LoopStart(i64), LoopEnd(i64), ToggleMetronome, CountIn(u32), ToggleExportClick,
     ExportSettings, ExportSetting(crate::export::ExportSetting), Integration(super::integrations::IntegrationAction),
 }
@@ -181,6 +182,8 @@ impl Editor {
                 A::ClearPoints=>{self.point_selection.clear();cx.notify();}
                 A::TransformPoints=>self.open_transform_points_dialog(window,cx),
                 A::Interpolation(mode)=>{let mut notes=self.selected_notes();for n in &mut notes{n.curves.set_interpolation(self.param.short(),mode);}self.replace_selected_notes("曲线插值",notes,cx);}
+                A::CreatePartAt(track,tick)=>crate::arrange::create_part_at(self,&track,tick as f64,window,cx),
+                A::GoToBar=>self.prompt_text("跳转到小节（从 1 开始）",PromptPurpose::GoToBar,"",window,cx),
                 A::CreatePart=>{let mut parts=Parts::load(self.project())?;let name=parts.next_name("片段");let id=parts.create(self.project(),&self.session.track,&self.session.selection_in_order(self.project()),name)?;if self.commit(self.revision(),CommandBatch::single("创建声部片段",parts.command()),cx){self.selected_part=Some(id);}}
                 A::SelectPart(id)=>{let parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("片段已不存在")?;if !self.select_track(p.track.clone(),cx){return Err("先完成当前歌词编辑".into());}self.session.selection=p.bindings.values().filter(|id|self.project().track(&p.track).is_some_and(|t|t.note(id).is_some())).cloned().collect();self.selected_part=Some(id);self.sync_index();cx.notify();}
                 A::RenamePart|A::MovePart|A::TrimPart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let p=Parts::load(self.project())?.instance(&id).cloned().ok_or("片段已不存在")?;let(title,purpose,current)=match action{A::RenamePart=>("片段名称",PromptPurpose::RenamePart(id),p.name),A::MovePart=>("片段开始 tick",PromptPurpose::MovePart(id),p.start_tick.to_string()),_=>("源偏移 tick、片段长度 tick",PromptPurpose::TrimPart(id),format!("{}, {}",p.source_offset_tick,p.duration_tick))};self.prompt_text(title,purpose,&current,window,cx);}

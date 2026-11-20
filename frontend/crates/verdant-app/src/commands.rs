@@ -213,7 +213,7 @@ impl Render for HistoryPanel {
                 .child(uniform_list("history-rows", count + 1, move |range, _, cx| {
                     panel.update(cx, |view, cx| view.rows(range, cx))
                 }).track_scroll(&self.scroll).size_full()))
-            .child(div().p(px(12.0)).border_t_1().border_color(th.separator).text_xs().text_color(th.text_secondary)
+            .child(div().p(px(12.0)).border_t_1().border_color(th.shade).text_xs().text_color(th.text_secondary)
                 .child("点击状态跳转；撤销后进行新编辑会清除后续历史。"))
             .into_any_element()
     }

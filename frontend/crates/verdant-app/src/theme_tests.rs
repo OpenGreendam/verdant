@@ -21,13 +21,14 @@ fn every_paint_token_resolves_in_both_appearances() {
     for theme in [Theme::dark(), Theme::light()] {
         // Exhaustive on purpose: a new paint token must also be checked here.
         let Theme {
-            dark: _, pride: _, window, surface, control, control_pressed, separator,
+            dark: _, pride: _, window, surface, headerbar, view, card, popover, shade, hover,
+            control, control_pressed, separator,
             text, text_secondary, text_tertiary, accent, accent_text, selection,
             success, error, warning, roll_white, roll_black, grid_bar, grid_beat,
             grid_sub, key_white, key_black, playhead, lcd, meter_low, meter_high,
         } = theme;
         for color in [
-            window, surface, control, control_pressed, separator,
+            window, surface, headerbar, view, card, popover, shade, hover, control, control_pressed, separator,
             text, text_secondary, text_tertiary, accent, accent_text, selection,
             success, error, warning, roll_white, roll_black, grid_bar, grid_beat,
             grid_sub, key_white, key_black, playhead, lcd, meter_low, meter_high,
@@ -39,7 +40,7 @@ fn every_paint_token_resolves_in_both_appearances() {
         }
         assert_eq!(meter_low, success);
         assert_eq!(meter_high, warning);
-        for background in [window, surface, control, control_pressed, lcd, roll_white, roll_black] {
+        for background in [window, surface, headerbar, view, card, popover, control, control_pressed, lcd, roll_white, roll_black] {
             for foreground in [text, text_secondary, text_tertiary] {
                 assert!(contrast(foreground, background) >= 4.5,
                     "unreadable foreground {foreground:?} on {background:?}");
@@ -47,7 +48,9 @@ fn every_paint_token_resolves_in_both_appearances() {
         }
         assert!(contrast(accent_text, accent) >= 4.5);
         for status in [success, warning, error] {
-            assert!(contrast(status, surface) >= 4.5, "unreadable status {status:?}");
+            for background in [surface, headerbar, card] {
+                assert!(contrast(status, background) >= 4.5, "unreadable status {status:?} on {background:?}");
+            }
         }
         assert!(contrast(separator, surface) >= 3.0);
         for background in [roll_white, roll_black] {
@@ -105,7 +108,11 @@ fn toggle_changes_tokens_without_mutating_the_document() {
     assert!(!light.dark);
     assert_ne!(dark.surface, light.surface);
     assert_ne!(dark.text, light.text);
-    assert_ne!(dark.accent, light.accent);
+    // libadwaita keeps one accent blue in both appearances; what must hold is
+    // that it stays readable on each.
+    assert_eq!(dark.accent, light.accent);
+    assert!(contrast(dark.accent_text, dark.accent) >= 4.5 && contrast(light.accent_text, light.accent) >= 4.5);
+    assert_ne!(dark.headerbar, light.headerbar);
     for name in verdant_domain::TRACK_COLORS {
         assert_ne!(dark.track(Some(name)), light.track(Some(name)));
     }
