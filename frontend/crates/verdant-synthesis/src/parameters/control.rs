@@ -264,7 +264,7 @@ fn manual_curve(note: &Note) -> bool { !note.positions.is_empty() || note.vibrat
 pub fn plan_note_pitch(notes: &Value, times: &[f64], native_voiced: Option<&[bool]>,
     automatic: bool, default_portamento_ms: f64, manual_f0_hz: Option<&[f64]>) -> Result<(Vec<f64>,Value)>
 {
-    plan_note_pitch_with_maximum(notes,times,native_voiced,automatic,default_portamento_ms,manual_f0_hz,4000.0)
+    plan_note_pitch_with_maximum(notes,times,native_voiced,automatic,default_portamento_ms,manual_f0_hz,NATIVE_F0_MAX_HZ)
 }
 
 pub(super) fn plan_note_pitch_with_maximum(notes: &Value, times: &[f64], native_voiced: Option<&[bool]>,

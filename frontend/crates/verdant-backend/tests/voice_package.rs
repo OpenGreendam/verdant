@@ -4,6 +4,9 @@ use std::{collections::BTreeMap,fs,path::PathBuf,sync::atomic::{AtomicU64,Orderi
 use serde_json::json;
 use sha2::{Digest,Sha256};
 use verdant_backend::{artifact,voices::{self,SourceEvidence,SourceReceipt,VoiceAdmission,VoiceAssets,VoiceRegistry},wire::{Capabilities,FileStatus,Request,Route,WorkerEvent,parse_event}};
+
+#[path = "support/original.rs"]
+mod original;
 const TOKEN:&str="821b7cd9e7b489077dd55bf581ba90e1dffd3816c6fedcedc320744b498deead";
 const MODEL:&str="213aa67a5b92fc311d524da6d9868f87df584b00e2eb9a0b9fb46822602353ff";
 struct Temp(PathBuf);
@@ -139,11 +142,13 @@ fn voice_new_project_defaults_and_neutral_settings_emit_no_legacy_processors(){
 
 #[test]
 fn verdant_onnx_short_pinyin_fits_complete_native_phones() {
-    let caps: Capabilities = serde_json::from_value(json!({
+    let fixture = json!({
         "test_double": true, "routes": ["verdant-voice", "C0"], "max_phrase_seconds": 30,
         "native_score": {"inventory": ["ba", "a"], "sub_syllable_timing": true,
             "continuous_f0_control": true, "explicit_f0_hz_range": [35., 2000.]}
-    })).unwrap();
+    });
+    let caps: Capabilities = serde_json::from_value(fixture.clone()).unwrap();
+    let original_caps = original::capabilities(fixture);
     for (lyric, seconds, phones) in [("ba1", 0.05, 2), ("a1", 0.025, 1)] {
         let mut project = verdant_domain::Project::new_empty();
         let ticks = (seconds * project.ppq as f64 * 2.0).round() as i64;
@@ -157,8 +162,12 @@ fn verdant_onnx_short_pinyin_fits_complete_native_phones() {
         assert_eq!(segments.len(), phones);
         assert!(segments.iter().all(|segment| (segment.duration_seconds - 0.025).abs() < 1e-12));
         assert!((plan.phrases[0].seconds - seconds).abs() < 1e-12);
-        assert!(verdant_backend::plan(&project, &id, Route::C0, &caps).diagnostics.iter()
-            .any(|d| d.code == "E_SYLLABLE_DOMAIN"));
+        let mut original = original::project();
+        let original_track = &mut original.tracks[0];
+        original_track.notes = project.tracks[0].notes.clone();
+        let original_plan = verdant_backend::plan(&original, &original.tracks[0].id, Route::C0, &original_caps);
+        assert!(original_plan.diagnostics.iter().any(|d| d.code == "E_SYLLABLE_DOMAIN"),
+            "{:?}", original_plan.diagnostics);
         project.tracks[0].notes[0].duration_tick -= 1;
         let shorter = verdant_backend::plan(&project, &id, Route::VerdantVoice, &caps);
         assert!(shorter.phrases.is_empty());

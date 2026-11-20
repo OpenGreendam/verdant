@@ -1389,10 +1389,15 @@ impl Editor {
         };
 
         div()
+            .id("editor-header-scroll")
             .h(px(34.0))
+            .w_full()
+            .min_w_0()
             .flex_none()
             .flex()
             .items_center()
+            .overflow_x_scroll()
+            .whitespace_nowrap()
             .gap(px(5.0))
             .px(px(8.0))
             .bg(th.surface)
@@ -1411,15 +1416,15 @@ impl Editor {
                         .aria_label(label).size(px(26.0)).px_0()
                         .child(svg().path(icon(icon_name)).size(px(15.0)).text_color(th.text))
                 })))
-            .child(numeric_pill(self, Num::SnapGridTicks, Arg::None, "snap", true, cx))
-            .child(numeric_pill(self, Num::DefaultNoteTicks, Arg::None, "new-note-length", true, cx))
-            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::TogglePhonemeLane, "mic-vocal", "音素条", "roll-phoneme-toggle", self.layout.show_phoneme_lane, cx).h(px(28.0)))
-            .child(crate::ui_controls::flat_command_button(self, Cmd::ToggleTempoLane, Arg::None, "BPM 线", "roll-tempo-toggle", self.layout.show_tempo_lane, cx).h(px(28.0)).px(px(9.0)).text_sm())
-            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenScaleDialog, "sliders-horizontal", scale_label, "roll-scale-btn", scale_active, cx).h(px(28.0)))
-            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleOtherTracks, "layers", "多轨重影", "roll-ghost-notes", self.integrations.other_tracks, cx).h(px(28.0)))
+            .child(numeric_pill(self, Num::SnapGridTicks, Arg::None, "snap", true, cx).flex_none())
+            .child(numeric_pill(self, Num::DefaultNoteTicks, Arg::None, "new-note-length", true, cx).flex_none())
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::TogglePhonemeLane, "mic-vocal", "音素条", "roll-phoneme-toggle", self.layout.show_phoneme_lane, cx).h(px(28.0)).flex_none())
+            .child(crate::ui_controls::flat_command_button(self, Cmd::ToggleTempoLane, Arg::None, "BPM 线", "roll-tempo-toggle", self.layout.show_tempo_lane, cx).h(px(28.0)).flex_none().px(px(9.0)).text_sm())
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenScaleDialog, "sliders-horizontal", scale_label, "roll-scale-btn", scale_active, cx).h(px(28.0)).flex_none())
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleOtherTracks, "layers", "多轨重影", "roll-ghost-notes", self.integrations.other_tracks, cx).h(px(28.0)).flex_none())
             .child(div().flex_1())
-            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::FitView, "maximize-2", "适合音符", "fit-notes", false, cx).h(px(28.0)))
-            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleF0Overlay, "activity", "F0 对照", "show-f0", self.show_f0, cx).h(px(28.0)))
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::FitView, "maximize-2", "适合音符", "fit-notes", false, cx).h(px(28.0)).flex_none())
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleF0Overlay, "activity", "F0 对照", "show-f0", self.show_f0, cx).h(px(28.0)).flex_none())
     }
 
     fn lane_tabs(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1427,10 +1432,15 @@ impl Editor {
         let route = self.route();
         let caps = self.scheduler.capabilities.as_ref();
         let mut tabs = div()
+            .id("lane-tabs-scroll")
             .h(px(32.0))
+            .w_full()
+            .min_w_0()
             .flex_none()
             .flex()
             .items_center()
+            .overflow_x_scroll()
+            .whitespace_nowrap()
             .gap(px(4.0))
             .px(px(8.0))
             .bg(th.surface)
@@ -1470,16 +1480,21 @@ impl Editor {
             "three-lanes-btn",
             self.integrations.three_lanes,
             cx,
-        ))
+        ).flex_none())
     }
 
     fn curve_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         div()
+            .id("curve-toolbar-scroll")
             .h(px(32.0))
+            .w_full()
+            .min_w_0()
             .flex_none()
             .flex()
             .items_center()
+            .overflow_x_scroll()
+            .whitespace_nowrap()
             .gap(px(5.0))
             .px(px(8.0))
             .bg(th.surface)
@@ -1500,13 +1515,14 @@ impl Editor {
                         .children(ic.map(|ic| svg().path(icon(ic)).size(px(14.0)).text_color(th.text)))
                         .child(label)
                 })))
-            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenTransformPoints, "sliders-horizontal", "点集变换…", "transform-points", false, cx).h(px(28.0)))
-            .child(crate::ui_controls::flat_command_button(self, Cmd::CopyCurve, Arg::None, "复制曲线", "copy-curve", false, cx).h(px(28.0)).px(px(9.0)).text_sm())
-            .child(crate::ui_controls::flat_command_button(self, Cmd::PasteCurve, Arg::None, "粘贴曲线", "paste-curve", false, cx).h(px(28.0)).px(px(9.0)).text_sm())
+            .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenTransformPoints, "sliders-horizontal", "点集变换…", "transform-points", false, cx).h(px(28.0)).flex_none())
+            .child(crate::ui_controls::flat_command_button(self, Cmd::CopyCurve, Arg::None, "复制曲线", "copy-curve", false, cx).h(px(28.0)).flex_none().px(px(9.0)).text_sm())
+            .child(crate::ui_controls::flat_command_button(self, Cmd::PasteCurve, Arg::None, "粘贴曲线", "paste-curve", false, cx).h(px(28.0)).flex_none().px(px(9.0)).text_sm())
             .when(self.param == Param::Pit, |d| {
                 d.child(
                     generated_select_button(self, SelectId::PitchRangeCents, Arg::None, "pitch-range-select", cx)
                         .h(px(BAR_BTN_H))
+                        .flex_none()
                         .w(px(104.0)),
                 )
             })
@@ -1951,9 +1967,11 @@ impl Editor {
                             .child(splitter_bar(entity.clone(), SplitterKind::InspectorWidth, th))
                     })
                     .child(
-                        // Narrow windows: panels open as drawers over the
-                        // timeline; a tap on the dimmed area closes them.
+                        // All playback anchors are laid out by the control bar
+                        // and center above. Paint playback/lyrics before drawers,
+                        // keeping drawers within the center and off the rails.
                         div().relative().flex_1().min_w_0().min_h_0().flex().child(center)
+                            .child(crate::clock::playback_layer(entity.clone(), self.touch_ui))
                             .when(!docked && has_track && self.drawer.is_some(), |d| d
                                 .child(div().id("drawer-scrim").absolute().inset_0().bg(gpui::rgba(0x0000_0066)).occlude()
                                     .on_click(cx.listener(|ed, _, _, cx| { ed.drawer = None; cx.notify(); })))
@@ -2164,7 +2182,6 @@ impl Render for Editor {
             }))
             .child(self.playback.driver.clone())
             .child(static_content)
-            .child(crate::clock::playback_layer(entity, self.touch_ui))
             .children(frame)
             .children(modal)
             .children(menu)

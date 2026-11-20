@@ -92,9 +92,9 @@ fn is_arrangement_anchor(surface: Surface) -> bool {
     matches!(surface, Surface::Arrange | Surface::ArrangeRuler | Surface::HeaderMeter(_))
 }
 
-/// This canvas is a sibling of StaticEditor under the action-owning Editor.
-/// Build child layout during prepaint, after the static sibling has updated
-/// its anchors; reusing a static cache leaves the recorded anchors intact.
+/// Build child layout during prepaint, after the toolbar and central content
+/// have recorded their anchors and before the side drawers paint. Reusing a
+/// static cache leaves the recorded anchors intact.
 pub fn playback_layer(editor: Entity<Editor>, touch_seen: bool) -> impl IntoElement {
     let touch_editor = editor.clone();
     canvas(move |_, window, cx| {
