@@ -52,7 +52,7 @@ fn startup_reopens_native_untitled_recovery_and_creates_fresh_verp() {
     let expected = store.project_for_save();
     drop(store);
     let opened = opened(open_startup_document(None, &temp.0, &[], None));
-    assert_eq!(opened.persistence.project_path(), working);
+    assert_eq!(opened.persistence.project_path(), working.canonicalize().unwrap());
     assert_eq!(opened.persistence.project_for_save(), expected);
     assert!(opened.recovery.recovered_anything());
     assert!(opened.persistence.pending_recovery().is_some());
@@ -61,7 +61,7 @@ fn startup_reopens_native_untitled_recovery_and_creates_fresh_verp() {
     assert_eq!(std::fs::read(&working).unwrap(), original);
     let fresh = Temp::new();
     let opened = match open_startup_document(None, &fresh.0, &[], None).unwrap() { StartupOpen::Opened(document) => document, _ => panic!("fresh document") };
-    assert_eq!(opened.persistence.project_path(), fresh.0.join("untitled/project.verp"));
+    assert_eq!(opened.persistence.project_path().canonicalize().unwrap(), fresh.0.join("untitled/project.verp").canonicalize().unwrap());
     assert!(opened.project_path.is_none());
     assert!(opened.new_demo);
     assert_eq!(creator_version(opened.persistence.project()).as_deref(), Some(CREATOR_VERSION));

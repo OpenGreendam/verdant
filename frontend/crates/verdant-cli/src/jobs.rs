@@ -588,15 +588,24 @@ impl Store {
         Ok(())
     }
 
+    // The caller holds the index lock through publication and lease acquisition.
     fn create(&self, receipt: &Receipt) -> Result<File, CliError> {
         self.validate(receipt, &receipt.job_id)?;
         let temporary = tempfile::Builder::new().prefix(".prepare-").tempdir_in(&self.root).map_err(io_error)?;
         let lease = open_lock(&temporary.path().join("lease.lock"))?;
+        #[cfg(not(windows))]
         if !try_lock(&lease)? { return Err(internal("new job lease is unexpectedly held")); }
+        // Windows denies renaming a directory with an open file inside it.
+        #[cfg(windows)]
+        drop(lease);
         atomic_json(&temporary.path().join("receipt.json"), receipt)?;
-        fs::rename(temporary.path(), self.job_dir(&receipt.job_id)).map_err(io_error)?;
+        fs::rename(temporary.path(), self.job_dir(&receipt.job_id))
+            .map_err(|error| CliError::new("IO_ERROR", format!("publish job directory: {error}")))?;
         let _ = temporary.keep();
         sync_directory(&self.root)?;
+        #[cfg(windows)]
+        let lease = self.try_job_lease(&receipt.job_id)?
+            .ok_or_else(|| internal("new job lease is unexpectedly held"))?;
         Ok(lease)
     }
 
@@ -1204,5 +1213,24 @@ mod windows_path_tests {
         drop(store.index_lock().unwrap());
         assert!(lock_path.is_file());
         drop(store.index_lock().unwrap());
+    }
+
+    #[test]
+    fn publishes_a_new_job_with_its_execution_lease_held() {
+        let directory = tempfile::tempdir().unwrap();
+        let params = json!({"workspace": directory.path()});
+        let store = Store::open(&params, true).unwrap().unwrap();
+        let _index = store.index_lock().unwrap();
+        let id = Uuid::new_v4().to_string();
+        let input = json!({"workspace": store.workspace_text});
+        let fingerprint = "test-render";
+        let digest = request_digest(&input, fingerprint).unwrap();
+        let receipt = Receipt::new(&store, id.clone(), input, fingerprint.to_owned(), digest, None, None);
+        let lease = store.create(&receipt).unwrap();
+        assert_eq!(store.ids().unwrap(), [id.clone()]);
+        assert_eq!(store.read(&id).unwrap().request_digest, receipt.request_digest);
+        assert!(store.try_job_lease(&id).unwrap().is_none());
+        drop(lease);
+        assert!(store.try_job_lease(&id).unwrap().is_some());
     }
 }
