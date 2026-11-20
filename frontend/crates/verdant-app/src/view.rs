@@ -437,7 +437,10 @@ impl Editor {
             .child(div().id("primary-menu").role(Role::Button).aria_label("主菜单").size(px(btn)).flex().items_center().justify_center().rounded(px(6.0))
                 .hover(move |s| s.bg(th.hover))
                 .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
-                .on_click(cx.listener(|ed, ev: &gpui::ClickEvent, w, cx| ed.main_menu(ev.position(), w, cx))))
+                .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| {
+                    // The popover's tail points at the button's lower edge.
+                    ed.main_menu(gpui::point(ev.position().x, px((bar_h + btn) / 2.0 + 2.0)), w, cx)
+                })))
             .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "属性面板", "right-dock-toggle", self.right_dock_visible(), cx))
             .children(captions)
             .when(th.pride, |bar| bar.relative().child(

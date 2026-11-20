@@ -133,3 +133,24 @@ fn folded_main_menu_keeps_every_hidden_toolbar_control_reachable() {
     let phone = labels(WidthClass::Phone);
     for hidden in ["钢琴卷帘", "混音器", "音符表", "撤销", "重做", "回到开头", "立即渲染"] { assert!(phone.iter().any(|l| l == hidden), "{hidden}"); }
 }
+
+#[test]
+fn popovers_point_at_their_anchor_and_flip_or_clamp_at_window_edges() {
+    use gpui::{point, px};
+    let win = (1600.0, 900.0);
+    // Room below: centred under the anchor, tail in the middle, pointing up.
+    let p = popover_placement(point(px(800.0), px(40.0)), (300.0, 200.0), win);
+    assert_eq!((p.x, p.y), (650.0, 50.0));
+    assert_eq!(p.arrow, Some((150.0, true)));
+    // Near the right edge: clamped inside the window, tail follows the anchor.
+    let p = popover_placement(point(px(1580.0), px(40.0)), (300.0, 200.0), win);
+    assert_eq!(p.x, 1296.0);
+    assert_eq!(p.arrow, Some((284.0, true)));
+    // No room below in the lower half: flipped above, tail pointing down.
+    let p = popover_placement(point(px(700.0), px(850.0)), (300.0, 200.0), win);
+    assert_eq!(p.y, 640.0);
+    assert_eq!(p.arrow, Some((150.0, false)));
+    // Anchor in a corner: the tail cannot reach the popover's edge, so none.
+    let p = popover_placement(point(px(1598.0), px(40.0)), (300.0, 200.0), win);
+    assert_eq!(p.arrow, None);
+}

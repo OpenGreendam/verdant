@@ -532,12 +532,11 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
     let height = px((menu.rows().map(|(_, _, item)| item.row_height()).sum::<f32>() + 14.0).min(win.height.as_f32() - 8.0).max(0.0));
     // Reserve a check column only in menus that contain toggles.
     let checks = menu.rows().any(|(_, _, item)| item.checked.is_some());
-    let x = menu.anchor.x.min((win.width - width).max(px(0.0))).max(px(0.0));
-    let y = menu.anchor.y.min((win.height - height).max(px(0.0))).max(px(0.0));
+    let place = popover_placement(menu.anchor, (width.as_f32(), height.as_f32()), (win.width.as_f32(), win.height.as_f32()));
     let selected = menu.selected;
-    div().id("context-menu").role(gpui::Role::Menu).aria_label("上下文菜单")
+    let list = div().id("context-menu").role(gpui::Role::Menu).aria_label("上下文菜单")
         .key_context("ContextMenu").track_focus(&ed.focus_menu).occlude()
-        .absolute().left(x).top(y).w(width).max_h(height).overflow_y_scroll()
+        .w_full().max_h(height).overflow_y_scroll()
         .p(px(6.0)).rounded(px(12.0)).bg(th.popover).border_1().border_color(th.shade).shadow_lg()
         .text_sm().text_color(th.text)
         .on_key_down(cx.listener(|ed, ev: &KeyDownEvent, window, cx| {
@@ -605,7 +604,49 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
                     cx.stop_propagation();
                 })).into_any_element()
         }))
-        .on_mouse_down_out(cx.listener(|ed, _, window, cx| ed.close_menu(window, cx)))
+        .on_mouse_down_out(cx.listener(|ed, _, window, cx| ed.close_menu(window, cx)));
+    let (popover, border) = (th.popover, th.shade);
+    div().absolute().left(px(place.x)).top(px(place.y)).w(width)
+        .child(list)
+        // The GtkPopover tail, pointing at the anchor.
+        .when_some(place.arrow, |d, (ax, below)| d.child(gpui::canvas(|_, _, _| (), move |bounds, (), window, _| {
+            let o = bounds.origin;
+            let tail = |inset: f64, color: gpui::Rgba, window: &mut Window| {
+                let (tip, base) = if below { (-ARROW_H + inset, 1.5) } else { (ARROW_H - inset, -1.5) };
+                let mut path = gpui::PathBuilder::fill();
+                path.move_to(crate::paint::p(ax, tip, o));
+                path.line_to(crate::paint::p(ax - ARROW_W / 2.0 + inset, base, o));
+                path.line_to(crate::paint::p(ax + ARROW_W / 2.0 - inset, base, o));
+                path.close();
+                if let Ok(path) = path.build() { window.paint_path(path, color); }
+            };
+            tail(0.0, border, window);
+            tail(1.2, popover, window);
+        }).absolute().left_0().w_full().h(px(0.0)).when(below, |d| d.top_0()).when(!below, |d| d.bottom_0())))
+}
+
+const ARROW_W: f64 = 20.0;
+const ARROW_H: f64 = 10.0;
+
+/// Where a popover goes for an anchor point, as GtkPopover does: centred
+/// under the anchor with the tail pointing at it, flipped above when there
+/// is no room below, kept inside the window. `arrow` is the tail's x inside
+/// the popover and whether the popover is below the anchor.
+#[derive(Debug, PartialEq)]
+pub(crate) struct Placement { pub x: f32, pub y: f32, pub arrow: Option<(f64, bool)> }
+
+pub(crate) fn popover_placement(anchor: Point<Pixels>, (w, h): (f32, f32), (win_w, win_h): (f32, f32)) -> Placement {
+    let (ax, ay) = (anchor.x.as_f32(), anchor.y.as_f32());
+    let margin = 4.0;
+    let gap = ARROW_H as f32;
+    let x = (ax - w / 2.0).min(win_w - w - margin).max(margin.min((win_w - w).max(0.0)));
+    let below = ay + gap + h <= win_h - margin || ay < win_h / 2.0;
+    let y = if below { ay + gap } else { ay - gap - h };
+    let y = y.min(win_h - h - margin).max(margin.min((win_h - h).max(0.0)));
+    // Only draw the tail where it can touch the popover's straight edge.
+    let tail_x = (ax - x) as f64;
+    let reaches = tail_x >= 16.0 && tail_x <= w as f64 - 16.0 && (if below { (y - ay - gap).abs() < 0.5 } else { (ay - gap - h - y).abs() < 0.5 });
+    Placement { x, y, arrow: reaches.then_some((tail_x, below)) }
 }
 
 #[cfg(test)]
