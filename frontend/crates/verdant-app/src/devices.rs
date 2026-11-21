@@ -111,6 +111,8 @@ pub fn format_value(d: &ParamDesc, v: f64) -> String {
         ":1" => format!("{v:.1}:1"),
         "" if d.id.ends_with("_q") || d.id == "q" => format!("{v:.2}"),
         "s" => format!("{v:.2} s"),
+        "st" => format!("{v:+.0} 半音"),
+        "ct" => format!("{v:.0} 音分"),
         "" if d.step_count == 1 => (if v >= 0.5 { "开" } else { "关" }).to_string(),
         unit => format!("{v:.2} {unit}"),
     }
@@ -556,7 +558,7 @@ fn toggle(ed: &Editor, track: &TrackId, slot: usize, params: &[ParamDesc], id: &
 }
 
 /// A dropdown-looking button that opens a menu (AdwComboRow's button).
-fn dropdown(id: SharedString, label: String, th: Theme, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
+pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
     div().id(id).role(Role::ComboBox).aria_label(label.clone()).h(px(30.0)).px(px(10.0)).flex().items_center().gap(px(6.0))
         .rounded(px(6.0)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
         .child(div().max_w(px(120.0)).truncate().child(label))
@@ -586,7 +588,7 @@ fn sidechain_picker(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<
     div().flex().items_center().gap(px(8.0))
         .child(svg().path(icon("git-merge")).size(px(14.0)).text_color(th.text_secondary))
         .child(div().text_sm().text_color(th.text_secondary).child("侧链"))
-        .child(dropdown(SharedString::from(format!("sidechain-{slot}")), label, th, items, cx))
+        .child(dropdown_button(SharedString::from(format!("sidechain-{slot}")), label, th, items, cx))
         .into_any_element()
 }
 
@@ -706,7 +708,7 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize,
             .on_click(cx.listener(move |ed, _, _, cx| { ed.device_band = i; cx.notify(); }))
     }));
     let shape_track = track.clone();
-    let shape = dropdown(SharedString::from(format!("eq-shape-{slot}")), band.kind.label().into(), th, move |ed| {
+    let shape = dropdown_button(SharedString::from(format!("eq-shape-{slot}")), band.kind.label().into(), th, move |ed| {
         let params = ed.live_insert(&shape_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
         eq_menu(shape_track.clone(), slot, selected, &EqParams::from_descs(&params))
     }, cx);
@@ -979,6 +981,65 @@ fn saturation_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot
 }
 
 // ---------------------------------------------------------------------------
+// Instrument (built-in synth)
+// ---------------------------------------------------------------------------
+
+/// Apply the live drag preview for `key`, then ease toward new values.
+pub(crate) fn preview_and_animate(ed: &mut Editor, key: InsertKey, params: &mut [ParamDesc], window: &mut Window) {
+    let dragging = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.preview.clone());
+    if let Some(preview) = &dragging {
+        for (id, value) in preview {
+            if let Some(p) = params.iter_mut().find(|p| &p.id == id) { p.value = *value; }
+        }
+    }
+    animate(ed, key, params, dragging.is_some(), window);
+}
+
+pub(crate) fn synth_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+    let th = ed.theme;
+    let slot = crate::instrument::INSTRUMENT_SLOT;
+    let target = || Target { track: track.clone(), slot, key };
+    let (attack, decay, release) = (Axis::log(1.0, 2000.0), Axis::log(1.0, 4000.0), Axis::log(1.0, 4000.0));
+    let sustain = Axis::lin(0.0, 100.0);
+    // ADSR: four equal columns for attack, decay, hold and release.
+    let points = move |ps: &[ParamDesc]| {
+        let v = |id: &str, d: f64| param(ps, id).map_or(d, |p| p.value);
+        let (a, d, s, r) = (attack.norm(v("attack", 5.0)), decay.norm(v("decay", 300.0)), sustain.norm(v("sustain", 70.0)), release.norm(v("release", 250.0)));
+        let xa = 0.02 + 0.23 * a;
+        let xd = xa + 0.02 + 0.23 * d;
+        let xs = 0.75;
+        let xr = xs + 0.02 + 0.23 * r;
+        [(0.0, 0.0), (xa, 1.0), (xd, s), (xs, s), (xr.min(1.0), 0.0)]
+    };
+    let painter: Painter = Rc::new(move |window, plot, params, texts| {
+        paint_grid(window, plot, th, &[(0.25, "A".into()), (0.5, "D".into()), (0.75, "R".into())], &[(0.5, String::new())], None, texts);
+        let pts: Vec<(f64, f64)> = points(params).iter().map(|&(x, y)| (plot.x(x), plot.y(y))).collect();
+        fill_under(window, plot, &pts, plot.y(0.0), with_alpha(th.accent, 0.14));
+        polyline(window, plot.o, pts.iter().map(|&q| Some(q)), 2.25, th.accent);
+    });
+    let pts = points(params);
+    let mk = |control: &'static str, at: (f64, f64), x: Option<(String, Axis)>, y: Option<(String, Axis)>, defaults: Vec<(String, f64)>| Handle {
+        control: Control::Handle(control), at, x, y, color: gpui::rgb(0xffffff), label: String::new(), hollow: false, selected: false, also: vec![], defaults };
+    let handles = vec![
+        mk("attack", pts[1], Some(("attack".into(), attack)), None, vec![("attack".into(), 5.0)]),
+        mk("decay", pts[2], Some(("decay".into(), decay)), Some(("sustain".into(), sustain)), vec![("decay".into(), 300.0), ("sustain".into(), 70.0)]),
+        mk("release", pts[4], Some(("release".into(), release)), None, vec![("release".into(), 250.0)]),
+    ];
+    let mut waves = |id: &str, label: &str| div().flex().items_center().gap(px(8.0))
+        .child(div().w(px(64.0)).text_sm().text_color(th.text_secondary).child(label.to_string()))
+        .child(choice(ed, track, slot, params, id, &dsp::WAVES, cx));
+    let (osc1, osc2) = (waves("osc1", "振荡器 1"), waves("osc2", "振荡器 2"));
+    div().flex().flex_col().gap(px(10.0))
+        .child(div().flex().gap(px(16.0))
+            .child(graph(editor.clone(), target(), params.to_vec(), "synth-adsr", "音量包络：拖动起音、衰减/延音与释音点", th, painter, handles, None, None).h(px(140.0)).flex_1())
+            .child(div().flex().flex_col().gap(px(8.0)).justify_center()
+                .child(osc1).child(osc2)))
+        .child(knob_row(editor, target, params, &["osc2_semi", "detune", "osc2_mix", "width", "gain"], th, 42.0))
+        .child(knob_row(editor, target, params, &["attack", "decay", "sustain", "release", "cutoff", "resonance", "env_amount"], th, 42.0))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
 // Device cards and the view
 // ---------------------------------------------------------------------------
 
@@ -1100,8 +1161,9 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window
             (key, values)
         }));
     }
+    let instrument = crate::instrument::instrument_card(ed, editor, &track, window, cx);
     let ed = &*ed;
-    let cards: Vec<gpui::AnyElement> = params.into_iter().enumerate().map(|(slot, p)| device_card(ed, editor, &track, slot, p, cx)).collect();
+    let cards: Vec<gpui::AnyElement> = instrument.into_iter().chain(params.into_iter().enumerate().map(|(slot, p)| device_card(ed, editor, &track, slot, p, cx))).collect();
     let empty = cards.is_empty();
     div().id("device-view").role(Role::Group).aria_label(format!("{name} 的效果器链"))
         .size_full().flex().flex_col().bg(th.view)

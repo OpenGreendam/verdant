@@ -1156,6 +1156,7 @@ impl Editor {
     /// round trip, one state capture and one undo step (a curve handle moves
     /// frequency and gain together). Rolls back like a single-parameter edit.
     pub(crate) fn set_track_insert_params(&mut self, track: TrackId, slot: usize, values: Vec<(String, f64)>, cx: &mut Context<Self>) {
+        if slot == crate::instrument::INSTRUMENT_SLOT { return self.set_instrument_params(&track, values, cx); }
         let owner = InsertOwner::Track(track);
         let Some(handle) = self.live_owned_insert(&owner, slot) else { return };
         let key = handle.key();

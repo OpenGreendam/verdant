@@ -19,6 +19,7 @@ icons!(
     "minus",
     "menu",
     "git-merge",
+    "instrument",
     "copy",
     "skip-back",
     "repeat",

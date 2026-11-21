@@ -162,6 +162,14 @@ pub enum Command {
         track: TrackId,
         inserts: Vec<Value>,
     },
+    /// Make a track an instrument track (`Some` plug-in spec, stored in
+    /// `track.unknown["instrument"]`) or a vocal track again (`None`). An
+    /// instrument track plays its notes through the instrument instead of a
+    /// singing voice. One undoable transaction.
+    SetTrackInstrument {
+        track: TrackId,
+        instrument: Option<Value>,
+    },
 }
 
 impl Command {
@@ -200,6 +208,7 @@ impl Command {
             Command::SetVibrato { .. } => "SetVibrato",
             Command::SetPortamento { .. } => "SetPortamento",
             Command::SetTrackInserts { .. } => "SetTrackInserts",
+            Command::SetTrackInstrument { .. } => "SetTrackInstrument",
         }
     }
 }

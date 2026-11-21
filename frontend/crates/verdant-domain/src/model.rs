@@ -152,6 +152,15 @@ pub struct Track {
     pub unknown: Map<String, Value>,
 }
 
+/// `track.unknown` key of an instrument track's instrument spec.
+pub const INSTRUMENT_KEY: &str = "instrument";
+
+impl Track {
+    /// The instrument spec of an instrument track; `None` for vocal tracks.
+    pub fn instrument(&self) -> Option<&Value> { self.unknown.get(INSTRUMENT_KEY).filter(|v| v.is_object()) }
+    pub fn is_instrument(&self) -> bool { self.instrument().is_some() }
+}
+
 fn yes() -> bool {
     true
 }

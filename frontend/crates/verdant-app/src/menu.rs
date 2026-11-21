@@ -520,8 +520,11 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
         MenuItem::action("静音", MenuAction::MuteTrack(track.clone())).enabled(exists).checked(state.is_some_and(|t| t.muted)),
         MenuItem::action("独奏", MenuAction::SoloTrack(track.clone())).enabled(exists).checked(state.is_some_and(|t| t.solo)),
         MenuItem::action("切换轨道颜色", MenuAction::CycleColor(track.clone())).enabled(exists),
+        MenuItem::action(if state.is_some_and(|t| t.is_instrument()) { "转为人声轨" } else { "转为乐器轨" },
+            MenuAction::MakeInstrumentTrack { track: track.clone(), instrument: !state.is_some_and(|t| t.is_instrument()) }).enabled(exists),
         MenuItem::separator(),
-        MenuItem::action("新建轨道", MenuAction::AddTrack).enabled(can_add),
+        MenuItem::action("新建人声轨", MenuAction::AddTrack).enabled(can_add),
+        MenuItem::action("新建乐器轨", MenuAction::AddInstrumentTrack).enabled(can_add),
         MenuItem::action("删除轨道", MenuAction::DeleteTrack(track.clone())).enabled(exists && project.tracks.len() > 1),
     ]
 }

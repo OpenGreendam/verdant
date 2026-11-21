@@ -53,6 +53,8 @@ impl PhraseSource {
 pub struct MediaPreparation<'a> { pub cache:&'a mut WaveformCache,pub previews:&'a mut HashMap<String,Arc<WaveformPreview>> }
 pub struct PreparedTimeline {
     pub timeline:Timeline,pub phrase_pcm:PhrasePcmCache,pub phrase_count:usize,pub media_count:usize,
+    /// Instrument tracks that rendered at least one note.
+    pub instrument_count:usize,
 }
 pub fn prepare_timeline(project:&Project,sources:&[PhraseSource],policy:AssetPolicy,rate:u32,mut cache:PhrasePcmCache,media:Option<&mut MediaPreparation>)->Result<PreparedTimeline,String>{
     let tempo=TempoMap::new(&project.tempo_map,project.ppq).map_err(|e|e.to_string())?;
@@ -87,9 +89,13 @@ pub fn prepare_timeline(project:&Project,sources:&[PhraseSource],policy:AssetPol
         None=>importer.prepare_project_clips(project,&tempo,rate).map_err(|e|e.to_string())?,
     };
     let media_count=prepared_media.len();let mut stereo=Vec::new();
+    let mut instrument_count=0;
+    for(index,track)in project.tracks.iter().enumerate(){
+        if let Some(clip)=render_instrument(track,index,&tempo,rate)?{stereo.push(clip);instrument_count+=1;}
+    }
     for clip in prepared_media{if clip.channels==1{clips.push(Clip{start:clip.start,samples:clip.samples,gain:clip.gain,track:clip.track});}else{stereo.push(StereoClip{start:clip.start,samples:clip.samples,gain:clip.gain,pan:clip.pan,track:clip.track});}}
     let mut timeline=Timeline::with_stereo(rate,clips,stereo);timeline.automation=verdant_backend::automation_plan::compile_automation(project,rate).map_err(|e|e.to_string())?;
-    Ok(PreparedTimeline{timeline,phrase_pcm:cache,phrase_count,media_count})
+    Ok(PreparedTimeline{timeline,phrase_pcm:cache,phrase_count,media_count,instrument_count})
 }
 
 pub fn master_insert_specs(project:&Project)->Vec<verdant_plugins::InsertSpec>{
@@ -109,6 +115,36 @@ pub fn plugin_schedule(channel:&verdant_audio::automation_clock::ChannelAutomati
         schedule.parameters.push(NativeParameterLane{native_id:target.native_id(),fallback:target.default_value(),curve:lane.curve.clone()});
     }
     if schedule.parameters.is_empty(){return Ok(None);}schedule.validate_density(256,4096).map_err(|e|e.to_string())?;Ok(Some(schedule))
+}
+
+/// Render an instrument track's notes through its instrument, as one stereo
+/// clip from the first note. Playback and export share this path. Results
+/// are cached by content, so editing one track re-renders only that track.
+pub fn render_instrument(track:&verdant_domain::Track,index:usize,tempo:&TempoMap,rate:u32)->Result<Option<StereoClip>,String>{
+    use verdant_plugins::builtin_dsp::{render,SynthNote,SynthParams,SYNTH_ID};
+    let Some(spec)=track.instrument()else{return Ok(None)};
+    let id=spec.get("id").and_then(serde_json::Value::as_str).unwrap_or_default();
+    let format=spec.get("format").and_then(serde_json::Value::as_str).unwrap_or_default();
+    if format!="builtin"||id!=SYNTH_ID{return Err(format!("轨道 {} 的乐器 {} 尚不能在此版本中发声",track.name,spec.get("name").and_then(serde_json::Value::as_str).unwrap_or(id)));}
+    if index>=verdant_audio::MAX_TRACKS{return Ok(None);}
+    let params=SynthParams::from_json(spec.get("params"));
+    let notes:Vec<SynthNote>=track.notes.iter().filter(|n|!n.is_muted()&&n.duration_tick>0).map(|n|{
+        let start=tempo.sample_at(n.start_tick,rate).max(0);let end=tempo.sample_at(n.start_tick+n.duration_tick,rate).max(start+1);
+        SynthNote{start:start as u64,length:(end-start)as u64,pitch:n.midi_note as f64+n.detune_millicents as f64/100_000.0,velocity:0.8}
+    }).collect();
+    let Some(first)=notes.iter().map(|n|n.start).min()else{return Ok(None)};
+    let shifted:Vec<SynthNote>=notes.iter().map(|n|SynthNote{start:n.start-first,..*n}).collect();
+    let key={use std::hash::{Hash,Hasher};let mut h=std::collections::hash_map::DefaultHasher::new();
+        serde_json::to_string(&params.to_json()).unwrap_or_default().hash(&mut h);rate.hash(&mut h);
+        for n in &shifted{n.start.hash(&mut h);n.length.hash(&mut h);n.pitch.to_bits().hash(&mut h);}h.finish()};
+    static CACHE:std::sync::OnceLock<std::sync::Mutex<HashMap<u64,Arc<[f32]>>>>=std::sync::OnceLock::new();
+    let cache=CACHE.get_or_init(Default::default);
+    let cached=cache.lock().unwrap_or_else(|p|p.into_inner()).get(&key).cloned();
+    let samples=match cached{Some(pcm)=>pcm,None=>{
+        let pcm:Arc<[f32]>=render(&params,&shifted,rate as f64).into();
+        let mut map=cache.lock().unwrap_or_else(|p|p.into_inner());if map.len()>=64{map.clear();}map.insert(key,pcm.clone());pcm
+    }};
+    Ok(Some(StereoClip{start:first,samples,gain:1.0,pan:0.0,track:index as u16}))
 }
 
 /// `InsertSpec.extra` key naming the track whose pre-insert, pre-fader
@@ -387,5 +423,31 @@ mod tests{
     fn realtime_drain_rejects_duration_overflow_without_publishing_a_partial_length(){
         let mut timeline=Timeline::new(RATE,vec![Clip{start:0,samples:vec![0.25].into(),gain:1.,track:0}]);timeline.length=u64::MAX;
         assert!(extend_realtime_duration(&mut timeline,[1],[9472]).is_err());assert_eq!(timeline.length,u64::MAX);
+    }
+
+    #[test]
+    fn instrument_tracks_render_their_notes_into_the_shared_timeline(){
+        use verdant_plugins::builtin_dsp::{SynthParams,SYNTH_ID};
+        let mut project=Project::new_empty();
+        let mut track=Track::new("乐器","#3584e4");
+        for (start,pitch) in [(0,60),(960,64)]{track.notes.push(Note::new(start,480,pitch));}
+        track.refresh_index();
+        project.tracks=vec![track];
+        // A vocal track with the same notes yields nothing without renders.
+        let prepared=prepare_timeline(&project,&[],AssetPolicy::new(Vec::<std::path::PathBuf>::new()).unwrap(),RATE,PhrasePcmCache::default(),None).unwrap();
+        assert_eq!(prepared.instrument_count,0);
+        project.tracks[0].unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),
+            serde_json::json!({"format":"builtin","id":SYNTH_ID,"name":"Verdant Synth","params":SynthParams::default().to_json()}));
+        let prepared=prepare_timeline(&project,&[],AssetPolicy::new(Vec::<std::path::PathBuf>::new()).unwrap(),RATE,PhrasePcmCache::default(),None).unwrap();
+        assert_eq!(prepared.instrument_count,1);
+        let clip=&prepared.timeline.stereo_clips[0];
+        assert_eq!((clip.start,clip.track),(0,0));
+        let tempo=TempoMap::new(&project.tempo_map,project.ppq).unwrap();
+        let second=tempo.sample_at(960,RATE)as usize;
+        assert!(clip.samples[..200].iter().any(|v|v.abs()>1e-4),"the first note sounds at once");
+        assert!(clip.samples[second*2..second*2+400].iter().any(|v|v.abs()>1e-4),"the second note sounds at its tick");
+        // An instrument this build cannot play is a located error, not silence.
+        project.tracks[0].unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),serde_json::json!({"format":"vst3","id":"x","name":"Foreign"}));
+        assert!(prepare_timeline(&project,&[],AssetPolicy::new(Vec::<std::path::PathBuf>::new()).unwrap(),RATE,PhrasePcmCache::default(),None).err().unwrap().contains("Foreign"));
     }
 }

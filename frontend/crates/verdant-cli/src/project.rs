@@ -326,6 +326,7 @@ const OPERATIONS: &[OperationSpec] = &[
     OperationSpec { op:"set_vibrato", command:"SetVibrato", fields:&["track","note_ids","vibrato"] },
     OperationSpec { op:"set_portamento", command:"SetPortamento", fields:&["track","note_ids","portamento_ms"] },
     OperationSpec { op:"set_track_inserts", command:"SetTrackInserts", fields:&["track","inserts"] },
+    OperationSpec { op:"set_track_instrument", command:"SetTrackInstrument", fields:&["track","instrument"] },
 ];
 
 pub fn operation_catalog() -> Value {

@@ -29,6 +29,7 @@ mod generated {
     pub mod controls;
 }
 mod index;
+mod instrument;
 mod lanes;
 mod lyric_view;
 mod menu;

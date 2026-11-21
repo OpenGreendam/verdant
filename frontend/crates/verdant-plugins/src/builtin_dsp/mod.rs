@@ -22,11 +22,13 @@ mod eq;
 mod dynamics;
 mod space;
 mod color;
+mod synth;
 
 pub use eq::*;
 pub use dynamics::*;
 pub use space::*;
 pub use color::*;
+pub use synth::*;
 pub use filters::{db_to_lin, lin_to_db};
 
 use crate::proto::ParamDesc;
