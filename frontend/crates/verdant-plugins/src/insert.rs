@@ -205,6 +205,9 @@ impl InsertHandle {
                 let mut pending_since = None;
                 while !stop.load(Ordering::Acquire) {
                     let mut c = child.lock().unwrap();
+                    // Drop may have started while this watcher waited for the
+                    // child lock. A deliberately retired host is not a crash.
+                    if stop.load(Ordering::Acquire) { return; }
                     let reason = match c.try_wait() {
                         Ok(Some(s)) => Some(format!("host exited: {s}")),
                         Err(e) => Some(format!("host wait failed: {e}")),
@@ -230,6 +233,9 @@ impl InsertHandle {
                         }
                     };
                     if let Some(reason) = reason {
+                        // Teardown can signal the child while we hold this
+                        // lock, so recheck after observing its exit as well.
+                        if stop.load(Ordering::Acquire) { return; }
                         declare_dead(&ring, &crashed, &detail, &events, key, reason);
                         let _ = c.kill();
                         let _ = c.wait();
@@ -547,6 +553,10 @@ fn declare_dead(ring: &Ring, crashed: &AtomicBool, detail: &Mutex<String>,
 
 impl Drop for InsertHandle {
     fn drop(&mut self) {
+        // Publish retirement before requesting shutdown or making stdout
+        // reach EOF. Both observers must stop reporting faults before the
+        // deliberate exit, including a watcher already waiting on child.
+        self.stop.store(true, Ordering::Release);
         self.ring.request_shutdown();
         self.ring.set_status(STATUS_CRASHED);
         self.in_w.signal();
@@ -573,7 +583,6 @@ impl Drop for InsertHandle {
                 break;
             }
         }
-        self.stop.store(true, Ordering::Release);
         for h in [self.watcher.take(), self.reader.take()].into_iter().flatten() {
             let _ = h.join();
         }

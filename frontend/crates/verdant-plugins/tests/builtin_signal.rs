@@ -7,7 +7,7 @@ use std::f64::consts::TAU;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use verdant_plugins::builtin_dsp::{self as dsp, TableEffect};
 use verdant_plugins::{InsertSpec, PluginClient, PluginClientOpts};
 
@@ -53,6 +53,49 @@ fn client() -> Arc<PluginClient> {
         cache_dir: std::env::temp_dir().join(format!("verdant-signal-{}", uuid::Uuid::new_v4())),
         sample_rate: 48_000.0, max_frames: 8192,
     }, host).unwrap()
+}
+
+#[test]
+#[ignore = "requires a freshly built verdant-plughost in VERDANT_PLUGIN_HOST"]
+fn deliberate_host_retirement_is_silent_but_explicit_kill_reports_a_crash() {
+    let client = client();
+    // Drop joins both observers, so after each retirement there can be no
+    // later event from that instance. Exercise live undo-style retirement
+    // and the independently owned hosts used by export.
+    for _ in 0..4 {
+        let live = client.insert(PluginClient::builtin_gain_spec()).unwrap();
+        assert!(matches!(live.status(), verdant_plugins::InsertStatus::Running));
+        client.remove(live.key());
+        drop(live);
+        let offline = client.offline_insert(PluginClient::builtin_gain_spec()).unwrap();
+        assert!(matches!(offline.status(), verdant_plugins::InsertStatus::Running));
+        drop(offline);
+        while let Some(event) = client.try_recv_event() {
+            assert!(!matches!(&event, verdant_plugins::ClientEvent::Crashed { .. }),
+                "normal host retirement must not publish a crash: {event:?}");
+        }
+    }
+
+    let live = client.insert(PluginClient::builtin_gain_spec()).unwrap();
+    let key = live.key();
+    live.kill_host();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(verdant_plugins::ClientEvent::Crashed { insert, detail }) = client.try_recv_event() {
+            assert_eq!(insert, key, "a retired instance must not generate a delayed fault");
+            assert!(!detail.is_empty());
+            break;
+        }
+        assert!(Instant::now() < deadline, "an unexpected host exit must remain observable");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(matches!(live.status(), verdant_plugins::InsertStatus::Crashed { .. }));
+    client.remove(key);
+    drop(live);
+    while let Some(event) = client.try_recv_event() {
+        assert!(!matches!(&event, verdant_plugins::ClientEvent::Crashed { .. }),
+            "one real failure must not produce duplicate crash events: {event:?}");
+    }
 }
 
 #[test]

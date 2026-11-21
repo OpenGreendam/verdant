@@ -2753,7 +2753,12 @@ impl Editor {
         if let Some(client) = self.plugins.clone() {
             while let Some(ev) = client.try_recv_event() {
                 match ev {
-                    verdant_plugins::ClientEvent::Crashed { detail, .. } => {
+                    // Host retirement is asynchronous. A queued failure from
+                    // a replaced/removed instance must not reconfigure its
+                    // replacement or report that the current plugin crashed.
+                    verdant_plugins::ClientEvent::Crashed { insert, detail }
+                        if self.inserts.values().flatten().chain(&self.master_inserts).any(|slot|
+                            matches!(slot, verdant_plugins::InsertSlot::Live(handle) if handle.key() == insert)) => {
                         self.plugin_reconfigure_pending = true;
                         self.notice(format!("插件崩溃已旁通：{detail}"));
                         cx.notify();

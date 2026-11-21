@@ -230,7 +230,7 @@ impl Render for NativePluginWindow {
                 DeviceTarget::Master => "主总线".into(),
             };
             let button = |id: &'static str, label: &'static str| div().id(id).role(Role::Button)
-                .aria_label(label).cursor_pointer().px(px(10.)).py(px(6.)).rounded(px(6.))
+                .aria_label(label).cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
                 .bg(th.control).hover(move |s| s.bg(th.hover)).text_sm().child(label);
             let mut root = div().id("builtin-native-editor").role(Role::Group)
                 .aria_label(format!("{name} 原生编辑器")).size_full().relative()
@@ -252,8 +252,8 @@ impl Render for NativePluginWindow {
                 .child(div().flex_none().h(px(56.)).px(px(16.)).flex().items_center().gap(px(10.))
                     .bg(th.headerbar).border_b_1().border_color(th.shade)
                     .child(div().flex_1().min_w_0().flex().flex_col()
-                        .child(div().text_lg().font_weight(FontWeight::BOLD).child(name.clone()))
-                        .child(div().text_xs().text_color(th.text_secondary).child(bus)))
+                        .child(div().truncate().text_lg().font_weight(FontWeight::BOLD).child(name.clone()))
+                        .child(div().truncate().text_xs().text_color(th.text_secondary).child(bus)))
                     .when(is_insert, |header| header
                         .child(button("native-bypass", if bypassed { "启用" } else { "旁通" })
                             .aria_selected(bypassed).on_click(cx.listener(move |ed, _, _, cx| {
