@@ -1,25 +1,25 @@
-//! Six-band parametric EQ. Each band can take any of eight shapes; cuts
+//! Twenty-four-band parametric/dynamic EQ. Each band can take nine shapes; cuts
 //! cascade up to four Butterworth sections (12–48 dB/oct); each band runs on
 //! both channels, one side, or the mid/side signal.
 
-use super::filters::{butterworth_qs, db_to_lin, response_db, rbj, Coefficients, Lattice, LatticeState, Rbj, IDENTITY};
+use super::filters::{butterworth_qs, db_to_lin, lin_to_db, response_db, rbj, time_coefficient, Biquad, Coefficients, Lattice, LatticeState, Rbj, IDENTITY};
 use super::{desc, Spec};
 use crate::proto::ParamDesc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BandKind { Bell, LowShelf, LowCut, HighShelf, HighCut, Notch, BandPass, TiltShelf }
+pub enum BandKind { Bell, LowShelf, LowCut, HighShelf, HighCut, Notch, BandPass, TiltShelf, AllPass }
 
 impl BandKind {
-    pub const ALL: [BandKind; 8] = [Self::Bell, Self::LowShelf, Self::LowCut, Self::HighShelf, Self::HighCut, Self::Notch, Self::BandPass, Self::TiltShelf];
+    pub const ALL: [BandKind; 9] = [Self::Bell, Self::LowShelf, Self::LowCut, Self::HighShelf, Self::HighCut, Self::Notch, Self::BandPass, Self::TiltShelf, Self::AllPass];
     pub fn index(self) -> usize { Self::ALL.iter().position(|k| *k == self).unwrap_or(0) }
-    pub fn from_index(value: f64) -> Self { Self::ALL[(value.round().max(0.0) as usize).min(7)] }
+    pub fn from_index(value: f64) -> Self { Self::ALL[(value.round().max(0.0) as usize).min(8)] }
     /// Cuts, notches and band-passes have no gain; their Q shapes the corner.
     pub fn has_gain(self) -> bool { matches!(self, Self::Bell | Self::LowShelf | Self::HighShelf | Self::TiltShelf) }
     pub fn has_slope(self) -> bool { matches!(self, Self::LowCut | Self::HighCut) }
     pub fn label(self) -> &'static str {
         match self {
             Self::Bell => "峰值", Self::LowShelf => "低架", Self::LowCut => "低切", Self::HighShelf => "高架",
-            Self::HighCut => "高切", Self::Notch => "陷波", Self::BandPass => "带通", Self::TiltShelf => "倾斜",
+            Self::HighCut => "高切", Self::Notch => "陷波", Self::BandPass => "带通", Self::TiltShelf => "倾斜", Self::AllPass => "全通",
         }
     }
 }
@@ -40,18 +40,24 @@ impl Placement {
     }
 }
 
-pub const EQ_BANDS: usize = 6;
+pub const EQ_BANDS: usize = 24;
 /// Up to four biquad sections per band (48 dB/oct cuts).
 pub const MAX_SECTIONS: usize = 4;
 /// (kind, default frequency, default Q, default on).
-pub const EQ_LAYOUT: [(BandKind, f64, f64, bool); EQ_BANDS] = [
+pub const EQ_LAYOUT: [(BandKind, f64, f64, bool); EQ_BANDS] = {
+    let mut layout = [(BandKind::Bell, 1000.0, 1.0, false); EQ_BANDS];
+    let legacy = [
     (BandKind::LowCut, 60.0, 0.707, false),
     (BandKind::LowShelf, 150.0, 0.707, true),
     (BandKind::Bell, 400.0, 1.0, true),
     (BandKind::Bell, 1_500.0, 1.0, true),
     (BandKind::Bell, 4_500.0, 1.0, true),
     (BandKind::HighShelf, 10_000.0, 0.707, true),
-];
+    ];
+    let mut i = 0;
+    while i < legacy.len() { layout[i] = legacy[i]; i += 1; }
+    layout
+};
 pub const FREQ_MIN: f64 = 20.0;
 pub const FREQ_MAX: f64 = 20_000.0;
 pub const GAIN_RANGE: f64 = 24.0;
@@ -74,6 +80,11 @@ impl Band {
             BandKind::HighShelf => { out[0] = rbj(Rbj::HighShelf, f, q, g, sample_rate); 1 }
             BandKind::Notch => { out[0] = rbj(Rbj::Notch, f, q, 0.0, sample_rate); 1 }
             BandKind::BandPass => { out[0] = rbj(Rbj::BandPass, f, q, 0.0, sample_rate); 1 }
+            BandKind::AllPass => {
+                let c = rbj(Rbj::LowPass, f, q, 0.0, sample_rate);
+                out[0] = [c[4], c[3], 1.0, c[3], c[4]];
+                1
+            }
             BandKind::TiltShelf => {
                 out[0] = rbj(Rbj::LowShelf, f, q, -g / 2.0, sample_rate);
                 out[1] = rbj(Rbj::HighShelf, f, q, g / 2.0, sample_rate);
@@ -96,109 +107,142 @@ impl Band {
     }
 }
 
+/// Dynamics on a bell or shelf: signed range is the maximum gain change.
+/// A separate detector follows the band's original input (or routed key).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DynamicBand { pub enabled: bool, pub range_db: f64, pub threshold_db: f64, pub attack_ms: f64, pub release_ms: f64 }
+
+impl Default for DynamicBand {
+    fn default() -> Self { Self { enabled: false, range_db: -6.0, threshold_db: -24.0, attack_ms: 10.0, release_ms: 150.0 } }
+}
+
 #[derive(Clone, Debug, PartialEq)]
-pub struct EqParams { pub bands: [Band; EQ_BANDS], pub output_db: f64 }
+pub struct EqParams {
+    pub bands: [Band; EQ_BANDS],
+    pub output_db: f64,
+    pub dynamics: [DynamicBand; EQ_BANDS],
+    /// Zero disables audition; 1..=24 selects a band-pass audition filter.
+    pub solo: usize,
+    pub auto_gain: bool,
+}
 
 impl Default for EqParams {
     fn default() -> Self {
         let bands = EQ_LAYOUT.map(|(kind, freq, q, on)| Band { kind, on, freq, gain_db: 0.0, q, slope: 1, place: Placement::Stereo });
-        Self { bands, output_db: 0.0 }
+        Self { bands, output_db: 0.0, dynamics: [DynamicBand::default(); EQ_BANDS], solo: 0, auto_gain: false }
     }
 }
 
 pub fn eq_param_id(band: usize, field: &str) -> String { format!("b{}_{field}", band + 1) }
 
-/// Index layout: `[on, freq, gain, q] × bands`, `output`, then the appended
-/// `[shape, slope, place] × bands`.
-const LEGACY: usize = EQ_BANDS * 4 + 1;
+// The original six-band automation ABI is immutable: output stays at 24,
+// b1_shape at 25 and b6_place at 42. New bands and dynamics are appended.
+const ORIGINAL_BANDS: usize = 6;
+const LEGACY: usize = ORIGINAL_BANDS * 4 + 1;
+const ORIGINAL_COUNT: usize = LEGACY + ORIGINAL_BANDS * 3;
+const DYNAMIC_START: usize = ORIGINAL_COUNT + (EQ_BANDS - ORIGINAL_BANDS) * 7;
+const GLOBAL_START: usize = DYNAMIC_START + EQ_BANDS * 5;
+const BAND_FIELDS: [&str; 7] = ["on", "freq", "gain", "q", "shape", "slope", "place"];
+const DYNAMIC_FIELDS: [&str; 5] = ["dynamic", "dyn_range", "dyn_threshold", "dyn_attack", "dyn_release"];
 
 /// Formatting/range metadata of one EQ parameter.
 pub fn eq_spec(id: &str) -> Option<Spec> {
-    if id == "output" { return Some(Spec::new("output", "输出", -GAIN_RANGE, GAIN_RANGE, 0.0, "dB")); }
-    let (_, field) = id.strip_prefix('b')?.split_once('_')?;
+    if matches!(id, "output" | "solo" | "auto_gain") { return eq_field_spec(id); }
+    let (n, field) = id.strip_prefix('b')?.split_once('_')?;
+    let band: usize = n.parse().ok()?;
+    if !(1..=EQ_BANDS).contains(&band) { return None; }
+    eq_field_spec(field)
+}
+
+fn eq_field_spec(field: &str) -> Option<Spec> {
     Some(match field {
+        "output" => Spec::new("output", "输出", -GAIN_RANGE, GAIN_RANGE, 0.0, "dB"),
+        "solo" => Spec::new("solo", "独听频段", 0.0, EQ_BANDS as f64, 0.0, "").steps(EQ_BANDS as i64),
+        "auto_gain" => Spec::new("auto_gain", "自动增益", 0.0, 1.0, 0.0, "").steps(1),
         "on" => Spec::new("on", "开关", 0.0, 1.0, 1.0, "").steps(1),
         "freq" => Spec::new("freq", "频率", FREQ_MIN, FREQ_MAX, 1000.0, "Hz").log(),
         "gain" => Spec::new("gain", "增益", -GAIN_RANGE, GAIN_RANGE, 0.0, "dB"),
         "q" => Spec::new("q", "Q", Q_MIN, Q_MAX, 1.0, "").log(),
-        "shape" => Spec::new("shape", "形状", 0.0, 7.0, 0.0, "").steps(7),
+        "shape" => Spec::new("shape", "形状", 0.0, 8.0, 0.0, "").steps(8),
         "slope" => Spec::new("slope", "陡度", 0.0, 3.0, 1.0, "").steps(3),
         "place" => Spec::new("place", "声像", 0.0, 4.0, 0.0, "").steps(4),
+        "dynamic" => Spec::new("dynamic", "动态", 0.0, 1.0, 0.0, "").steps(1),
+        "dyn_range" => Spec::new("dyn_range", "动态范围", -24.0, 24.0, -6.0, "dB"),
+        "dyn_threshold" => Spec::new("dyn_threshold", "动态阈值", -60.0, 0.0, -24.0, "dB"),
+        "dyn_attack" => Spec::new("dyn_attack", "动态启动", 0.1, 200.0, 10.0, "ms").log(),
+        "dyn_release" => Spec::new("dyn_release", "动态释放", 5.0, 2000.0, 150.0, "ms").log(),
         _ => return None,
     })
 }
 
 impl EqParams {
+    /// Reverse mapping for stable host automation and descriptor order.
+    fn field_at(index: usize) -> Option<(Option<usize>, &'static str)> {
+        if index < 24 { return Some((Some(index / 4), BAND_FIELDS[index % 4])); }
+        if index == 24 { return Some((None, "output")); }
+        if index < ORIGINAL_COUNT { return Some((Some((index - LEGACY) / 3), BAND_FIELDS[4 + (index - LEGACY) % 3])); }
+        if index < DYNAMIC_START { return Some((Some(ORIGINAL_BANDS + (index - ORIGINAL_COUNT) / 7), BAND_FIELDS[(index - ORIGINAL_COUNT) % 7])); }
+        if index < GLOBAL_START { return Some((Some((index - DYNAMIC_START) / 5), DYNAMIC_FIELDS[(index - DYNAMIC_START) % 5])); }
+        match index - GLOBAL_START { 0 => Some((None, "solo")), 1 => Some((None, "auto_gain")), _ => None }
+    }
+
+    fn value_at(&self, index: usize) -> f64 {
+        let Some((band, field)) = Self::field_at(index) else { return 0.0; };
+        let Some(i) = band else { return match field { "output" => self.output_db, "solo" => self.solo as f64, _ => if self.auto_gain { 1.0 } else { 0.0 } }; };
+        let b = &self.bands[i];
+        let d = &self.dynamics[i];
+        match field {
+            "on" => if b.on { 1.0 } else { 0.0 }, "freq" => b.freq, "gain" => b.gain_db, "q" => b.q,
+            "shape" => b.kind.index() as f64, "slope" => b.slope as f64, "place" => b.place.index() as f64,
+            "dynamic" => if d.enabled { 1.0 } else { 0.0 }, "dyn_range" => d.range_db, "dyn_threshold" => d.threshold_db,
+            "dyn_attack" => d.attack_ms, "dyn_release" => d.release_ms, _ => unreachable!(),
+        }
+    }
+
     /// Parameter order is stable: the index is the automation id.
     pub fn descs(&self) -> Vec<ParamDesc> {
-        let mut out = Vec::with_capacity(Self::param_count());
-        for (i, b) in self.bands.iter().enumerate() {
-            let n = i + 1;
-            out.push(desc(eq_param_id(i, "on"), format!("频段 {n} 开关"), if b.on { 1.0 } else { 0.0 }, 0.0, 1.0, "", 1));
-            out.push(desc(eq_param_id(i, "freq"), format!("频段 {n} 频率"), b.freq, FREQ_MIN, FREQ_MAX, "Hz", 0));
-            out.push(desc(eq_param_id(i, "gain"), format!("频段 {n} 增益"), b.gain_db, -GAIN_RANGE, GAIN_RANGE, "dB", 0));
-            out.push(desc(eq_param_id(i, "q"), format!("频段 {n} Q"), b.q, Q_MIN, Q_MAX, "", 0));
-        }
-        out.push(desc("output", "输出", self.output_db, -GAIN_RANGE, GAIN_RANGE, "dB", 0));
-        for (i, b) in self.bands.iter().enumerate() {
-            let n = i + 1;
-            out.push(desc(eq_param_id(i, "shape"), format!("频段 {n} 形状"), b.kind.index() as f64, 0.0, 7.0, "", 7));
-            out.push(desc(eq_param_id(i, "slope"), format!("频段 {n} 陡度"), b.slope as f64, 0.0, 3.0, "", 3));
-            out.push(desc(eq_param_id(i, "place"), format!("频段 {n} 声像"), b.place.index() as f64, 0.0, 4.0, "", 4));
-        }
-        // Defaults are the layout's, not the current values.
-        for (d, v) in out.iter_mut().zip(Self::default().values()) { d.default_value = Some(v); }
-        out
+        let defaults = Self::default();
+        (0..Self::param_count()).map(|index| {
+            let (band, field) = Self::field_at(index).expect("known EQ index");
+            let id = band.map_or_else(|| field.to_string(), |b| eq_param_id(b, field));
+            let spec = eq_spec(&id).expect("known EQ parameter");
+            let name = band.map_or_else(|| spec.name.to_string(), |b| format!("频段 {} {}", b + 1, spec.name));
+            let mut d = desc(id, name, self.value_at(index), spec.min, spec.max, spec.unit, spec.steps);
+            d.default_value = Some(defaults.value_at(index));
+            d
+        }).collect()
     }
 
-    pub fn values(&self) -> Vec<f64> {
-        let mut v = Vec::with_capacity(Self::param_count());
-        for b in &self.bands { v.extend([if b.on { 1.0 } else { 0.0 }, b.freq, b.gain_db, b.q]); }
-        v.push(self.output_db);
-        for b in &self.bands { v.extend([b.kind.index() as f64, b.slope as f64, b.place.index() as f64]); }
-        v
-    }
+    pub fn values(&self) -> Vec<f64> { (0..Self::param_count()).map(|i| self.value_at(i)).collect() }
 
-    pub fn param_count() -> usize { LEGACY + EQ_BANDS * 3 }
+    pub fn param_count() -> usize { GLOBAL_START + 2 }
 
     pub fn index_of(id: &str) -> Option<usize> {
-        if id == "output" { return Some(EQ_BANDS * 4); }
+        match id { "output" => return Some(24), "solo" => return Some(GLOBAL_START), "auto_gain" => return Some(GLOBAL_START + 1), _ => {} }
         let (n, field) = id.strip_prefix('b')?.split_once('_')?;
         let band: usize = n.parse().ok()?;
         if band == 0 || band > EQ_BANDS { return None; }
         let b = band - 1;
-        Some(match field {
-            "on" => b * 4, "freq" => b * 4 + 1, "gain" => b * 4 + 2, "q" => b * 4 + 3,
-            "shape" => LEGACY + b * 3, "slope" => LEGACY + b * 3 + 1, "place" => LEGACY + b * 3 + 2,
-            _ => return None,
-        })
+        if let Some(f) = DYNAMIC_FIELDS.iter().position(|s| *s == field) { return Some(DYNAMIC_START + b * 5 + f); }
+        let f = BAND_FIELDS.iter().position(|s| *s == field)?;
+        Some(if b < ORIGINAL_BANDS { if f < 4 { b * 4 + f } else { LEGACY + b * 3 + f - 4 } } else { ORIGINAL_COUNT + (b - ORIGINAL_BANDS) * 7 + f })
     }
 
     /// Set by stable index; values outside the parameter's range are refused.
     pub fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> {
-        if !value.is_finite() { return Err("non-finite EQ parameter".into()); }
-        if index == EQ_BANDS * 4 {
-            if !(-GAIN_RANGE..=GAIN_RANGE).contains(&value) { return Err("EQ output outside ±24 dB".into()); }
-            self.output_db = value;
+        let (band, field) = Self::field_at(index).ok_or("unknown EQ parameter")?;
+        eq_field_spec(field).ok_or("unknown EQ parameter")?.check(value)?;
+        let Some(i) = band else {
+            match field { "output" => self.output_db = value, "solo" => self.solo = value.round() as usize, "auto_gain" => self.auto_gain = value >= 0.5, _ => unreachable!() }
             return Ok(());
-        }
-        if index >= LEGACY {
-            let band = self.bands.get_mut((index - LEGACY) / 3).ok_or("unknown EQ parameter")?;
-            match (index - LEGACY) % 3 {
-                0 if (0.0..=7.0).contains(&value) => band.kind = BandKind::from_index(value),
-                1 if (0.0..=3.0).contains(&value) => band.slope = value.round() as usize,
-                2 if (0.0..=4.0).contains(&value) => band.place = Placement::from_index(value),
-                _ => return Err("EQ parameter outside its range".into()),
-            }
-            return Ok(());
-        }
-        let band = self.bands.get_mut(index / 4).ok_or("unknown EQ parameter")?;
-        match index % 4 {
-            0 if (0.0..=1.0).contains(&value) => band.on = value >= 0.5,
-            1 if (FREQ_MIN..=FREQ_MAX).contains(&value) => band.freq = value,
-            2 if (-GAIN_RANGE..=GAIN_RANGE).contains(&value) => band.gain_db = value,
-            3 if (Q_MIN..=Q_MAX).contains(&value) => band.q = value,
-            _ => return Err("EQ parameter outside its range".into()),
+        };
+        let b = &mut self.bands[i];
+        let d = &mut self.dynamics[i];
+        match field {
+            "on" => b.on = value >= 0.5, "freq" => b.freq = value, "gain" => b.gain_db = value, "q" => b.q = value,
+            "shape" => b.kind = BandKind::from_index(value), "slope" => b.slope = value.round() as usize, "place" => b.place = Placement::from_index(value),
+            "dynamic" => d.enabled = value >= 0.5, "dyn_range" => d.range_db = value, "dyn_threshold" => d.threshold_db = value,
+            "dyn_attack" => d.attack_ms = value, "dyn_release" => d.release_ms = value, _ => unreachable!(),
         }
         Ok(())
     }
@@ -219,6 +263,22 @@ impl EqParams {
     /// Bands placed on one side or on M/S are drawn at their own response.
     pub fn response_db(&self, freq: f64, sample_rate: f64) -> f64 {
         self.output_db + self.bands.iter().filter(|b| b.on).map(|b| band_response_db(b, freq, sample_rate)).sum::<f64>()
+    }
+
+    /// Static equal-log-frequency energy compensation. Compute this once
+    /// per editor curve, then add it to `response_db` samples.
+    pub fn auto_gain_db(&self, sample_rate: f64) -> f64 {
+        if !self.auto_gain { return 0.0; }
+        // Design each static band once, rather than once per probe frequency.
+        // This function also runs after admitted parameter automation.
+        let filters = self.bands.map(|band| band.sections(sample_rate));
+        let energy = (0..48).map(|i| {
+            let f = FREQ_MIN * (FREQ_MAX / FREQ_MIN).powf((i as f64 + 0.5) / 48.0);
+            let db: f64 = self.bands.iter().zip(&filters).filter(|(band, _)| band.on)
+                .map(|(_, (coefficients, count))| coefficients[..*count].iter().map(|&c| response_db(c, f, sample_rate)).sum::<f64>()).sum();
+            10.0f64.powf(db / 10.0)
+        }).sum::<f64>() / 48.0;
+        (-10.0 * energy.max(1e-12).log10()).clamp(-24.0, 24.0)
     }
 }
 
@@ -241,30 +301,86 @@ pub struct EqProcessor {
     sections: [usize; EQ_BANDS],
     state: [[[LatticeState; MAX_SECTIONS]; EQ_BANDS]; 2],
     output: f64,
+    auto_compensation_db: f64,
+    detector: [[Biquad; 2]; EQ_BANDS],
+    dynamic_gain: [f64; EQ_BANDS],
+    applied_gain: [f64; EQ_BANDS],
+    attack: [f64; EQ_BANDS],
+    release: [f64; EQ_BANDS],
+    envelope: [f64; EQ_BANDS],
+    clock: usize,
+    solo_filter: [Biquad; 2],
 }
 
 impl EqProcessor {
     pub fn new(sample_rate: f64) -> Self {
         let mut p = Self { params: EqParams::default(), sample_rate, coeffs: [[Lattice::default(); MAX_SECTIONS]; EQ_BANDS],
-            sections: [1; EQ_BANDS], state: Default::default(), output: 1.0 };
+            sections: [1; EQ_BANDS], state: Default::default(), output: 1.0, auto_compensation_db: 0.0,
+            detector: Default::default(), dynamic_gain: [0.0; EQ_BANDS], applied_gain: [0.0; EQ_BANDS],
+            attack: [0.0; EQ_BANDS], release: [0.0; EQ_BANDS], envelope: [0.0; EQ_BANDS], clock: 0, solo_filter: Default::default() };
         p.refresh();
         p
     }
-    pub fn set_sample_rate(&mut self, sample_rate: f64) { self.sample_rate = sample_rate; self.state = Default::default(); self.refresh(); }
-    pub fn refresh(&mut self) {
-        for (i, b) in self.params.bands.iter().enumerate() {
-            let (sections, n) = b.sections(self.sample_rate);
-            for k in 0..MAX_SECTIONS { self.coeffs[i][k] = Lattice::new(sections[k]); }
-            // Bypass drops the whole tail; fewer sections drop the unused ones.
-            let keep = if b.on { n } else { 0 };
-            for channel in &mut self.state { for k in keep..MAX_SECTIONS { channel[i][k] = LatticeState::default(); } }
-            self.sections[i] = n;
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        let params = self.params.clone();
+        *self = Self::new(sample_rate);
+        self.params = params;
+        self.refresh();
+    }
+    /// Signed live gain change for the native editor's dynamic-range overlay.
+    pub fn dynamic_gain_db(&self, band: usize) -> f64 { self.dynamic_gain.get(band).copied().unwrap_or(0.0) }
+    fn refresh_band(&mut self, i: usize) {
+        let b = &self.params.bands[i];
+        let dynamic = &self.params.dynamics[i];
+        if !b.on || !dynamic.enabled || !b.kind.has_gain() {
+            self.dynamic_gain[i] = 0.0; self.envelope[i] = 0.0;
+            self.detector[i].iter_mut().for_each(Biquad::reset);
         }
-        self.output = db_to_lin(self.params.output_db);
+        let effective = Band { gain_db: b.gain_db + self.dynamic_gain[i], ..*b };
+        let (sections, n) = effective.sections(self.sample_rate);
+        self.applied_gain[i] = effective.gain_db;
+        for k in 0..MAX_SECTIONS { self.coeffs[i][k] = Lattice::new(sections[k]); }
+        let detector_kind = match b.kind { BandKind::LowShelf => Rbj::LowPass, BandKind::HighShelf => Rbj::HighPass, _ => Rbj::BandPass };
+        let detect = rbj(detector_kind, b.freq, b.q, 0.0, self.sample_rate);
+        for filter in &mut self.detector[i] { filter.set(detect); }
+        self.attack[i] = time_coefficient(dynamic.attack_ms, self.sample_rate);
+        self.release[i] = time_coefficient(dynamic.release_ms, self.sample_rate);
+        // Bypass drops the whole tail; fewer sections drop the unused ones.
+        let keep = if b.on { n } else { 0 };
+        for channel in &mut self.state { for k in keep..MAX_SECTIONS { channel[i][k] = LatticeState::default(); } }
+        self.sections[i] = n;
+    }
+    fn refresh_output(&mut self) {
+        // Equal-log-frequency energy matching is a static compensation, not
+        // a loudness normalizer; it never follows the programme envelope.
+        self.auto_compensation_db = self.params.auto_gain_db(self.sample_rate);
+        self.output = db_to_lin(self.params.output_db + self.auto_compensation_db);
+    }
+    fn refresh_solo(&mut self) {
+        if let Some(band) = self.params.solo.checked_sub(1).and_then(|i| self.params.bands.get(i)) {
+            for filter in &mut self.solo_filter { filter.set(rbj(Rbj::BandPass, band.freq, band.q.max(0.5), 0.0, self.sample_rate)); }
+        } else { self.solo_filter.iter_mut().for_each(Biquad::reset); }
+    }
+    pub fn refresh(&mut self) {
+        for band in 0..EQ_BANDS { self.refresh_band(band); }
+        self.refresh_output();
+        self.refresh_solo();
     }
     pub fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> {
+        let (band, field) = EqParams::field_at(index).ok_or("unknown EQ parameter")?;
         self.params.set_index(index, value)?;
-        self.refresh();
+        if let Some(band) = band {
+            self.refresh_band(band);
+            if BAND_FIELDS.contains(&field) { self.refresh_output(); }
+            if self.params.solo == band + 1 { self.refresh_solo(); }
+        } else {
+            match field {
+                "output" => self.output = db_to_lin(self.params.output_db + self.auto_compensation_db),
+                "auto_gain" => self.refresh_output(),
+                "solo" => self.refresh_solo(),
+                _ => unreachable!(),
+            }
+        }
         Ok(())
     }
 
@@ -275,6 +391,10 @@ impl EqProcessor {
     }
 
     pub fn process(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) {
+        self.process_with_sidechain(in_l, in_r, None, out_l, out_r)
+    }
+
+    pub fn process_with_sidechain(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) {
         let on: [bool; EQ_BANDS] = std::array::from_fn(|i| self.params.bands[i].on);
         let place: [Placement; EQ_BANDS] = std::array::from_fn(|i| self.params.bands[i].place);
         // `params` is public: also honor bypass set directly before a block.
@@ -283,8 +403,41 @@ impl EqProcessor {
         }
         for i in 0..in_l.len() {
             let (mut l, mut r) = (in_l[i] as f64, in_r[i] as f64);
+            let (key_l, key_r) = key.map_or((l, r), |(a, b)| (a[i] as f64, b[i] as f64));
+            if self.params.solo > 0 && self.params.solo <= EQ_BANDS {
+                let band = &self.params.bands[self.params.solo - 1];
+                let (sl, sr) = match band.place {
+                    Placement::Stereo => (l, r), Placement::Left => (l, l), Placement::Right => (r, r),
+                    Placement::Mid => ((l + r) * 0.5, (l + r) * 0.5), Placement::Side => ((l - r) * 0.5, (l - r) * 0.5),
+                };
+                out_l[i] = self.solo_filter[0].run(sl) as f32;
+                out_r[i] = self.solo_filter[1].run(sr) as f32;
+                continue;
+            }
             for b in 0..EQ_BANDS {
                 if !on[b] { continue; }
+                let dynamic = self.params.dynamics[b];
+                if dynamic.enabled && self.params.bands[b].kind.has_gain() {
+                    let (kl, kr) = match place[b] {
+                        Placement::Stereo => (key_l, key_r), Placement::Left => (key_l, key_l), Placement::Right => (key_r, key_r),
+                        Placement::Mid => ((key_l + key_r) * 0.5, (key_l + key_r) * 0.5),
+                        Placement::Side => ((key_l - key_r) * 0.5, (key_l - key_r) * 0.5),
+                    };
+                    let level = self.detector[b][0].run(kl).abs().max(self.detector[b][1].run(kr).abs());
+                    let coeff = if level > self.envelope[b] { self.attack[b] } else { self.release[b] };
+                    self.envelope[b] = level + coeff * (self.envelope[b] - level);
+                    let fraction = ((lin_to_db(self.envelope[b]) - dynamic.threshold_db) / 12.0).clamp(0.0, 1.0);
+                    self.dynamic_gain[b] = dynamic.range_db * fraction;
+                    let gain = self.params.bands[b].gain_db + self.dynamic_gain[b];
+                    // Control-rate redesign bounds CPU cost; the normalized
+                    // lattice preserves bounded state under coefficient changes.
+                    if self.clock % 16 == 0 && (gain - self.applied_gain[b]).abs() > 0.01 {
+                        let effective = Band { gain_db: gain, ..self.params.bands[b] };
+                        let (sections, n) = effective.sections(self.sample_rate);
+                        for k in 0..n { self.coeffs[b][k] = Lattice::new(sections[k]); }
+                        self.applied_gain[b] = gain;
+                    }
+                }
                 match place[b] {
                     Placement::Stereo => { l = self.band(b, 0, l); r = self.band(b, 1, r); }
                     Placement::Left => l = self.band(b, 0, l),
@@ -295,6 +448,7 @@ impl EqProcessor {
             }
             out_l[i] = (l * self.output) as f32;
             out_r[i] = (r * self.output) as f32;
+            self.clock = self.clock.wrapping_add(1);
         }
     }
 }
@@ -454,10 +608,11 @@ mod tests {
         assert_eq!(EqParams::index_of("output"), Some(24));
         assert_eq!(EqParams::index_of("b1_shape"), Some(25));
         assert_eq!(EqParams::index_of("b6_place"), Some(25 + 17));
-        assert_eq!(EqParams::index_of("b7_q"), None);
+        assert_eq!(EqParams::index_of("b7_q"), Some(46));
+        assert_eq!(EqParams::index_of("b25_q"), None);
         assert!(p.set("b2_freq", 5.0).is_err(), "below 20 Hz refused");
         assert!(p.set("b2_gain", f64::NAN).is_err());
-        assert!(p.set("b2_shape", 8.0).is_err());
+        assert!(p.set("b2_shape", 9.0).is_err());
         p.set("b2_gain", 3.5).unwrap();
         p.set("b2_shape", BandKind::Notch.index() as f64).unwrap();
         p.set("b1_slope", 3.0).unwrap();
@@ -470,5 +625,53 @@ mod tests {
         for (id, v) in parse_state(&state_json(&descs)).unwrap() { q.set(&id, v).unwrap(); }
         assert_eq!(p, q);
         assert_eq!(EqParams::from_descs(&descs), p);
+    }
+
+    #[test]
+    fn all_twenty_four_bands_keep_the_original_automation_indices() {
+        let mut p = EqParams::default();
+        assert_eq!(p.bands.iter().filter(|b| b.on).count(), 5);
+        for (index, descriptor) in p.descs().iter().enumerate() {
+            assert_eq!(EqParams::index_of(&descriptor.id), Some(index), "{}", descriptor.id);
+            let mut restored = EqParams::default();
+            restored.set_index(index, descriptor.value).unwrap();
+        }
+        p.set("b24_on", 1.0).unwrap(); p.set("b24_freq", 1000.0).unwrap(); p.set("b24_gain", 6.0).unwrap();
+        assert!((p.response_db(1000.0, FS) - 6.0).abs() < 0.01);
+        assert_eq!(p.descs()[42].id, "b6_place");
+        assert_eq!(p.descs()[43].id, "b7_on");
+    }
+
+    #[test]
+    fn dynamic_band_responds_to_its_frequency_and_external_key() {
+        let configure = || {
+            let mut p = single_band_eq(bell(1000.0, 0.0, 2.0));
+            for (id, value) in [("b4_dynamic", 1.0), ("b4_dyn_range", -12.0), ("b4_dyn_threshold", -30.0), ("b4_dyn_attack", 1.0)] { p.params.set(id, value).unwrap(); }
+            p.refresh(); p
+        };
+        let quiet = sine(1000.0, 0.001, 24000); let key = sine(1000.0, 0.5, 24000);
+        let (mut l, mut r) = (vec![0.0; quiet.len()], vec![0.0; quiet.len()]);
+        let mut p = configure(); p.process(&quiet, &quiet, &mut l, &mut r);
+        assert!((rms_db(&l[12000..]) - rms_db(&quiet[12000..])).abs() < 0.05);
+        p.process_with_sidechain(&quiet, &quiet, Some((&key, &key)), &mut l, &mut r);
+        assert!(rms_db(&quiet[12000..]) - rms_db(&l[12000..]) > 10.0);
+        assert!(p.dynamic_gain_db(3) < -10.0);
+        let low_key = sine(40.0, 0.1, 24000); let mut p = configure();
+        p.process_with_sidechain(&quiet, &quiet, Some((&low_key, &low_key)), &mut l, &mut r);
+        assert!(p.dynamic_gain_db(3).abs() < 0.1, "an unrelated low frequency must not trigger this band");
+    }
+
+    #[test]
+    fn allpass_is_flat_and_solo_auditions_the_band_only() {
+        let allpass = Band { kind: BandKind::AllPass, ..bell(1000.0, 0.0, 1.0) };
+        for f in [40.0, 300.0, 1000.0, 8000.0] { assert!(band_response_db(&allpass, f, FS).abs() < 1e-8); }
+        let mut p = single_band_eq(bell(1000.0, 0.0, 4.0));
+        p.set_index(EqParams::index_of("solo").unwrap(), 4.0).unwrap();
+        let low = sine(100.0, 0.1, 12000); let target = sine(1000.0, 0.1, 12000);
+        let (mut l, mut r) = (vec![0.0; 12000], vec![0.0; 12000]);
+        p.process(&low, &low, &mut l, &mut r);
+        assert!(rms_db(&low[6000..]) - rms_db(&l[6000..]) > 25.0);
+        p.process(&target, &target, &mut l, &mut r);
+        assert!((rms_db(&target[6000..]) - rms_db(&l[6000..])).abs() < 0.1);
     }
 }

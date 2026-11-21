@@ -116,6 +116,7 @@ fn check_cancelled(cancelled:&dyn Fn()->bool)->Result<(),String>{
 fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,plugins:Option<&PluginClient>,settings:&RenderSettings,target:Option<&TrackId>,cancelled:&dyn Fn()->bool)->Result<(AtomicWav,u64),String>{
     use verdant_audio::engine::ChainInput;
     let document=verdant_domain::automation::AutomationDocument::from_project(project).map_err(|e|e.to_string())?;
+    let transport_tempo=project_audio::transport_tempo_curve(project,RATE)?;
     let errors=Arc::new(Mutex::new(None));let mut chains=Vec::with_capacity(project.tracks.len());let mut schedules=Vec::with_capacity(project.tracks.len());let mut latencies=Vec::with_capacity(project.tracks.len());let mut ends=Vec::with_capacity(project.tracks.len());
     let target_slot=target.map(|id|project.tracks.iter().position(|t|&t.id==id).ok_or("导出轨道不存在")).transpose()?;
     // A stem keeps its sidechain sources' material: they are muted below but
@@ -133,7 +134,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
                 if spec.bypass{matched.insert(spec.instance_id.clone());continue;}
                 let client=plugins.ok_or_else(||format!("轨道 {} 需要插件 {}，但宿主不可用",track.name,spec.name))?;
                 let handle=client.offline_insert(spec.clone()).map_err(|e|format!("插件 {}：{e}",spec.name))?;
-                let schedule=project_audio::plugin_schedule(&timeline.automation.tracks[index],&document,&verdant_domain::automation::AutomationOwner::Track{track_id:track.id.clone()},&spec.instance_id,&handle)?;
+                let schedule=project_audio::plugin_schedule(&timeline.automation.tracks[index],&document,&verdant_domain::automation::AutomationOwner::Track{track_id:track.id.clone()},&spec.instance_id,&handle,&transport_tempo,latency,None)?;
                 sidechains.extend(project_audio::sidechain_route(project,index,&spec,chain.len(),latency));
                 matched.insert(spec.instance_id.clone());let own=handle.plugin_latency_samples();latency=latency.checked_add(own).ok_or("插件延迟超出范围")?;
                 native.push(schedule);chain.push(ChainInput::New(Box::new(OfflineInsert{handle,error:errors.clone(),latency:own})));
@@ -143,19 +144,21 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
         let tail=if end>0&&!chain.is_empty(){u64::from(RATE)*u64::from(INSERT_TAIL_SECONDS)}else{0};
         ends.push(end.checked_add(tail).ok_or("尾音范围溢出")?);latencies.push(latency);chains.push(chain);schedules.push(native);
     }
+    let maximum=latencies.iter().copied().max().unwrap_or(0);
     let mut master_chain:verdant_audio::engine::Chain=Vec::new();let mut master_native=Vec::new();let mut master_latency=0u32;let mut matched=std::collections::BTreeSet::new();
     if settings.options.effects{
         for spec in project_audio::master_insert_specs(project){
             if spec.bypass{matched.insert(spec.instance_id.clone());continue;}
             let client=plugins.ok_or_else(||format!("主总线需要插件 {}，但宿主不可用",spec.name))?;
             let handle=client.offline_insert(spec.clone()).map_err(|error|format!("主总线插件 {}：{error}",spec.name))?;
-            let schedule=project_audio::plugin_schedule(&timeline.automation.master,&document,&verdant_domain::automation::AutomationOwner::Master,&spec.instance_id,&handle)?;
+            let input_latency=maximum.checked_add(master_latency).ok_or("主总线插件节拍延迟超出范围")?;
+            let schedule=project_audio::plugin_schedule(&timeline.automation.master,&document,&verdant_domain::automation::AutomationOwner::Master,&spec.instance_id,&handle,&transport_tempo,input_latency,None)?;
             matched.insert(spec.instance_id.clone());let own=handle.plugin_latency_samples();master_latency=master_latency.checked_add(own).ok_or("主总线插件延迟超出范围")?;
             master_native.push(schedule);master_chain.push(Box::new(OfflineInsert{handle,error:errors.clone(),latency:own}));
         }
         if timeline.automation.master.plugins.iter().any(|lane|!matched.contains(&lane.instance_id)){return Err("主总线的参数自动化缺少已安装插件".into());}
     }
-    let maximum=latencies.iter().copied().max().unwrap_or(0);let source_length=ends.iter().copied().max().unwrap_or(0);if source_length==0{return Err("所选轨道没有可导出的音频".into());}
+    let source_length=ends.iter().copied().max().unwrap_or(0);if source_length==0{return Err("所选轨道没有可导出的音频".into());}
     let master_tail=if master_chain.is_empty(){0}else{u64::from(RATE)*u64::from(INSERT_TAIL_SECONDS)};
     let length=source_length.checked_add(master_tail).ok_or("主总线尾音范围溢出")?;
     let latency=maximum.checked_add(master_latency).ok_or("总插件延迟超出范围")?;

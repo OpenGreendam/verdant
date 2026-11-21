@@ -133,6 +133,6 @@ red/[en/xsampa:r\ E d]
 
 ## 参见
 
-[项目入口](../README.md) · [构建与发行](../RELEASE.md) · [平台验收](docs/PLATFORM-ACCEPTANCE.md) · [路线图](ROADMAP.md) · [规格](../SPEC.md) · [CLI／DSH 设计](../spec/CLI-DSH.md)
+[项目入口](../README.md) · [构建与发行](../RELEASE.md) · [平台验收](docs/PLATFORM-ACCEPTANCE.md) · [内置插件与原生界面](docs/NATIVE-PLUGIN-SUITE.md) · [路线图](ROADMAP.md) · [规格](../SPEC.md) · [CLI／DSH 设计](../spec/CLI-DSH.md)
 
 开发使用现有开发容器与锁定工具链；Compiler 源、固定身份及生成物位于 `proto-ui/`，说明见 [P0-DECISIONS.md](P0-DECISIONS.md) 和 [spec](../spec/README.md)。

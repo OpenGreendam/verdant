@@ -4,14 +4,18 @@
 //!
 //! | id | effect |
 //! |----|--------|
-//! | `verdant.builtin.eq` | six-band EQ: eight shapes, 12–48 dB/oct cuts, stereo/L/R/M/S per band |
+//! | `verdant.builtin.eq` | 24-band dynamic EQ: nine shapes, 12–48 dB/oct cuts, stereo/L/R/M/S per band |
 //! | `verdant.builtin.compressor` | compressor: styles, lookahead, range, external sidechain, key filter |
-//! | `verdant.builtin.gate` | gate/expander: hold, hysteresis-free range, lookahead, external key |
+//! | `verdant.builtin.gate` | gate/expander: six styles, hold, hysteresis, lookahead, external key |
 //! | `verdant.builtin.deesser` | de-esser: split or wide-band reduction above a frequency |
 //! | `verdant.builtin.limiter` | lookahead brickwall limiter |
 //! | `verdant.builtin.reverb` | eight-line FDN reverb with predelay, damping and post EQ |
 //! | `verdant.builtin.delay` | stereo/ping-pong delay with filtered, saturated feedback |
-//! | `verdant.builtin.saturation` | four-style saturation with tone and mix |
+//! | `verdant.builtin.saturation` | six-band saturation with eight styles, feedback and modulation |
+//! | `verdant.builtin.multiband` | six-band upward/downward compression and expansion |
+//! | `verdant.builtin.filter` | four modulated filters with serial/parallel routing |
+//! | `verdant.builtin.simplon` | dual filter with serial/parallel routing |
+//! | `verdant.builtin.micro` | envelope-controlled low/high-pass filter |
 //!
 //! Parameters are plain values in their own units (Hz, dB, ms, %, ratio).
 //! A parameter's position in `descs()` is its automation index and never
@@ -23,12 +27,16 @@ mod dynamics;
 mod space;
 mod color;
 mod synth;
+mod multiband;
+mod filter_fx;
 
 pub use eq::*;
 pub use dynamics::*;
 pub use space::*;
 pub use color::*;
 pub use synth::*;
+pub use multiband::*;
+pub use filter_fx::*;
 pub use filters::{db_to_lin, lin_to_db};
 
 use crate::proto::ParamDesc;
@@ -41,9 +49,41 @@ pub const LIMITER_ID: &str = "verdant.builtin.limiter";
 pub const REVERB_ID: &str = "verdant.builtin.reverb";
 pub const DELAY_ID: &str = "verdant.builtin.delay";
 pub const SATURATION_ID: &str = "verdant.builtin.saturation";
+pub const MULTIBAND_ID: &str = "verdant.builtin.multiband";
+pub const FILTER_ID: &str = "verdant.builtin.filter";
+pub const SIMPLON_ID: &str = "verdant.builtin.simplon";
+pub const MICRO_ID: &str = "verdant.builtin.micro";
+
+/// Private built-in event, below the note-event namespace. Compiled from the
+/// project tempo map and delivered at sample offsets through the existing
+/// automation transport; it is never a saved/user parameter or a foreign
+/// plug-in's native parameter id.
+pub const TRANSPORT_TEMPO_EVENT: u32 = 0x7fff_fffe;
+
+pub fn uses_transport_tempo(format: &str, id: &str) -> bool {
+    format == "builtin" && id == DELAY_ID
+}
 
 /// Built-in effect ids other than the diagnostic gain, in browser order.
-pub const EFFECT_IDS: [&str; 8] = [EQ_ID, COMPRESSOR_ID, GATE_ID, DEESSER_ID, LIMITER_ID, REVERB_ID, DELAY_ID, SATURATION_ID];
+pub const EFFECT_IDS: [&str; 12] = [EQ_ID, COMPRESSOR_ID, GATE_ID, DEESSER_ID, LIMITER_ID, REVERB_ID, DELAY_ID, SATURATION_ID,
+    MULTIBAND_ID, FILTER_ID, SIMPLON_ID, MICRO_ID];
+
+/// Editors for built-in processors are drawn by the desktop, independently
+/// of the child host's external plug-in window capability.
+pub fn has_native_editor(id: &str) -> bool {
+    EFFECT_IDS.contains(&id) || id == crate::BUILTIN_GAIN_ID
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditorKind { Builtin, Hosted, Parameters }
+
+/// The default editor is a capability decision, not a user-facing extra
+/// switch. A third-party id cannot impersonate an internal editor.
+pub fn preferred_editor(format: &str, id: &str, host_has_editor: bool) -> EditorKind {
+    if format == "builtin" && has_native_editor(id) { EditorKind::Builtin }
+    else if host_has_editor { EditorKind::Hosted }
+    else { EditorKind::Parameters }
+}
 
 pub fn display_name(id: &str) -> Option<&'static str> {
     Some(match id {
@@ -55,6 +95,10 @@ pub fn display_name(id: &str) -> Option<&'static str> {
         REVERB_ID => "Verdant Reverb",
         DELAY_ID => "Verdant Delay",
         SATURATION_ID => "Verdant Saturation",
+        MULTIBAND_ID => "Verdant Multiband",
+        FILTER_ID => "Verdant Filter",
+        SIMPLON_ID => "Verdant Dual Filter",
+        MICRO_ID => "Verdant Micro Filter",
         _ => return None,
     })
 }
@@ -70,12 +114,18 @@ pub fn short_label(id: &str) -> Option<&'static str> {
         REVERB_ID => "混响",
         DELAY_ID => "延迟",
         SATURATION_ID => "饱和",
+        MULTIBAND_ID => "多段动态",
+        FILTER_ID => "调制滤波器",
+        SIMPLON_ID => "双滤波器",
+        MICRO_ID => "微型滤波器",
         _ => return None,
     })
 }
 
 /// Whether the effect reads the sidechain key when one is routed to it.
-pub fn takes_sidechain(id: &str) -> bool { matches!(id, COMPRESSOR_ID | GATE_ID | DEESSER_ID) }
+pub fn takes_sidechain(id: &str) -> bool {
+    matches!(id, EQ_ID | COMPRESSOR_ID | GATE_ID | DEESSER_ID | LIMITER_ID | REVERB_ID | DELAY_ID | SATURATION_ID | MULTIBAND_ID | FILTER_ID | SIMPLON_ID | MICRO_ID)
+}
 
 fn desc(id: impl Into<String>, name: impl Into<String>, value: f64, min: f64, max: f64, unit: &str, steps: i64) -> ParamDesc {
     ParamDesc { id: id.into(), name: name.into(), value, min, max, unit: unit.into(), step_count: steps, default_value: Some(value) }
@@ -137,6 +187,10 @@ pub fn spec_for(effect: &str, id: &str) -> Option<Spec> {
         REVERB_ID => REVERB_SPECS,
         DELAY_ID => DELAY_SPECS,
         SATURATION_ID => SATURATION_SPECS,
+        MULTIBAND_ID => MULTIBAND_SPECS,
+        FILTER_ID => FILTER_SPECS,
+        SIMPLON_ID => SIMPLON_SPECS,
+        MICRO_ID => MICRO_SPECS,
         EQ_ID => return eq_spec(id),
         _ => return None,
     };
@@ -151,6 +205,8 @@ pub trait TableEffect {
     /// Recompute derived coefficients after a value change.
     fn refresh(&mut self);
     fn set_sample_rate(&mut self, sample_rate: f64);
+    fn uses_transport_tempo() -> bool { false }
+    fn set_transport_tempo(&mut self, _bpm: f64) {}
     /// Fill `out_*` from `in_*`; `key` is the routed sidechain, if any.
     fn process(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]);
     /// Processing latency in samples.

@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 /// The host announces itself with this string.
 pub const HOST_NAME: &str = "verdant-plughost";
 
@@ -202,6 +202,9 @@ pub enum HostRequest {
     GetParams { id: u64 },
     /// Control-only admission of native automation targets; never sent by RT.
     GetAutomationParams { id: u64 },
+    /// Bounded measured input/output history; analyzed on a client background
+    /// thread. This request never runs in an audio callback.
+    GetTelemetry { id: u64 },
     GetState { id: u64 },
     /// Base64 blob previously produced by GetState on the same plugin id+version.
     SetState { id: u64, state_b64: String },
@@ -243,6 +246,7 @@ pub enum HostMessage {
 /// - `instantiate` ok: `{"plugin_id": "…", "latency": n, "has_editor": bool, "name": "…"}`
 /// - `get_params` ok: `{"params": [{"id","name","value","min","max","default","unit","step_count"}]}`
 /// - `get_state` ok: `{"state_b64": "…"}`
+/// - `get_telemetry` ok: `{"telemetry": TelemetryFrame}` (see `telemetry` module)
 /// - `open_editor` ok: `{}` (failure → ok:false with error)
 ///
 /// `Event.event` names: `"param_changed"`, `"latency_changed"`,

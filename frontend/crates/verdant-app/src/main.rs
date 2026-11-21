@@ -19,6 +19,7 @@ mod clock;
 mod commands;
 mod curve_span;
 mod devices;
+mod plugin_editor;
 mod dialogs;
 mod disclosures;
 mod demos;

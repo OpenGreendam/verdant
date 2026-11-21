@@ -515,7 +515,11 @@ impl Editor {
         if let Some((name, preset)) = &instrument {
             track_section = track_section.child(row(name, preset.clone(), th))
                 .child(button("insp-open-instrument", "编辑乐器", th).h(px(PANEL_BTN_H))
-                    .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
+                    .on_click(cx.listener(|ed, _, w, cx| {
+                        let track = ed.session.track.clone();
+                        ed.show_bottom(Bottom::Devices, w, cx);
+                        ed.open_builtin_instrument_editor(&track, cx);
+                    })));
         } else {
             track_section = track_section.child(self.singer_language_controls(cx));
         }
@@ -1927,7 +1931,8 @@ impl Render for Editor {
         let static_content = self.static_shell(window, cx);
         let modal = modal_dialog_layer(self, &entity, cx);
         let text_prompt = crate::lyric_view::prompt_overlay(self, &entity, cx);
-        let menu = self.menu.as_ref().map(|menu| gpui::deferred(crate::menu::context_menu_layer(self, menu, window, cx)).into_any_element());
+        let menu = self.menu.as_ref().filter(|menu| menu.window == window.window_handle())
+            .map(|menu| gpui::deferred(crate::menu::context_menu_layer(self, menu, window, cx)).into_any_element());
         crate::window_chrome::track_title_drag(div().id("verdant"), cx)
             .relative()
             .size_full()

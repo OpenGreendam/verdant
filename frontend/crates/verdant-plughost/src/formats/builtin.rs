@@ -130,7 +130,8 @@ impl HostedPlugin for Gain {
 // ---------------------------------------------------------------------------
 
 use verdant_plugins::builtin_dsp::{self as dsp, CompProcessor, DeesserProcessor, DelayProcessor, EqParams, EqProcessor,
-    GateProcessor, LimiterProcessor, ReverbProcessor, SaturationProcessor, TableEffect};
+    GateProcessor, LimiterProcessor, ReverbProcessor, SaturationProcessor, TableEffect,
+    MultibandProcessor, FilterProcessor, SimplonProcessor, MicroProcessor};
 
 /// What a built-in effect provides to the generic host adapter.
 pub trait Effect {
@@ -140,6 +141,8 @@ pub trait Effect {
     fn set_index(&mut self, index: usize, value: f64) -> Result<(), String>;
     fn run(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]);
     fn set_sample_rate(&mut self, sample_rate: f64);
+    fn uses_transport_tempo() -> bool { false }
+    fn set_transport_tempo(&mut self, _bpm: f64) {}
     fn latency(&self) -> u32 { 0 }
     /// Latency-defining parameters are not offered for automation.
     fn automatable(&self, _index: usize) -> bool { true }
@@ -149,7 +152,7 @@ impl Effect for EqProcessor {
     fn descs(&self) -> Vec<ParamDesc> { self.params.descs() }
     fn index_of(id: &str) -> Option<usize> { EqParams::index_of(id) }
     fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> { EqProcessor::set_index(self, index, value) }
-    fn run(&mut self, in_l: &[f32], in_r: &[f32], _key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) { self.process(in_l, in_r, out_l, out_r) }
+    fn run(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) { self.process_with_sidechain(in_l, in_r, key, out_l, out_r) }
     fn set_sample_rate(&mut self, sample_rate: f64) { EqProcessor::set_sample_rate(self, sample_rate) }
 }
 
@@ -162,6 +165,8 @@ impl<T: TableEffect> Effect for Table<T> {
     fn set_index(&mut self, index: usize, value: f64) -> Result<(), String> { self.0.set_index(index, value) }
     fn run(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) { self.0.process(in_l, in_r, key, out_l, out_r) }
     fn set_sample_rate(&mut self, sample_rate: f64) { self.0.set_sample_rate(sample_rate) }
+    fn uses_transport_tempo() -> bool { T::uses_transport_tempo() }
+    fn set_transport_tempo(&mut self, bpm: f64) { self.0.set_transport_tempo(bpm) }
     fn latency(&self) -> u32 { self.0.latency() }
     fn automatable(&self, index: usize) -> bool { T::SPECS.get(index).is_some_and(|s| s.automatable) }
 }
@@ -203,7 +208,11 @@ impl<E: Effect> Builtin<E> {
         let mut next = 0usize;
         while start < in_l.len() {
             while next < events.len() && events[next].1 as usize == start {
-                self.fx.set_index(events[next].0 as usize, events[next].2)?;
+                if events[next].0 == dsp::TRANSPORT_TEMPO_EVENT {
+                    self.fx.set_transport_tempo(events[next].2);
+                } else {
+                    self.fx.set_index(events[next].0 as usize, events[next].2)?;
+                }
                 next += 1;
             }
             let end = events.get(next).map_or(in_l.len(), |e| e.1 as usize);
@@ -217,6 +226,10 @@ impl<E: Effect> Builtin<E> {
     /// Check a whole set of (index, value) writes before applying any.
     fn validate(&self, writes: impl IntoIterator<Item = (usize, f64)>) -> Result<(), String> {
         for (index, value) in writes {
+            if index == dsp::TRANSPORT_TEMPO_EVENT as usize && E::uses_transport_tempo() {
+                if !value.is_finite() || !(20.0..=1000.0).contains(&value) { return Err("invalid transport tempo".into()); }
+                continue;
+            }
             let d = self.validation_descs.get(index).ok_or("unknown builtin parameter")?;
             if !value.is_finite() || !(d.min..=d.max).contains(&value) {
                 return Err(format!("{} outside {}…{}", d.id, d.min, d.max));
@@ -227,6 +240,8 @@ impl<E: Effect> Builtin<E> {
 }
 
 impl<E: Effect> HostedPlugin for Builtin<E> {
+    fn uses_transport_tempo(&self) -> bool { E::uses_transport_tempo() }
+
     fn process(&mut self, in_l: &[f32], in_r: &[f32], out_l: &mut [f32], out_r: &mut [f32]) -> Result<(), String> {
         if in_l.len() != in_r.len() || in_l.len() != out_l.len() || in_l.len() != out_r.len() {
             return Err("invalid builtin block".into());
@@ -292,6 +307,10 @@ pub fn effect(id: &str, sample_rate: f64) -> Option<Box<dyn HostedPlugin>> {
         dsp::REVERB_ID => Some(Box::new(Builtin::new(Table(ReverbProcessor::new(sample_rate))))),
         dsp::DELAY_ID => Some(Box::new(Builtin::new(Table(DelayProcessor::new(sample_rate))))),
         dsp::SATURATION_ID => Some(Box::new(Builtin::new(Table(SaturationProcessor::new(sample_rate))))),
+        dsp::MULTIBAND_ID => Some(Box::new(Builtin::new(Table(MultibandProcessor::new(sample_rate))))),
+        dsp::FILTER_ID => Some(Box::new(Builtin::new(Table(FilterProcessor::new(sample_rate))))),
+        dsp::SIMPLON_ID => Some(Box::new(Builtin::new(Table(SimplonProcessor::new(sample_rate))))),
+        dsp::MICRO_ID => Some(Box::new(Builtin::new(Table(MicroProcessor::new(sample_rate))))),
         _ => None,
     }
 }
@@ -335,6 +354,34 @@ pub fn descriptor() -> ScannedPlugin {
 mod tests {
     use super::*;
     use verdant_plugins::shm::Ring;
+
+    #[test]
+    fn transport_tempo_uses_sample_offsets_without_mutating_saved_parameters() {
+        let mut expected=DelayProcessor::new(48_000.);
+        expected.set("sync",1.).unwrap();
+        expected.set("mix",100.).unwrap();
+        let mut actual=DelayProcessor::new(48_000.);
+        actual.set("sync",1.).unwrap();
+        actual.set("mix",100.).unwrap();
+        let mut fx=Builtin::new(Table(actual));
+        let saved=fx.state().unwrap();
+        let mut input=vec![0.;48_000];
+        for sample in (0..input.len()).step_by(3_000){input[sample]=0.5;}
+        let (mut actual_l,mut actual_r)=(vec![0.;input.len()],vec![0.;input.len()]);
+        let (mut expected_l,mut expected_r)=(actual_l.clone(),actual_r.clone());
+        let boundary=12_345;
+        expected.set_tempo(120.);
+        expected.process(&input[..boundary],&input[..boundary],None,&mut expected_l[..boundary],&mut expected_r[..boundary]);
+        expected.set_tempo(60.);
+        expected.process(&input[boundary..],&input[boundary..],None,&mut expected_l[boundary..],&mut expected_r[boundary..]);
+        fx.process_events(&input,&input,&mut actual_l,&mut actual_r,&[(dsp::TRANSPORT_TEMPO_EVENT,0,120.),(dsp::TRANSPORT_TEMPO_EVENT,boundary as u32,60.)]).unwrap();
+        assert_eq!(actual_l,expected_l);
+        assert_eq!(actual_r,expected_r);
+        assert!(actual_l.iter().any(|sample|sample.abs()>0.01));
+        assert_eq!(fx.state().unwrap(),saved);
+        let mut eq=Builtin::new(EqProcessor::new(48_000.));
+        assert!(eq.process_events(&[0.],&[0.],&mut[0.],&mut[0.],&[(dsp::TRANSPORT_TEMPO_EVENT,0,120.)]).is_err());
+    }
 
     #[test]
     fn shared_quantum_events_reach_native_dsp_at_exact_sample_offsets() {

@@ -103,8 +103,85 @@ pub fn master_insert_specs(project:&Project)->Vec<verdant_plugins::InsertSpec>{
         .map(|specs|specs.iter().filter_map(|spec|serde_json::from_value(spec.clone()).ok()).collect()).unwrap_or_default()
 }
 
+/// Compile absolute tempo boundaries once, outside the audio callback. A seek
+/// or loop receives the value at its source sample just like parameter lanes.
+pub fn transport_tempo_curve(project:&Project,rate:u32)->Result<verdant_audio::automation_clock::SampleCurve,String>{
+    use verdant_audio::automation_clock::{SampleCurve,SamplePoint,SampleInterpolation};
+    let tempo=TempoMap::new(&project.tempo_map,project.ppq).map_err(|e|e.to_string())?;
+    let mut points:Vec<SamplePoint>=Vec::with_capacity(project.tempo_map.len());
+    for point in tempo.points(){
+        let sample=tempo.sample_at(point.tick,rate).max(0)as u64;
+        let value=point.micro_bpm as f64/1e6;
+        let next=SamplePoint{sample,value,interpolation:SampleInterpolation::Step};
+        if points.last().is_some_and(|previous|previous.sample==sample){*points.last_mut().unwrap()=next;}else{points.push(next);}
+    }
+    SampleCurve::new(points).map_err(|error|error.to_string())
+}
+
+/// A processor receives audio delayed by every upstream latency, so its
+/// private transport lane must reach the same source sample. Authored user
+/// parameter lanes retain their existing clock. A loop uses a circular shift
+/// within the authored loop range; no tempo point is lost at its wrap. This
+/// describes steady playback: a discontinuous seek does not clear pre-existing
+/// plugin/bridge audio, whose transient history remains the engine's policy.
+fn delayed_transport_curve(tempo:&verdant_audio::automation_clock::SampleCurve,input_latency:u32,loop_range:Option<(u64,u64)>)->Result<verdant_audio::automation_clock::SampleCurve,String>{
+    use verdant_audio::automation_clock::{SampleCurve,SamplePoint,SampleInterpolation};
+    let delay=u64::from(input_latency);
+    let mut points=Vec::with_capacity(tempo.points().len()+4);
+    points.push(SamplePoint{sample:0,value:tempo.value_at(0,120.),interpolation:SampleInterpolation::Step});
+    for point in tempo.points(){
+        points.push(SamplePoint{sample:point.sample.checked_add(delay).ok_or("插件节拍延迟时钟溢出")?,..*point});
+    }
+    if let Some((start,end))=loop_range.filter(|(start,end)|start<end){
+        let length=end-start;let shift=delay%length;
+        points.retain(|point|point.sample<start||point.sample>=end);
+        let source=start+(length-shift)%length;
+        points.push(SamplePoint{sample:start,value:tempo.value_at(source,120.),interpolation:SampleInterpolation::Step});
+        points.push(SamplePoint{sample:start+shift,value:tempo.value_at(start,120.),interpolation:SampleInterpolation::Step});
+        for point in tempo.points().iter().filter(|point|point.sample>start&&point.sample<end){
+            // Both operands are less than length; use subtraction to avoid
+            // overflowing even for an unusually long imported loop.
+            let offset=point.sample-start;
+            let offset=if offset>=length-shift{offset-(length-shift)}else{offset+shift};
+            points.push(SamplePoint{sample:start+offset,..*point});
+        }
+        points.push(SamplePoint{sample:end,value:tempo.value_at(end.saturating_sub(delay),tempo.value_at(0,120.)),interpolation:SampleInterpolation::Step});
+    }
+    points.sort_by_key(|point|point.sample);
+    let mut unique:Vec<SamplePoint>=Vec::with_capacity(points.len());
+    for point in points{
+        if unique.last().is_some_and(|previous|previous.sample==point.sample){*unique.last_mut().unwrap()=point;}
+        else{unique.push(point);}
+    }
+    SampleCurve::new(unique).map_err(|error|error.to_string())
+}
+
+/// Unsupported tempos only restrict an enabled beat-synced Delay. Free-time
+/// Delay and every other processor must remain usable in those projects.
+fn admit_transport_tempo(tempo:&verdant_audio::automation_clock::SampleCurve,sync_enabled:bool)->Result<bool,String>{
+    if let Some(point)=tempo.points().iter().find(|point|!(20.0..=1000.0).contains(&point.value)){
+        if sync_enabled{return Err(format!("延迟的节拍同步支持 20–1000 BPM；工程在音频帧 {} 使用 {:.6} BPM。请关闭该延迟的节拍同步或调整工程速度。",point.sample,point.value));}
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn transport_parameter(channel:&verdant_audio::automation_clock::ChannelAutomation,instance_id:&str,handle:&verdant_plugins::InsertHandle,tempo:&verdant_audio::automation_clock::SampleCurve,input_latency:u32,loop_range:Option<(u64,u64)>)->Result<Option<verdant_audio::automation_clock::NativeParameterLane>,String>{
+    if handle.bypassed()||!verdant_plugins::builtin_dsp::uses_transport_tempo(&handle.spec().format,&handle.spec().id){return Ok(None);}
+    let current=handle.params().map_err(|error|error.to_string())?.iter().find(|parameter|parameter.id=="sync").map_or(0.,|parameter|parameter.value);
+    let automated=channel.plugins.iter().find(|lane|lane.instance_id==instance_id&&lane.parameter_id=="sync");
+    let sync_enabled=automated.map_or(current>=0.5,|lane|
+        (lane.curve.points().first().is_none_or(|point|point.sample>0)&&current>=0.5)||lane.curve.points().iter().any(|point|point.value>=0.5));
+    if !admit_transport_tempo(tempo,sync_enabled)?{return Ok(None);}
+    Ok(Some(verdant_audio::automation_clock::NativeParameterLane{
+        native_id:verdant_plugins::builtin_dsp::TRANSPORT_TEMPO_EVENT,fallback:tempo.value_at(0,120.),
+        curve:delayed_transport_curve(tempo,input_latency,loop_range)?,
+    }))
+}
+
 /// Compile persisted native values against the actual hosted parameter descriptor.
-pub fn plugin_schedule(channel:&verdant_audio::automation_clock::ChannelAutomation,document:&verdant_domain::automation::AutomationDocument,owner:&verdant_domain::automation::AutomationOwner,instance_id:&str,handle:&verdant_plugins::InsertHandle)->Result<Option<verdant_audio::automation_clock::NativePluginSchedule>,String>{
+/// Tempo is private transport state: it must never overwrite a saved parameter.
+pub fn plugin_schedule(channel:&verdant_audio::automation_clock::ChannelAutomation,document:&verdant_domain::automation::AutomationDocument,owner:&verdant_domain::automation::AutomationOwner,instance_id:&str,handle:&verdant_plugins::InsertHandle,tempo:&verdant_audio::automation_clock::SampleCurve,input_latency:u32,loop_range:Option<(u64,u64)>)->Result<Option<verdant_audio::automation_clock::NativePluginSchedule>,String>{
     use verdant_audio::automation_clock::{NativeParameterLane,NativePluginSchedule};
     use verdant_domain::automation::AutomationTarget;
     let mut schedule=NativePluginSchedule{instance_id:instance_id.into(),parameters:Vec::new()};
@@ -114,6 +191,7 @@ pub fn plugin_schedule(channel:&verdant_audio::automation_clock::ChannelAutomati
         authored.validate_parameter_range(target.min(),target.max()).map_err(|e|e.to_string())?;authored.validate_parameter_steps(target.step_count()).map_err(|e|e.to_string())?;for point in &authored.points{target.event(0,point.value).map_err(|e|e.to_string())?;}
         schedule.parameters.push(NativeParameterLane{native_id:target.native_id(),fallback:target.default_value(),curve:lane.curve.clone()});
     }
+    if let Some(parameter)=transport_parameter(channel,instance_id,handle,tempo,input_latency,loop_range)?{schedule.parameters.push(parameter);}
     if schedule.parameters.is_empty(){return Ok(None);}schedule.validate_density(256,4096).map_err(|e|e.to_string())?;Ok(Some(schedule))
 }
 
@@ -165,18 +243,18 @@ pub fn render_hosted(client:&verdant_plugins::PluginClient,spec:&serde_json::Val
 /// clip from the first note. Playback and export share this path. Results
 /// are cached by content, so editing one track re-renders only that track.
 pub fn render_instrument(track:&verdant_domain::Track,index:usize,tempo:&TempoMap,rate:u32)->Result<Option<StereoClip>,String>{
-    use verdant_plugins::builtin_dsp::{render,SynthNote,SynthParams,SYNTH_ID};
+    use verdant_plugins::builtin_dsp::{render,SynthNote,SynthParams,is_builtin_instrument};
     let Some(spec)=track.instrument()else{return Ok(None)};
     let id=spec.get("id").and_then(serde_json::Value::as_str).unwrap_or_default();
     let format=spec.get("format").and_then(serde_json::Value::as_str).unwrap_or_default();
-    let hosted=!(format=="builtin"&&id==SYNTH_ID);
+    let hosted=!(format=="builtin"&&is_builtin_instrument(id));
     let host=if hosted{
         let name=spec.get("name").and_then(serde_json::Value::as_str).unwrap_or(id);
         if !matches!(format,"clap"|"vst3"|"au"){return Err(format!("轨道 {} 的乐器 {name} 格式未知",track.name));}
         Some(instrument_host().ok_or_else(||format!("轨道 {} 的乐器 {name} 需要插件宿主，但宿主不可用",track.name))?)
     }else{None};
     if index>=verdant_audio::MAX_TRACKS{return Ok(None);}
-    let params=SynthParams::from_json(spec.get("params"));
+    let params=SynthParams::from_json_for(id,spec.get("params"));
     let notes:Vec<SynthNote>=track.notes.iter().filter(|n|!n.is_muted()&&n.duration_tick>0).map(|n|{
         let start=tempo.sample_at(n.start_tick,rate).max(0);let end=tempo.sample_at(n.start_tick+n.duration_tick,rate).max(start+1);
         SynthNote{start:start as u64,length:(end-start)as u64,pitch:n.midi_note as f64+n.detune_millicents as f64/100_000.0,velocity:0.8}
@@ -249,25 +327,60 @@ fn extend_realtime_duration(timeline:&mut Timeline,track_latencies:impl IntoIter
     Ok(())
 }
 
-fn bind_channel(channel:&verdant_audio::automation_clock::ChannelAutomation,document:&verdant_domain::automation::AutomationDocument,owner:&verdant_domain::automation::AutomationOwner,label:&str,bound:&[NativeBinding])->Result<Vec<Option<verdant_audio::automation_clock::NativePluginSchedule>>,String>{
-    let size=bound.iter().filter_map(|binding|binding.processor).max().map_or(0,|index|index+1);let mut processors=vec![None;size];
+fn realtime_channel_latencies(bound:&[NativeBinding],input_latency:u32)->Result<(Vec<u32>,u32),String>{
+    let size=bound.iter().filter_map(|binding|binding.processor).max().map_or(0,|index|index+1);
+    let mut latencies=vec![0u32;size];
+    for binding in bound{
+        if let Some(index)=binding.processor{latencies[index]=realtime_insert_latency(binding).unwrap_or(0);}
+    }
+    let mut total=input_latency;
+    for latency in &mut latencies{
+        let own=*latency;*latency=total;
+        total=total.checked_add(own).ok_or("插件节拍延迟范围溢出")?;
+    }
+    Ok((latencies,total))
+}
+
+fn bind_channel(channel:&verdant_audio::automation_clock::ChannelAutomation,document:&verdant_domain::automation::AutomationDocument,owner:&verdant_domain::automation::AutomationOwner,label:&str,bound:&[NativeBinding],tempo:&verdant_audio::automation_clock::SampleCurve,input_latency:u32,loop_range:Option<(u64,u64)>)->Result<Vec<Option<verdant_audio::automation_clock::NativePluginSchedule>>,String>{
+    let (input_latencies,_)=realtime_channel_latencies(bound,input_latency)?;
+    let mut processors=vec![None;input_latencies.len()];
     for instance in channel.plugins.iter().map(|lane|lane.instance_id.as_str()).collect::<std::collections::BTreeSet<_>>(){
         let binding=bound.iter().find(|binding|binding.instance_id==instance).ok_or_else(||format!("{label}的自动化插件尚未应用"))?;
         let handle=binding.handle.as_ref().ok_or_else(||format!("{label}的自动化插件不可用"))?;
         if !matches!(handle.status(),verdant_plugins::InsertStatus::Running){return Err(format!("{label}的自动化插件已停止运行"));}
-        let schedule=plugin_schedule(channel,document,owner,instance,handle)?;
+        let latency=binding.processor.map_or(input_latency,|index|input_latencies[index]);
+        let schedule=plugin_schedule(channel,document,owner,instance,handle,tempo,latency,loop_range)?;
         if !binding.bypass{let processor=binding.processor.ok_or("插件没有音频处理器")?;processors[processor]=schedule;}
-    }Ok(processors)
+    }
+    // Legacy documents may have empty or duplicate instance UUIDs. Transport
+    // binds to the actual processor slot independently of authored lane ids.
+    for binding in bound.iter().filter(|binding|!binding.bypass){
+        let Some(index)=binding.processor else{continue;};
+        let Some(handle)=binding.handle.as_ref() else{continue;};
+        if processors[index].is_none()&&verdant_plugins::builtin_dsp::uses_transport_tempo(&handle.spec().format,&handle.spec().id){
+            if let Some(parameter)=transport_parameter(channel,&binding.instance_id,handle,tempo,input_latencies[index],loop_range)?{
+                let schedule=verdant_audio::automation_clock::NativePluginSchedule{instance_id:binding.instance_id.clone(),parameters:vec![parameter]};
+                schedule.validate_density(256,4096).map_err(|e|e.to_string())?;
+                processors[index]=Some(schedule);
+            }
+        }
+    }
+    Ok(processors)
 }
 pub fn bind_native_automation(project:&Project,timeline:&mut Timeline,bindings:&NativeBindings)->Result<(),String>{
     use verdant_domain::automation::AutomationOwner;
     let document=verdant_domain::automation::AutomationDocument::from_project(project).map_err(|e|e.to_string())?;
+    let tempo=transport_tempo_curve(project,timeline.sample_rate)?;
+    let loop_range=timeline.loop_range;
+    // Track compensation delays every track to the longest live chain before
+    // the master bus. Master transport therefore includes that shared prefix.
+    let maximum=bindings.tracks.iter().map(|bound|realtime_channel_latencies(bound,0).map(|(_,total)|total)).collect::<Result<Vec<_>,_>>()?.into_iter().max().unwrap_or(0);
     let mut native=Vec::with_capacity(project.tracks.len());
     for(index,track)in project.tracks.iter().enumerate(){
         let bound=bindings.tracks.get(index).map(Vec::as_slice).unwrap_or(&[]);
-        native.push(bind_channel(&timeline.automation.tracks[index],&document,&AutomationOwner::Track{track_id:track.id.clone()},&format!("轨道 {} ",track.name),bound)?);
+        native.push(bind_channel(&timeline.automation.tracks[index],&document,&AutomationOwner::Track{track_id:track.id.clone()},&format!("轨道 {} ",track.name),bound,&tempo,0,loop_range)?);
     }
-    let master=bind_channel(&timeline.automation.master,&document,&AutomationOwner::Master,"主总线",&bindings.master)?;
+    let master=bind_channel(&timeline.automation.master,&document,&AutomationOwner::Master,"主总线",&bindings.master,&tempo,maximum,loop_range)?;
     timeline.native_automation=native;timeline.master_native_automation=master;
     timeline.sidechains=realtime_sidechains(project,bindings);Ok(())
 }
@@ -276,8 +389,12 @@ fn realtime_sidechains(project:&Project,bindings:&NativeBindings)->Vec<verdant_a
     let mut routes=Vec::new();
     for(index,track)in project.tracks.iter().enumerate(){
         let bound=bindings.tracks.get(index).map(Vec::as_slice).unwrap_or(&[]);
-        for spec in verdant_plugins::project::read_inserts(&track.unknown){
-            let Some(binding)=bound.iter().find(|b|b.instance_id==spec.instance_id&&!b.bypass)else{continue};let Some(processor)=binding.processor else{continue};
+        // The app supplies one binding for every persisted slot, including
+        // bypassed/missing inserts. UUID lookup is ambiguous in legacy files.
+        for (spec,binding) in verdant_plugins::project::read_inserts(&track.unknown).iter().zip(bound){
+            if spec.bypass||binding.bypass||binding.instance_id!=spec.instance_id{continue;}
+            if binding.handle.as_ref().is_some_and(|handle|handle.spec().format!=spec.format||handle.spec().id!=spec.id){continue;}
+            let Some(processor)=binding.processor else{continue};
             let delay=bound.iter().filter(|b|b.processor.is_some_and(|p|p<processor)).filter_map(realtime_insert_latency).fold(0u32,u32::saturating_add);
             routes.extend(sidechain_route(project,index,&spec,processor,delay));
         }
@@ -374,6 +491,10 @@ pub fn channel_settings(header: &verdant_domain::model::TrackHeader, any_solo: b
 }
 
 #[cfg(test)]
+#[path="project_audio_tempo_tests.rs"]
+mod tempo_tests;
+
+#[cfg(test)]
 mod tests{
     use super::*;
     use std::sync::atomic::Ordering;
@@ -381,6 +502,27 @@ mod tests{
     use verdant_audio::engine::channel;
     use verdant_domain::{Note,Track};
     use verdant_plugins::DelayPad;
+
+    #[test]
+    fn transport_tempo_reconstructs_after_sample_boundary_seek_and_loop() {
+        use verdant_audio::automation_clock::{NativePluginSchedule,NativeParameterLane};
+        let mut project=Project::new_empty();
+        project.tempo_map=vec![
+            verdant_domain::model::TempoPoint{tick:0,micro_bpm:120_000_000,unknown:Default::default()},
+            verdant_domain::model::TempoPoint{tick:project.ppq,micro_bpm:60_000_000,unknown:Default::default()},
+        ];
+        let curve=transport_tempo_curve(&project,48_000).unwrap();
+        let schedule=NativePluginSchedule{instance_id:"delay".into(),parameters:vec![NativeParameterLane{
+            native_id:verdant_plugins::builtin_dsp::TRANSPORT_TEMPO_EVENT,fallback:120.,curve,
+        }]};
+        let mut events=[(0,0,0.);4];
+        let count=schedule.write_events(23_998,8,&mut events).unwrap();
+        assert_eq!(&events[..count],&[(verdant_plugins::builtin_dsp::TRANSPORT_TEMPO_EVENT,0,120.),(verdant_plugins::builtin_dsp::TRANSPORT_TEMPO_EVENT,2,60.)]);
+        assert_eq!(schedule.write_events(48_000,8,&mut events).unwrap(),1);
+        assert_eq!(events[0].2,60.);
+        assert_eq!(schedule.write_events(0,8,&mut events).unwrap(),1);
+        assert_eq!(events[0].2,120.);
+    }
 
     const RATE:u32=48_000;
 

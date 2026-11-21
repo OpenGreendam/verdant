@@ -16,6 +16,7 @@ use gpui::{Bounds, ElementInputHandler, EntityInputHandler, IntoElement, Pixels,
     SharedString, TextRun, UTF16Selection, WindowBounds, WindowOptions, canvas, div, fill,
     point, prelude::*, px, size};
 use std::ops::Range;
+use crate::devices::DeviceTarget;
 
 #[derive(Clone)]
 enum InsertOwner {
@@ -23,8 +24,21 @@ enum InsertOwner {
     Master,
 }
 
+impl From<DeviceTarget> for InsertOwner {
+    fn from(target: DeviceTarget) -> Self {
+        match target { DeviceTarget::Track(track) => Self::Track(track), DeviceTarget::Master => Self::Master }
+    }
+}
+
+impl From<InsertOwner> for DeviceTarget {
+    fn from(owner: InsertOwner) -> Self {
+        match owner { InsertOwner::Track(track) => Self::Track(track), InsertOwner::Master => Self::Master }
+    }
+}
+
 struct PluginBrowserWindow {
     editor: gpui::WeakEntity<Editor>,
+    generation: u64,
     client: Arc<PluginClient>,
     browser: verdant_plugins::insert::PluginBrowser,
     track: TrackId,
@@ -118,6 +132,7 @@ impl Editor {
     pub fn open_plugin_browser(&mut self, track: TrackId, slot: usize, cx: &mut Context<Self>) {
         let Some(client) = self.plugins.clone() else { self.notice("插件宿主不可用"); cx.notify(); return; };
         let editor = cx.entity().downgrade();
+        let generation = self.document_generation;
         let bounds = Bounds::centered(None, size(px(720.), px(580.)), cx);
         if let Err(error) = cx.open_window(WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)), app_id: Some("verdant".into()), ..Default::default()
@@ -126,7 +141,7 @@ impl Editor {
             cx.new(|cx| {
                 let focus = cx.focus_handle();
                 window.focus(&focus, cx);
-                PluginBrowserWindow { editor, browser: verdant_plugins::insert::PluginBrowser::new(client.catalog()),
+                PluginBrowserWindow { editor, generation, browser: verdant_plugins::insert::PluginBrowser::new(client.catalog()),
                     client, track, slot, search: verdant_session::TextEditState::new(""), focus,
                     line: None, bounds: None, scanning: false, message: String::new() }
             })
@@ -150,6 +165,7 @@ impl PluginBrowserWindow {
                 view.scanning = false;
                 view.browser.refresh(view.client.catalog());
                 let _ = view.editor.update(cx, |ed, cx| {
+                    if ed.document_generation != view.generation { return; }
                     ed.insert_runtime.retry_missing = true;
                     ed.restore_inserts(cx);
                     cx.notify();
@@ -193,7 +209,7 @@ impl Render for PluginBrowserWindow {
                     .on_click(cx.listener(move |view, _, window, cx| {
                         let track = view.track.clone();
                         let slot = view.slot;
-                        match view.editor.update(cx, |ed, cx| ed.add_insert_at(&track, slot, &format, &id, cx)) {
+                        match view.editor.update(cx, |ed, cx| ed.document_generation == view.generation && ed.add_insert_at(&track, slot, &format, &id, cx)) {
                             Ok(true) => window.remove_window(),
                             Ok(false) => { view.message = "暂时无法插入；请检查主窗口提示后重试".into(); cx.notify(); }
                             Err(_) => { view.message = "工程窗口已关闭".into(); cx.notify(); }
@@ -839,6 +855,11 @@ impl Editor {
                 }
                 self.mark_inserts_applied();
                 self.rebuild_timeline(cx);
+                if let Some((owner, instance)) = opening {
+                    if let Some(slot) = self.owned_insert_specs(&owner).iter().position(|spec| spec.instance_id == instance) {
+                        self.open_owned_insert_editor(owner, slot, cx);
+                    }
+                }
                 if let Some((track, slot)) = self.insert_panel.clone() {
                     if self.live_insert(&track, slot).is_some_and(|handle| !self.plugin_params.contains_key(&handle.key())) {
                         self.show_insert_params(track, slot, cx);
@@ -1029,6 +1050,36 @@ impl Editor {
         match self.master_inserts.get(slot)? { InsertSlot::Live(handle) => Some(handle.clone()), _ => None }
     }
 
+    pub(crate) fn live_device_insert(&self, target: &DeviceTarget, slot: usize) -> Option<Arc<InsertHandle>> {
+        self.live_owned_insert(&target.clone().into(), slot)
+    }
+
+    pub(crate) fn device_insert_specs(&self, target: &DeviceTarget) -> Vec<InsertSpec> {
+        self.owned_insert_specs(&target.clone().into())
+    }
+
+    pub(crate) fn device_target_matches(&self, target: &DeviceTarget, slot: usize, key: verdant_plugins::InsertKey) -> bool {
+        if slot == crate::instrument::INSTRUMENT_SLOT {
+            return match target {
+                DeviceTarget::Track(track) => self.project().track(track).is_some_and(|current| {
+                    crate::instrument::synth_params(current).is_some()
+                        && current.instrument().and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str)
+                            .is_some_and(|id| crate::instrument::instrument_key_for_generation(track, id, self.document_generation) == key)
+                }),
+                DeviceTarget::Master => false,
+            };
+        }
+        self.live_device_insert(target, slot).is_some_and(|handle| handle.key() == key)
+    }
+
+    pub(crate) fn toggle_device_bypass(&mut self, target: DeviceTarget, slot: usize, cx: &mut Context<Self>) {
+        self.toggle_owned_insert_bypass(target.into(), slot, cx);
+    }
+
+    pub(crate) fn show_device_params(&mut self, target: DeviceTarget, slot: usize, cx: &mut Context<Self>) {
+        self.show_owned_insert_params(target.into(), slot, cx);
+    }
+
     /// A generic parameter panel is always available for a live plugin;
     /// native editor availability is a separate capability.
     pub fn show_insert_params(&mut self, track: TrackId, slot: usize, cx: &mut Context<Self>) {
@@ -1139,10 +1190,14 @@ impl Editor {
     /// cache was read against (undo/redo restore state into the same live
     /// instance, so the key alone cannot tell the cache is stale).
     pub(crate) fn fetch_track_insert_params(&mut self, track: &TrackId, slot: usize, cx: &mut Context<Self>) {
+        self.fetch_device_params(&DeviceTarget::Track(track.clone()), slot, cx);
+    }
+
+    pub(crate) fn fetch_device_params(&mut self, target: &DeviceTarget, slot: usize, cx: &mut Context<Self>) {
         if self.inserts_loading || self.device_drag.is_some() { return; }
-        let Some(handle) = self.live_insert(track, slot) else { return };
+        let Some(handle) = self.live_device_insert(target, slot) else { return };
         let key = handle.key();
-        let state = self.insert_specs(track).get(slot).map(|s| s.state_b64.clone()).unwrap_or_default();
+        let state = self.device_insert_specs(target).get(slot).map(|s| s.state_b64.clone()).unwrap_or_default();
         let fresh = self.device_param_state.get(&key) == Some(&state);
         if (self.plugin_params.contains_key(&key) && fresh) || !self.plugin_busy.insert(key) { return; }
         cx.spawn(async move |this, cx| {
@@ -1160,22 +1215,34 @@ impl Editor {
     /// round trip, one state capture and one undo step (a curve handle moves
     /// frequency and gain together). Rolls back like a single-parameter edit.
     pub(crate) fn set_track_insert_params(&mut self, track: TrackId, slot: usize, values: Vec<(String, f64)>, cx: &mut Context<Self>) {
-        if slot == crate::instrument::INSTRUMENT_SLOT { return self.set_instrument_params(&track, values, cx); }
-        let owner = InsertOwner::Track(track);
-        let Some(handle) = self.live_owned_insert(&owner, slot) else { return };
+        self.set_device_params(DeviceTarget::Track(track), slot, values, cx);
+    }
+
+    pub(crate) fn set_device_params(&mut self, target: DeviceTarget, slot: usize, values: Vec<(String, f64)>, cx: &mut Context<Self>) -> bool {
+        if slot == crate::instrument::INSTRUMENT_SLOT {
+            return match target {
+                DeviceTarget::Track(track) => self.set_instrument_params(&track, values, cx),
+                DeviceTarget::Master => false,
+            };
+        }
+        if self.inserts_loading { return false; }
+        let owner: InsertOwner = target.into();
+        let Some(handle) = self.live_owned_insert(&owner, slot) else { return false };
         let key = handle.key();
-        let Some(current) = self.plugin_params.get(&key).cloned() else { return };
+        if self.plugin_busy.contains(&key) { return false; }
+        let Some(current) = self.plugin_params.get(&key).cloned() else { return false };
         let mut changes = Vec::new();
         for (id, value) in values {
-            let Some(desc) = current.iter().find(|d| d.id == id) else { continue };
+            let Some(desc) = current.iter().find(|d| d.id == id) else { return false };
             match verdant_plugins::insert::parameter_editor_value(desc, value) {
                 Ok(v) if v != desc.value => changes.push((id, v)),
                 Ok(_) => {}
-                Err(error) => { self.notice(format!("参数值无效：{error}")); cx.notify(); return; }
+                Err(error) => { self.notice(format!("参数值无效：{error}")); cx.notify(); return false; }
             }
         }
-        if changes.is_empty() || !self.flush_insert_edits(cx) { return; }
-        if !self.plugin_busy.insert(key) { return; }
+        if changes.is_empty() { return true; }
+        if !self.flush_insert_edits(cx) { return false; }
+        if !self.plugin_busy.insert(key) { return false; }
         cx.notify();
         let before = self.owned_insert_specs(&owner);
         cx.spawn(async move |this, cx| {
@@ -1217,6 +1284,7 @@ impl Editor {
                 cx.notify();
             });
         }).detach();
+        true
     }
 
     fn rollback_plugin_param(&mut self, handle: Arc<InsertHandle>, previous: String, cx: &mut Context<Self>) {
@@ -1276,10 +1344,32 @@ impl Editor {
     fn open_owned_insert_editor(&mut self, owner: InsertOwner, slot: usize, cx: &mut Context<Self>) {
         if self.inserts_loading { self.notice("插件链正在重建，请稍后打开插件窗口"); cx.notify(); return; }
         let Some(handle) = self.live_owned_insert(&owner, slot) else { self.notice("插件缺失，保留了其状态"); cx.notify(); return };
-        if !handle.has_editor() { self.show_owned_insert_params(owner, slot, cx); return; }
+        use verdant_plugins::builtin_dsp::{EditorKind, preferred_editor};
+        match preferred_editor(&handle.spec().format, &handle.spec().id, handle.has_editor()) {
+            EditorKind::Builtin => {
+                self.insert_panel = None;
+                self.master_insert_panel = None;
+                self.open_builtin_editor(owner.into(), slot, cx);
+                return;
+            }
+            EditorKind::Parameters => { self.show_owned_insert_params(owner, slot, cx); return; }
+            EditorKind::Hosted => {
+                self.insert_panel = None;
+                self.master_insert_panel = None;
+            }
+        }
+        let expected_key = handle.key();
         cx.spawn(async move |this, cx| {
             let result = cx.background_spawn(async move { handle.open_editor(&handle.spec().name) }).await;
-            let _ = this.update(cx, |ed, cx| { if let Err(e) = result { ed.notice(format!("无法打开插件窗口：{e}")); } cx.notify(); });
+            let _ = this.update(cx, |ed, cx| {
+                if let Err(e) = result {
+                    if ed.live_owned_insert(&owner, slot).is_some_and(|live| live.key() == expected_key) {
+                        ed.notice(format!("无法打开插件窗口：{e}；已显示可编辑参数"));
+                        ed.show_owned_insert_params(owner, slot, cx);
+                    }
+                }
+                cx.notify();
+            });
         }).detach();
     }
 

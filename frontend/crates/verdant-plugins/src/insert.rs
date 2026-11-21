@@ -9,6 +9,7 @@ use crate::project::InsertSpec;
 use crate::proto::{self, validate_event_quanta, AutomationError, AutomationParam,
     HostMessage, HostRequest, ParamDesc, ParamEvent, ParamTarget};
 use crate::shm::{Channel, Ring, Wake, STATUS_CRASHED, STATUS_OK};
+use crate::telemetry::{TelemetryFrame, TelemetrySnapshot};
 use serde_json::Value;
 use std::io::{self, Read};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -90,6 +91,12 @@ pub enum InsertSlot {
     Missing { spec: InsertSpec, reason: String },
 }
 
+#[derive(Default)]
+struct TelemetryCache {
+    requested_at: Option<Instant>,
+    snapshot: Option<Arc<TelemetrySnapshot>>,
+}
+
 pub struct InsertHandle {
     key: InsertKey,
     spec: InsertSpec,
@@ -115,6 +122,10 @@ pub struct InsertHandle {
     origin: Instant,
     // A watchdog also bounds a blocked pipe write, not just reply waits.
     control_deadline_ms: Arc<AtomicU64>,
+    // The snapshot lock is held only for an Arc clone/swap. Refresh work has a
+    // separate gate, so UI reads never wait for a pipe or spectral analysis.
+    telemetry_cache: Mutex<TelemetryCache>,
+    telemetry_refresh: Mutex<()>,
 }
 
 impl InsertHandle {
@@ -249,6 +260,8 @@ impl InsertHandle {
             crashed, detail, processor_taken: AtomicBool::new(false), offline: false,
             has_editor: false, child, stop, reader: Some(reader), watcher: Some(watcher),
             next_req: AtomicU64::new(1), origin, control_deadline_ms,
+            telemetry_cache: Mutex::new(TelemetryCache::default()),
+            telemetry_refresh: Mutex::new(()),
         };
         match handle.call(HostRequest::Hello { id: 0 }, Duration::from_secs(5))? {
             HostMessage::HelloAck { protocol, .. } if protocol == proto::PROTOCOL_VERSION => {}
@@ -358,6 +371,44 @@ impl InsertHandle {
             }
             msg => Err(PluginError::Protocol(format!("get_params: {msg:?}"))),
         }
+    }
+
+    /// Latest measured signal, if polled. This never performs IPC, allocates a
+    /// signal buffer, or waits for a background refresh. Safe for UI rendering.
+    pub fn cached_telemetry(&self) -> Option<Arc<TelemetrySnapshot>> {
+        self.telemetry_cache.try_lock().ok()?.snapshot.clone()
+    }
+
+    /// Background/control thread only: synchronous IPC and a bounded FFT.
+    /// Poll only visible native editors. Requests are limited to 10 Hz per
+    /// instance; unchanged processed-frame counts retain their original time
+    /// so stopped playback cannot masquerade as a fresh measurement.
+    pub fn refresh_telemetry(&self) -> Result<Arc<TelemetrySnapshot>> {
+        let _refresh = self.telemetry_refresh.lock().unwrap();
+        let now = Instant::now();
+        {
+            let mut cache = self.telemetry_cache.lock().unwrap();
+            if cache.requested_at.is_some_and(|at| now.duration_since(at) < Duration::from_millis(100)) {
+                if let Some(snapshot) = cache.snapshot.as_ref() { return Ok(snapshot.clone()); }
+            }
+            cache.requested_at = Some(now);
+        }
+        let frame: TelemetryFrame = match self.call(HostRequest::GetTelemetry { id: 0 }, Duration::from_secs(5))? {
+            HostMessage::Reply { mut data, .. } => serde_json::from_value(data.remove("telemetry")
+                .ok_or_else(|| PluginError::Protocol("missing signal telemetry".into()))?)?,
+            msg => return Err(PluginError::Protocol(format!("get_telemetry: {msg:?}"))),
+        };
+        let snapshot = frame.analyze(Instant::now())
+            .map_err(|error| PluginError::Protocol(error.to_string()))?;
+        let mut cache = self.telemetry_cache.lock().unwrap();
+        if let Some(previous) = cache.snapshot.as_ref().filter(|previous|
+            previous.frames_total == snapshot.frames_total && previous.window_frames == snapshot.window_frames
+                && previous.sample_rate == snapshot.sample_rate) {
+            return Ok(previous.clone());
+        }
+        let snapshot = Arc::new(snapshot);
+        cache.snapshot = Some(snapshot.clone());
+        Ok(snapshot)
     }
     /// Query native writable/automatable metadata. Control thread only: IPC.
     pub fn automation_params(&self) -> Result<Vec<AutomationParam>> {
@@ -479,6 +530,7 @@ fn stamp_id(req: &mut HostRequest, id: u64) {
         | HostRequest::Reconfigure { id: r, .. } | HostRequest::SetParam { id: r, .. }
         | HostRequest::SetOffline { id: r, .. }
         | HostRequest::GetParams { id: r } | HostRequest::GetAutomationParams { id: r }
+        | HostRequest::GetTelemetry { id: r }
         | HostRequest::GetState { id: r }
         | HostRequest::SetState { id: r, .. } | HostRequest::OpenEditor { id: r, .. }
         | HostRequest::CloseEditor { id: r } | HostRequest::Shutdown { id: r } => *r = id,

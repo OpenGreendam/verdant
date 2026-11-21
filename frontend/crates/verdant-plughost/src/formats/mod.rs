@@ -51,6 +51,10 @@ pub trait HostedPlugin {
     /// Whether this instance plays notes (and so accepts note events).
     fn is_instrument(&self) -> bool { false }
 
+    /// Internal processors may consume the private project-tempo event. This
+    /// is separate from third-party parameter ids and never a saved parameter.
+    fn uses_transport_tempo(&self) -> bool { false }
+
     /// Plugin-reported processing latency in samples.
     fn latency(&mut self) -> u64 {
         0

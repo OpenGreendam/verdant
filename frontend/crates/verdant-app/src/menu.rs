@@ -189,6 +189,7 @@ impl MenuItem {
 }
 #[derive(Clone, Debug)]
 pub struct OpenMenu {
+    pub window: gpui::AnyWindowHandle,
     pub anchor: Point<Pixels>,
     pub items: Vec<MenuItem>,
     pub selected: usize,
@@ -224,7 +225,7 @@ impl Editor {
     }
 
     fn activate_menu_item(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(menu) = self.menu.as_mut() else { return; };
+        let Some(menu) = self.menu.as_mut().filter(|menu| menu.window == window.window_handle()) else { return; };
         let Some((index, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
         match &item.command {
             Some(MenuCommand::Submenu(_)) => {
@@ -276,14 +277,16 @@ impl Editor {
 
     pub fn show_menu(&mut self, anchor: Point<Pixels>, items: Vec<MenuItem>, window: &mut Window, cx: &mut Context<Self>) {
         self.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
-        let previous_focus = self.menu.as_ref().and_then(|m| m.previous_focus.clone()).or_else(|| window.focused(cx));
+        let previous_focus = self.menu.as_ref().filter(|m| m.window == window.window_handle())
+            .and_then(|m| m.previous_focus.clone()).or_else(|| window.focused(cx));
         let selected = items.iter().position(|i| i.enabled && i.command.is_some()).unwrap_or(0);
-        self.menu = Some(OpenMenu { anchor, items, selected, previous_focus, expanded: None });
+        self.menu = Some(OpenMenu { window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None });
         window.focus(&self.focus_menu, cx);
         cx.notify();
     }
 
     pub fn close_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.menu.as_ref().is_some_and(|menu| menu.window != window.window_handle()) { return; }
         if let Some(menu) = self.menu.take() {
             if let Some(focus) = menu.previous_focus { window.focus(&focus, cx); }
             else { window.focus(&self.focus_roll, cx); }
@@ -544,6 +547,7 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
         .p(px(6.0)).rounded(px(12.0)).bg(th.popover).border_1().border_color(th.shade).shadow_lg()
         .text_sm().text_color(th.text)
         .on_key_down(cx.listener(|ed, ev: &KeyDownEvent, window, cx| {
+            if ed.menu.as_ref().is_none_or(|menu| menu.window != window.window_handle()) { return; }
             let key = ev.keystroke.key.as_str();
             if !matches!(key, "up" | "down" | "home" | "end" | "enter" | "space" | "escape" | "tab" | "left" | "right") { return; }
             if matches!(key, "left" | "right") && !ed.menu.as_ref().is_some_and(|menu|

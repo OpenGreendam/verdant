@@ -263,9 +263,17 @@ fn catalog(mut params: Params) -> Outcome {
             }
         }
     }
+    let builtin_effects = std::iter::once(verdant_plugins::BUILTIN_GAIN_ID)
+        .chain(verdant_plugins::builtin_dsp::EFFECT_IDS)
+        .map(|id| json!({"format":"builtin","id":id,
+            "name":verdant_plugins::builtin_dsp::display_name(id).unwrap_or("Verdant Gain"),
+            "requires_plughost":true,"native_editor":"gpui"})).collect::<Vec<_>>();
+    let builtin_instruments = [verdant_plugins::builtin_dsp::SYNTH_ID, verdant_plugins::builtin_dsp::ONE_SYNTH_ID]
+        .map(|id| json!({"format":"builtin","id":id,"name":verdant_plugins::builtin_dsp::instrument_name(id),
+            "requires_plughost":false,"native_editor":"gpui"}));
     Ok(json!({"cache_dir":cache_dir,"cache_found":found,"verification":"cached_not_loaded",
         "plugins":plugins,"blacklisted":blacklisted,"reports":reports,
-        "builtin_effects":[{"format":"builtin","id":verdant_plugins::BUILTIN_GAIN_ID,"requires_plughost":true}]}))
+        "builtin_effects":builtin_effects,"builtin_instruments":builtin_instruments}))
 }
 
 fn read_scan_cache(cache_dir: &Path) -> Result<Option<Vec<ScanReport>>, CliError> {
