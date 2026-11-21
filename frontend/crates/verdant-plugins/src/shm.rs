@@ -36,7 +36,7 @@ use std::time::{Duration, Instant};
 
 /// `"VRPL"` — sanity check when a child maps a descriptor it was handed.
 pub const MAGIC: u32 = 0x5652_504C;
-pub const RING_VERSION: u32 = 4;
+pub const RING_VERSION: u32 = 5;
 /// Hard cap matching `verdant_audio::device::MAX_BLOCK` — oversized blocks are
 /// chunked by the caller before they ever reach the ring.
 pub const MAX_BLOCK_FRAMES: usize = 8192;
@@ -86,8 +86,10 @@ struct Slot {
     frames: std::cell::UnsafeCell<u32>,
     seq: std::cell::UnsafeCell<u64>,
     event_count: std::cell::UnsafeCell<u32>,
-    _pad: u32,
-    // L/R planes follow, then input-only WireParamEvent storage.
+    /// Input slots only: 1 when the sidechain planes carry a key signal.
+    sidechain: std::cell::UnsafeCell<u32>,
+    // L/R planes follow; input slots add sidechain L/R planes and then
+    // WireParamEvent storage.
 }
 
 const SLOT_HEADER_SIZE: usize = 24;
@@ -101,14 +103,21 @@ struct WireParamEvent {
     value: f64,
 }
 
+/// Input slots carry four planes (main L/R, sidechain L/R); output two.
+fn planes(input: bool) -> usize { if input { 4 } else { 2 } }
+
 fn event_offset(max_frames: usize) -> usize {
-    SLOT_HEADER_SIZE + 2 * max_frames * 4
+    SLOT_HEADER_SIZE + planes(true) * max_frames * 4
 }
 
 fn slot_stride(max_frames: usize, input: bool) -> usize {
-    let events = if input { MAX_PARAM_EVENTS * std::mem::size_of::<WireParamEvent>() } else { 0 };
-    (event_offset(max_frames) + events).div_ceil(64) * 64
+    let size = if input { event_offset(max_frames) + MAX_PARAM_EVENTS * std::mem::size_of::<WireParamEvent>() }
+        else { SLOT_HEADER_SIZE + planes(false) * max_frames * 4 };
+    size.div_ceil(64) * 64
 }
+
+/// Borrowed sidechain (key) planes for one input publication.
+pub type Sidechain<'a> = Option<(&'a [f32], &'a [f32])>;
 
 fn output_base(max_frames: usize) -> usize {
     HEADER_SIZE + RING_SLOTS * slot_stride(max_frames, true)
@@ -164,7 +173,7 @@ impl Ring {
                         frames: std::cell::UnsafeCell::new(0),
                         seq: std::cell::UnsafeCell::new(0),
                         event_count: std::cell::UnsafeCell::new(0),
-                        _pad: 0,
+                        sidechain: std::cell::UnsafeCell::new(0),
                     });
                 }
             }
@@ -241,9 +250,11 @@ impl Ring {
         unsafe { self.ptr.add(base + index * slot_stride(self.max_frames(), base == HEADER_SIZE)) }
     }
 
-    fn try_write(&self, base: usize, seq: u64, l: &[f32], r: &[f32], events: &[ParamEvent], source_offset: u32) -> bool {
+    fn try_write(&self, base: usize, seq: u64, l: &[f32], r: &[f32], sidechain: Sidechain<'_>, events: &[ParamEvent], source_offset: u32) -> bool {
         let max = self.max_frames();
-        if l.len() != r.len() || l.is_empty() || l.len() > max || events.len() > MAX_PARAM_EVENTS {
+        if l.len() != r.len() || l.is_empty() || l.len() > max || events.len() > MAX_PARAM_EVENTS
+            || (base != HEADER_SIZE && sidechain.is_some())
+            || sidechain.is_some_and(|(sl, sr)| sl.len() != l.len() || sr.len() != l.len()) {
             return false;
         }
         unsafe {
@@ -258,6 +269,11 @@ impl Ring {
             let data = ptr.add(SLOT_HEADER_SIZE) as *mut f32;
             std::ptr::copy_nonoverlapping(l.as_ptr(), data, l.len());
             std::ptr::copy_nonoverlapping(r.as_ptr(), data.add(max), r.len());
+            if let Some((sl, sr)) = sidechain {
+                std::ptr::copy_nonoverlapping(sl.as_ptr(), data.add(2 * max), sl.len());
+                std::ptr::copy_nonoverlapping(sr.as_ptr(), data.add(3 * max), sr.len());
+            }
+            *slot.sidechain.get() = sidechain.is_some() as u32;
             if !events.is_empty() {
                 let wire = ptr.add(event_offset(max)) as *mut WireParamEvent;
                 for (index, &(native_id, sample_offset, value)) in events.iter().enumerate() {
@@ -273,18 +289,18 @@ impl Ring {
     }
 
     fn try_read(&self, base: usize, seq: u64, l: &mut [f32], r: &mut [f32],
-        events: &mut [ParamEvent]) -> std::result::Result<(usize, usize), AutomationError> {
+        sidechain: Option<(&mut [f32], &mut [f32])>, events: &mut [ParamEvent]) -> std::result::Result<(usize, usize, bool), AutomationError> {
         unsafe {
             let ptr = self.slot_ptr(base, (seq % RING_SLOTS as u64) as usize);
             let slot = &*(ptr as *const Slot);
             if slot.state.compare_exchange(2, 3, Ordering::Acquire, Ordering::Relaxed).is_err() {
-                return Ok((0, 0));
+                return Ok((0, 0, false));
             }
             let tag = *slot.seq.get();
             let n = *slot.frames.get() as usize;
             if tag != seq || n == 0 || n > self.max_frames() || l.len() < n || r.len() < n {
                 slot.state.store(if tag > seq { 2 } else { 0 }, Ordering::Release);
-                return Ok((0, 0));
+                return Ok((0, 0, false));
             }
             let count = *slot.event_count.get() as usize;
             if count > MAX_PARAM_EVENTS || (base != HEADER_SIZE && count != 0) {
@@ -315,8 +331,18 @@ impl Ring {
             let data = ptr.add(SLOT_HEADER_SIZE) as *const f32;
             std::ptr::copy_nonoverlapping(data, l.as_mut_ptr(), n);
             std::ptr::copy_nonoverlapping(data.add(self.max_frames()), r.as_mut_ptr(), n);
+            let keyed = base == HEADER_SIZE && *slot.sidechain.get() != 0;
+            if let Some((sl, sr)) = sidechain {
+                if keyed && sl.len() >= n && sr.len() >= n {
+                    std::ptr::copy_nonoverlapping(data.add(2 * self.max_frames()), sl.as_mut_ptr(), n);
+                    std::ptr::copy_nonoverlapping(data.add(3 * self.max_frames()), sr.as_mut_ptr(), n);
+                } else {
+                    sl.fill(0.0);
+                    sr.fill(0.0);
+                }
+            }
             slot.state.store(0, Ordering::Release);
-            Ok((n, count))
+            Ok((n, count, keyed))
         }
     }
 
@@ -342,10 +368,16 @@ impl Ring {
     /// Rebase caller-owned events directly into the wire slot. Full quanta and
     /// export never need an intermediate parameter-event copy.
     pub(crate) fn try_write_input_rebased(&self, seq: u64, l: &[f32], r: &[f32], events: &[ParamEvent], source_offset: u32) -> bool {
+        self.try_write_input_keyed(seq, l, r, None, events, source_offset)
+    }
+
+    /// As `try_write_input_rebased`, plus the sidechain key planes.
+    pub(crate) fn try_write_input_keyed(&self, seq: u64, l: &[f32], r: &[f32], sidechain: Sidechain<'_>,
+        events: &[ParamEvent], source_offset: u32) -> bool {
         // Preserve unread input during a full callback burst. A rejected timeline
         // sequence is not a publication; a later admitted sequence may resume it.
         if self.in_seq().saturating_sub(self.out_seq()) >= RING_SLOTS as u64 { return false; }
-        if !self.try_write(HEADER_SIZE, seq, l, r, events, source_offset) { return false; }
+        if !self.try_write(HEADER_SIZE, seq, l, r, sidechain, events, source_offset) { return false; }
         self.header().in_seq.store(seq + 1, Ordering::Release);
         true
     }
@@ -361,7 +393,7 @@ impl Ring {
 
     pub fn try_read_output(&self, seq: u64, l: &mut [f32], r: &mut [f32]) -> bool {
         if self.out_seq() <= seq { return false; }
-        let Ok((n, _)) = self.try_read(output_base(self.max_frames()), seq, l, r, &mut []) else { return false; };
+        let Ok((n, _, _)) = self.try_read(output_base(self.max_frames()), seq, l, r, None, &mut []) else { return false; };
         if n == 0 { return false; }
         l[n..].fill(0.0);
         r[n..].fill(0.0);
@@ -376,12 +408,19 @@ impl Ring {
     /// leaves the full publication available, rather than losing its suffix.
     pub fn read_input_events(&self, seq: u64, l: &mut [f32], r: &mut [f32],
         events: &mut [ParamEvent]) -> Result<(usize, usize)> {
-        if self.in_seq() <= seq { return Ok((0, 0)); }
-        Ok(self.try_read(HEADER_SIZE, seq, l, r, events)?)
+        self.read_input_keyed(seq, l, r, None, events).map(|(n, count, _)| (n, count))
+    }
+
+    /// Host-side read including the sidechain planes. Unkeyed publications
+    /// zero the supplied sidechain buffers; the flag reports which it was.
+    pub fn read_input_keyed(&self, seq: u64, l: &mut [f32], r: &mut [f32],
+        sidechain: Option<(&mut [f32], &mut [f32])>, events: &mut [ParamEvent]) -> Result<(usize, usize, bool)> {
+        if self.in_seq() <= seq { return Ok((0, 0, false)); }
+        Ok(self.try_read(HEADER_SIZE, seq, l, r, sidechain, events)?)
     }
 
     pub fn write_output(&self, seq: u64, l: &[f32], r: &[f32]) -> Result<()> {
-        if !self.try_write(output_base(self.max_frames()), seq, l, r, &[], 0) {
+        if !self.try_write(output_base(self.max_frames()), seq, l, r, None, &[], 0) {
             return Err(PluginError::Shm("output slot unavailable or invalid block".into()));
         }
         self.header().out_seq.store(seq + 1, Ordering::Release);
@@ -1215,5 +1254,21 @@ mod tests {
             ring.header().magic.store(0, Ordering::Relaxed);
             assert!(Ring::attach(&ShmConn::Fd(ring.imp)).is_err());
         }
+    }
+
+    #[test]
+    fn sidechain_planes_travel_with_their_block_and_unkeyed_blocks_read_silence() {
+        let ring = Ring::create(64).unwrap();
+        let (l, r) = ([0.25f32; 64], [-0.25f32; 64]);
+        let (kl, kr) = ([0.5f32; 64], [0.75f32; 64]);
+        assert!(ring.try_write_input_keyed(0, &l, &r, Some((&kl, &kr)), &[], 0));
+        assert!(ring.try_write_input_keyed(1, &l, &r, None, &[], 0));
+        let (mut il, mut ir, mut ol, mut or) = ([0.0; 64], [0.0; 64], [9.0; 64], [9.0; 64]);
+        assert_eq!(ring.read_input_keyed(0, &mut il, &mut ir, Some((&mut ol, &mut or)), &mut []).unwrap(), (64, 0, true));
+        assert_eq!((ol, or), (kl, kr));
+        assert_eq!(ring.read_input_keyed(1, &mut il, &mut ir, Some((&mut ol, &mut or)), &mut []).unwrap(), (64, 0, false));
+        assert_eq!((ol, or), ([0.0; 64], [0.0; 64]));
+        // Mismatched key lengths publish nothing.
+        assert!(!ring.try_write_input_keyed(2, &l, &r, Some((&kl[..32], &kr)), &[], 0));
     }
 }

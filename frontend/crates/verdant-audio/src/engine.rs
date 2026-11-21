@@ -96,11 +96,46 @@ pub struct Timeline {
     pub master_native_automation: Vec<Option<crate::automation_clock::NativePluginSchedule>>,
     pub loop_range: Option<(u64,u64)>,
     pub metronome: Option<ClickTrack>,
+    /// Sidechain routes: a track's pre-insert, pre-fader signal keys one
+    /// processor in another track's chain.
+    pub sidechains: Vec<SidechainRoute>,
+}
+
+/// One sidechain connection. `delay` aligns the key with the destination
+/// processor's input: the summed latency of the processors before it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SidechainRoute { pub source: u16, pub track: u16, pub processor: u16, pub delay: u32 }
+
+/// Callback-owned delay line and output for one route; allocated on the
+/// control side together with its timeline.
+struct KeyLine { route: SidechainRoute, line_l: Vec<f32>, line_r: Vec<f32>, head: usize, out_l: Vec<f32>, out_r: Vec<f32> }
+
+impl KeyLine {
+    fn new(route: SidechainRoute, block: usize) -> Self {
+        let n = route.delay as usize;
+        Self { route, line_l: vec![0.0; n], line_r: vec![0.0; n], head: 0, out_l: vec![0.0; block], out_r: vec![0.0; block] }
+    }
+    /// Delay `frames` of the source signal into `out_*`.
+    fn feed(&mut self, left: &[f32], right: &[f32]) {
+        let n = left.len();
+        if self.line_l.is_empty() {
+            self.out_l[..n].copy_from_slice(left);
+            self.out_r[..n].copy_from_slice(right);
+            return;
+        }
+        for i in 0..n {
+            self.out_l[i] = std::mem::replace(&mut self.line_l[self.head], left[i]);
+            self.out_r[i] = std::mem::replace(&mut self.line_r[self.head], right[i]);
+            self.head += 1;
+            if self.head == self.line_l.len() { self.head = 0; }
+        }
+    }
 }
 
 struct TimelineSwap {
     revision: u64,
     timeline: Timeline,
+    keys: Vec<KeyLine>,
 }
 
 impl std::ops::Deref for TimelineSwap {
@@ -114,7 +149,7 @@ impl Timeline {
         clips.retain(|c|(c.track as usize)<MAX_TRACKS);stereo_clips.retain(|c|(c.track as usize)<MAX_TRACKS&&c.samples.len()%2==0);
         clips.sort_by_key(|c|c.start);stereo_clips.sort_by_key(|c|c.start);
         let length=clips.iter().map(|c|c.start.saturating_add(c.samples.len()as u64)).chain(stereo_clips.iter().map(|c|c.start.saturating_add((c.samples.len()/2)as u64))).max().unwrap_or(0);
-        Self{sample_rate,clips,stereo_clips,length,automation:Default::default(),native_automation:Vec::new(),master_native_automation:Vec::new(),loop_range:None,metronome:None}
+        Self{sample_rate,clips,stereo_clips,length,automation:Default::default(),native_automation:Vec::new(),master_native_automation:Vec::new(),loop_range:None,metronome:None,sidechains:Vec::new()}
     }
     fn mix_track(&self,track:Option<u16>,pos:u64,out:&mut[f32])->bool{
         let end=pos.saturating_add(out.len()as u64);let mut any=false;
@@ -138,6 +173,11 @@ pub trait Processor: Send {
     fn process_automated(&mut self,left:&mut[f32],right:&mut[f32],events:&[(u32,u32,f64)])->bool{
         if !events.is_empty(){return false;}self.process(left,right);true
     }
+    /// Process with a sidechain key signal aligned to `left`/`right`.
+    /// Processors without a key input ignore it.
+    fn process_keyed(&mut self,left:&mut[f32],right:&mut[f32],_key:(&[f32],&[f32]),events:&[(u32,u32,f64)])->bool{
+        self.process_automated(left,right,events)
+    }
 }
 
 /// Built-in: fixed gain (used by tests; also a minimal reference processor).
@@ -156,10 +196,12 @@ impl Processor for GainProcessor {
 
 pub type Chain = Vec<Box<dyn Processor>>;
 
-fn process_chain(chain: &mut Chain, schedules: &[Option<crate::automation_clock::NativePluginSchedule>],
-    position: u64, left: &mut [f32], right: &mut [f32], events: &mut [(u32, u32, f64)]) -> bool
+fn process_chain<'k>(chain: &mut Chain, schedules: &[Option<crate::automation_clock::NativePluginSchedule>],
+    position: u64, left: &mut [f32], right: &mut [f32], events: &mut [(u32, u32, f64)],
+    key: &dyn Fn(usize) -> Option<(&'k [f32], &'k [f32])>) -> bool
 {
     for (index, processor) in chain.iter_mut().enumerate() {
+        let keyed = key(index);
         if let Some(schedule) = schedules.get(index).and_then(Option::as_ref) {
             // Hosted publication uses a fixed 256-frame quantum. Both track
             // and master inserts reuse the engine's preallocated event buffer.
@@ -167,9 +209,15 @@ fn process_chain(chain: &mut Chain, schedules: &[Option<crate::automation_clock:
             while offset < left.len() {
                 let end = (offset + 256).min(left.len());
                 let Ok(count) = schedule.write_events(position + offset as u64, end - offset, events) else { return false };
-                if !processor.process_automated(&mut left[offset..end], &mut right[offset..end], &events[..count]) { return false; }
+                let ok = match keyed {
+                    Some((kl, kr)) => processor.process_keyed(&mut left[offset..end], &mut right[offset..end], (&kl[offset..end], &kr[offset..end]), &events[..count]),
+                    None => processor.process_automated(&mut left[offset..end], &mut right[offset..end], &events[..count]),
+                };
+                if !ok { return false; }
                 offset = end;
             }
+        } else if let Some(key) = keyed {
+            if !processor.process_keyed(left, right, key, &[]) { return false; }
         } else { processor.process(left, right); }
     }
     true
@@ -397,6 +445,7 @@ pub struct Control {
     pending: Option<Box<TimelineSwap>>,
     overlay_out:rtrb::Producer<Box<Overlay>>,
     overlay_retired:rtrb::Consumer<Box<Overlay>>,
+    block: usize,
 }
 
 struct Overlay{samples:Arc<[f32]>,block_transport:bool}
@@ -415,7 +464,7 @@ pub fn channel(sample_rate: u32, max_block: usize) -> (Control, RtState) {
             #[cfg(feature = "audio-device")]
             output_owner: None,
             shared: shared.clone(), outgoing, retired, chain_out, chain_retired,
-            chain_lengths: [0; MIXER_BUSES], chain_revision: 0, retired_chain_revision: 0, timeline_revision: 0, pending: None, overlay_out, overlay_retired },
+            chain_lengths: [0; MIXER_BUSES], chain_revision: 0, retired_chain_revision: 0, timeline_revision: 0, pending: None, overlay_out, overlay_retired, block },
         RtState {
             shared,
             incoming,
@@ -528,7 +577,9 @@ impl Control {
         self.timeline_revision += 1;
         let start = t.loop_range.filter(|(start, end)| start < end).map_or(0, |(start, _)| start);
         self.shared.return_position.store(start, Ordering::Release);
-        self.pending = Some(Box::new(TimelineSwap { revision: self.timeline_revision, timeline: t }));
+        let keys = t.sidechains.iter().filter(|r| (r.source as usize) < MAX_TRACKS && (r.track as usize) < MAX_TRACKS && r.source != r.track)
+            .map(|&r| KeyLine::new(r, self.block)).collect();
+        self.pending = Some(Box::new(TimelineSwap { revision: self.timeline_revision, timeline: t, keys }));
         self.maintain();
         self.timeline_revision
     }
@@ -798,14 +849,29 @@ impl RtState {
         let fading=self.fading.as_ref().filter(|(_,remaining)|*remaining>0);
         let used=self.current.as_ref().map_or(0,|t|t.used_tracks()).max(fading.map_or(0,|(old,_)|old.used_tracks())).min(MAX_TRACKS);
         let any_solo=self.shared.channels.iter().any(|c|c.solo.load(Ordering::Relaxed));
+        // Pass 1: every track's source material, so sidechain keys can read
+        // any track's pre-insert signal regardless of track order.
+        let mut material=[false;MAX_TRACKS];
         for ti in 0..used{
-            let ctl=&self.shared.channels[ti];let(bl,br)=(&mut self.bus_l[ti][..frames],&mut self.bus_r[ti][..frames]);bl.fill(0.);br.fill(0.);
-            let mut material=self.current.as_ref().is_some_and(|t|t.mix_stereo(ti as u16,pos,bl,br));
-            if let Some((old,remaining))=fading{let n=(*remaining as usize).min(frames);let(pl,pr)=(&mut self.fade_tmp[..n],&mut self.fade_tmp_r[..n]);pl.fill(0.);pr.fill(0.);material|=old.mix_stereo(ti as u16,pos,pl,pr);for i in 0..n{let old_gain=(*remaining as usize-i)as f32/CROSSFADE_FRAMES as f32;bl[i]=bl[i]*(1.-old_gain)+pl[i]*old_gain;br[i]=br[i]*(1.-old_gain)+pr[i]*old_gain;}}
-            if !material&&self.chains[ti].is_none(){continue;}
+            let(bl,br)=(&mut self.bus_l[ti][..frames],&mut self.bus_r[ti][..frames]);bl.fill(0.);br.fill(0.);
+            material[ti]=self.current.as_ref().is_some_and(|t|t.mix_stereo(ti as u16,pos,bl,br));
+            if let Some((old,remaining))=fading{let n=(*remaining as usize).min(frames);let(pl,pr)=(&mut self.fade_tmp[..n],&mut self.fade_tmp_r[..n]);pl.fill(0.);pr.fill(0.);material[ti]|=old.mix_stereo(ti as u16,pos,pl,pr);for i in 0..n{let old_gain=(*remaining as usize-i)as f32/CROSSFADE_FRAMES as f32;bl[i]=bl[i]*(1.-old_gain)+pl[i]*old_gain;br[i]=br[i]*(1.-old_gain)+pr[i]*old_gain;}}
+        }
+        if let Some(current)=self.current.as_mut(){
+            for key in &mut current.keys{
+                let source=key.route.source as usize;
+                if source<used{key.feed(&self.bus_l[source][..frames],&self.bus_r[source][..frames]);}
+                else{key.out_l[..frames].fill(0.);key.out_r[..frames].fill(0.);}
+            }
+        }
+        for ti in 0..used{
+            let ctl=&self.shared.channels[ti];let(bl,br)=(&mut self.bus_l[ti][..frames],&mut self.bus_r[ti][..frames]);
+            if !material[ti]&&self.chains[ti].is_none(){continue;}
             if let Some(chain)=&mut self.chains[ti]{
                 let schedules=self.current.as_ref().and_then(|t|t.native_automation.get(ti)).map(Vec::as_slice).unwrap_or(&[]);
-                if !process_chain(&mut chain.chain,schedules,pos,bl,br,&mut self.parameter_events){self.shared.automation_fault.store(true,Ordering::Release);return false;}
+                let keys=self.current.as_ref().map(|t|t.keys.as_slice()).unwrap_or(&[]);
+                let key=|processor:usize|keys.iter().find(|k|k.route.track as usize==ti&&k.route.processor as usize==processor).map(|k|(&k.out_l[..frames],&k.out_r[..frames]));
+                if !process_chain(&mut chain.chain,schedules,pos,bl,br,&mut self.parameter_events,&key){self.shared.automation_fault.store(true,Ordering::Release);return false;}
             }
             let audible=!ctl.mute.load(Ordering::Relaxed)&&(!any_solo||ctl.solo.load(Ordering::Relaxed));
             let gain=f32::from_bits(ctl.gain.load(Ordering::Relaxed));let pan=f32::from_bits(ctl.pan.load(Ordering::Relaxed));
@@ -817,7 +883,7 @@ impl RtState {
         if let Some(clicks)=self.current.as_ref().and_then(|t|t.metronome.as_ref()){clicks.mix(pos,ml,mr);}
         if let Some(chain)=&mut self.chains[MASTER_BUS]{
             let schedules=self.current.as_ref().map(|t|t.master_native_automation.as_slice()).unwrap_or(&[]);
-            if !process_chain(&mut chain.chain,schedules,pos,ml,mr,&mut self.parameter_events){self.shared.automation_fault.store(true,Ordering::Release);return false;}
+            if !process_chain(&mut chain.chain,schedules,pos,ml,mr,&mut self.parameter_events,&|_|None){self.shared.automation_fault.store(true,Ordering::Release);return false;}
         }
         let master_muted=self.shared.master.mute.load(Ordering::Relaxed);
         let gain=f32::from_bits(self.shared.master.gain.load(Ordering::Relaxed));let pan=f32::from_bits(self.shared.master.pan.load(Ordering::Relaxed));
@@ -1058,5 +1124,40 @@ mod tests {
         assert_eq!(control.applied_timeline_revision(), 0);
         rt.process(&mut [0.0; 2], 2);
         assert_eq!(control.applied_timeline_revision(), revision);
+    }
+
+    struct KeyProbe { seen: Arc<std::sync::Mutex<Vec<f32>>> }
+    impl Processor for KeyProbe {
+        fn name(&self) -> &str { "key probe" }
+        fn process(&mut self, _l: &mut [f32], _r: &mut [f32]) {}
+        fn process_keyed(&mut self, _l: &mut [f32], _r: &mut [f32], key: (&[f32], &[f32]), _events: &[(u32, u32, f64)]) -> bool {
+            self.seen.lock().unwrap().extend_from_slice(key.0);
+            true
+        }
+    }
+
+    #[test]
+    fn a_sidechain_route_keys_a_later_or_earlier_track_with_its_source_delayed() {
+        for (source, dest) in [(1u16, 0u16), (0, 1)] {
+            let (mut control, mut rt) = channel(48_000, 64);
+            let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let mut chain: Chain = vec![Box::new(GainProcessor(1.0)), Box::new(KeyProbe { seen: seen.clone() })];
+            chain.shrink_to_fit();
+            assert!(control.set_chain(dest as usize, chain));
+            let ramp: Arc<[f32]> = (0..32).map(|i| i as f32 + 1.0).collect::<Vec<_>>().into();
+            let mut timeline = Timeline::new(48_000, vec![
+                Clip { start: 0, samples: ramp, gain: 1.0, track: source },
+                Clip { start: 0, samples: vec![0.0; 32].into(), gain: 1.0, track: dest },
+            ]);
+            timeline.sidechains = vec![SidechainRoute { source, track: dest, processor: 1, delay: 3 }];
+            control.set_timeline(timeline);
+            control.play();
+            rt.process(&mut [0.0; 16], 1);
+            rt.process(&mut [0.0; 16], 1);
+            let seen = seen.lock().unwrap();
+            // The key is the source's pre-fader signal, three samples late.
+            assert_eq!(&seen[..6], &[0.0, 0.0, 0.0, 1.0, 2.0, 3.0], "source {source} → {dest}");
+            assert_eq!(seen.len(), 32);
+        }
     }
 }

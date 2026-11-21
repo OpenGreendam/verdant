@@ -59,6 +59,9 @@ for previous_package in "$worker_target"/package-smoke.*; do
     fi
 done
 package_output=$(mktemp -d "$worker_target/package-smoke.XXXXXX")
+# mktemp creates 0700; CI uploads the package as the runner user, outside
+# this container, so the directory must be listable by others.
+chmod 0755 "$package_output"
 source_selection=$(mktemp -d "$worker_target/source-selection.XXXXXX")/selection.json
 release="$worker_target/debug/verdant-release"
 selection_sha=$("$release" select-source --repo "$repo" --output "$source_selection" | jq -er .sha256)

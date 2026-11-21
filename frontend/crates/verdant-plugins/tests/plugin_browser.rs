@@ -94,8 +94,8 @@ fn browser_matches_native_host_report_and_inserted_handle_identity() {
     assert!(!report.plugins.is_empty());
     let mut browser = PluginBrowser::new(client.catalog());
     // The catalog includes each of Verdant's built-in effects exactly once.
-    let builtin_ids = [verdant_plugins::BUILTIN_GAIN_ID,
-        verdant_plugins::builtin_dsp::EQ_ID, verdant_plugins::builtin_dsp::COMPRESSOR_ID];
+    let builtin_ids: Vec<&str> = std::iter::once(verdant_plugins::BUILTIN_GAIN_ID)
+        .chain(verdant_plugins::builtin_dsp::EFFECT_IDS).collect();
     assert_eq!(browser.entries().len(), report.plugins.len() + builtin_ids.len());
     for id in builtin_ids {
         assert_eq!(browser.entries().iter().filter(|row| row.format == PluginFormat::Builtin

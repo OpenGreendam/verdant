@@ -135,6 +135,16 @@ pub enum MenuAction {
     BypassInsert { track: TrackId, slot: usize },
     RemoveInsert { track: TrackId, slot: usize },
     OpenInsertEditor { track: TrackId, slot: usize },
+    /// Route another track's signal to an insert's sidechain (`None` = off).
+    SetSidechain { track: TrackId, slot: usize, source: Option<TrackId> },
+    AddInstrumentTrack,
+    /// Make a vocal track an instrument track or back.
+    MakeInstrumentTrack { track: TrackId, instrument: bool },
+    SetInstrumentPreset { track: TrackId, preset: String },
+    SetHostedInstrument { track: TrackId, format: String, id: String },
+    UseBuiltinSynth { track: TrackId },
+    /// Set parameters of a track insert as one undo step.
+    SetInsertParams { track: TrackId, slot: usize, values: Vec<(String, f64)> },
     RescanPlugins,
     /// Select an audio device by name (empty = system default, `None` text →
     /// silent clock is never offered here; `--silent-audio` starts it).
@@ -286,6 +296,8 @@ pub struct Editor {
     phrase_pcm: project_audio::PhrasePcmCache,
     timeline_gen: u64,
     pub timeline_phrases: usize,
+    /// Instrument tracks with rendered notes in the current timeline.
+    pub timeline_instruments: usize,
     cache_restore_gen: u64,
     cache_restoring: bool,
 
@@ -338,6 +350,8 @@ pub struct Editor {
     pub device_band: usize,
     /// The saved insert state each cached parameter list was read against.
     pub device_param_state: HashMap<verdant_plugins::InsertKey, String>,
+    /// Curve/handle animations of device editors after parameter changes.
+    pub device_anim: HashMap<verdant_plugins::InsertKey, crate::devices::DeviceAnim>,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -507,6 +521,7 @@ impl Editor {
             phrase_pcm: project_audio::PhrasePcmCache::default(),
             timeline_gen: 0,
             timeline_phrases: 0,
+            timeline_instruments: 0,
             cache_restore_gen: 0,
             cache_restoring: false,
             notices: VecDeque::new(),
@@ -543,6 +558,7 @@ impl Editor {
             device_drag: None,
             device_band: 2,
             device_param_state: HashMap::new(),
+            device_anim: HashMap::new(),
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,
@@ -1430,6 +1446,13 @@ impl Editor {
             MenuAction::BypassInsert { track, slot } => self.toggle_insert_bypass(&track, slot, cx),
             MenuAction::RemoveInsert { track, slot } => self.remove_insert(&track, slot, cx),
             MenuAction::OpenInsertEditor { track, slot } => self.open_insert_editor(&track, slot, cx),
+            MenuAction::SetSidechain { track, slot, source } => self.set_insert_sidechain(&track, slot, source, cx),
+            MenuAction::SetInsertParams { track, slot, values } => self.set_track_insert_params(track, slot, values, cx),
+            MenuAction::AddInstrumentTrack => self.add_instrument_track(cx),
+            MenuAction::MakeInstrumentTrack { track, instrument } => self.make_instrument_track(&track, instrument, cx),
+            MenuAction::SetInstrumentPreset { track, preset } => self.set_instrument_preset(&track, &preset, cx),
+            MenuAction::SetHostedInstrument { track, format, id } => self.set_hosted_instrument(&track, &format, &id, cx),
+            MenuAction::UseBuiltinSynth { track } => self.use_builtin_synth(&track, cx),
             MenuAction::RescanPlugins => self.rescan_plugins(cx),
             MenuAction::AddMasterInsert { format, id } => self.add_master_insert(&format, &id, cx),
             MenuAction::ChooseDevice(name) => self.choose_device(&name),
@@ -2460,8 +2483,8 @@ impl Editor {
                 Ok::<_,String>((prepared,media_previews,media_cache))
             }).await;
             let _=this.update(cx,|ed,cx|{if ed.timeline_gen!=generation{return;}match result{
-                Ok((prepared,media_previews,media_cache))=>{ed.integrations.media_cache=media_cache;ed.integrations.media_previews=media_previews;ed.phrase_pcm=prepared.phrase_pcm;ed.timeline_phrases=prepared.phrase_count;ed.integrations.media_ready=prepared.media_count>0;let revision=ed.audio.set_timeline(prepared.timeline);ed.insert_timeline_ready(revision,cx);}
-                Err(error)=>{ed.audio.set_timeline(Timeline::new(rate,Vec::new()));ed.timeline_phrases=0;ed.integrations.media_ready=false;ed.integrations.media_previews.clear();ed.notice(format!("音频时序 / 资产校验失败：{error}"));}
+                Ok((prepared,media_previews,media_cache))=>{ed.integrations.media_cache=media_cache;ed.integrations.media_previews=media_previews;ed.phrase_pcm=prepared.phrase_pcm;ed.timeline_phrases=prepared.phrase_count;ed.timeline_instruments=prepared.instrument_count;ed.integrations.media_ready=prepared.media_count>0;let revision=ed.audio.set_timeline(prepared.timeline);ed.insert_timeline_ready(revision,cx);}
+                Err(error)=>{ed.audio.set_timeline(Timeline::new(rate,Vec::new()));ed.timeline_phrases=0;ed.timeline_instruments=0;ed.integrations.media_ready=false;ed.integrations.media_previews.clear();ed.notice(format!("音频时序 / 资产校验失败：{error}"));}
             }cx.notify();});
         }).detach();
     }
@@ -2473,7 +2496,7 @@ impl Editor {
             Transport::Playing => self.audio.pause(),
             _ => {
                 let wanted = self.scheduler.wanted().len();
-                if self.timeline_phrases == 0 && !self.integrations.media_ready && !self.playback_settings().metronome {
+                if self.timeline_phrases == 0 && self.timeline_instruments == 0 && !self.integrations.media_ready && !self.playback_settings().metronome {
                     // Never substitute another sound for a missing render.
                     let msg = if wanted == 0 {
                         "没有可渲染的乐句（查看诊断）".to_string()

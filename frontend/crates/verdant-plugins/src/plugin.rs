@@ -65,6 +65,14 @@ pub struct PluginDesc {
     pub features: Vec<String>,
 }
 
+impl PluginDesc {
+    /// Whether the plug-in plays notes: CLAP `instrument`, VST3 `Instrument`
+    /// categories, AU music devices (`aumu`).
+    pub fn is_instrument(&self) -> bool {
+        self.features.iter().any(|f| { let f = f.to_ascii_lowercase(); f == "instrument" || f.starts_with("instrument|") || f.contains("|instrument") || f.starts_with("aumu") })
+    }
+}
+
 impl From<&ScannedPlugin> for PluginDesc {
     fn from(s: &ScannedPlugin) -> Self {
         Self {
@@ -133,6 +141,9 @@ pub struct PluginClient {
 }
 
 impl PluginClient {
+    /// The rate every hosted instance runs at.
+    pub fn sample_rate(&self) -> f64 { self.opts.sample_rate }
+
     /// Build a client. Fails when no `verdant-plughost` binary is resolvable;
     /// `opts.cache_dir` needn't exist yet.
     pub fn new(opts: PluginClientOpts) -> Result<Arc<Self>> {

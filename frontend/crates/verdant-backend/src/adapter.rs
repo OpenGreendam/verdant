@@ -362,6 +362,8 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
         out.diagnostics.push(Diagnostic::error("E_UNKNOWN_TRACK", None, "轨道不存在", track_id.to_string()));
         return out;
     };
+    // Instrument tracks play their notes through the instrument, not a voice.
+    if track.is_instrument() { return out; }
     let route = match track_route(project, track) {
         Ok(stored) => requested.unwrap_or(stored),
         Err(error) => {

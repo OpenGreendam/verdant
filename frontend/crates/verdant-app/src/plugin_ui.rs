@@ -481,7 +481,11 @@ impl Editor {
             sample_rate: self.audio_info.sample_rate as f64,
             max_frames: verdant_audio::device::MAX_BLOCK,
         }) {
-            Ok(client) => { self.plugins = Some(client); self.rescan_plugins(cx); }
+            Ok(client) => {
+                verdant_service::project_audio::set_instrument_host(Some(client.clone()));
+                self.plugins = Some(client);
+                self.rescan_plugins(cx);
+            }
             Err(e) => self.notice(format!("插件宿主不可用：{e}")),
         }
     }
@@ -929,6 +933,20 @@ impl Editor {
         }
     }
 
+    /// Route `source`'s pre-insert signal to the insert's sidechain key.
+    pub fn set_insert_sidechain(&mut self, track: &TrackId, slot: usize, source: Option<TrackId>, cx: &mut Context<Self>) {
+        if !self.flush_insert_states(cx) { return; }
+        let mut specs = self.insert_specs(track);
+        let Some(spec) = specs.get_mut(slot) else { return };
+        let key = verdant_service::project_audio::SIDECHAIN_KEY;
+        match &source {
+            Some(id) if id != track => { spec.extra.insert(key.into(), serde_json::Value::String(id.as_str().into())); }
+            _ => { spec.extra.remove(key); }
+        }
+        let label = if source.is_some() { "设置侧链" } else { "关闭侧链" };
+        self.commit_inserts(track, specs, label, cx);
+    }
+
     pub fn add_insert(&mut self, track: &TrackId, format: &str, id: &str, cx: &mut Context<Self>) {
         self.add_insert_at(track, self.insert_specs(track).len(), format, id, cx);
     }
@@ -1142,6 +1160,7 @@ impl Editor {
     /// round trip, one state capture and one undo step (a curve handle moves
     /// frequency and gain together). Rolls back like a single-parameter edit.
     pub(crate) fn set_track_insert_params(&mut self, track: TrackId, slot: usize, values: Vec<(String, f64)>, cx: &mut Context<Self>) {
+        if slot == crate::instrument::INSTRUMENT_SLOT { return self.set_instrument_params(&track, values, cx); }
         let owner = InsertOwner::Track(track);
         let Some(handle) = self.live_owned_insert(&owner, slot) else { return };
         let key = handle.key();

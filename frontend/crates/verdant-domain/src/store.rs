@@ -1100,6 +1100,19 @@ fn apply_command(p: &mut Project, command: &Command, out: &mut Vec<NotePatch>, m
             }
             meta.push(MetaPatch::TrackUnknownKey { track: track.clone(), key: "inserts".into(), before, after });
         }
+        Command::SetTrackInstrument { track, instrument } => {
+            if instrument.as_ref().is_some_and(|v| !v.is_object()) {
+                return Err(DomainError::InvalidCommand("instrument must be an object".into()));
+            }
+            let t = track_of(p, track)?;
+            let key = crate::model::INSTRUMENT_KEY;
+            let before = t.unknown.get(key).cloned();
+            match instrument {
+                Some(v) => { t.unknown.insert(key.into(), v.clone()); }
+                None => { t.unknown.remove(key); }
+            }
+            meta.push(MetaPatch::TrackUnknownKey { track: track.clone(), key: key.into(), before, after: instrument.clone() });
+        }
     }
     Ok(())
 }

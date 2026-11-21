@@ -165,18 +165,31 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
         };
         if !enabled && !windows { continue; }
         let (id, name, label, area) = match caption {
-            Caption::Minimize => ("window-minimize", "minus", "最小化", WindowControlArea::Min),
-            Caption::Maximize if chrome.maximized => ("window-maximize", "copy", "还原", WindowControlArea::Max),
-            Caption::Maximize => ("window-maximize", "square", "最大化", WindowControlArea::Max),
-            Caption::Close => ("window-close", "x", "关闭", WindowControlArea::Close),
+            Caption::Minimize => ("window-minimize", if windows { "minus" } else { "window-minimize" }, "最小化", WindowControlArea::Min),
+            Caption::Maximize if chrome.maximized => ("window-maximize", if windows { "copy" } else { "window-restore" }, "还原", WindowControlArea::Max),
+            Caption::Maximize => ("window-maximize", if windows { "square" } else { "window-maximize" }, "最大化", WindowControlArea::Max),
+            Caption::Close => ("window-close", if windows { "x" } else { "window-close" }, "关闭", WindowControlArea::Close),
         };
         let close = caption == Caption::Close;
-        let hover = if close { gpui::rgb(0xc42b1c) } else { th.control_pressed };
         let fg = if enabled { th.text } else { th.text_tertiary };
-        let mut button = div().id(id).role(gpui::Role::Button).aria_label(label)
-            .w(px(if windows { 46.0 } else { 40.0 })).h_full().flex().items_center().justify_center().occlude()
-            .child(svg().path(icon(name)).size(px(if caption == Caption::Maximize { 12.0 } else { 15.0 })).text_color(fg))
-            .when(enabled, |b| b.hover(move |s| s.bg(hover)));
+        let mut button = if windows {
+            // Windows keeps its own caption layout: 46 px cells, red close.
+            let hover = if close { gpui::rgb(0xc42b1c) } else { th.control_pressed };
+            div().id(id).role(gpui::Role::Button).aria_label(label)
+                .w(px(46.0)).h_full().flex().items_center().justify_center().occlude()
+                .child(svg().path(icon(name)).size(px(if caption == Caption::Maximize { 12.0 } else { 15.0 })).text_color(fg))
+                .when(enabled, |b| b.hover(move |s| s.bg(hover)))
+        } else {
+            // GNOME: a 24 px round button with a faint fill, darker on hover
+            // and pressed, inside a larger hit area.
+            let base = crate::theme::with_alpha(th.text, 0.10);
+            let (hover, pressed) = (crate::theme::with_alpha(th.text, 0.16), crate::theme::with_alpha(th.text, 0.26));
+            div().id(id).role(gpui::Role::Button).aria_label(label)
+                .w(px(34.0)).h_full().flex().items_center().justify_center().occlude().cursor_pointer().group(id)
+                .child(div().id(SharedString::from(format!("{id}-disc"))).size(px(24.0)).rounded(px(12.0)).flex().items_center().justify_center().bg(base)
+                    .group_hover(id, move |s| s.bg(hover)).group_active(id, move |s| s.bg(pressed))
+                    .child(svg().path(icon(name)).size(px(16.0)).text_color(fg)))
+        };
         if windows {
             // Native hit-testing performs the action (and shows snap layouts).
             if enabled {

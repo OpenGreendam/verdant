@@ -491,7 +491,11 @@ impl Editor {
         let rename_id = track.id.clone();
         let auto_open = self.automation_ui.expanded_tracks.contains(&track.id);
 
-        let mut track_section = section("声库与语言", th)
+        let instrument = track.instrument().map(|spec| (
+            spec.get("name").and_then(serde_json::Value::as_str).unwrap_or("乐器").to_string(),
+            spec.get("preset").and_then(serde_json::Value::as_str).filter(|p| !p.is_empty()).map(str::to_string)
+                .unwrap_or_else(|| match spec.get("format").and_then(serde_json::Value::as_str) { Some("builtin") | None => "自定义".into(), Some(f) => f.to_uppercase() })));
+        let mut track_section = section(if instrument.is_some() { "乐器" } else { "声库与语言" }, th)
             .child(
                 div()
                     .flex()
@@ -507,10 +511,16 @@ impl Editor {
                                 ed.run_workflow(WorkflowAction::RenameTrack(rename_id.clone()), w, cx);
                             })),
                     ),
-            )
-            .child(self.singer_language_controls(cx));
+            );
+        if let Some((name, preset)) = &instrument {
+            track_section = track_section.child(row(name, preset.clone(), th))
+                .child(button("insp-open-instrument", "编辑乐器", th).h(px(PANEL_BTN_H))
+                    .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
+        } else {
+            track_section = track_section.child(self.singer_language_controls(cx));
+        }
 
-        if let Some((_, voice)) = caps.and_then(|c| verdant_backend::adapter::desktop_voice(&project, track, c).ok().flatten()) {
+        if let Some((_, voice)) = caps.filter(|_| instrument.is_none()).and_then(|c| verdant_backend::adapter::desktop_voice(&project, track, c).ok().flatten()) {
             track_section = track_section.child(row("当前声源", voice.display_name.clone(), th));
         }
 
@@ -1505,7 +1515,11 @@ impl Editor {
             // Pane header (AdwToolbarView top bar): its bottom line meets the
             // inspector's and the dock's.
             .child(pane_header(th)
-                .child(crate::ui_controls::flat_icon_command_button(self, Cmd::AddTrack, "plus", "添加轨道", "add-track", false, cx).h(px(32.0)))
+                .child(crate::ui_controls::flat_icon_command_button(self, Cmd::AddTrack, "plus", "人声轨", "add-track", false, cx).h(px(32.0)))
+                .child(div().id("add-instrument-track").role(Role::Button).aria_label("添加乐器轨").h(px(32.0)).px(px(9.0)).flex().items_center().gap(px(6.0))
+                    .rounded(px(6.0)).text_sm().cursor_pointer().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed))
+                    .child(svg().path(icon("instrument")).size(px(15.0)).flex_none().text_color(th.text)).child("乐器轨")
+                    .on_click(cx.listener(|ed, _, _, cx| ed.add_instrument_track(cx))))
                 .child(crate::ui_controls::flat_icon_command_button(self, Cmd::FitArrange, "maximize-2", "显示全部", "fit-arrange", false, cx).h(px(32.0)))
                 .child(div().flex_1())
                 .child(div().text_sm().text_color(th.text_secondary).child(format!("{} 条轨道", self.project().tracks.len()))))
@@ -1785,7 +1799,7 @@ impl Editor {
                     .into_any_element(),
             ),
             Bottom::Table => Some(div().flex_1().min_h_0().child(crate::table::note_table(self, entity.clone(), window, cx)).into_any_element()),
-            Bottom::Devices => Some(div().flex_1().min_h_0().child(crate::devices::device_view(self, &entity, cx)).into_any_element()),
+            Bottom::Devices => Some(div().flex_1().min_h_0().child(crate::devices::device_view(self, &entity, window, cx)).into_any_element()),
             Bottom::Hidden => None,
         };
 
@@ -1894,6 +1908,7 @@ impl Render for Editor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.theme = Theme::resolve_appearance(window.appearance(), self.appearance_override, &self.prefs)
             .with_pride(self.theme.pride);
+        crate::alert::remember_theme(self.theme);
         let chrome = crate::window_chrome::ChromeState::read(window);
         if chrome != self.window_chrome {
             self.window_chrome = chrome;

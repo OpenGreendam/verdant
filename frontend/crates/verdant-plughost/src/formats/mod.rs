@@ -37,10 +37,19 @@ pub trait HostedPlugin {
         self.process(in_l, in_r, out_l, out_r)
     }
 
+    /// Process with a sidechain key. Plugins without a key input ignore it.
+    fn process_keyed(&mut self, in_l: &[f32], in_r: &[f32], _key: (&[f32], &[f32]), out_l: &mut [f32], out_r: &mut [f32],
+        events: &[ParamEvent]) -> Result<(), String> {
+        self.process_events(in_l, in_r, out_l, out_r, events)
+    }
+
     /// Control-side discovery filters native writable/automatable flags.
     fn automation_params(&mut self) -> Result<Vec<AutomationParam>, String> {
         Err("native parameter automation unsupported".into())
     }
+
+    /// Whether this instance plays notes (and so accepts note events).
+    fn is_instrument(&self) -> bool { false }
 
     /// Plugin-reported processing latency in samples.
     fn latency(&mut self) -> u64 {
