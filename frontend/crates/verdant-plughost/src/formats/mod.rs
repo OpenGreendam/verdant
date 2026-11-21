@@ -48,6 +48,9 @@ pub trait HostedPlugin {
         Err("native parameter automation unsupported".into())
     }
 
+    /// Whether this instance plays notes (and so accepts note events).
+    fn is_instrument(&self) -> bool { false }
+
     /// Plugin-reported processing latency in samples.
     fn latency(&mut self) -> u64 {
         0

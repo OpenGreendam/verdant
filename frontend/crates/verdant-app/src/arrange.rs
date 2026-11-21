@@ -145,7 +145,8 @@ pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement 
             .child(div().flex().items_center().gap(px(8.0)).text_xs().text_color(th.text_secondary)
                 .child(match track.instrument() {
                     Some(spec) => format!("{} · {}", spec.get("name").and_then(serde_json::Value::as_str).unwrap_or("乐器"),
-                        spec.get("preset").and_then(serde_json::Value::as_str).filter(|p| !p.is_empty()).unwrap_or("自定义")),
+                        spec.get("preset").and_then(serde_json::Value::as_str).filter(|p| !p.is_empty()).map(str::to_string)
+                        .unwrap_or_else(|| match spec.get("format").and_then(serde_json::Value::as_str) { Some("builtin") | None => "自定义".into(), Some(f) => f.to_uppercase() })),
                     None => format!("{route_label} · {}", ed.scheduler.capabilities.as_ref()
                         .and_then(|caps| verdant_backend::adapter::desktop_voice(ed.project(), track, caps).ok().flatten())
                         .map(|(_, voice)| voice.display_name.as_str()).unwrap_or("尚无已校验声库")),

@@ -141,6 +141,8 @@ pub enum MenuAction {
     /// Make a vocal track an instrument track or back.
     MakeInstrumentTrack { track: TrackId, instrument: bool },
     SetInstrumentPreset { track: TrackId, preset: String },
+    SetHostedInstrument { track: TrackId, format: String, id: String },
+    UseBuiltinSynth { track: TrackId },
     /// Set parameters of a track insert as one undo step.
     SetInsertParams { track: TrackId, slot: usize, values: Vec<(String, f64)> },
     RescanPlugins,
@@ -1449,6 +1451,8 @@ impl Editor {
             MenuAction::AddInstrumentTrack => self.add_instrument_track(cx),
             MenuAction::MakeInstrumentTrack { track, instrument } => self.make_instrument_track(&track, instrument, cx),
             MenuAction::SetInstrumentPreset { track, preset } => self.set_instrument_preset(&track, &preset, cx),
+            MenuAction::SetHostedInstrument { track, format, id } => self.set_hosted_instrument(&track, &format, &id, cx),
+            MenuAction::UseBuiltinSynth { track } => self.use_builtin_synth(&track, cx),
             MenuAction::RescanPlugins => self.rescan_plugins(cx),
             MenuAction::AddMasterInsert { format, id } => self.add_master_insert(&format, &id, cx),
             MenuAction::ChooseDevice(name) => self.choose_device(&name),

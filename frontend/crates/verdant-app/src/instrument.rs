@@ -85,6 +85,20 @@ impl Editor {
         }
     }
 
+    /// Play the track through a scanned third-party instrument.
+    pub fn set_hosted_instrument(&mut self, track: &TrackId, format: &str, id: &str, cx: &mut Context<Self>) {
+        let Some(desc) = self.plugin_catalog().into_iter().find(|d| d.format.tag() == format && d.id == id) else {
+            self.notice("乐器插件已不在插件列表中；请重新扫描"); cx.notify(); return;
+        };
+        let spec = serde_json::json!({ "format": desc.format.tag(), "id": desc.id, "name": desc.name, "version": desc.version, "path": desc.path });
+        self.commit_instrument(track, Some(spec), &format!("乐器：{}", desc.name), cx);
+    }
+
+    pub fn use_builtin_synth(&mut self, track: &TrackId, cx: &mut Context<Self>) {
+        let (p, _) = SYNTH_PRESETS[0];
+        self.commit_instrument(track, Some(synth_spec(&SynthParams::preset(p).unwrap_or_default(), p)), "乐器：内置合成器", cx);
+    }
+
     pub fn make_instrument_track(&mut self, track: &TrackId, instrument: bool, cx: &mut Context<Self>) {
         let spec = instrument.then(|| { let (p, _) = SYNTH_PRESETS[0]; synth_spec(&SynthParams::preset(p).unwrap_or_default(), p) });
         self.commit_instrument(track, spec, if instrument { "转为乐器轨" } else { "转为人声轨" }, cx);
@@ -97,10 +111,18 @@ pub fn instrument_card(ed: &mut Editor, editor: &Entity<Editor>, track: &TrackId
     let t = ed.project().track(track)?;
     let spec = t.instrument()?.clone();
     let name = spec.get("name").and_then(serde_json::Value::as_str).unwrap_or("乐器").to_string();
+    let chooser_track = track.clone();
+    let chooser = crate::devices::dropdown_button(SharedString::from("instrument-choose"), "换乐器".into(), th, move |ed| instrument_menu(ed, &chooser_track), cx);
     let Some(params) = synth_params(t) else {
-        return Some(div().flex_none().w(px(320.0)).p(px(14.0)).rounded(px(12.0)).bg(th.card).flex().flex_col().gap(px(8.0))
-            .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))
-            .child(div().text_sm().text_color(th.text_secondary).child("此版本还不能让这个乐器发声；设置已保留。"))
+        let format = spec.get("format").and_then(serde_json::Value::as_str).unwrap_or("").to_uppercase();
+        return Some(div().id("instrument-card").role(Role::Group).aria_label(format!("乐器：{name}"))
+            .flex_none().w(px(360.0)).p(px(14.0)).rounded(px(12.0)).bg(th.card).shadow_sm().flex().flex_col().gap(px(10.0))
+            .border_1().border_color(crate::theme::with_alpha(th.accent, 0.35))
+            .child(div().flex().items_center().gap(px(10.0)).h(px(32.0))
+                .child(gpui::svg().path(crate::assets::icon("instrument")).size(px(18.0)).text_color(th.accent))
+                .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).child(name))
+                .child(chooser))
+            .child(div().text_sm().text_color(th.text_secondary).child(format!("{format} 乐器插件 · 音符在后台离线渲染，改动后自动更新")))
             .into_any_element());
     };
     let preset = spec.get("preset").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
@@ -123,9 +145,31 @@ pub fn instrument_card(ed: &mut Editor, editor: &Entity<Editor>, track: &TrackId
         .child(div().flex().items_center().gap(px(10.0)).h(px(32.0))
             .child(gpui::svg().path(crate::assets::icon("instrument")).size(px(18.0)).text_color(th.accent))
             .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).child(name))
-            .child(presets))
+            .child(presets).child(chooser))
         .child(body)
         .into_any_element())
+}
+
+/// Built-in synth plus every scanned instrument plug-in.
+fn instrument_menu(ed: &Editor, track: &TrackId) -> Vec<crate::menu::MenuItem> {
+    use crate::editor::MenuAction as M;
+    use crate::menu::MenuItem as I;
+    let current = ed.project().track(track).and_then(|t| t.instrument().cloned());
+    let is = |format: &str, id: &str| current.as_ref().is_some_and(|s| s.get("format").and_then(serde_json::Value::as_str) == Some(format) && s.get("id").and_then(serde_json::Value::as_str) == Some(id));
+    let mut items = vec![I::header("乐器"), I::action("Verdant Synth（内置）", M::UseBuiltinSynth { track: track.clone() }).checked(is("builtin", SYNTH_ID))];
+    let hosted: Vec<_> = ed.plugin_catalog().into_iter().filter(|d| d.is_instrument()).collect();
+    if hosted.is_empty() {
+        items.push(I::disabled("未找到乐器插件（CLAP / VST3）"));
+    } else {
+        items.push(I::separator());
+        for d in hosted {
+            let label = format!("{} · {}", d.name, d.format.tag().to_uppercase());
+            items.push(I::action(label, M::SetHostedInstrument { track: track.clone(), format: d.format.tag().into(), id: d.id.clone() }).checked(is(d.format.tag(), &d.id)));
+        }
+    }
+    items.push(I::separator());
+    items.push(I::action("重新扫描插件", M::RescanPlugins));
+    items
 }
 
 #[cfg(test)]

@@ -481,7 +481,11 @@ impl Editor {
             sample_rate: self.audio_info.sample_rate as f64,
             max_frames: verdant_audio::device::MAX_BLOCK,
         }) {
-            Ok(client) => { self.plugins = Some(client); self.rescan_plugins(cx); }
+            Ok(client) => {
+                verdant_service::project_audio::set_instrument_host(Some(client.clone()));
+                self.plugins = Some(client);
+                self.rescan_plugins(cx);
+            }
             Err(e) => self.notice(format!("插件宿主不可用：{e}")),
         }
     }

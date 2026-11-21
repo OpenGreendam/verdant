@@ -493,7 +493,8 @@ impl Editor {
 
         let instrument = track.instrument().map(|spec| (
             spec.get("name").and_then(serde_json::Value::as_str).unwrap_or("乐器").to_string(),
-            spec.get("preset").and_then(serde_json::Value::as_str).filter(|p| !p.is_empty()).unwrap_or("自定义").to_string()));
+            spec.get("preset").and_then(serde_json::Value::as_str).filter(|p| !p.is_empty()).map(str::to_string)
+                .unwrap_or_else(|| match spec.get("format").and_then(serde_json::Value::as_str) { Some("builtin") | None => "自定义".into(), Some(f) => f.to_uppercase() })));
         let mut track_section = section(if instrument.is_some() { "乐器" } else { "声库与语言" }, th)
             .child(
                 div()

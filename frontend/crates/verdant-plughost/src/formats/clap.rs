@@ -14,7 +14,8 @@ use clack_extensions::render::{PluginRender, RenderMode};
 use clack_extensions::timer::{HostTimer, HostTimerImpl, PluginTimer, TimerId};
 #[cfg(unix)]
 use clack_extensions::posix_fd::{FdFlags, HostPosixFd, HostPosixFdImpl, PluginPosixFd};
-use clack_host::events::event_types::ParamValueEvent;
+use clack_host::events::event_types::{NoteOffEvent, NoteOnEvent, ParamValueEvent};
+use clack_host::events::Match;
 use clack_host::events::io::{EventBuffer, InputEvents, OutputEvents};
 use clack_host::events::Pckn;
 use clack_host::prelude::*;
@@ -174,6 +175,9 @@ pub struct ClapPlugin {
     gui_created: bool,
     gui_size: (u32, u32),
     steady_time: u64,
+    /// No audio input and one stereo output: plays notes rather than
+    /// processing audio.
+    instrument: bool,
 }
 impl ClapPlugin {
     fn stop(&mut self) {
@@ -192,8 +196,13 @@ impl ClapPlugin {
     fn check_ports(&mut self) -> Result<(), String> {
         let ports = self.exts.ports.get().copied().flatten().ok_or("CLAP effect has no audio ports")?;
         let handle = self.instance.plugin_handle();
+        // An effect has one stereo input and output; an instrument has only
+        // the stereo output.
+        let inputs = ports.count(&handle, true);
+        if ports.count(&handle, false) != 1 || inputs > 1 { return Err("CLAP insert needs one stereo input and output bus".into()); }
+        self.instrument = inputs == 0;
         for input in [true, false] {
-            if ports.count(&handle, input) != 1 { return Err("CLAP insert needs one stereo input and output bus".into()); }
+            if input && self.instrument { continue; }
             let mut buf = AudioPortInfoBuffer::new();
             let info = ports.get(&handle, 0, input, &mut buf).ok_or("CLAP port query failed")?;
             if info.channel_count != 2 { return Err("CLAP insert needs stereo ports".into()); }
@@ -284,10 +293,11 @@ impl HostedPlugin for ClapPlugin {
         self.in_bufs[0][..n].copy_from_slice(il);
         self.in_bufs[1][..n].copy_from_slice(ir);
         for b in &mut self.out_bufs { b[..n].fill(0.0); }
-        let inputs = self.in_ports.with_input_buffers([AudioPortBuffer {
+        let instrument = self.instrument;
+        let inputs = self.in_ports.with_input_buffers((!instrument).then(|| AudioPortBuffer {
             latency: 0,
             channels: AudioPortBufferType::f32_input_only(self.in_bufs.iter_mut().map(|b| InputChannel::variable(&mut b[..n]))),
-        }]);
+        }));
         let mut outputs = self.out_ports.with_output_buffers([AudioPortBuffer {
             latency: 0,
             channels: AudioPortBufferType::f32_output_only(self.out_bufs.iter_mut().map(|b| &mut b[..n])),
@@ -311,18 +321,29 @@ impl HostedPlugin for ClapPlugin {
         // event header before staging any point, then use the preallocated buffer.
         let mut previous = 0;
         for &(id, offset, value) in events {
-            if ClapId::from_raw(id).is_none() || offset as usize >= il.len()
+            let note = self.instrument && verdant_plugins::proto::decode_note(id, value).is_some();
+            if (!note && ClapId::from_raw(id).is_none()) || offset as usize >= il.len()
                 || offset < previous || !value.is_finite() {
                 return Err("invalid CLAP native parameter event".into());
             }
             previous = offset;
         }
         for &(id, offset, value) in events {
-            let id = ClapId::from_raw(id).ok_or("invalid CLAP parameter id")?;
-            self.in_events.push(&ParamValueEvent::new(offset, id, Pckn::match_all(), value));
+            match verdant_plugins::proto::decode_note(id, value).filter(|_| self.instrument) {
+                Some(verdant_plugins::proto::NoteEvent::On { key, velocity }) =>
+                    self.in_events.push(&NoteOnEvent::new(offset, Pckn::new(0u16, 0u16, key as u16, Match::All), velocity)),
+                Some(verdant_plugins::proto::NoteEvent::Off { key }) =>
+                    self.in_events.push(&NoteOffEvent::new(offset, Pckn::new(0u16, 0u16, key as u16, Match::All), 0.0)),
+                None => {
+                    let id = ClapId::from_raw(id).ok_or("invalid CLAP parameter id")?;
+                    self.in_events.push(&ParamValueEvent::new(offset, id, Pckn::match_all(), value));
+                }
+            }
         }
         self.process(il, ir, ol, orr)
     }
+
+    fn is_instrument(&self) -> bool { self.instrument }
 
     fn automation_params(&mut self) -> Result<Vec<AutomationParam>, String> {
         let Some(ext) = self.exts.params.get().copied().flatten() else { return Ok(vec![]); };
@@ -560,7 +581,7 @@ pub fn instantiate(path: &str, id: &str, rate: f64, max: u32, events: EventTx)
         out_bufs: [vec![0.0; max as usize], vec![0.0; max as usize]],
         in_ports: AudioPorts::with_capacity(2, 1), out_ports: AudioPorts::with_capacity(2, 1),
         in_events: EventBuffer::with_capacity(MAX_PARAM_EVENTS), out_events: EventBuffer::with_capacity(128),
-        editor: None, gui_created: false, gui_size: (0, 0), steady_time: 0,
+        editor: None, gui_created: false, gui_size: (0, 0), steady_time: 0, instrument: false,
     };
     plugin.check_ports().and_then(|_| plugin.activate()).map_err(PluginError::Host)?;
     Ok((Box::new(plugin), InstDesc { id: id.into(), name: id.into() }))

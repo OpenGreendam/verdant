@@ -209,7 +209,9 @@ impl Session {
                         let events = &self.parameter_events[..event_count];
                         // Validate the complete quantum before any native API
                         // can queue a point. Metadata discovery never runs here.
+                        let instrument = p.is_instrument();
                         for &(native_id, offset, value) in events {
+                            if instrument && verdant_plugins::proto::decode_note(native_id, value).is_some() { continue; }
                             let index = self.automation.binary_search_by_key(&native_id, |p| p.target.native_id())
                                 .map_err(|_| AutomationError::UnknownParameter)?;
                             self.automation[index].target.event(offset, value)?;

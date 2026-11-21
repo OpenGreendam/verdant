@@ -117,6 +117,50 @@ pub fn plugin_schedule(channel:&verdant_audio::automation_clock::ChannelAutomati
     if schedule.parameters.is_empty(){return Ok(None);}schedule.validate_density(256,4096).map_err(|e|e.to_string())?;Ok(Some(schedule))
 }
 
+static INSTRUMENT_HOST:std::sync::Mutex<Option<Arc<verdant_plugins::PluginClient>>>=std::sync::Mutex::new(None);
+
+/// The plug-in host instrument tracks render third-party instruments with.
+pub fn set_instrument_host(client:Option<Arc<verdant_plugins::PluginClient>>){*INSTRUMENT_HOST.lock().unwrap_or_else(|p|p.into_inner())=client;}
+fn instrument_host()->Option<Arc<verdant_plugins::PluginClient>>{INSTRUMENT_HOST.lock().unwrap_or_else(|p|p.into_inner()).clone()}
+
+/// Seconds rendered after the last note-off so instrument releases ring out.
+const INSTRUMENT_TAIL_SECONDS:f64=2.0;
+
+/// Render notes through a hosted CLAP/VST3/AU instrument, offline, at the
+/// host's rate, resampled to `rate`. Interleaved stereo.
+pub fn render_hosted(client:&verdant_plugins::PluginClient,spec:&serde_json::Value,notes:&[verdant_plugins::builtin_dsp::SynthNote],rate:u32)->Result<Vec<f32>,String>{
+    use verdant_plugins::proto::{note_off,note_on};
+    let insert:verdant_plugins::InsertSpec=serde_json::from_value(spec.clone()).map_err(|e|format!("乐器设置无效：{e}"))?;
+    let mut handle=client.offline_insert(insert).map_err(|e|e.to_string())?;
+    let host_rate=client.sample_rate();let scale=host_rate/rate as f64;
+    // Every on/off at its host-rate frame; offs sort before ons at one frame.
+    let mut events:Vec<(u64,bool,u8,f64)>=Vec::with_capacity(notes.len()*2);
+    for n in notes{
+        let key=n.pitch.round().clamp(0.,127.)as u8;let start=(n.start as f64*scale).round()as u64;let end=((n.start+n.length)as f64*scale).round()as u64;
+        events.push((start,true,key,n.velocity));events.push((end.max(start+1),false,key,0.));
+    }
+    events.sort_by(|a,b|a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    let total=events.last().map_or(0,|e|e.0)+(INSTRUMENT_TAIL_SECONDS*host_rate)as u64;
+    const BLOCK:usize=4096;
+    let (mut out_l,mut out_r)=(Vec::with_capacity(total as usize),Vec::with_capacity(total as usize));
+    let (mut l,mut r)=(vec![0f32;BLOCK],vec![0f32;BLOCK]);
+    let mut next=0;let mut position=0u64;
+    while position<total{
+        let n=((total-position)as usize).min(BLOCK);
+        l[..n].fill(0.);r[..n].fill(0.);
+        let mut block=Vec::new();
+        while next<events.len()&&events[next].0<position+n as u64{
+            let (frame,on,key,velocity)=events[next];let offset=(frame-position)as u32;
+            block.push(if on{note_on(key,offset,velocity)}else{note_off(key,offset)});next+=1;
+        }
+        handle.process_offline_events(&mut l[..n],&mut r[..n],&block).map_err(|e|e.to_string())?;
+        if l[..n].iter().chain(&r[..n]).any(|v|!v.is_finite()){return Err("乐器输出含非有限 PCM".into());}
+        out_l.extend_from_slice(&l[..n]);out_r.extend_from_slice(&r[..n]);position+=n as u64;
+    }
+    if (host_rate-rate as f64).abs()>0.5{out_l=verdant_audio::resample(&out_l,host_rate.round()as u32,rate);out_r=verdant_audio::resample(&out_r,host_rate.round()as u32,rate);}
+    Ok(out_l.iter().zip(&out_r).flat_map(|(a,b)|[*a,*b]).collect())
+}
+
 /// Render an instrument track's notes through its instrument, as one stereo
 /// clip from the first note. Playback and export share this path. Results
 /// are cached by content, so editing one track re-renders only that track.
@@ -125,7 +169,12 @@ pub fn render_instrument(track:&verdant_domain::Track,index:usize,tempo:&TempoMa
     let Some(spec)=track.instrument()else{return Ok(None)};
     let id=spec.get("id").and_then(serde_json::Value::as_str).unwrap_or_default();
     let format=spec.get("format").and_then(serde_json::Value::as_str).unwrap_or_default();
-    if format!="builtin"||id!=SYNTH_ID{return Err(format!("轨道 {} 的乐器 {} 尚不能在此版本中发声",track.name,spec.get("name").and_then(serde_json::Value::as_str).unwrap_or(id)));}
+    let hosted=!(format=="builtin"&&id==SYNTH_ID);
+    let host=if hosted{
+        let name=spec.get("name").and_then(serde_json::Value::as_str).unwrap_or(id);
+        if !matches!(format,"clap"|"vst3"|"au"){return Err(format!("轨道 {} 的乐器 {name} 格式未知",track.name));}
+        Some(instrument_host().ok_or_else(||format!("轨道 {} 的乐器 {name} 需要插件宿主，但宿主不可用",track.name))?)
+    }else{None};
     if index>=verdant_audio::MAX_TRACKS{return Ok(None);}
     let params=SynthParams::from_json(spec.get("params"));
     let notes:Vec<SynthNote>=track.notes.iter().filter(|n|!n.is_muted()&&n.duration_tick>0).map(|n|{
@@ -135,13 +184,16 @@ pub fn render_instrument(track:&verdant_domain::Track,index:usize,tempo:&TempoMa
     let Some(first)=notes.iter().map(|n|n.start).min()else{return Ok(None)};
     let shifted:Vec<SynthNote>=notes.iter().map(|n|SynthNote{start:n.start-first,..*n}).collect();
     let key={use std::hash::{Hash,Hasher};let mut h=std::collections::hash_map::DefaultHasher::new();
-        serde_json::to_string(&params.to_json()).unwrap_or_default().hash(&mut h);rate.hash(&mut h);
+        serde_json::to_string(spec).unwrap_or_default().hash(&mut h);rate.hash(&mut h);
         for n in &shifted{n.start.hash(&mut h);n.length.hash(&mut h);n.pitch.to_bits().hash(&mut h);}h.finish()};
     static CACHE:std::sync::OnceLock<std::sync::Mutex<HashMap<u64,Arc<[f32]>>>>=std::sync::OnceLock::new();
     let cache=CACHE.get_or_init(Default::default);
     let cached=cache.lock().unwrap_or_else(|p|p.into_inner()).get(&key).cloned();
     let samples=match cached{Some(pcm)=>pcm,None=>{
-        let pcm:Arc<[f32]>=render(&params,&shifted,rate as f64).into();
+        let pcm:Arc<[f32]>=match &host{
+            Some(client)=>render_hosted(client,spec,&shifted,rate).map_err(|e|format!("轨道 {} 的乐器：{e}",track.name))?.into(),
+            None=>render(&params,&shifted,rate as f64).into(),
+        };
         let mut map=cache.lock().unwrap_or_else(|p|p.into_inner());if map.len()>=64{map.clear();}map.insert(key,pcm.clone());pcm
     }};
     Ok(Some(StereoClip{start:first,samples,gain:1.0,pan:0.0,track:index as u16}))
@@ -449,5 +501,37 @@ mod tests{
         // An instrument this build cannot play is a located error, not silence.
         project.tracks[0].unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),serde_json::json!({"format":"vst3","id":"x","name":"Foreign"}));
         assert!(prepare_timeline(&project,&[],AssetPolicy::new(Vec::<std::path::PathBuf>::new()).unwrap(),RATE,PhrasePcmCache::default(),None).err().unwrap().contains("Foreign"));
+    }
+
+    #[test]
+    #[ignore = "requires a built verdant-plughost and the verdant-test-clap-instrument bundle"]
+    fn a_hosted_clap_instrument_plays_track_notes(){
+        use verdant_plugins::{PluginClient,PluginClientOpts};
+        let host=std::path::PathBuf::from(std::env::var_os("VERDANT_PLUGIN_HOST").expect("VERDANT_PLUGIN_HOST"));
+        let bundle=std::path::PathBuf::from(std::env::var_os("VERDANT_TEST_CLAP_INSTRUMENT").expect("VERDANT_TEST_CLAP_INSTRUMENT"));
+        let cache=std::env::temp_dir().join(format!("verdant-instrument-{}",uuid::Uuid::new_v4()));
+        let client=PluginClient::with_plughost(PluginClientOpts{plughost_path:Some(host.clone()),cache_dir:cache,sample_rate:48_000.,max_frames:8192},host).unwrap();
+        let report=client.scan_file(&bundle).unwrap();
+        assert_eq!(report.error,None);
+        let desc=&report.plugins[0];
+        set_instrument_host(Some(client));
+        let mut project=Project::new_empty();
+        let mut track=Track::new("乐器","#3584e4");
+        track.notes.push(Note::new(0,480,69));track.notes.push(Note::new(960,480,81));track.refresh_index();
+        track.unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),serde_json::json!({"format":"clap","id":desc.id,"name":desc.name,"path":bundle.to_string_lossy()}));
+        project.tracks=vec![track];
+        let prepared=prepare_timeline(&project,&[],AssetPolicy::new(Vec::<std::path::PathBuf>::new()).unwrap(),RATE,PhrasePcmCache::default(),None).unwrap();
+        set_instrument_host(None);
+        assert_eq!(prepared.instrument_count,1);
+        let pcm=&prepared.timeline.stereo_clips[0].samples;
+        let tempo=TempoMap::new(&project.tempo_map,project.ppq).unwrap();
+        let (first_end,second)=(tempo.sample_at(480,RATE)as usize,tempo.sample_at(960,RATE)as usize);
+        // A440 for the first note: count rising zero crossings over 0.1 s.
+        let left:Vec<f32>=pcm.chunks(2).map(|f|f[0]).collect();
+        let crossings=left[100..4_900].windows(2).filter(|w|w[0]<0.&&w[1]>=0.).count();
+        assert!((crossings as i64-44).abs()<=1,"{crossings} crossings");
+        assert!(left[first_end+10..second-10].iter().all(|v|v.abs()<1e-6),"silent between the notes");
+        let crossings=left[second+100..second+4_900].windows(2).filter(|w|w[0]<0.&&w[1]>=0.).count();
+        assert!((crossings as i64-88).abs()<=1,"A5 for the second note: {crossings}");
     }
 }

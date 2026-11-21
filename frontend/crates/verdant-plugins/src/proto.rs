@@ -122,6 +122,27 @@ pub struct AutomationParam {
 /// Validate the whole call, including events already accumulated in a partial
 /// quantum. This bounded pass makes capacity failures atomic with respect to
 /// publication. No allocation, sorting, locking or parameter IPC occurs here.
+/// Note events travel in the same per-quantum event list as parameter
+/// points: the top bit of the id marks a note, bit 8 marks note-on and the
+/// low seven bits are the MIDI key; the value is the velocity (0…1). Only
+/// instrument instances accept them.
+pub const NOTE_EVENT: u32 = 1 << 31;
+const NOTE_ON: u32 = 1 << 8;
+
+/// A decoded note event.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum NoteEvent { On { key: u8, velocity: f64 }, Off { key: u8 } }
+
+pub fn note_on(key: u8, offset: u32, velocity: f64) -> ParamEvent { (NOTE_EVENT | NOTE_ON | (key & 0x7f) as u32, offset, velocity.clamp(0.0, 1.0)) }
+pub fn note_off(key: u8, offset: u32) -> ParamEvent { (NOTE_EVENT | (key & 0x7f) as u32, offset, 0.0) }
+
+/// `None` for a parameter event.
+pub fn decode_note(id: u32, value: f64) -> Option<NoteEvent> {
+    if id & NOTE_EVENT == 0 { return None; }
+    let key = (id & 0x7f) as u8;
+    Some(if id & NOTE_ON != 0 { NoteEvent::On { key, velocity: value } } else { NoteEvent::Off { key } })
+}
+
 pub(crate) fn validate_event_quanta(events: &[ParamEvent], frames: usize,
     quantum: usize, carry_frames: usize, carry_events: usize) -> Result<(), AutomationError> {
     if quantum == 0 || carry_frames >= quantum || carry_events > MAX_PARAM_EVENTS {
