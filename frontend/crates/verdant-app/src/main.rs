@@ -10,6 +10,7 @@
 //! packages are user-provided. The desktop launches the Rust worker directly.
 
 mod actions;
+mod alert;
 mod arrange;
 mod auditions;
 mod assets;
@@ -266,6 +267,9 @@ fn main() {
     let explicit = args.project;
 
     application().with_assets(assets::Assets).run(move |cx: &mut App| {
+        // macOS and Windows keep their native alerts.
+        #[cfg(not(any(target_os = "macos", windows)))]
+        alert::install(cx);
         actions::bind(cx);
         cx.set_menus(actions::menus());
         crate::disclosures::i18n::initialize(&startup.prefs, cx);

@@ -1907,6 +1907,7 @@ impl Render for Editor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.theme = Theme::resolve_appearance(window.appearance(), self.appearance_override, &self.prefs)
             .with_pride(self.theme.pride);
+        crate::alert::remember_theme(self.theme);
         let chrome = crate::window_chrome::ChromeState::read(window);
         if chrome != self.window_chrome {
             self.window_chrome = chrome;
