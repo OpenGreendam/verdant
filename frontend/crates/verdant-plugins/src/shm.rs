@@ -613,6 +613,15 @@ impl Channel {
 }
 
 #[cfg(unix)]
+fn posix_shm_name(id: uuid::Uuid) -> std::ffi::CString {
+    use base64::Engine as _;
+    // Darwin permits 31 name bytes, excluding NUL. Unpadded URL-safe base64
+    // retains all 16 UUID bytes in a 27-byte name, with no interior slash.
+    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(id.as_bytes());
+    std::ffi::CString::new(format!("/vdt-{token}")).expect("base64 UUID has no NUL")
+}
+
+#[cfg(unix)]
 mod imp {
     use super::*;
 
@@ -630,8 +639,7 @@ mod imp {
     }
 
     pub fn map_new(len: usize) -> Result<(*mut u8, RingImp)> {
-        let name = format!("/verdant-ph-{}", uuid::Uuid::new_v4().as_simple());
-        let cname = std::ffi::CString::new(name).unwrap();
+        let cname = posix_shm_name(uuid::Uuid::new_v4());
         unsafe {
             let fd = libc::shm_open(
                 cname.as_ptr(),
@@ -1131,6 +1139,20 @@ pub(crate) fn channel(max_frames: usize) -> Result<Channel> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn posix_shm_name_fits_darwin_and_preserves_uuid() {
+        use base64::Engine as _;
+        for byte in [0, 0xff, 0xfb] {
+            let id = uuid::Uuid::from_bytes([byte; 16]);
+            let name = posix_shm_name(id);
+            assert!(name.as_bytes().len() <= 31, "Darwin PSHMNAMLEN includes the leading slash");
+            let token = name.to_str().unwrap().strip_prefix("/vdt-").unwrap();
+            assert!(token.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')));
+            assert_eq!(base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(token).unwrap(), id.as_bytes());
+        }
+    }
 
     #[test]
     fn header_layout() {
