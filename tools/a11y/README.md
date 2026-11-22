@@ -109,9 +109,11 @@ to the exact observed accessible frame name. If that name is empty or is
 shared, `--window-reference BUS PATH` selects the exact frame reference from
 the current session's snapshot. References from a terminated run must not be
 reused. Ambiguous interaction targets fail rather than selecting the first
-matching name. This multiple-window addition has only had local syntax/helper
-validation; its native-window OS cases remain unexecuted after remote quota
-exhaustion, as recorded in `tools/native-input/README.md`.
+matching name. This multiple-window selection was exercised by the complete
+22-case X11/windowed-Wayland CI run `45026004598`, including the actual native
+editor's Close action, reopen/edit and preset-menu cancellation. See
+`tools/native-input/README.md` for the exact tested checkout and binary hashes,
+the retained initial selector/discovery failures and the final observations.
 
 ```sh
 python3 tools/a11y/observe-atspi.py --app verdant --name Cutoff --focus \
