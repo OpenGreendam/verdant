@@ -37,11 +37,14 @@ pub(crate) struct NativePluginWindow {
     focus: FocusHandle,
     generic: bool,
     held_notes: std::collections::BTreeSet<u8>,
+    pending_notes: std::collections::BTreeSet<u8>,
     preview_started: bool,
 }
 
 impl NativePluginWindow {
     fn note(&mut self, note: u8, pressed: bool, cx: &mut gpui::App) {
+        // A release before the deferred first press cancels that press.
+        if !pressed { self.pending_notes.remove(&note); }
         let changed = if pressed { self.held_notes.insert(note) } else { self.held_notes.remove(&note) };
         if !changed { return; }
         let DeviceTarget::Track(track) = &self.target else { return; };
@@ -55,6 +58,7 @@ impl NativePluginWindow {
         });
     }
     fn release_notes(&mut self, cx: &mut gpui::App) {
+        self.pending_notes.clear();
         let held: Vec<_> = self.held_notes.iter().copied().collect();
         let had_preview = std::mem::take(&mut self.preview_started);
         for key in held { self.note(key, false, cx); }
@@ -194,7 +198,7 @@ impl Editor {
                             });
                         });
                     }).detach();
-                    let view = NativePluginWindow { editor: observed.downgrade(), project, generation, target, binding, focus, generic: false, held_notes: Default::default(), preview_started: false };
+                    let view = NativePluginWindow { editor: observed.downgrade(), project, generation, target, binding, focus, generic: false, held_notes: Default::default(), pending_notes: Default::default(), preview_started: false };
                     view.spawn_signal_poll(cx);
                     view
                 })
@@ -298,6 +302,7 @@ impl Render for NativePluginWindow {
             let button = |id: &'static str, label: &'static str| div().id(id).role(Role::Button)
                 .aria_label(label).cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
                 .bg(th.control).hover(move |s| s.bg(th.hover)).text_size(px(14.)).child(label);
+            let key_editor = editor_entity.clone();
             let mut root = div().id("builtin-native-editor").role(Role::Group)
                 .aria_label(format!("{name} 原生编辑器")).size_full().relative()
                 .bg(th.view).text_color(th.text).font_family(ed.ui_font.clone())
@@ -307,25 +312,45 @@ impl Render for NativePluginWindow {
                         note_up.update(cx, |view, cx| { view.note(note, false, cx); cx.notify(); });
                     } }
                 })
-                .on_key_down(cx.listener(move |ed, event: &KeyDownEvent, window, cx| {
+                // Some X11 backends report auto-repeat with is_held=false.
+                // De-duplicate physical note presses before any Editor update,
+                // deferred work or notification, including the first-press gap.
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
                     let key = event.keystroke.key.as_str();
-                    if instrument_window && ed.menu.is_none() && !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt {
+                    if instrument_window && !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt
+                        && key_editor.read(cx).menu.is_none() {
                         if let Some(note) = typing_note(key) {
-                            if !event.is_held { let entity = note_down.clone(); cx.defer(move |cx| entity.update(cx, |view, cx| { view.note(note, true, cx); cx.notify(); })); }
+                            let already_down = { let view = note_down.read(cx); view.held_notes.contains(&note) || view.pending_notes.contains(&note) };
+                            if !already_down {
+                                let reserved = note_down.update(cx, |view, _| reserve_note_press(&view.held_notes, &mut view.pending_notes, note));
+                                if reserved {
+                                    let entity = note_down.downgrade();
+                                    cx.defer(move |cx| {
+                                        let Some(entity) = entity.upgrade() else { return };
+                                        entity.update(cx, |view, cx| {
+                                            if view.pending_notes.remove(&note) { view.note(note, true, cx); cx.notify(); }
+                                        });
+                                    });
+                                }
+                            }
                             window.prevent_default(); cx.stop_propagation(); return;
                         }
                     }
                     if event.keystroke.modifiers.control || event.keystroke.modifiers.platform {
                         if key == "z" {
-                            if event.keystroke.modifiers.shift { ed.redo(cx); } else { ed.undo(cx); }
+                            key_editor.update(cx, |ed, cx| {
+                                if event.keystroke.modifiers.shift { ed.redo(cx); } else { ed.undo(cx); }
+                            });
                             window.prevent_default(); cx.stop_propagation();
                         }
                     } else if key == "escape" {
-                        ed.cancel_device_drag_in(window.window_handle(), cx);
-                        if ed.menu.is_some() { ed.close_menu(window, cx); }
+                        key_editor.update(cx, |ed, cx| {
+                            ed.cancel_device_drag_in(window.window_handle(), cx);
+                            if ed.menu.is_some() { ed.close_menu(window, cx); }
+                        });
                         cx.stop_propagation();
                     }
-                }))
+                })
                 .child(div().flex_none().min_h(px(56.)).py(px(6.)).px(px(16.)).flex().flex_wrap().items_center().gap(px(10.))
                     .bg(th.headerbar).border_b_1().border_color(th.shade)
                     .child(div().flex_1().min_w_0().flex().flex_col()
@@ -390,6 +415,12 @@ impl Render for NativePluginWindow {
     }
 }
 
+/// Reserve the first key event before deferral. Repeated KeyPress events may
+/// all have is_held=false; the window's actual press state is authoritative.
+fn reserve_note_press(held: &std::collections::BTreeSet<u8>, pending: &mut std::collections::BTreeSet<u8>, note: u8) -> bool {
+    !held.contains(&note) && pending.insert(note)
+}
+
 fn typing_note(key: &str) -> Option<u8> {
     ["a", "w", "s", "e", "d", "f", "t", "g", "y", "h", "u", "j", "k"].iter().position(|&s| s == key).map(|i| 60 + i as u8)
 }
@@ -424,6 +455,34 @@ fn performance_keyboard(view: &gpui::Entity<NativePluginWindow>, held: &std::col
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn repeated_keypresses_without_held_flag_schedule_only_one_note() {
+        let mut held = std::collections::BTreeSet::new();
+        let mut pending = std::collections::BTreeSet::new();
+        let key = typing_note("a").unwrap();
+        assert!(reserve_note_press(&held, &mut pending, key));
+        for _ in 0..100 { assert!(!reserve_note_press(&held, &mut pending, key)); }
+        assert!(pending.remove(&key)); held.insert(key);
+        for _ in 0..100 { assert!(!reserve_note_press(&held, &mut pending, key)); }
+        held.remove(&key);
+        assert!(reserve_note_press(&held, &mut pending, key), "a new physical press is allowed after release");
+    }
+
+    #[test]
+    fn early_key_release_or_blur_cancels_the_deferred_note() {
+        let held = std::collections::BTreeSet::new();
+        let mut pending = std::collections::BTreeSet::new();
+        let first = typing_note("a").unwrap(); let second = typing_note("s").unwrap();
+        assert!(reserve_note_press(&held, &mut pending, first));
+        pending.remove(&first); // key-up before the deferred first press
+        assert!(!pending.remove(&first), "the deferred callback must not start a released note");
+        assert!(reserve_note_press(&held, &mut pending, first));
+        assert!(reserve_note_press(&held, &mut pending, second));
+        pending.clear(); // focus loss or window closure
+        assert!(!pending.remove(&first)); assert!(!pending.remove(&second));
+        assert!(reserve_note_press(&held, &mut pending, second));
+    }
+
     #[test]
     fn editor_follows_instance_after_reorder_and_cannot_alias_replacement() {
         let a = InsertSpec::new("builtin", "verdant.builtin.eq", "EQ", "");
