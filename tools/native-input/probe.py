@@ -738,10 +738,12 @@ class Probe:
         if drag_base != before:
             raise RuntimeError("Opening the native editor changed the saved project")
         self.record("native-preset-preview")
-        self.advertised_action(self.node("自定义", "combo box"))
+        # The native synth toolbar owns 预设; 自定义 belongs to the main
+        # instrument card. node() retains the observed native frame scope.
+        self.advertised_action(self.node("预设", "combo box"))
         self.wait(lambda: self.nodes("上下文菜单", "menu"), bool, "the actual native preset menu")
         self.ui_gain(before["gainDb"])
-        self.record("native-preset-menu-opened", activationRoute="advertised AT-SPI native 自定义 combobox click")
+        self.record("native-preset-menu-opened", activationRoute="advertised AT-SPI native 预设 combobox click")
         self.key("Escape")
         self.wait(lambda: self.nodes("上下文菜单", "menu"), lambda nodes: not nodes, "native preset menu dismissal")
         self.ui_gain(before["gainDb"])
