@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,6 +10,25 @@ import { setTimeout } from 'node:timers/promises';
 import { acquireProducerLock, assertOwnedInventory, publishBatch, recoverPublication } from '../lib/artifact-publication.mjs';
 
 const hash = (value) => createHash('sha256').update(value).digest('hex');
+const stateDirectory = (lock) => lstatSync(lock).isDirectory()
+  ? lock : `${lock}.state-${JSON.parse(readFileSync(lock, 'utf8')).id}`;
+const moduleUrl = new URL('../lib/artifact-publication.mjs', import.meta.url).href;
+function childProcess(t, script) {
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script]);
+  t.after(() => child.kill());
+  let output = '';
+  child.stdout.on('data', (data) => { output += data; });
+  child.stderr.on('data', (data) => { output += data; });
+  const completion = new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', (code, signal) => resolve({ code, signal, output }));
+  });
+  return { child, completion };
+}
+async function waitForFile(filename) {
+  for (let attempt = 0; !existsSync(filename) && attempt < 400; attempt += 1) await setTimeout(5);
+  assert.equal(existsSync(filename), true, `child reached ${path.basename(filename)}`);
+}
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'verdant-publication-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -64,7 +83,7 @@ test('an incomplete multi-unit replacement rolls all artifacts and receipts back
     assert.equal(readFileSync(path.join(entry.outDirectory, 'Component.rs'), 'utf8'), entry.artifacts[0].contents);
     assert.equal(readFileSync(entry.receiptPath, 'utf8'), receipts[index]);
   });
-  assert.equal(existsSync(path.join(lockDirectory, 'journal.json')), false);
+  assert.equal(existsSync(path.join(stateDirectory(lockDirectory), 'journal.json')), false);
   assert.equal(readdirSync(root).some((filename) => filename.includes('.producer-')), false);
 });
 
@@ -160,7 +179,7 @@ test('a process killed during its first staging write leaves a recoverable inven
     child.on('close', (code, signal) => resolve({ code, signal }));
   });
   assert.equal(status.signal, 'SIGKILL', errors);
-  assert.equal(existsSync(path.join(lockDirectory, 'journal.json')), true);
+  assert.equal(existsSync(path.join(stateDirectory(lockDirectory), 'journal.json')), true);
   assert.equal(recoverPublication(lockDirectory, root), true);
   assert.equal(readFileSync(path.join(original.outDirectory, 'Component.rs'), 'utf8'), 'old');
   assert.equal(readdirSync(root).some((filename) => filename.includes('.producer-')), false);
@@ -285,4 +304,240 @@ test('a late recovery cannot recreate the lock removed by an earlier recovery', 
   writeFileSync(resume, 'resume');
   await completion;
   assert.equal(existsSync(lockDirectory), false);
+});
+
+for (const stage of ['partial owner', 'published owner']) {
+  test(`SIGKILL during ${stage} initialization never exposes an incomplete active lock`, { timeout: 10000 }, async (t) => {
+    const { root, lockDirectory, unit, options, release } = fixture(t);
+    const original = unit('one', 'original before owner initialization');
+    publishBatch([original], options);
+    release();
+    const script = `import fs from 'node:fs'; import path from 'node:path'; import {syncBuiltinESMExports} from 'node:module';
+      const open=fs.openSync, write=fs.writeFileSync, link=fs.linkSync, paths=new Map();
+      fs.openSync=function(file,...args){const fd=open.call(this,file,...args);paths.set(fd,String(file));return fd;};
+      fs.writeFileSync=function(file,...args){
+        if (${JSON.stringify(stage)}==='partial owner' && path.basename(paths.get(file)??String(file))==='owner.json') {
+          write.call(this,file,'{');process.kill(process.pid,'SIGKILL');
+        }
+        return write.call(this,file,...args);
+      };
+      fs.linkSync=function(source,target){const result=link.call(this,source,target);
+        if (${JSON.stringify(stage)}==='published owner' && String(target)===${JSON.stringify(lockDirectory)}) process.kill(process.pid,'SIGKILL');
+        return result;
+      };
+      syncBuiltinESMExports();
+      const {acquireProducerLock}=await import(${JSON.stringify(moduleUrl)});
+      acquireProducerLock(${JSON.stringify(lockDirectory)},${JSON.stringify(root)});`;
+    const status = await childProcess(t, script).completion;
+    assert.equal(status.signal, 'SIGKILL', status.output);
+    assert.equal(readFileSync(path.join(original.outDirectory, 'Component.rs'), 'utf8'), original.artifacts[0].contents);
+    if (stage === 'partial owner') {
+      assert.equal(existsSync(lockDirectory), false, 'partial owner bytes have never become the public lock');
+      const orphan = readdirSync(root).filter((name) => name.startsWith('.producer.lock.state-'));
+      assert.equal(orphan.length, 1);
+      const privateOwner = path.join(root, orphan[0], 'owner.json');
+      assert.equal(readFileSync(privateOwner, 'utf8'), '{');
+      assert.equal(recoverPublication(lockDirectory, root), false);
+      const nextRelease = acquireProducerLock(lockDirectory, root);
+      nextRelease();
+      assert.equal(readFileSync(privateOwner, 'utf8'), '{', 'unpublished private candidates are not guessed away');
+    } else {
+      const owner = JSON.parse(readFileSync(lockDirectory, 'utf8'));
+      assert.equal(owner.schema, 'verdant.proto-ui.producer-lock.v2');
+      assert.equal(readFileSync(path.join(stateDirectory(lockDirectory), 'owner.json'), 'utf8'), readFileSync(lockDirectory, 'utf8'));
+      assert.equal(recoverPublication(lockDirectory, root), true);
+      assert.equal(readdirSync(root).some((name) => name.startsWith('.producer.lock.state-')), false);
+    }
+    assert.equal(existsSync(lockDirectory), false);
+  });
+}
+
+for (const stage of ['partial journal', 'published journal']) {
+  test(`SIGKILL during ${stage} initialization preserves a recoverable publication`, { timeout: 10000 }, async (t) => {
+    const { root, lockDirectory, unit, options, release } = fixture(t);
+    const original = unit('one', 'original before journal initialization');
+    publishBatch([original], options);
+    const originalReceipt = readFileSync(original.receiptPath, 'utf8');
+    release();
+    const replacement = unit('one', 'replacement must not become visible');
+    const script = `import fs from 'node:fs'; import path from 'node:path'; import {syncBuiltinESMExports} from 'node:module';
+      const open=fs.openSync, write=fs.writeFileSync, link=fs.linkSync, paths=new Map();
+      fs.openSync=function(file,...args){const fd=open.call(this,file,...args);paths.set(fd,String(file));return fd;};
+      fs.writeFileSync=function(file,...args){
+        if (${JSON.stringify(stage)}==='partial journal' && ['journal.initial.json','journal.json'].includes(path.basename(paths.get(file)??String(file)))) {
+          write.call(this,file,'{');process.kill(process.pid,'SIGKILL');
+        }
+        return write.call(this,file,...args);
+      };
+      fs.linkSync=function(source,target){const result=link.call(this,source,target);
+        if (${JSON.stringify(stage)}==='published journal' && path.basename(String(target))==='journal.json') process.kill(process.pid,'SIGKILL');
+        return result;
+      };
+      syncBuiltinESMExports();
+      const {acquireProducerLock,publishBatch}=await import(${JSON.stringify(moduleUrl)});
+      acquireProducerLock(${JSON.stringify(lockDirectory)},${JSON.stringify(root)});
+      publishBatch([${JSON.stringify(replacement)}],${JSON.stringify(options)});`;
+    const status = await childProcess(t, script).completion;
+    assert.equal(status.signal, 'SIGKILL', status.output);
+    const directory = stateDirectory(lockDirectory);
+    const journal = path.join(directory, 'journal.json');
+    if (stage === 'partial journal') {
+      assert.equal(existsSync(journal), false, 'partial bytes never replace the recoverable journal');
+      assert.equal(readFileSync(path.join(directory, 'journal.initial.json'), 'utf8'), '{');
+    } else {
+      const record = JSON.parse(readFileSync(journal, 'utf8'));
+      assert.equal(record.replacements.length, 2);
+      assert.equal(record.committed, false);
+    }
+    assert.equal(readFileSync(path.join(original.outDirectory, 'Component.rs'), 'utf8'), original.artifacts[0].contents);
+    assert.equal(readFileSync(original.receiptPath, 'utf8'), originalReceipt);
+    assert.equal(recoverPublication(lockDirectory, root), true);
+    assert.equal(readFileSync(path.join(original.outDirectory, 'Component.rs'), 'utf8'), original.artifacts[0].contents);
+    assert.equal(readFileSync(original.receiptPath, 'utf8'), originalReceipt);
+    assert.equal(existsSync(lockDirectory), false);
+    assert.equal(existsSync(directory), false);
+  });
+}
+
+test('simultaneous acquire publishes exactly one complete owner', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, release } = fixture(t);
+  release();
+  const go = path.join(root, 'acquire-go'), finish = path.join(root, 'acquire-finish');
+  const children = [1, 2].map((id) => {
+    const ready = path.join(root, `acquire-ready-${id}`);
+    const won = path.join(root, `acquire-won-${id}`), lost = path.join(root, `acquire-lost-${id}`);
+    const script = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+      const link=fs.linkSync;
+      fs.linkSync=function(source,target){
+        if (String(target)===${JSON.stringify(lockDirectory)}) {
+          fs.writeFileSync(${JSON.stringify(ready)},'ready');
+          while(!fs.existsSync(${JSON.stringify(go)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);
+        }
+        return link.call(this,source,target);
+      };
+      syncBuiltinESMExports();
+      const {acquireProducerLock}=await import(${JSON.stringify(moduleUrl)});
+      try {
+        const release=acquireProducerLock(${JSON.stringify(lockDirectory)},${JSON.stringify(root)});
+        fs.writeFileSync(${JSON.stringify(won)},String(process.pid));
+        while(!fs.existsSync(${JSON.stringify(finish)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);
+        release();release();
+      } catch(error) {
+        if(!error.message.includes('producer is locked')) throw error;
+        fs.writeFileSync(${JSON.stringify(lost)},'locked');
+      }`;
+    return { ...childProcess(t, script), ready, won, lost };
+  });
+  await Promise.all(children.map(({ ready }) => waitForFile(ready)));
+  writeFileSync(go, 'go');
+  for (let attempt = 0; children.some(({ won, lost }) => !existsSync(won) && !existsSync(lost)) && attempt < 400; attempt += 1) await setTimeout(5);
+  const winners = children.filter(({ won }) => existsSync(won));
+  assert.equal(winners.length, 1);
+  assert.equal(children.filter(({ lost }) => existsSync(lost)).length, 1);
+  assert.equal(JSON.parse(readFileSync(lockDirectory, 'utf8')).pid, Number(readFileSync(winners[0].won, 'utf8')));
+  assert.equal(readdirSync(root).filter((name) => name.startsWith('.producer.lock.state-')).length, 1, 'loser removes only its own unpublished candidate');
+  writeFileSync(finish, 'finish');
+  for (const child of children) {
+    const result = await child.completion;
+    assert.equal(result.code, 0, result.output);
+  }
+  assert.equal(existsSync(lockDirectory), false);
+});
+
+test('an old release is idempotent and cannot remove a later owner', (t) => {
+  const { lockDirectory, root, release } = fixture(t);
+  release();
+  const nextRelease = acquireProducerLock(lockDirectory, root);
+  const nextOwner = readFileSync(lockDirectory, 'utf8');
+  release();
+  assert.equal(readFileSync(lockDirectory, 'utf8'), nextOwner);
+  nextRelease();
+  nextRelease();
+  assert.equal(existsSync(lockDirectory), false);
+});
+
+test('a late file-lock recovery cannot remove a new producer at the same public path', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, release } = fixture(t);
+  release();
+  const owner = childProcess(t, `import {acquireProducerLock} from ${JSON.stringify(moduleUrl)};
+    acquireProducerLock(${JSON.stringify(lockDirectory)},${JSON.stringify(root)});process.kill(process.pid,'SIGKILL');`);
+  assert.equal((await owner.completion).signal, 'SIGKILL');
+  const claims = path.join(stateDirectory(lockDirectory), 'recovery-claims');
+  const ready = path.join(root, 'file-recovery-ready'), resume = path.join(root, 'file-recovery-resume');
+  const script = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+    const mkdir=fs.mkdirSync;
+    fs.mkdirSync=function(filename,...args){
+      if(String(filename)===${JSON.stringify(claims)}) {
+        fs.writeFileSync(${JSON.stringify(ready)},'ready');
+        while(!fs.existsSync(${JSON.stringify(resume)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);
+      }
+      return mkdir.call(this,filename,...args);
+    };
+    syncBuiltinESMExports();
+    const {recoverPublication}=await import(${JSON.stringify(moduleUrl)});
+    if(recoverPublication(${JSON.stringify(lockDirectory)},${JSON.stringify(root)})!==false) throw new Error('obsolete recovery must be a no-op');`;
+  const late = childProcess(t, script);
+  await waitForFile(ready);
+  assert.equal(recoverPublication(lockDirectory, root), true);
+  const nextRelease = acquireProducerLock(lockDirectory, root);
+  const nextOwner = readFileSync(lockDirectory, 'utf8');
+  writeFileSync(resume, 'resume');
+  const status = await late.completion;
+  assert.equal(status.code, 0, status.output);
+  assert.equal(readFileSync(lockDirectory, 'utf8'), nextOwner);
+  nextRelease();
+});
+
+test('legacy recovery can hand its public path to a new file lock before returning', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, release } = fixture(t);
+  release();
+  mkdirSync(lockDirectory);
+  writeFileSync(path.join(lockDirectory, 'owner.json'), JSON.stringify({ pid: 2147483647, host: os.hostname() }));
+  const ready = path.join(root, 'legacy-handoff-ready'), resume = path.join(root, 'legacy-handoff-resume');
+  const script = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+    const remove=fs.rmSync;
+    fs.rmSync=function(filename,...args){
+      const result=remove.call(this,filename,...args);
+      if(String(filename)===${JSON.stringify(lockDirectory)}) {
+        fs.writeFileSync(${JSON.stringify(ready)},'ready');
+        while(!fs.existsSync(${JSON.stringify(resume)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);
+      }
+      return result;
+    };
+    syncBuiltinESMExports();
+    const {recoverPublication}=await import(${JSON.stringify(moduleUrl)});
+    if(recoverPublication(${JSON.stringify(lockDirectory)},${JSON.stringify(root)})!==true) throw new Error('completed recovery must succeed');`;
+  const recovery = childProcess(t, script);
+  await waitForFile(ready);
+  const nextRelease = acquireProducerLock(lockDirectory, root);
+  const nextOwner = readFileSync(lockDirectory, 'utf8');
+  writeFileSync(resume, 'resume');
+  const status = await recovery.completion;
+  assert.equal(status.code, 0, status.output);
+  assert.equal(readFileSync(lockDirectory, 'utf8'), nextOwner, 'the legacy release marker cannot touch the new public file');
+  nextRelease();
+});
+
+test('unknown legacy locks, forged state identities and extra private files remain intact', (t) => {
+  const { root, lockDirectory, release } = fixture(t);
+  release();
+  mkdirSync(lockDirectory);
+  assert.throws(() => acquireProducerLock(lockDirectory, root), /producer is locked/);
+  assert.throws(() => recoverPublication(lockDirectory, root), /ENOENT/);
+  assert.equal(lstatSync(lockDirectory).isDirectory(), true);
+  rmSync(lockDirectory, { recursive: true }); // Remove only this test's known empty fixture.
+  const forged = JSON.stringify({ schema: 'verdant.proto-ui.producer-lock.v2', pid: 2147483647, host: os.hostname(), id: '../outside' });
+  writeFileSync(lockDirectory, forged);
+  assert.throws(() => acquireProducerLock(lockDirectory, root), /producer is locked/);
+  assert.throws(() => recoverPublication(lockDirectory, root), /Invalid publication lock identity/);
+  assert.equal(readFileSync(lockDirectory, 'utf8'), forged);
+  rmSync(lockDirectory);
+  const nextRelease = acquireProducerLock(lockDirectory, root);
+  const humanFile = path.join(stateDirectory(lockDirectory), 'human-notes.md');
+  writeFileSync(humanFile, 'preserve unknown content');
+  assert.throws(nextRelease, /Unknown publication lock metadata/);
+  assert.equal(readFileSync(humanFile, 'utf8'), 'preserve unknown content');
+  assert.equal(existsSync(lockDirectory), true);
+  rmSync(humanFile);
+  nextRelease();
 });
