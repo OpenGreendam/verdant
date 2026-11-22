@@ -22,9 +22,9 @@ The executed probe was SHA-256
 `f6543afcb6c192370f16603508e5a04fd3fe4ca5bca29161312ace7583e8816d`.
 
 The two native plugin window cases below and the associated multiple-window
-selection/geometry changes were added afterward. **They have not been run
-against the application.** The remote execution service exhausted its monthly
-quota before that run. Current default execution therefore has **eleven cases
+selection/geometry changes were added afterward. **The expanded suite has not
+yet completed successfully.** The remote execution service exhausted its monthly
+quota before the first expanded run. Current default execution has **eleven cases
 per backend**; the earlier 18 passes do not establish a pass for this expanded
 script or subsequent application changes. Offline tests cover frame selection,
 Weston scene parsing, recorded pointer-contact interpretation, and refusal of
@@ -34,7 +34,7 @@ incomplete, filtered or mismatched CI observations:
 python3 -B -m unittest discover -s tools/native-input -p 'test_*.py' -v
 ```
 
-These nine tests do not start GPUI, D-Bus or an operating-system window.
+These eleven tests do not start GPUI, D-Bus or an operating-system window.
 The historical result and pending expanded scope are recorded separately in
 [`NATIVE-INPUT-2026-11-22.json`](../../frontend/proto-ui/NATIVE-INPUT-2026-11-22.json).
 The replacement local environment loaded the official Debian 13 D-Bus/GI
@@ -44,6 +44,16 @@ even the private `dbus-run-session` stopped with “Failed to open socket:
 Operation not permitted”. No application OS pass is claimed for that local
 environment. The independent CI job below runs the expanded suite on its
 own Ubuntu runner, without reclassifying either environment limitation as a pass.
+
+The first CI attempt, [run 45023915036](https://github.com/OpenGreendam/verdant/actions/runs/45023915036),
+passed package/source identity checks and all nine original X11 cases. Its
+native close case stopped because the actual editor contains one **关闭** push
+button and two identically named radio choices. The selector now requires
+the push-button role inside that observed frame. Weston 13 created its output,
+but title-based discovery failed before a Wayland app started; the wrapper now
+uses that owned compositor's logged output ID and checks its actual X11
+geometry. Both failures remain recorded in the original `native-input-linux`
+artifact. The corrections have offline regressions; a complete rerun is pending.
 
 ## CI package and evidence gate
 
@@ -121,6 +131,9 @@ xdotool, Weston 13 or 14 (including its desktop shell and debug client), Lavapip
 fonts and the AT-SPI/Python dependencies described in `tools/a11y/README.md`.
 It records the actual `weston --version` and `--help` output; it does not label
 Ubuntu's Weston 13 as the Weston 14 used in the earlier remote baseline.
+Its nested X11 host ID comes from the owned compositor's actual `x11 output`
+log entry, and its observed X11 dimensions must match that entry. Missing,
+invalid or multiple output IDs fail; dimensions never select a guessed ID.
 With installed system packages, missing GSettings schemas cause a failure;
 the wrapper does not compile or change system schemas.
 
@@ -233,7 +246,7 @@ windowed exit case must contain a measured outside-window motion sample.
 | Numeric accessibility | Write `Value.CurrentValue = 0.63`, read it back, save −5.1 dB as one revision, then undo once. |
 | Numeric takeover | Write the same numeric value during a pointer preview, save before up, send another move and late up, and require no second revision or document change; undo once. |
 | Lease reuse | Perform another real drag and undo after the cancellation cases, demonstrating that a new pointer edit can start and finish. |
-| Native window close — not yet executed | Click the instrument card's **打开界面** button, drag its native window's gain while held, invoke that window's advertised **关闭** action, observe the frame disappear, send the late up, and save in the main window with identical gain/revision/hash. Reopen through the same real button, make a new 18-pixel drag, close, then save and undo once. |
+| Native window close — complete pass pending | Click the instrument card's **打开界面** button, drag its native window's gain while held, invoke that window's advertised **关闭** push-button action, observe the frame disappear, send the late up, and save in the main window with identical gain/revision/hash. Reopen through the same real button, make a new 18-pixel drag, close, then save and undo once. |
 | Native preset menu — not yet executed | Open the native window, hold a gain preview, invoke its **自定义** combobox's advertised click, observe **上下文菜单** and the restored gain, dismiss with Escape while still held, then release, close and verify the main saved document is unchanged. |
 
 The fixture's native editor is opened through the actual instrument card,
