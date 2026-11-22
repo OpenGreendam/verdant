@@ -1,0 +1,43 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "analysis.eq-fit",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "max_bands": {
+        "maximum": 24,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "points": {
+        "description": "Frequency (Hz), response (dB) pairs.",
+        "items": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 20000,
+              "minimum": 20,
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        },
+        "maxItems": 65536,
+        "minItems": 2,
+        "type": "array"
+      },
+      "sample_rate": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "points"
+    ],
+    "type": "object"
+  }
+}

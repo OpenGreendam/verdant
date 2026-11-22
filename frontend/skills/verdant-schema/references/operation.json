@@ -1,0 +1,13 @@
+{
+  "op": "schema",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "op": {
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

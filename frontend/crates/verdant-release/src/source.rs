@@ -14,7 +14,11 @@ pub(crate) const REQUIRED: &[&str] = &[
     "LICENSE", "NOTICE.md", "README.md", "RELEASE.md", "SPEC.md", "TODO.md",
     "frontend/Cargo.toml", "frontend/Cargo.lock", "frontend/rust-toolchain.toml", "frontend/Dockerfile",
     "frontend/crates/verdant-release/Cargo.toml", "frontend/crates/verdant-release/src/main.rs",
-    "frontend/crates/verdant-cli/Cargo.toml", "frontend/crates/verdant-voice/Cargo.toml",
+    "frontend/crates/verdant-cli/Cargo.toml", "frontend/crates/verdant-cli/src/lib.rs",
+    "frontend/crates/verdant-launcher/Cargo.toml", "frontend/crates/verdant-launcher/src/lib.rs",
+    "frontend/crates/verdant-launcher/src/main.rs", "frontend/crates/verdant-agent-skills/Cargo.toml",
+    "frontend/crates/verdant-agent-skills/src/lib.rs", "frontend/skills/manifest.json",
+    "frontend/crates/verdant-voice/Cargo.toml",
     "backend/worker-request.schema.json", "plugins/dsh/package.json", "plugins/dsh/src/index.ts",
     "plugins/dsh/tsconfig.json", "plugins/dsh/cordis.patch.yml",
 ];
@@ -86,7 +90,7 @@ fn source_kind(path: &str) -> bool {
         || name.starts_with("LICENSE-")
         || Path::new(path).extension().and_then(|s| s.to_str()).is_some_and(|ext| matches!(ext,
             "rs" | "toml" | "lock" | "json" | "md" | "txt" | "html" | "css" | "js" | "mjs" | "ts"
-            | "sh" | "ps1" | "cmd" | "bat" | "sha256" | "verp" | "ufdata" | "vsqx" | "desktop"
+            | "py" | "sh" | "ps1" | "cmd" | "bat" | "sha256" | "verp" | "ufdata" | "vsqx" | "desktop"
             | "xml" | "yml" | "yaml" | "svg" | "csv" | "map" | "c" | "cc" | "cpp" | "h" | "hpp" | "m" | "mm"))
 }
 

@@ -1,0 +1,27 @@
+{
+  "op": "voice.install",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "artifact_policy": {
+        "type": "string"
+      },
+      "artifact_policy_sha256": {
+        "type": "string"
+      },
+      "package": {
+        "type": "string"
+      },
+      "registry": {
+        "type": "string"
+      },
+      "set_default": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "package"
+    ],
+    "type": "object"
+  }
+}

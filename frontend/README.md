@@ -1,31 +1,31 @@
-# verdant(1) — 桌面歌声编辑器
+# verdant gui — 桌面歌声编辑器
 
 ## 用法
 
 ```text
-verdant [工程.verp | --import FILE] [选项]
-verdant --help
-verdant --runtime-features
+verdant gui [工程.verp | --import FILE] [选项]
+verdant gui --help
+verdant gui --check --json
 ```
 
-在卷帘编辑音符、歌词、读音与表达，经真实 Rust worker 合成后播放或导出 WAV。不指定文件时打开本账户的未命名工作副本；无已有工作副本时使用试听目录或诊断示例。
+在卷帘编辑音符、歌词、读音与表达，经真实 Rust worker 合成后播放或导出 WAV。`verdant` 无参数只显示 CLI 帮助并退出；`verdant gui` 才打开桌面，默认启动后返回，使用 `--wait` 可等待关闭。GUI 不指定文件时打开本账户的未命名工作副本；无已有工作副本时使用试听目录或诊断示例。
 
 ## 启动与选项
 
 | 平台 | 包入口 | 基线验收范围 |
 | --- | --- | --- |
-| Linux x64 | `bin/verdant` | 已有真实本地模型、离线合成、48 kHz 和 Pride 外观记录。 |
-| Windows x64／MSVC | `bin/verdant.exe` | 打包代码已准备，原生验收待完成。 |
-| macOS Apple Silicon | `Verdant.app` 或 `Contents/MacOS/verdant` | 打包代码已准备，原生验收待完成。 |
+| Linux x64 | 包根 `verdant-launcher` 或 `bin/verdant gui` | 已有真实本地模型、离线合成、48 kHz 和 Pride 外观记录。 |
+| Windows x64／MSVC | 包根 `verdant-launcher.exe` 或 `bin/verdant.exe gui` | 打包代码已准备，原生验收待完成。 |
+| macOS Apple Silicon | `Verdant.app` 或包根 `verdant-launcher` | 打包代码已准备，原生验收待完成。 |
 
 使用包内启动入口；声库准备见 [verdant-voice](../docs/verdant-voice.md)。当前本地声库输入及正式随包声库的条件分别见[发行政策](../RELEASE.md)。
 
 ```sh
-/path/to/package/bin/verdant song.verp
-/path/to/package/bin/verdant --import source.ufdata
+/path/to/package/verdant-launcher song.verp
+/path/to/package/bin/verdant gui --import source.ufdata
 ```
 
-Windows PowerShell：`& 'C:\path\bin\verdant.exe' 'C:\songs\song.verp'`。macOS 可从 Finder 启动后打开工程，或执行 `/path/to/Verdant.app/Contents/MacOS/verdant song.verp`。
+Windows PowerShell：`& 'C:\path\verdant-launcher.exe' 'C:\songs\song.verp'`。macOS 可从 Finder 启动后打开工程，或执行 `/path/to/Verdant.app/Contents/MacOS/verdant gui song.verp`。
 
 | 选项 | 行为／默认 |
 | --- | --- |
@@ -40,11 +40,13 @@ Windows PowerShell：`& 'C:\path\bin\verdant.exe' 'C:\songs\song.verp'`。macOS 
 | `--appearance system|dark|light` | 默认跟随系统。 |
 | `--audition-dir DIR` | 覆盖 `VERDANT_AUDITION_DIR`；默认 `state/auditions`。 |
 | `--repo DIR` | 覆盖 `VERDANT_REPO` 指定工作根；平台默认见[运行配置](../backend/RUNTIME.md#文件与目录)。 |
-| `--runtime-features` | stdout 输出版本、资源目录和声库支持的 JSON 后退出。 |
+| `--runtime-features` | 传给 GUI 实体时输出桌面角色、版本、资源目录和声库支持后退出；`verdant --runtime-features` 查询 CLI。 |
 
 工具栏兼作窗口标题栏：空白处拖动移动窗口、双击最大化。macOS 保留红绿灯；Windows 与支持客户端装饰的 Linux 桌面（Wayland 或带合成器的 X11）由 Verdant 绘制最小化、最大化和关闭按钮，Linux 另可拖动窗口边缘调整大小。设置 `VERDANT_WINDOW_DECORATIONS=server` 可改用系统标题栏。
 
 ONNX 库由包布局或 `VERDANT_ONNXRUNTIME_LIBRARY` 提供。开发诊断时可逐项传入 `--worker-arg --onnxruntime-library --worker-arg /path/to/library`。来源选项、平台目录及独立 worker 参数见[运行配置](../backend/RUNTIME.md)。
+
+CLI 的 `--json`、`--events`、工作流 worker、同包 GUI 路径解析及全套技能安装见[Agent 自动化](docs/AGENT-AUTOMATION.md)。
 
 ## 工程与恢复
 

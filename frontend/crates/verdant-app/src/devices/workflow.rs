@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 pub(super) mod library;
 pub(crate) mod instances;
-mod text_field;
+pub(in crate::devices) mod text_field;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -17,6 +17,9 @@ pub(super) struct Workspace {
     pub matrix_open: bool,
     pub modulation_advanced_open: bool,
     pub sequencer_step: usize,
+    /// Local presentation only; never changes processing or parameter history.
+    pub editor_page: u8,
+    pub expanded_sections: std::collections::BTreeSet<String>,
     pub reference: Option<Reference>,
 }
 
@@ -170,6 +173,14 @@ pub(super) struct PresetFile {
     pub name: String,
     pub tags: Vec<String>,
     #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub origin_factory_id: Option<String>,
+    #[serde(default)]
     pub favorite: bool,
     pub parameters: BTreeMap<String, f64>,
 }
@@ -178,6 +189,7 @@ impl PresetFile {
     pub fn new(device: &str, name: &str, tags: &str, params: &[ParamDesc]) -> Result<Self, String> {
         let mut result = Self { format: "verdant-device-preset".into(), version: 1, device: device.into(),
             name: name.trim().into(), tags: tags.split([',', '，', ';', '；']).map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect(),
+            category: String::new(), author: String::new(), description: String::new(), origin_factory_id: None,
             favorite: false, parameters: params.iter().map(|d| (d.id.clone(), d.value)).collect() };
         result.tags.sort(); result.tags.dedup();
         result.validate(device, params)?;
@@ -188,11 +200,12 @@ impl PresetFile {
         if self.device != device { return Err(format!("预设属于 {}，当前设备为 {device}", self.device)); }
         if self.name.trim().is_empty() || self.name.chars().count() > 120 { return Err("预设名称须为 1–120 个字符".into()); }
         if self.tags.len() > 16 || self.tags.iter().any(|t| t.chars().count() > 40 || t.trim().is_empty()) { return Err("最多 16 个标签，每个最多 40 个字符".into()); }
+        if self.category.chars().count() > 80 || self.author.chars().count() > 120 || self.description.chars().count() > 2000 || self.origin_factory_id.as_ref().is_some_and(|id| id.chars().count() > 160) { return Err("预设类别、作者或说明过长".into()); }
         if self.parameters.is_empty() { return Err("预设没有参数".into()); }
         preset_values(params, &self.parameters, false).map(|_| ())
     }
     pub fn matches(&self, query: &str) -> bool {
-        let text = format!("{} {}", self.name, self.tags.join(" ")).to_lowercase();
+        let text = format!("{} {} {} {} {}", self.name, self.category, self.author, self.description, self.tags.join(" ")).to_lowercase();
         query.to_lowercase().split_whitespace().all(|word| text.contains(word))
     }
 }
@@ -260,6 +273,21 @@ mod tests {
         assert!(preset_values(&params, &BTreeMap::from([("missing".into(), 1.)]), false).is_err());
         assert!(preset_values(&params, &BTreeMap::from([("mix".into(), f64::NAN)]), false).is_err());
     }
+    #[test] fn preset_metadata_remains_compatible_with_legacy_v1_and_is_searchable() {
+        let params = descs();
+        let preset = PresetFile::new("verdant.builtin.filter", "Warm", "voice", &params).unwrap();
+        let mut old = serde_json::to_value(&preset).unwrap();
+        for key in ["category", "author", "description", "origin_factory_id", "favorite"] { old.as_object_mut().unwrap().remove(key); }
+        let mut restored: PresetFile = serde_json::from_value(old).unwrap();
+        restored.validate("verdant.builtin.filter", &params).unwrap();
+        assert!(restored.category.is_empty()); assert!(restored.origin_factory_id.is_none());
+        restored.category = "Vocal".into(); restored.author = "Verdant".into(); restored.description = "Tame harsh upper mids".into();
+        restored.origin_factory_id = Some("filter-vocal-warm".into());
+        assert!(restored.matches("vocal verdant harsh"));
+        let roundtrip: PresetFile = serde_json::from_value(serde_json::to_value(restored.clone()).unwrap()).unwrap();
+        assert_eq!(roundtrip.origin_factory_id, restored.origin_factory_id);
+        restored.description = "x".repeat(2001); assert!(restored.validate("verdant.builtin.filter", &params).is_err());
+    }
     #[test] fn comparison_migrates_old_banks_to_current_descriptors_before_commit() {
         let params = descs();
         let old = vec![("mix".into(), 70.)];
@@ -287,7 +315,7 @@ mod tests {
         assert!(take_pending_comparison(&mut states, "project/track/instance", InsertKey(12)).is_none());
     }
     #[test] fn comparison_workspace_serializes_both_confirmed_banks() {
-        let state = Workspace { comparison: Comparison { active: 1, slots: [Some(vec![("mix".into(), 10.)]), Some(vec![("mix".into(), 80.)])], pending: None }, wet_lock: true, matrix_open: false, modulation_advanced_open: false, sequencer_step: 0, reference: None };
+        let state = Workspace { comparison: Comparison { active: 1, slots: [Some(vec![("mix".into(), 10.)]), Some(vec![("mix".into(), 80.)])], pending: None }, wet_lock: true, matrix_open: false, modulation_advanced_open: false, sequencer_step: 0, reference: None, ..Default::default() };
         let restored: Workspace = serde_json::from_value(serde_json::to_value(state).unwrap()).unwrap();
         assert_eq!(restored.comparison.active, 1);
         assert_eq!(restored.comparison.slots[0].as_ref().unwrap()[0].1, 10.);

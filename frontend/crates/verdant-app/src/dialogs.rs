@@ -477,9 +477,8 @@ impl Editor {
                 let mut clips = verdant_media::read_clips(self.project().track(track).ok_or("轨道不存在")?)
                     .map_err(|e| e.to_string())?;
                 let clip = clips.iter_mut().find(|c| c.id.to_string() == *clip_id).ok_or("音频片段不存在")?;
-                clip.start_tick = (*start_tick).max(0);
-                clip.source_offset_frames = *offset_frames;
-                clip.duration_frames = *duration_frames;
+                let placement = if *start_tick == clip.start_tick { clip.tick() } else { (*start_tick).max(0) as f64 };
+                *clip = clip.trim_source(*offset_frames, *duration_frames, placement, &self.tempo()).map_err(|e| e.to_string())?;
                 // Display conversions must never rewrite untouched source values.
                 if *gain_changed {
                     clip.gain = clip_dialog_gain(*gain_db);
@@ -513,7 +512,7 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
     let th = ed.theme;
     let rate = clip.source.sample_rate.max(1);
     let offset_s = clip.source_offset_frames as f64 / rate as f64;
-    let duration_s = clip.duration_frames as f64 / rate as f64;
+    let duration_s = clip.duration_seconds();
     let gain_db = if clip.gain <= 1e-5 { -96.0 } else { (20.0 * (clip.gain as f64).log10()).clamp(-96.0, 12.0) };
     let pan_pct = (clip.pan as f64 * 100.0).clamp(-100.0, 100.0);
     let pos = ed.meter().position_at(clip.start_tick);

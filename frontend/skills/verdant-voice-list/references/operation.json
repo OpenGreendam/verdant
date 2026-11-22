@@ -1,0 +1,13 @@
+{
+  "op": "voice.list",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "registry": {
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

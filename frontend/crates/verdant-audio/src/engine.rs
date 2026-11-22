@@ -134,6 +134,8 @@ impl KeyLine {
 
 struct TimelineSwap {
     revision: u64,
+    callback_budget: u64,
+    chain_revision:u64,
     timeline: Timeline,
     keys: Vec<KeyLine>,
 }
@@ -294,6 +296,10 @@ pub struct Shared {
     pub sample_rate: AtomicU64,
     pub swaps: AtomicU64,
     pub automation_fault: AtomicBool,
+    // Device owner publishes a generation + source-frame burst before play.
+    // Unregistered headless/offline callers retain their existing behavior.
+    callback_budget: AtomicU64,
+    callback_budget_required: AtomicBool,
     monitor_reset: AtomicU64,
     timeline_revision: AtomicU64,
     pub channels: Vec<ChannelCtl>,
@@ -316,11 +322,24 @@ impl Shared {
             sample_rate: AtomicU64::new(sample_rate as u64),
             swaps: AtomicU64::new(0),
             automation_fault: AtomicBool::new(false),
+            callback_budget: AtomicU64::new(0),
+            callback_budget_required: AtomicBool::new(false),
             monitor_reset: AtomicU64::new(0),
             timeline_revision: AtomicU64::new(0),
             channels: (0..MAX_TRACKS).map(|_| ChannelCtl::default()).collect(),
             master: ChannelCtl::default(),
         })
+    }
+
+    /// Driver/control side only; the sole device worker serializes changes.
+    /// Equal bounds retain their generation and do not interrupt playback.
+    pub fn publish_callback_budget(&self,source_frames:u32)->u64{
+        assert!(source_frames>0);
+        let old=self.callback_budget.load(Ordering::Acquire);
+        if old as u32==source_frames{return old;}
+        let generation=((old>>32)as u32).wrapping_add(1).max(1);
+        let next=(u64::from(generation)<<32)|u64::from(source_frames);
+        self.callback_budget.store(next,Ordering::Release);next
     }
 
     pub fn transport(&self) -> Transport {
@@ -416,6 +435,7 @@ pub struct RtState {
     current: Option<Box<TimelineSwap>>,
     fading: Option<(Box<TimelineSwap>, u32)>,
     chains: Vec<Option<Box<ChainSwap>>>,
+    applied_chain_revision:u64,
     bus_l: Vec<Vec<f32>>,
     bus_r: Vec<Vec<f32>>,
     mix_l: Vec<f32>,
@@ -491,6 +511,7 @@ pub fn channel(sample_rate: u32, max_block: usize) -> (Control, RtState) {
             current: None,
             fading: None,
             chains: (0..MIXER_BUSES).map(|_| None).collect(),
+            applied_chain_revision:0,
             // Preallocated once, sized for the largest block the device may ask.
             bus_l: (0..MAX_TRACKS).map(|_| vec![0.0; block]).collect(),
             bus_r: (0..MAX_TRACKS).map(|_| vec![0.0; block]).collect(),
@@ -619,12 +640,25 @@ impl Control {
     /// Hand a new timeline to the callback. If the ring is momentarily full
     /// the newest timeline is kept and retried on the next `maintain()`.
     pub fn set_timeline(&mut self, t: Timeline) -> u64 {
+        self.set_timeline_for_callback_budget(t,0)
+    }
+
+    /// Enable the device/PDC handoff for a client with hosted processors.
+    /// Existing offline and engine-only clients never need to register.
+    pub fn require_callback_budget(&self){
+        self.shared.callback_budget_required.store(true,Ordering::Release);
+    }
+    pub fn callback_budget(&self)->u64{self.shared.callback_budget.load(Ordering::Acquire)}
+
+    /// A prepared graph/timeline acknowledges only the device generation it
+    /// was built against. A stale background result cannot unblock a new one.
+    pub fn set_timeline_for_callback_budget(&mut self,t:Timeline,callback_budget:u64)->u64{
         self.timeline_revision += 1;
         let start = t.loop_range.filter(|(start, end)| start < end).map_or(0, |(start, _)| start);
         self.shared.return_position.store(start, Ordering::Release);
         let keys = t.sidechains.iter().filter(|r| (r.source as usize) < MAX_TRACKS && (r.track as usize) <= MASTER_BUS && r.source != r.track)
             .map(|&r| KeyLine::new(r, self.block)).collect();
-        self.pending = Some(Box::new(TimelineSwap { revision: self.timeline_revision, timeline: t, keys }));
+        self.pending = Some(Box::new(TimelineSwap { revision: self.timeline_revision, callback_budget, chain_revision:self.chain_revision, timeline: t, keys }));
         self.maintain();
         self.timeline_revision
     }
@@ -813,6 +847,7 @@ impl RtState {
                 }
                 ChainChange::Remap(remap) => remap.apply(&mut self.chains),
             }
+            self.applied_chain_revision=command.revision;
             // Every command carries its retired allocations back, including
             // an empty first installation, and provides a reclamation receipt.
             let _ = self.chain_retire.push(command);
@@ -844,6 +879,12 @@ impl RtState {
         stopped || seek != NO_SEEK
     }
 
+    pub(crate) fn callback_budget_ready(&self)->bool{
+        if !self.shared.callback_budget_required.load(Ordering::Acquire){return true;}
+        let expected=self.shared.callback_budget.load(Ordering::Acquire);
+        expected!=0&&self.current.as_ref().is_some_and(|current|current.callback_budget==expected&&current.chain_revision<=self.applied_chain_revision)
+    }
+
     pub(crate) fn has_monitor_source(&self)->bool{
         self.monitor.as_ref().is_some_and(|monitor|monitor.source.is_some())
     }
@@ -863,6 +904,13 @@ impl RtState {
     pub(crate) fn process_prepared(&mut self,out:&mut[f32],channels:usize){
         let started=std::time::Instant::now();let channels=channels.max(1);let frames=out.len()/channels;out.fill(0.);
         self.monitor_offset=0;
+        // Commands are still consumed by prepare_callback above, so a graph
+        // receipt can arrive while the old timeline is held. No DSP, monitor,
+        // automation event or transport position advances under a stale token.
+        if !self.callback_budget_ready(){
+            if self.shared.transport()!=Transport::DeviceError{self.shared.state.store(Transport::Paused as u8,Ordering::Release);}
+            self.shared.callbacks.fetch_add(1,Ordering::Relaxed);return;
+        }
         if frames<=self.monitor_l.len(){
             self.monitor_l[..frames].fill(0.);self.monitor_r[..frames].fill(0.);
             let mut count=0;
@@ -935,7 +983,7 @@ impl RtState {
     fn render_span(&mut self,out:&mut[f32],channels:usize,include_material:bool)->bool{
         let frames=out.len()/channels;let pos=self.pos;
         let(ml,mr)=(&mut self.mix_l[..frames],&mut self.mix_r[..frames]);ml.fill(0.);mr.fill(0.);
-        let fading=self.fading.as_ref().filter(|(_,remaining)|include_material&&*remaining>0);
+        let fading=self.fading.as_ref().filter(|(old,remaining)|include_material&&*remaining>0&&self.current.as_ref().is_some_and(|current|old.callback_budget==current.callback_budget));
         let monitor_track=self.monitor.as_ref().filter(|m|m.source.is_some()).map(|m|m.track);
         let used=if include_material{self.current.as_ref().map_or(0,|t|t.used_tracks()).max(fading.map_or(0,|(old,_)|old.used_tracks()))}else{0};
         let used=used.max(monitor_track.map_or(0,|t|t+1)).min(MAX_TRACKS);
@@ -1338,4 +1386,35 @@ mod master_key_tests {
   control.set_timeline(timeline);control.play();let mut out=[0.;512];rt.process(&mut out,2);
   assert_eq!(&out[..6],&[0.;6]);assert!(out[6..].iter().all(|s|(*s-0.2).abs()<1e-7));
  }
+}
+
+#[cfg(test)]
+mod callback_budget_contract {
+    use super::*;
+    struct Gain;
+    impl Processor for Gain{
+        fn name(&self)->&str{"budget gain"}
+        fn process(&mut self,l:&mut[f32],r:&mut[f32]){for x in l.iter_mut().chain(r){*x*=2.;}}
+    }
+    #[test]
+    fn matching_budget_cannot_overtake_a_backpressured_pdc_graph(){
+        let(mut control,mut rt)=channel(48_000,128);
+        control.require_callback_budget();
+        let budget=control.shared.publish_callback_budget(624);
+        assert!(control.set_chain(0,vec![Box::new(Gain)]));
+        control.set_timeline_for_callback_budget(Timeline::new(48_000,vec![
+            Clip{start:0,samples:vec![0.1;1024].into(),gain:1.,track:0}]),budget);
+        control.play();
+        // Reclamation is temporarily full, so the timeline can arrive before
+        // its chain remap. No frames may enter the preceding graph.
+        while !rt.chain_retire.is_full(){
+            assert!(rt.chain_retire.push(Box::new(ChainCommand{revision:0,change:ChainChange::Single(None)})).is_ok());
+        }
+        let mut output=[1.;128];rt.process(&mut output,2);
+        assert_eq!(output,[0.;128]);assert_eq!(control.position(),0);
+        assert_eq!(rt.applied_chain_revision,0);
+        control.maintain();rt.process(&mut output,2);
+        assert_eq!(control.position(),64);
+        assert!(output.iter().all(|x|(*x-0.2).abs()<1e-6));
+    }
 }

@@ -1,0 +1,21 @@
+{
+  "op": "batch",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "requests": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "stop_on_error": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "requests"
+    ],
+    "type": "object"
+  }
+}

@@ -8,7 +8,7 @@
 cd frontend
 cargo fetch --locked
 cargo build --offline --locked --release \
-  -p verdant-app -p verdant-cli -p verdant-worker -p verdant-plughost \
+  -p verdant-app -p verdant-cli -p verdant-launcher -p verdant-worker -p verdant-plughost \
   -p verdant-voice -p verdant-release
 cd ..
 ```
@@ -46,6 +46,12 @@ selection_sha=$("$release" select-source --repo . --output build/source.json | j
 这些脚本用于开发和 CI 验证，只作为对应源码收录；它们不成为应用或 worker 的生产 Python 依赖，不改变 `production_python_required: false`。增加新验证脚本时应明确更新分类并通过源码选择和归档检查。
 
 运行包使用 `verdant-voice` 所需的 ONNX Runtime。历史 OpenVPI 声码器通知随对应源码保存。[原文通知](docs/archive/research/licenses/vocoder/)
+
+## 命令入口与离线技能
+
+当前原生包清单为 `verdant-native-package/3`。`verdant` 和兼容别名 `verdant-cli` 是无 GUI 依赖的 CLI，默认显示帮助；`verdant gui` 解析同包 `verdant-gui` 并启动。归档根目录提供可执行 `verdant-launcher`，Windows 使用无额外控制台的 `verdant-launcher.exe`。macOS `.app` 的主程序为 `verdant-gui`。
+
+八个 native 程序、根启动器权限、Windows GUI/console 子系统和离线 `share/verdant/skills` 清单均由打包器检查。组装阶段在空格／Unicode 路径和不同 cwd 运行实际 CLI help、GUI 路径探测及隔离技能安装／幂等重装／卸载；这些命令不打开 GUI，不改当前用户技能目录。源码包同时包括 manifest、全部技能内容、生成脚本和安装器源码。[完整入口与安装说明](frontend/docs/AGENT-AUTOMATION.md)。
 
 ## 声库
 

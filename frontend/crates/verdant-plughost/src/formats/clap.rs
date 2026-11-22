@@ -492,7 +492,7 @@ impl HostedPlugin for ClapPlugin {
     fn close_editor(&mut self) { self.destroy_gui(); }
     fn editor_open(&self) -> bool { self.gui_created }
     fn reconfigure(&mut self, rate: f64, max: u32) -> Result<(), String> {
-        if rate != verdant_plugins::SAMPLE_RATE || max != self.config.max_frames_count {
+        if rate != self.config.sample_rate || max != self.config.max_frames_count {
             return Err("CLAP insert processing contract is fixed".into());
         }
         self.stop();

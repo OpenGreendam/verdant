@@ -133,9 +133,9 @@ pub fn instantiate(
     max_frames: u32,
     events: EventTx,
 ) -> Result<(Box<dyn HostedPlugin>, InstDesc), PluginError> {
-    if sample_rate != verdant_plugins::SAMPLE_RATE || max_frames == 0
+    if !verdant_plugins::supported_sample_rate(sample_rate) || max_frames == 0
         || max_frames as usize > verdant_plugins::shm::MAX_BLOCK_FRAMES {
-        return Err(PluginError::Host("effects require 48 kHz and a bounded nonzero block".into()));
+        return Err(PluginError::Host("effects require an admitted sample rate and a bounded nonzero block".into()));
     }
     match format {
         "builtin" if plugin_id == verdant_plugins::BUILTIN_GAIN_ID => {
@@ -148,7 +148,7 @@ pub fn instantiate(
                 },
             ))
         }
-        "builtin" if builtin::effect(plugin_id, sample_rate).is_some() => {
+        "builtin" if verdant_plugins::builtin_dsp::EFFECT_IDS.contains(&plugin_id) => {
             let p = builtin::effect(plugin_id, sample_rate).expect("checked builtin effect");
             let name = verdant_plugins::builtin_dsp::display_name(plugin_id).unwrap_or(plugin_id).to_string();
             Ok((p, InstDesc { id: plugin_id.into(), name }))
@@ -257,3 +257,6 @@ mod tests {
         assert_eq!(plugin.calls, 1);
     }
 }
+
+#[cfg(test)]
+mod factory_preset_tests;

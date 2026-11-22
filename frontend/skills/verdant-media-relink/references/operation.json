@@ -1,0 +1,49 @@
+{
+  "op": "media.relink",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "clip_id": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "label": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "source": {
+        "type": "string"
+      },
+      "track": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "track",
+      "source",
+      "clip_id"
+    ],
+    "type": "object"
+  }
+}

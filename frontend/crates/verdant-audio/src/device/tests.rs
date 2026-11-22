@@ -343,7 +343,7 @@ fn an_unadvertised_oversized_callback_reports_rejection_and_enters_an_explicit_s
         DeviceEvent::OutputChanged(OutputInfo { kind: OutputKind::SilentClock { .. }, .. })));
     assert!(events.iter().any(|event| matches!(event,
         DeviceEvent::Rejected(DeviceError { kind: DeviceErrorKind::UnsupportedConfig, message })
-            if message.contains("8193") && message.contains("8192"))));
+            if message.contains("8193") && message.contains("maximum is 64"))));
     assert!(!events.iter().any(|event| matches!(event, DeviceEvent::DeviceLost { .. } | DeviceEvent::Recovered(_))));
     assert!(matches!(engine.output_info().kind, OutputKind::SilentClock { .. }));
     assert_eq!(engine.output_info().device_sample_rate, 48_000);
@@ -352,4 +352,42 @@ fn an_unadvertised_oversized_callback_reports_rejection_and_enters_an_explicit_s
     assert_eq!(*harness.samples.lock().unwrap().last().unwrap(), (0.0, 0.0));
     assert_eq!(harness.builds.load(Ordering::Acquire), 2);
     assert_eq!(harness.live.load(Ordering::Acquire), 0);
+}
+
+#[test]
+fn negotiated_small_callback_bound_is_enforced_even_below_global_maximum(){
+    let(engine,control,harness)=open();engine.drain_events();
+    harness.callback_override.store(65,Ordering::Release);
+    engine.select(DeviceSelection::Device("second".into()));
+    let events=await_events(&engine,|event|matches!(event,
+        DeviceEvent::OutputChanged(OutputInfo{kind:OutputKind::SilentClock{..},..})));
+    assert!(events.iter().any(|event|matches!(event,
+        DeviceEvent::Rejected(DeviceError{kind:DeviceErrorKind::UnsupportedConfig,message})
+            if message.contains("65 frames")&&message.contains("maximum is 64"))));
+    assert_eq!(control.position(),0);
+    assert_eq!(control.callback_budget()as u32,624);
+}
+
+#[test]
+fn device_budget_is_published_before_the_first_callback_of_a_new_rate(){
+    let(engine,mut control,harness)=open();engine.drain_events();
+    control.require_callback_budget();
+    let first=control.callback_budget();
+    assert_eq!(first as u32,208);
+    let timeline=||crate::Timeline::new(48_000,vec![crate::Clip{start:0,
+        samples:vec![0.1;10_000].into(),gain:1.,track:0}]);
+    control.set_timeline_for_callback_budget(timeline(),first);control.play();
+    harness.rate_override.store(44_100,Ordering::Release);
+    engine.select(DeviceSelection::Device("second".into()));barrier(&engine);
+    let second=control.callback_budget();
+    assert_ne!(first,second);
+    assert_eq!(second as u32,214);
+    assert_eq!(control.position(),0);
+    assert_eq!(*harness.samples.lock().unwrap().last().unwrap(),(0.,0.));
+    // Same physical budget, fresh driver: its callback can now acknowledge the
+    // graph generation prepared in response to the preceding device change.
+    control.set_timeline_for_callback_budget(timeline(),second);
+    engine.select(DeviceSelection::Device("first".into()));barrier(&engine);
+    assert_eq!(control.callback_budget(),second);
+    assert!(control.position()>0);
 }

@@ -1,5 +1,6 @@
 //! Spectrum capture, cross-instance matching and editable EQ sketches.
 use super::*;
+use super::workflow::text_field::TextField;
 use gpui::{App, AppContext, Bounds, Render, WeakEntity, WindowBounds, WindowOptions, size};
 
 pub(super) fn tools(ed: &Editor, editor: &Entity<Editor>, target: Target, effect: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
@@ -37,6 +38,7 @@ fn grab_peak(ed: &mut Editor, target: &Target, cx: &mut Context<Editor>) {
     ed.notice(format!("已在频谱峰值处建立频段（输入 {level:.1} dBFS）")); cx.notify();
 }
 fn import_ir(ed: &mut Editor, target: &Target, cx: &mut Context<Editor>) {
+    let expected = current_params(ed, target).map(|params| params.into_iter().map(|p|(p.id,p.value)).collect::<Vec<_>>()).unwrap_or_default();
     let target = target.clone(); let generation = ed.document_generation;
     let rx = cx.prompt_for_paths(gpui::PathPromptOptions { files: true, directories: false, multiple: false, prompt: Some("拟合 IR".into()) });
     cx.spawn(async move |this, cx| {
@@ -64,13 +66,15 @@ fn import_ir(ed: &mut Editor, target: &Target, cx: &mut Context<Editor>) {
                 let mono: Vec<f32> = audio.samples.chunks(audio.channels as usize).map(|frame| {
                     if frame.len() == 1 { frame[0] } else { ((frame[0]*frame[0]+frame[1]*frame[1])*0.5).sqrt().copysign(if frame[0].abs() >= frame[1].abs() { frame[0] } else { frame[1] }) }
                 }).collect();
-                dsp::fit_reverb_ir(&mono, f64::from(audio.sample_rate))
+                dsp::fit_reverb_ir_report(&mono, f64::from(audio.sample_rate))
             }).await;
             let _ = this.update(cx, |ed, cx| {
                 if ed.document_generation != generation || !ed.device_target_matches(&target.track, target.slot, target.key) { return; }
+                if !unchanged_parameters(ed, &target, &expected) { ed.notice("IR 分析期间参数已改变，未覆盖新修改；请重新拟合"); cx.notify(); return; }
                 match result {
-                    Ok(values) => {
-                        if ed.set_device_params(target.track.clone(), target.slot, values, cx) { ed.notice("已从 IR 拟合衰减与预延迟，可在历史中撤销"); }
+                    Ok(report) => {
+                        let message = format!("IR 可编辑拟合：测得衰减 {:.2} s · 回归 r² {:.3} · {} 个频带 · 模型误差 {:.1}%", report.decay_seconds, report.decay_r_squared, report.bands.len(), report.decay_model_rms_percent);
+                        if ed.set_device_params(target.track.clone(), target.slot, report.parameters, cx) { ed.notice(message); }
                         else { ed.notice("请等待插件载入或当前修改完成后重试 IR 拟合"); }
                     },
                     Err(error) => ed.notice(format!("IR 拟合失败：{error}")),
@@ -85,15 +89,16 @@ fn open_sketch(editor: Entity<Editor>, target: Target, cx: &mut App) {
     if current_params(editor.read(cx), &target).is_none() { return; }
     let th = editor.read(cx).theme; let generation = editor.read(cx).document_generation;
     let weak = editor.downgrade();
-    let bounds = Bounds::centered(None, size(px(800.), px(440.)), cx);
+    let font = crate::theme::plugin_ui_font(editor.read(cx).ui_font.clone());
+    let bounds = Bounds::centered(None, size(px(800.), px(480.)), cx);
     let _ = cx.open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), app_id: Some("verdant".into()), ..Default::default() }, move |window, cx| {
         window.set_window_title("绘制 EQ — Verdant");
-        cx.new(|_| Sketch { editor: weak, target, generation, points: [None; 128], dragging: false, last: None, th, message: String::new() })
+        cx.new(|_| Sketch { editor: weak, target, generation, points: [None; 128], dragging: false, last: None, fitted: None, busy: false, th, font, message: String::new() })
     });
 }
 struct Sketch {
     editor: WeakEntity<Editor>, target: Target, generation: u64, points: [Option<f64>; 128],
-    dragging: bool, last: Option<(usize, f64)>, th: Theme, message: String,
+    dragging: bool, last: Option<(usize, f64)>, fitted: Option<(EqParams, f64)>, busy: bool, th: Theme, font: gpui::Font, message: String,
 }
 fn draw_segment(points: &mut [Option<f64>;128], from: Option<(usize,f64)>, index: usize, value: f64) {
     let (start, old) = from.unwrap_or((index, value));
@@ -103,18 +108,62 @@ fn draw_segment(points: &mut [Option<f64>;128], from: Option<(usize,f64)>, index
         *point = Some((old + (value-old)*ratio).clamp(-24.,24.));
     }
 }
+
+fn unchanged_parameters(ed: &Editor, target: &Target, expected: &[(String, f64)]) -> bool {
+    current_params(ed, target).is_some_and(|params| params.len() == expected.len() &&
+        expected.iter().all(|(id, value)| params.iter().find(|p| p.id == *id)
+            .is_some_and(|p| (p.value-value).abs() <= 1e-8*value.abs().max(1.))))
+}
+impl Sketch {
+    fn apply(&mut self, cx: &mut Context<Self>) {
+        if self.busy { return; }
+        let Some(editor) = self.editor.upgrade() else { return; };
+        let ed = editor.read(cx);
+        let Some(params) = current_params(ed, &self.target) else { return; };
+        let before:Vec<_> = params.iter().map(|p|(p.id.clone(),p.value)).collect();
+        let sample_rate = ed.audio_info.sample_rate as f64;
+        let drawn = self.points;
+        let points:Vec<_> = drawn.iter().enumerate().filter_map(|(i,p)|p.map(|p|(FREQ_AXIS.value(i as f64/127.),p))).collect();
+        let target = self.target.clone(); let generation = self.generation;
+        self.busy = true; self.message = "正在后台拟合目标曲线…".into(); cx.notify();
+        cx.spawn(async move |this,cx| {
+            let result = cx.background_spawn(async move { dsp::eq_fit_curve_report(&points,24,sample_rate) }).await;
+            let _=this.update(cx,|view,cx| {
+                view.busy=false;
+                if view.points != drawn { view.message="绘制已改变，未应用旧曲线；请再次应用".into(); cx.notify(); return; }
+                view.message = match result {
+                    Ok(report) => {
+                        let message=format!("已提交 {} 个频段 · 拟合 RMS {:.2} dB · 最大误差 {:.2} dB · 可继续编辑或撤销",report.bands_used,report.rms_error_db,report.max_error_db);
+                        let mut fitted=EqParams::default();
+                        for (id,value) in &report.parameters { let _=fitted.set(id,*value); }
+                        let result=view.editor.update(cx,|ed,cx| ed.document_generation==generation &&
+                            ed.device_target_matches(&target.track,target.slot,target.key) &&
+                            unchanged_parameters(ed,&target,&before) &&
+                            ed.set_device_params(target.track.clone(),target.slot,report.parameters,cx));
+                        if matches!(result,Ok(true)) {view.fitted=Some((fitted,sample_rate));message}
+                        else {"插件或参数已改变，未覆盖新修改；请等待就绪后重新拟合".into()}
+                    },
+                    Err(error)=>error,
+                };
+                cx.notify();
+            });
+        }).detach();
+    }
+}
+
 impl Render for Sketch {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let th = self.th; let points = self.points; let entity = cx.entity();
-        div().size_full().bg(th.surface).text_color(th.text).p(px(18.)).flex().flex_col().gap(px(12.))
+        let th = self.th; let points = self.points; let fitted = self.fitted.clone(); let entity = cx.entity();
+        div().size_full().font(self.font.clone()).bg(th.surface).text_color(th.text).p(px(18.)).flex().flex_col().gap(px(12.))
             .child(div().text_lg().font_weight(FontWeight::BOLD).child("绘制目标频响"))
-            .child(div().text_sm().text_color(th.text_secondary).child("在图中按住并拖动。应用后拟合为最多 24 个可继续编辑的参数频段。"))
+            .child(div().text_sm().text_color(th.text_secondary).child("拖动绘制目标。后台联合拟合最多 24 个峰值／架式频段；应用后可撤销，细线显示拟合结果。"))
             .child(canvas(|b,w,_| w.insert_hitbox(b, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
                 let plot = Plot { o: bounds.origin, w: f64::from(bounds.size.width), h: f64::from(bounds.size.height) };
                 let axis = Axis::lin(-24.,24.); let mut texts = Texts::new();
                 let grid = [-24.,-12.,0.,12.,24.].map(|db| (axis.norm(db), format!("{db:+.0} dB")));
                 paint_grid(window, plot, th, &freq_grid(), &grid, Some(0.5), &mut texts);
                 polyline(window, plot.o, points.iter().enumerate().map(|(i,v)| v.map(|v| (plot.x(i as f64/127.),plot.y(axis.norm(v))))), 2.5, th.accent);
+                if let Some((fitted, fs)) = &fitted { polyline(window, plot.o, (0..256).map(|i| { let n=i as f64/255.; Some((plot.x(n), plot.y(axis.norm(fitted.response_db(FREQ_AXIS.value(n), *fs))))) }), 1.2, th.text_secondary); }
                 flush_texts(window,cx,bounds,texts);
                 let sample = move |p: gpui::Point<Pixels>| {
                     let n = ((f64::from(p.x-plot.o.x)-plot.x(0.))/plot.inner_w()).clamp(0.,1.);
@@ -125,7 +174,7 @@ impl Render for Sketch {
                 window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
                     if phase != DispatchPhase::Bubble || event.button != MouseButton::Left || !h.is_hovered(window) { return }
                     window.capture_pointer(h.id); let (index,value)=sample(event.position);
-                    e.update(cx,|v,cx|{v.dragging=true;v.last=Some((index,value));v.points[index]=Some(value);cx.notify();});cx.stop_propagation();
+                    e.update(cx,|v,cx|{v.dragging=true;v.last=Some((index,value));v.points[index]=Some(value);v.fitted=None;cx.notify();});cx.stop_propagation();
                 });
                 let e=entity.clone();
                 window.on_mouse_event(move |event: &MouseMoveEvent,phase,_,cx|{
@@ -140,15 +189,9 @@ impl Render for Sketch {
             }).w_full().flex_1())
             .child(div().text_xs().text_color(th.text_secondary).child(self.message.clone()))
             .child(div().flex().justify_end().gap(px(8.))
-                .child(crate::ui_controls::selectable_button("sketch-clear","清除",false,th).on_click(cx.listener(|v,_,_,cx|{v.points=[None;128];cx.notify();})))
+                .child(crate::ui_controls::selectable_button("sketch-clear","清除",false,th).on_click(cx.listener(|v,_,_,cx|{v.points=[None;128];v.fitted=None;cx.notify();})))
                 .child(crate::ui_controls::selectable_button("sketch-cancel","取消",false,th).on_click(|_,w,_|w.remove_window()))
-                .child(crate::ui_controls::selectable_button("sketch-apply","应用",true,th).on_click(cx.listener(|v,_,window,cx|{
-                    let points:Vec<_>=v.points.iter().enumerate().filter_map(|(i,p)|p.map(|p|(FREQ_AXIS.value(i as f64/127.),p))).collect();
-                    let writes=match dsp::eq_fit_curve(&points,24){Ok(w)=>w,Err(e)=>{v.message=e;cx.notify();return}};
-                    let target=v.target.clone();let generation=v.generation;
-                    let result=v.editor.update(cx,|ed,cx|ed.document_generation==generation&&ed.device_target_matches(&target.track,target.slot,target.key)&&ed.set_device_params(target.track,target.slot,writes,cx));
-                    if matches!(result,Ok(true)){window.remove_window()}else{v.message="参数尚未提交，请等待插件就绪".into();cx.notify();}
-                }))))
+                .child(presentation::button("sketch-apply", if self.busy {"正在拟合…"} else {"应用拟合"}, true, th).on_click(cx.listener(|v,_,_,cx|v.apply(cx)))))
     }
 }
 
@@ -167,13 +210,36 @@ fn matching_spectrum(frequencies: &[f32], levels: &[f32]) -> Result<Vec<(f64, f6
 
 fn open_references(editor: Entity<Editor>, target: Target, cx: &mut App) {
     let th=editor.read(cx).theme; let generation=editor.read(cx).document_generation;let weak=editor.downgrade();let observed=editor.clone();
-    let bounds=Bounds::centered(None,size(px(740.),px(560.)),cx);
-    let _=cx.open_window(WindowOptions{window_bounds:Some(WindowBounds::Windowed(bounds)),app_id:Some("verdant".into()),..Default::default()},move|window,cx|{
+    let font=crate::theme::plugin_ui_font(editor.read(cx).ui_font.clone());
+    let bounds=Bounds::centered(None,size(px(820.),px(650.)),cx);
+    let _=cx.open_window(WindowOptions{window_bounds:Some(WindowBounds::Windowed(bounds)),window_min_size:Some(size(px(640.),px(480.))),app_id:Some("verdant".into()),..Default::default()},move|window,cx|{
         window.set_window_title("参考频谱与匹配 — Verdant");
-        cx.new(|cx|{cx.observe(&observed,|_,_,cx|cx.notify()).detach();ReferenceWindow{editor:weak,target,generation,th,message:String::new()}})
+        cx.new(|cx|{
+            cx.observe(&observed,|_,_,cx|cx.notify()).detach();
+            let minimum=TextField::new("最低匹配频率，Hz","20",th,cx);
+            let maximum=TextField::new("最高匹配频率，Hz","20000",th,cx);
+            let amount=TextField::new("匹配强度，百分比","100",th,cx);
+            let bands=TextField::new("最多频段，1 到 24","24",th,cx);
+            ReferenceWindow{editor:weak,target,generation,th,font,minimum,maximum,amount,bands,
+                smoothing:1,remove_level:true,busy:false,message:String::new()}
+        })
     });
 }
-struct ReferenceWindow {editor:WeakEntity<Editor>,target:Target,generation:u64,th:Theme,message:String}
+struct ReferenceWindow {
+    editor:WeakEntity<Editor>,target:Target,generation:u64,th:Theme,font:gpui::Font,
+    minimum:Entity<TextField>,maximum:Entity<TextField>,amount:Entity<TextField>,bands:Entity<TextField>,
+    smoothing:usize,remove_level:bool,busy:bool,message:String,
+}
+impl ReferenceWindow {
+    fn options(&self,sample_rate:f64,cx:&App)->Result<dsp::EqMatchOptions,String>{
+        let number=|field:&Entity<TextField>,name:&str|field.read(cx).text.text.trim().parse::<f64>().map_err(|_|format!("{name}请输入数字"));
+        let max_bands=self.bands.read(cx).text.text.trim().parse::<usize>().map_err(|_|"频段数请输入 1 到 24 的整数")?;
+        if !(1..=24).contains(&max_bands){return Err("频段数必须在 1 到 24 之间".into())}
+        Ok(dsp::EqMatchOptions{max_bands,sample_rate,min_frequency:number(&self.minimum,"最低频率")?,
+            max_frequency:number(&self.maximum,"最高频率")?,amount:number(&self.amount,"匹配强度")?/100.,
+            smoothing_octaves:[0.,1./6.,1./3.,1.][self.smoothing.min(3)],remove_level_offset:self.remove_level})
+    }
+}
 impl Render for ReferenceWindow {
  fn render(&mut self,window:&mut Window,cx:&mut Context<Self>)->impl IntoElement{
   let Some(editor)=self.editor.upgrade()else{window.remove_window();return div().into_any_element()};
@@ -193,11 +259,15 @@ impl Render for ReferenceWindow {
           state.reference=reference_id.clone().map(|identity|workflow::Reference{identity,name:overlay_name.clone()});workflow::write_workspace(ed,&overlay_target,&state);cx.notify();});
       }))
       .child(crate::ui_controls::selectable_button(format!("match-{}",handle.key().0),"匹配",false,th).on_click(cx.listener(move|view,_,_,cx|{
+        if view.busy{return}
         let destination=destination.clone();let reference=reference_target.clone();
         let Some(ed)=view.editor.upgrade()else{return};let ed=ed.read(cx);
         let Some(source)=ed.live_device_insert(&destination.track,destination.slot).filter(|h|h.key()==destination.key)else{return};
         let Some(target)=ed.live_device_insert(&reference.track,reference.slot).filter(|h|h.key()==reference.key)else{return};
-        let generation=view.generation;view.message="正在捕获两个实例的实际频谱…".into();cx.notify();
+        let options=match view.options(source.sample_rate(),cx){Ok(options)=>options,Err(error)=>{view.message=error;cx.notify();return}};
+        let Some(params)=current_params(ed,&destination)else{return};
+        let before:Vec<_>=params.iter().map(|p|(p.id.clone(),p.value)).collect();
+        let generation=view.generation;view.busy=true;view.message="正在捕获实际频谱并后台拟合…".into();cx.notify();
         cx.spawn(async move|this,cx|{
           let result=cx.background_spawn(async move{
             source.refresh_telemetry().map_err(|e|e.to_string())?;target.refresh_telemetry().map_err(|e|e.to_string())?;
@@ -205,12 +275,15 @@ impl Render for ReferenceWindow {
             if a.frames_total==0||b.frames_total==0{return Err("请先播放两个实例的音频".into())}
             let source = matching_spectrum(&a.spectrum_frequencies, &a.spectrum_input_db)?;
             let reference = matching_spectrum(&b.spectrum_frequencies, &b.spectrum_output_db)?;
-            dsp::eq_match_spectra(&source, &reference, 24)
+            dsp::eq_match_spectra_with_options(&source, &reference, options)
           }).await;
           let _=this.update(cx,|view,cx|{
+            view.busy=false;
             match result{
-              Ok(writes)=>{let target=destination.clone();let result=view.editor.update(cx,|ed,cx|ed.document_generation==generation&&ed.device_target_matches(&target.track,target.slot,target.key)&&ed.set_device_params(target.track,target.slot,writes,cx));
-                view.message=if matches!(result,Ok(true)){"已提交匹配曲线，可继续编辑频段并撤销".into()}else{"插件已改变或正在提交其他参数".into()};},
+              Ok(report)=>{
+                let message=format!("已提交 {} 个频段 · RMS {:.2} dB · 最大误差 {:.2} dB · 移除电平差 {:+.1} dB",report.bands_used,report.rms_error_db,report.max_error_db,report.level_offset_db);
+                let target=destination.clone();let result=view.editor.update(cx,|ed,cx|ed.document_generation==generation&&ed.device_target_matches(&target.track,target.slot,target.key)&&unchanged_parameters(ed,&target,&before)&&ed.set_device_params(target.track,target.slot,report.parameters,cx));
+                view.message=if matches!(result,Ok(true)){message}else{"插件或参数已改变，未覆盖新修改；请重新捕获匹配".into()};},
               Err(e)=>view.message=e
             }cx.notify();
           });
@@ -218,9 +291,17 @@ impl Render for ReferenceWindow {
       }))));
    }
   }
-  div().size_full().bg(th.surface).text_color(th.text).p(px(18.)).flex().flex_col().gap(px(12.))
+  let field=|label:&'static str,entity:Entity<TextField>|div().flex_1().min_w_0().flex().flex_col().gap(px(4.)).child(div().text_xs().text_color(th.text_secondary).child(label)).child(entity);
+  let mut smoothing=div().flex().flex_wrap().items_center().gap(px(4.)).child(div().text_xs().text_color(th.text_secondary).child("平滑"));
+  for (index,label) in ["关闭","1/6 oct","1/3 oct","1 oct"].into_iter().enumerate() {
+    smoothing=smoothing.child(presentation::button(format!("match-smoothing-{index}"),label,self.smoothing==index,th).on_click(cx.listener(move|view,_,_,cx|{view.smoothing=index;cx.notify();})));
+  }
+  smoothing=smoothing.child(div().flex_1()).child(presentation::button("match-level","移除整体电平差",self.remove_level,th).on_click(cx.listener(|view,_,_,cx|{view.remove_level=!view.remove_level;cx.notify();})));
+  div().size_full().font(self.font.clone()).bg(th.surface).text_color(th.text).p(px(18.)).flex().flex_col().gap(px(12.))
    .child(div().text_lg().font_weight(FontWeight::BOLD).child("参考频谱与 EQ 匹配"))
    .child(div().text_sm().text_color(th.text_secondary).child("匹配当前 EQ 的输入与参考实例的输出。先播放代表性的音频；匹配是一组可撤销的静态频段。"))
+   .child(div().flex().gap(px(10.)).child(field("最低频率 · Hz",self.minimum.clone())).child(field("最高频率 · Hz",self.maximum.clone())).child(field("强度 · %",self.amount.clone())).child(field("最多频段",self.bands.clone())))
+   .child(smoothing)
    .child(rows).child(div().id("reference-status").role(Role::Status).text_xs().child(self.message.clone()))
    .child(div().flex().justify_end().gap(px(8.))
      .child(crate::ui_controls::selectable_button("reference-clear","清除叠加",false,th).on_click(cx.listener(|view,_,_,cx|{

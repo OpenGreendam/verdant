@@ -1,0 +1,1901 @@
+{
+  "schema": "verdant-skill-install-validation/1",
+  "first": {
+    "version": "1.0.0",
+    "bundle_sha256": "f72c179c4f3ee57ceab4f6429daffba6c90b21075d5d6e5c52a151dbdd34da50",
+    "destination": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/verdant-skills-验收-q7bqz00x/Agent 技能/skills",
+    "dry_run": false,
+    "skills": [
+      {
+        "name": "verdant",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-analysis-audio",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-batch",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-clean",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-verify",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-capabilities",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-bounce",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-copy",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-copy-range",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-crossfade",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-delete",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-delete-range",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-duplicate",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-edit",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-inspect",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-join",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-move",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-normalize",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-paste",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-set-properties",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-slip",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-range",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-silence",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-zero-crossing",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-trim",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-trim-to-range",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-doctor",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-add-track",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-delete-notes",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-duplicate-notes",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-insert-notes",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-move-notes",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-move-track",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-remove-track",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-replace-notes",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-resize-notes",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-consonant-dynamics",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-expression-curve",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-gain-curve",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-lyric",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-model-dynamics",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-output-transients",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-phoneme-timing",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pitch",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pitch-curve",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-portamento",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-project-extension",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pronunciation",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-route",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-synthesis",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-tempo-event",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-time-signature-event",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-timing",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-data",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-header",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-inserts",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-instrument",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-vibrato",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-vocal-tract",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-catalog",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-scan",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-status",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-export-audio",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-export-project",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-redo",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-undo",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-import",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-cancel",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-inspect",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-retry",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-verify",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-import",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-inspect",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-relink",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-verify",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-apply",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-automate",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-inspect",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-remove-automation",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-set",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-add",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-bypass",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-describe",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-edit",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-inspect",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-remove",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-reorder",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-reset",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-set",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-sidechain",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-apply",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-export",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-import",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-import-ffp",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-inspect-ffp",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-show",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-apply",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-inspect",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-migrate",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-new",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-pack",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-recover",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-save-as",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-unpack",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-validate",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-render",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-render-plan",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-schema",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-install",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-show",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-uninstall",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-convert",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-import-originals",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-install",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-list",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-remove",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-set-default",
+        "status": "installed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-verify",
+        "status": "installed",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "again": {
+    "version": "1.0.0",
+    "bundle_sha256": "f72c179c4f3ee57ceab4f6429daffba6c90b21075d5d6e5c52a151dbdd34da50",
+    "destination": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/verdant-skills-验收-q7bqz00x/Agent 技能/skills",
+    "dry_run": false,
+    "skills": [
+      {
+        "name": "verdant",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-analysis-audio",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-batch",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-clean",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-verify",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-capabilities",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-bounce",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-copy",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-copy-range",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-crossfade",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-delete",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-delete-range",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-duplicate",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-edit",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-inspect",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-join",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-move",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-normalize",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-paste",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-set-properties",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-slip",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-range",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-silence",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-zero-crossing",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-trim",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-trim-to-range",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-doctor",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-add-track",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-delete-notes",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-duplicate-notes",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-insert-notes",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-move-notes",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-move-track",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-remove-track",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-replace-notes",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-resize-notes",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-consonant-dynamics",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-expression-curve",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-gain-curve",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-lyric",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-model-dynamics",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-output-transients",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-phoneme-timing",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pitch",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pitch-curve",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-portamento",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-project-extension",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pronunciation",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-route",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-synthesis",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-tempo-event",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-time-signature-event",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-timing",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-data",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-header",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-inserts",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-instrument",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-vibrato",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-vocal-tract",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-catalog",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-scan",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-status",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-export-audio",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-export-project",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-redo",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-undo",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-import",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-cancel",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-inspect",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-retry",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-verify",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-import",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-inspect",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-relink",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-verify",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-apply",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-automate",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-inspect",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-remove-automation",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-set",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-add",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-bypass",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-describe",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-edit",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-inspect",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-remove",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-reorder",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-reset",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-set",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-sidechain",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-apply",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-export",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-import",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-import-ffp",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-inspect-ffp",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-show",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-apply",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-inspect",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-migrate",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-new",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-pack",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-recover",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-save-as",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-unpack",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-validate",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-render",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-render-plan",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-schema",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-install",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-show",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-uninstall",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-convert",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-import-originals",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-install",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-list",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-remove",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-set-default",
+        "status": "unchanged",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-verify",
+        "status": "unchanged",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "removed": {
+    "destination": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/verdant-skills-验收-q7bqz00x/Agent 技能/skills",
+    "dry_run": false,
+    "skills": [
+      {
+        "name": "verdant",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-analysis-audio",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-batch",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-clean",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-cache-verify",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-capabilities",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-bounce",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-copy",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-copy-range",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-crossfade",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-delete",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-delete-range",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-duplicate",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-edit",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-inspect",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-join",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-move",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-normalize",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-paste",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-set-properties",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-slip",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-range",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-silence",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-split-zero-crossing",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-trim",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-clip-trim-to-range",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-doctor",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-add-track",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-delete-notes",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-duplicate-notes",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-insert-notes",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-move-notes",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-move-track",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-remove-track",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-replace-notes",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-resize-notes",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-consonant-dynamics",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-expression-curve",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-gain-curve",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-lyric",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-model-dynamics",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-output-transients",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-phoneme-timing",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pitch",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pitch-curve",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-portamento",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-project-extension",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-pronunciation",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-route",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-synthesis",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-tempo-event",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-time-signature-event",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-timing",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-data",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-header",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-inserts",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-track-instrument",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-vibrato",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-edit-set-vocal-tract",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-catalog",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-scan",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-effect-status",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-export-audio",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-export-project",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-redo",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-history-undo",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-import",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-cancel",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-inspect",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-retry",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-job-verify",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-import",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-inspect",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-relink",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-media-verify",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-apply",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-automate",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-inspect",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-remove-automation",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-mixer-set",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-add",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-bypass",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-describe",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-edit",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-inspect",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-remove",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-reorder",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-reset",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-set",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-plugin-sidechain",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-apply",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-export",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-import",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-import-ffp",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-inspect-ffp",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-preset-show",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-apply",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-inspect",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-migrate",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-new",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-pack",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-recover",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-save-as",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-unpack",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-project-validate",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-render",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-render-plan",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-schema",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-install",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-show",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-skill-uninstall",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-convert",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-import-originals",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-install",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-list",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-remove",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-set-default",
+        "status": "removed",
+        "version": "1.0.0"
+      },
+      {
+        "name": "verdant-voice-verify",
+        "status": "removed",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "remaining": []
+}

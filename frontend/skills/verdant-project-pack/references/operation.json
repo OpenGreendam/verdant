@@ -1,0 +1,31 @@
+{
+  "op": "project.pack",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allow_external_media": {
+        "type": "boolean"
+      },
+      "allowed_creator": {
+        "type": "string"
+      },
+      "output": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "output"
+    ],
+    "type": "object"
+  }
+}

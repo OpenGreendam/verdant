@@ -1467,7 +1467,7 @@ impl Editor {
         let expanded_count = self.project().tracks.iter()
             .filter(|track| self.automation_ui.expanded_tracks.contains(&track.id)).count();
         let rows = expanded_count + usize::from(self.automation_ui.show_master);
-        self.layout.arrange_height + rows.min(2) as f32 * AUTO_LANE_H as f32
+        self.layout.arrange_height + 34.0 + rows.min(2) as f32 * AUTO_LANE_H as f32
     }
 
     fn arrangement_content(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -1520,6 +1520,12 @@ impl Editor {
             .aria_description(arrangement_semantics.description)
             .key_context("Arrange")
             .track_focus(&self.focus_arrange)
+            .on_key_down(cx.listener(crate::editor::integrations::audio_edit_ui::key_down))
+            .on_action(cx.listener(|ed, _: &CopyNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Copy,window,cx){ed.notice(error);cx.notify();} }))
+            .on_action(cx.listener(|ed, _: &CutNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Cut,window,cx){ed.notice(error);cx.notify();} }))
+            .on_action(cx.listener(|ed, _: &PasteNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Paste,window,cx){ed.notice(error);cx.notify();} }))
+            .on_action(cx.listener(|ed, _: &DuplicateSelection, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Duplicate,window,cx){ed.notice(error);cx.notify();} }))
+            .on_action(cx.listener(|ed, _: &SelectAll, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::SelectAll,window,cx){ed.notice(error);cx.notify();} }))
             .flex()
             .flex_col()
             .min_h_0()
@@ -1535,6 +1541,7 @@ impl Editor {
                 .child(crate::ui_controls::flat_icon_command_button(self, Cmd::FitArrange, "maximize-2", "显示全部", "fit-arrange", false, cx).h(px(32.0)))
                 .child(div().flex_1())
                 .child(div().text_sm().text_color(th.text_secondary).child(format!("{} 条轨道", self.project().tracks.len()))))
+            .child(crate::editor::integrations::audio_edit_ui::toolbar(self,cx))
             .child(
                 div()
                     .h(px(RULER_H))

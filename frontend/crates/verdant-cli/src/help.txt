@@ -1,24 +1,67 @@
-Usage: verdant-cli COMMAND [ARGUMENTS] [--json | --events]
-       verdant-cli request --json < request.json
-       verdant-cli serve --stdio
+Verdant — audio workstation and headless automation
 
-Commands:
-  capabilities                 List protocol, formats, and operations
-  schema [OPERATION]           Describe the machine interface
-  doctor                       Check the native worker and installed voices
+Usage: verdant <command> [arguments] [--json | --events]
+       verdant gui [--wait | --check] [--gui-binary PATH] [--] [GUI arguments]
+       verdant worker --stdio
+       verdant skill <list | show | install | uninstall> [name | --all] [options]
+
+Running verdant without arguments prints this help and exits. Only "verdant gui"
+(or the package-root verdant-launcher) opens the graphical interface. GUI startup
+returns promptly by default; --wait explicitly waits, --check only resolves it.
+The standalone verdant-cli binary remains a compatible command-line alias.
+
+Discovery:
+  capabilities                         List every supported atomic operation
+  schema [operation]                   Machine-readable request/parameter schemas
+  doctor                               Diagnose audio/voice/tool configuration
+  --runtime-features                   Probe this headless CLI without starting GUI
+
+Projects and audio:
   project new|inspect|validate|apply|save-as|recover|migrate|pack|unpack
-  history list|undo|redo       Inspect or apply persisted editor history
-  import SOURCE --output PROJECT
-  export project PROJECT --output SCORE
-  render PROJECT --output WAV [--report JSON]
-  export audio PROJECT --output WAV
-  job list|inspect|cancel|retry
-  cache list|verify|clean
-  voice list|verify|convert|install|remove|set-default|import-originals
-  media import|relink|inspect|verify
-  effect scan|catalog|status
-  batch --requests FILE       Run independent requests in order
+  history list|undo|redo                Transaction history
+  import                               Import a supported project format
+  export project|audio                 Export project or audio
+  media import|relink|inspect|verify    Import and manage audio assets
+  clip <operation>                     Audio slicing, editing and rendering
+  plugin <operation>                   Built-in/external effect operations
+  mixer <operation>                    Mix, buses, sends and routing operations
+  preset <operation>                   Factory and user effect presets
+  analysis <operation>                 Audio analysis and calibration
+  effect scan|catalog|status           External plug-in inventory
+  render [PROJECT]                     Reproducible offline audio render
+  render.plan [PROJECT]                Inspect render inputs and requirements
+  voice <operation>                    Manage licensed voice packages
+  job <operation>                      Inspect, verify, cancel or retry jobs
+  cache <operation>                    Inspect and verify cached artifacts
 
---params FILE adds a JSON object of operation parameters.
---json emits one response. --events emits one JSON record per line.
-Render and export put audio in files. Diagnostics go to standard error.
+Agent skills (included offline):
+  skill list                           List validated bundled skills
+  skill show NAME                      Read SKILL.md and its file inventory
+  skill install NAME|--all              Install a managed skill collection
+  skill uninstall NAME|--all            Remove unmodified managed skills
+    --agent generic|codex|claude        .agents/skills, .codex/skills, .claude/skills
+    --scope project|user               Default: project/current working directory
+    --project-root DIR                 Explicit project root
+    --dest DIR                         Explicit skills directory (isolated/custom)
+    --dry-run                          Validate and preview without writing
+  Local changes and untracked directories are protected; there is no force mode.
+
+Protocol:
+  request                              Read one verdant-cli/1 JSON request on stdin
+  worker --stdio                       Sequential NDJSON workflow worker; one active
+                                       request at a time, progress/result events
+  serve --stdio                        Compatible alias of worker --stdio
+  batch --requests FILE                Execute bounded atomic requests in order
+
+  The separate verdant-worker executable uses the voice-synthesis worker protocol;
+  it is not the CLI workflow worker. GUI and workflow-worker commands are explicit.
+
+Common options:
+  --params FILE                        Merge operation parameters from a JSON object
+  --json                               Emit a structured response
+  --events                             Emit NDJSON progress and result events
+  --                                   End option parsing
+  --version                            Print version
+  --help                               Print this help
+
+Use "verdant schema OPERATION" for exact parameters and revision requirements.

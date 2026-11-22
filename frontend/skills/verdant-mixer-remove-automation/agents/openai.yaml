@@ -1,0 +1,6 @@
+interface:
+  display_name: "Verdant Mixer Remove Automation"
+  short_description: "Operate Verdant through its typed headless API"
+  default_prompt: "Use $verdant-mixer-remove-automation to complete the requested Verdant task."
+policy:
+  allow_implicit_invocation: true

@@ -5,18 +5,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use crate::{Args, archive, files::{self, Entry}, policy, source, target::{ORT_VERSION, Target}};
 
-pub(crate) const FORMAT: &str = "verdant-native-package/2";
+pub(crate) const FORMAT: &str = "verdant-native-package/3";
 pub(crate) const PROGRAMS: &[(&str, &str)] = &[
-    ("verdant", "gpui"), ("verdant-worker", "worker"), ("verdant-plughost", "plughost"),
+    ("verdant", "cli"), ("verdant-gui", "gpui"), ("verdant-launcher", "launcher"),
+    ("verdant-worker", "worker"), ("verdant-plughost", "plughost"),
     ("verdant-cli", "cli"), ("verdant-voice", "voice"), ("verdant-release", "release"),
 ];
 const DOCUMENTS: &[&str] = &[
     "LICENSE", "NOTICE.md", "README.md", "RELEASE.md", "SYNTHESIS-FIDELITY.md", "CONTRIBUTING.md",
     "backend/RUNTIME.md", "frontend/README.md", "frontend/P0-DECISIONS.md", "docs/verdant-voice.md",
-    "frontend/docs/PLUGIN-HOST.md", "frontend/docs/THIRD_PARTY-PLUGINS.md",
+    "frontend/docs/PLUGIN-HOST.md", "frontend/docs/THIRD_PARTY-PLUGINS.md", "frontend/docs/AGENT-AUTOMATION.md",
     "frontend/crates/verdant-app/assets/icons/LICENSE-lucide.txt",
 ];
-const LAUNCHER: &str = "#!/bin/sh\nset -eu\nbindir=$(CDPATH= cd -- \"$(dirname -- \"$0\")\" && pwd)\nprefix=$(CDPATH= cd -- \"$bindir/..\" && pwd)\nexport VERDANT_DATA_DIR=\"$prefix/share/verdant\"\nexport VERDANT_PLUGIN_HOST=\"$prefix/libexec/verdant/verdant-plughost\"\nexport VERDANT_WORKER_BINARY=\"$prefix/bin/verdant-worker\"\nexport VERDANT_ONNXRUNTIME_LIBRARY=\"$prefix/lib/libonnxruntime.so.1.23.2\"\nexec \"$prefix/libexec/verdant/verdant\" \"$@\"\n";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -46,8 +46,15 @@ pub(crate) struct Manifest {
     pub voice_package: VoiceVersion, pub development_only_model_data: bool,
     pub production_runtime: String, pub production_python_required: bool,
     pub artifact_policy: String, pub bundle: Option<Bundle>,
+    pub agent_skills: AgentSkills,
     pub native_libraries: Vec<Library>, pub programs: Vec<Program>, pub source_offer: SourceOffer,
     pub files: Vec<Entry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AgentSkills {
+    pub directory: String, pub version: String, pub manifest_sha256: String, pub skills: usize,
 }
 
 pub(crate) fn version(root: &Path) -> Result<String> {
@@ -68,7 +75,7 @@ impl Drop for NativeChild {
     fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
 }
 
-fn run_bounded(command: &mut Command, timeout: Duration) -> Result<String> {
+pub(crate) fn run_bounded(command: &mut Command, timeout: Duration) -> Result<String> {
     let mut output = tempfile::tempfile()?;
     let mut errors = tempfile::tempfile()?;
     let mut child = NativeChild(command.stdin(Stdio::null()).stdout(output.try_clone()?).stderr(errors.try_clone()?).spawn()
@@ -142,7 +149,7 @@ fn selected_copy(blobs: &mut source::Blobs, selected: &source::Selection, relati
 }
 
 fn macos(stage: &Path, target: Target, version: &str) -> Result<()> {
-    let plist = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleExecutable</key><string>verdant</string><key>CFBundleIdentifier</key><string>org.verdant.Verdant</string><key>CFBundleName</key><string>Verdant</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>{version}</string><key>CFBundleVersion</key><string>{version}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>\n");
+    let plist = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleExecutable</key><string>verdant-gui</string><key>CFBundleIdentifier</key><string>org.verdant.Verdant</string><key>CFBundleName</key><string>Verdant</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>{version}</string><key>CFBundleVersion</key><string>{version}</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>\n");
     files::write_new(&stage.join("Verdant.app/Contents/Info.plist"), plist.as_bytes(), false)?;
     for (program, _) in PROGRAMS {
         run_bounded(Command::new("codesign").args(["--force", "--sign", "-", "--timestamp=none"]).arg(stage.join(target.program_path(program))), Duration::from_secs(60))?;
@@ -244,12 +251,15 @@ pub(crate) fn run(mut args: Args) -> Result<Value> {
         ensure!(fs::symlink_metadata(output.join(format!("{name}{suffix}"))).is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound), "refusing to overwrite an existing/inaccessible publication");
     }
     let scratch = tempfile::Builder::new().prefix(".verdant-package-").tempdir_in(&output)?;
-    let stage = scratch.path().join(&name); fs::create_dir(&stage)?;
+    // Probe relocation with spaces and Unicode before producing the final archive.
+    let stage = scratch.path().join("portable launch 空 格").join(&name);
+    fs::create_dir_all(&stage)?;
+    let stage = stage.canonicalize()?;
     for (program, _) in PROGRAMS {
         let filename = format!("{program}{}", target.extension());
         let destination = stage.join(target.program_path(program));
         files::copy(&binaries.join(filename), &destination, true)?;
-        target.admit(&destination, false)?;
+        target.admit_program(&destination, program)?;
     }
     let native_libraries = runtime(runtime_directory, runtime_wheel, target, &stage)?;
     let data = stage.join(target.data_dir()); let docs = stage.join(target.docs_dir());
@@ -265,8 +275,22 @@ pub(crate) fn run(mut args: Args) -> Result<Value> {
             selected_copy(&mut source_blobs, &selected, &entry.path, &docs.join("source-licenses").join(relative))?;
         }
     }
+    let skills_directory = format!("{}/skills", target.data_dir());
+    let skills_root = stage.join(&skills_directory);
+    selected_copy(&mut source_blobs, &selected, "frontend/skills/manifest.json", &skills_root.join("manifest.json"))?;
+    let skill_manifest = verdant_agent_skills::parse_manifest(&fs::read(skills_root.join("manifest.json"))?)?;
+    ensure!(skill_manifest.version == version, "Agent Skills version differs from app version");
+    for skill in &skill_manifest.skills {
+        for file in &skill.files {
+            let relative = format!("{}/{}", skill.name, file.path);
+            selected_copy(&mut source_blobs, &selected, &format!("frontend/skills/{relative}"), &skills_root.join(&relative))?;
+            files::set_mode(&skills_root.join(relative), if file.executable { 0o755 } else { 0o644 })?;
+        }
+    }
+    let verified_skills = verdant_agent_skills::Bundle::load(&skills_root)?;
+    let agent_skills = AgentSkills { directory: skills_directory, version: version.clone(),
+        manifest_sha256: verified_skills.manifest_sha256().to_owned(), skills: skill_manifest.skills.len() };
     if !target.windows() && !target.mac() {
-        files::write_new(&stage.join("bin/verdant"), LAUNCHER.as_bytes(), true)?;
         for (relative, destination) in [("frontend/packaging/org.verdant.Verdant.desktop", "share/applications/org.verdant.Verdant.desktop"),
             ("frontend/packaging/verdant-project.xml", "share/mime/packages/verdant-project.xml")] {
             selected_copy(&mut source_blobs, &selected, relative, &stage.join(destination))?;
@@ -291,7 +315,7 @@ pub(crate) fn run(mut args: Args) -> Result<Value> {
     let mut programs = Vec::new();
     for (name, role) in PROGRAMS {
         let path = target.program_path(name);
-        let runtime_features = if matches!(*role, "gpui" | "worker") { Some(probe(&stage.join(&path), role, &version)?) } else { None };
+        let runtime_features = if matches!(*role, "gpui" | "worker" | "cli" | "launcher") { Some(probe(&stage.join(&path), role, &version)?) } else { None };
         if *role == "worker" {
             let pin = runtime_features.as_ref().and_then(|features| features.get("bundled_voice_policy_sha256"));
             if let Some(policy) = &policy {
@@ -302,6 +326,7 @@ pub(crate) fn run(mut args: Args) -> Result<Value> {
         }
         programs.push(Program { name: (*name).into(), role: (*role).into(), sha256: files::digest(&stage.join(&path))?, path, runtime_features });
     }
+    crate::entrypoints::verify(&stage, target, &version, agent_skills.skills)?;
     let source_path = format!("{}/verdant-source.tar.gz", target.docs_dir());
     source::create(&root, &selection_path, &selection_sha256, &selected, &stage.join(&source_path), epoch)?;
     let source_offer = SourceOffer { path: source_path.clone(), sha256: files::digest(&stage.join(source_path))?,
@@ -312,7 +337,7 @@ pub(crate) fn run(mut args: Args) -> Result<Value> {
         voice_package: VoiceVersion { name: "verdant-voice".into(), version }, development_only_model_data: false,
         production_runtime: "Rust".into(), production_python_required: false,
         artifact_policy: if bundle_receipt.is_some() { "authorized-voice/1" } else { "code-runtime/no-model-data/1" }.into(),
-        bundle: bundle_receipt, native_libraries, programs, source_offer, files: members };
+        bundle: bundle_receipt, agent_skills, native_libraries, programs, source_offer, files: members };
     files::write_new_json(&stage.join("RELEASE-ASSETS.json"), &manifest)?;
     archive::check(&stage, policy.as_ref(), Some(&selected.source_commit), Some(&manifest.source_offer.source_selection_sha256), true, false)?;
     let prepared = scratch.path().join("publication"); fs::create_dir(&prepared)?;

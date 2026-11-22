@@ -1,0 +1,212 @@
+[
+  {
+    "family": "eq",
+    "window_title": "Verdant EQ",
+    "window": {
+      "WINDOW": "6291487",
+      "X": "352",
+      "Y": "172",
+      "WIDTH": "900",
+      "HEIGHT": "760",
+      "SCREEN": "0"
+    },
+    "screenshot": "eq-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "compressor",
+    "window_title": "Verdant Compressor",
+    "window": {
+      "WINDOW": "6291492",
+      "X": "362",
+      "Y": "182",
+      "WIDTH": "880",
+      "HEIGHT": "740",
+      "SCREEN": "0"
+    },
+    "screenshot": "compressor-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "gate",
+    "window_title": "Verdant Gate",
+    "window": {
+      "WINDOW": "6291497",
+      "X": "362",
+      "Y": "182",
+      "WIDTH": "880",
+      "HEIGHT": "740",
+      "SCREEN": "0"
+    },
+    "screenshot": "gate-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "deesser",
+    "window_title": "Verdant De-esser",
+    "window": {
+      "WINDOW": "6291502",
+      "X": "402",
+      "Y": "192",
+      "WIDTH": "800",
+      "HEIGHT": "720",
+      "SCREEN": "0"
+    },
+    "screenshot": "deesser-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "limiter",
+    "window_title": "Verdant Limiter",
+    "window": {
+      "WINDOW": "6291507",
+      "X": "402",
+      "Y": "192",
+      "WIDTH": "800",
+      "HEIGHT": "720",
+      "SCREEN": "0"
+    },
+    "screenshot": "limiter-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "reverb",
+    "window_title": "Verdant Reverb",
+    "window": {
+      "WINDOW": "6291512",
+      "X": "402",
+      "Y": "192",
+      "WIDTH": "800",
+      "HEIGHT": "720",
+      "SCREEN": "0"
+    },
+    "screenshot": "reverb-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "delay",
+    "window_title": "Verdant Delay",
+    "window": {
+      "WINDOW": "6291517",
+      "X": "402",
+      "Y": "192",
+      "WIDTH": "800",
+      "HEIGHT": "720",
+      "SCREEN": "0"
+    },
+    "screenshot": "delay-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "saturation",
+    "window_title": "Verdant Saturation",
+    "window": {
+      "WINDOW": "6291522",
+      "X": "352",
+      "Y": "162",
+      "WIDTH": "900",
+      "HEIGHT": "780",
+      "SCREEN": "0"
+    },
+    "screenshot": "saturation-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "multiband",
+    "window_title": "Verdant Multiband",
+    "window": {
+      "WINDOW": "6291527",
+      "X": "352",
+      "Y": "162",
+      "WIDTH": "900",
+      "HEIGHT": "780",
+      "SCREEN": "0"
+    },
+    "screenshot": "multiband-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "filter",
+    "window_title": "Verdant Filter",
+    "window": {
+      "WINDOW": "6291532",
+      "X": "352",
+      "Y": "162",
+      "WIDTH": "900",
+      "HEIGHT": "780",
+      "SCREEN": "0"
+    },
+    "screenshot": "filter-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "simplon",
+    "window_title": "Verdant Dual Filter",
+    "window": {
+      "WINDOW": "6291537",
+      "X": "352",
+      "Y": "162",
+      "WIDTH": "900",
+      "HEIGHT": "780",
+      "SCREEN": "0"
+    },
+    "screenshot": "simplon-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "micro",
+    "window_title": "Verdant Micro Filter",
+    "window": {
+      "WINDOW": "6291542",
+      "X": "442",
+      "Y": "217",
+      "WIDTH": "720",
+      "HEIGHT": "670",
+      "SCREEN": "0"
+    },
+    "screenshot": "micro-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "synth",
+    "window_title": "Verdant Synth",
+    "window": {
+      "WINDOW": "6291547",
+      "X": "332",
+      "Y": "162",
+      "WIDTH": "940",
+      "HEIGHT": "780",
+      "SCREEN": "0"
+    },
+    "screenshot": "synth-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  },
+  {
+    "family": "one",
+    "window_title": "Verdant One",
+    "window": {
+      "WINDOW": "6291552",
+      "X": "402",
+      "Y": "192",
+      "WIDTH": "800",
+      "HEIGHT": "720",
+      "SCREEN": "0"
+    },
+    "screenshot": "one-light.png",
+    "capture": "Xvfb root",
+    "host_profile": "release"
+  }
+]

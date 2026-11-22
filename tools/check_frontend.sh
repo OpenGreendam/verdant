@@ -57,6 +57,9 @@ esac
 export VERDANT_WORKER_BINARY="$worker_target/debug/verdant-worker"
 export VERDANT_TEST_WORKER_BINARY="$worker_target/debug/verdant-test-worker"
 cargo test --offline --locked --workspace --features verdant-test-worker/protocol-fixture
+# Packages need the optimized DSP host: debug oversampling can miss realtime deadlines.
+cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-launcher \
+    -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
 # CI caches the target directory and uploads package-smoke.*. Remove only
 # these generated smoke outputs so an older cached package cannot be uploaded
 # alongside the payload checked in this run. rm removes links without following
@@ -71,12 +74,12 @@ package_output=$(mktemp -d "$worker_target/package-smoke.XXXXXX")
 # this container, so the directory must be listable by others.
 chmod 0755 "$package_output"
 source_selection=$(mktemp -d "$worker_target/source-selection.XXXXXX")/selection.json
-release="$worker_target/debug/verdant-release"
+release="$worker_target/release/verdant-release"
 selection_sha=$("$release" select-source --repo "$repo" --output "$source_selection" | jq -er .sha256)
 source_commit=$(git -C "$repo" rev-parse HEAD)
 SOURCE_DATE_EPOCH=$(git -C "$repo" show -s --format=%ct HEAD)
 export SOURCE_DATE_EPOCH
-"$release" package --repo "$repo" --binaries "$worker_target/debug" --output "$package_output" \
+"$release" package --repo "$repo" --binaries "$worker_target/release" --output "$package_output" \
     --source-selection "$source_selection" --source-selection-sha256 "$selection_sha" \
     --onnxruntime-wheel "$VERDANT_ONNXRUNTIME_WHEEL"
 "$release" check --check "$package_output" --require-package --expected-source-commit "$source_commit" \

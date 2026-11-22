@@ -2,7 +2,7 @@
 //!
 //! Process-isolated hosting of CLAP, VST3 and (macOS) Audio Unit effects. Each
 //! live insert is served by its own `verdant-plughost` child process: audio
-//! flows through bounded shared-memory queues with 9472 frames of RT transport
+//! flows through bounded shared-memory queues with callback-budgeted RT transport
 //! latency (197⅓ ms at 48 kHz); native DSP blocks remain 256 frames. Control uses
 //! a line-delimited JSON protocol on
 //! pipes. A crashed or stalled plugin can only turn into passthrough + a
@@ -33,6 +33,7 @@ pub mod plugin;
 pub mod project;
 pub mod proto;
 pub mod preset_interop;
+pub mod factory_presets;
 pub mod scan;
 pub mod shm;
 pub mod telemetry;
@@ -94,4 +95,10 @@ pub fn resolve_plughost(explicit: Option<&std::path::Path>) -> Option<std::path:
         .into_iter()
         .map(|d| d.join(binary))
         .find(|p| Path::new(p).is_file())
+}
+
+/// Admitted offline processing rates; live engine rate is negotiated separately.
+pub const OFFLINE_SAMPLE_RATES: [u32; 5] = [44_100, 48_000, 88_200, 96_000, 192_000];
+pub fn supported_sample_rate(rate:f64)->bool {
+    rate.is_finite() && OFFLINE_SAMPLE_RATES.iter().any(|r|f64::from(*r)==rate)
 }

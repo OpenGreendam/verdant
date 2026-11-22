@@ -19,7 +19,7 @@ Linux 0.1.0 已有真实本地模型、断网合成、48 kHz 输出、Pride 外�
 
 ## 程序与声库
 
-从新用户状态开始，清除测试环境对预置注册表、缓存与外部声库的依赖，在断网条件解包待验收归档。检查 `verdant --runtime-features` 与 `verdant-worker --runtime-features` 的版本及角色，再按实际入口打开工程、编辑、保存、重开和真实渲染。
+从新用户状态开始，清除测试环境对预置注册表、缓存与外部声库的依赖，在断网条件解包待验收归档。检查 `verdant --runtime-features`、`verdant-gui --runtime-features`、根启动器及 `verdant-worker --runtime-features` 的版本与角色。确认无参数 `verdant` 立即显示帮助；`verdant gui --check` 和根启动器 `--check` 指向同包 GUI，再从包根启动器／`verdant gui` 打开工程、编辑、保存、重开和真实渲染。测试包路径、工作目录和工程名含空格及 Unicode；Windows 双击不额外打开控制台，缺失 GUI/异常退出应显示错误。
 
 正式发行要求随包提供具备分发依据的同版本完整声库，首启即可选择并合成。记录归档、声库清单 SHA-256、报告 `voice_version`、48 kHz 原生输出与实际 PCM。使用用户原始文件及兼容本地模型的安装和逐字节回滚单独验收。[声库命令](../../docs/verdant-voice.md)
 
@@ -40,6 +40,8 @@ IME 记录组合开始、更新、取消、提交、焦点切换及候选框位�
 ## CLI 与机器人
 
 无显示、声卡和 MIDI 的导入、编辑、合成与多轨导出按 [CLI／DSH 验收矩阵](../../spec/CLI-DSH.md)执行；与同工程桌面比较实际输入及最终 PCM。真实 IM 通道另记录附件、后台完成、发送回执和接收播放；本地产物或 queued 状态不能记为平台 sent。
+
+断网验证 `verdant skill list/show/install/uninstall`，在隔离目录完成整套安装、重复安装、版本更新和卸载；用户修改、未知目录、符号链接和越界路径应保留并拒绝覆盖。验证工作流 `verdant worker --stdio` 的顺序 `verdant-cli/1` 响应，与独立声库 worker 角色区分。包检查不代表 BSD 桌面已完成原生验收。
 
 ## 记录与判定
 

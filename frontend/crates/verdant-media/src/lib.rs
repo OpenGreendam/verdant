@@ -29,9 +29,10 @@ mod asset;
 mod clip;
 mod decode;
 mod preview;
+mod stretch;
 
 pub use asset::{AssetPolicy, ImportedAudio, MediaImporter};
-pub use clip::{AUDIO_CLIPS_KEY, AUDIO_CLIPS_SCHEMA, AudioClip, AudioSource, PreparedClip,
+pub use clip::{AUDIO_CLIPS_KEY, AUDIO_CLIPS_SCHEMA, AudioClip, AudioSource, ClipFadeWindow, FadeShape, PreparedClip,
     clips_value, prepare_clip, read_clips, read_clips_value, write_clips};
 pub use decode::{DecodedAudio, ImportLimits, decode_bytes};
 pub use preview::{Peak, WaveformCache, WaveformPreview};

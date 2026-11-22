@@ -1,0 +1,21 @@
+{
+  "op": "skill.list",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "all": {
+        "type": "boolean"
+      },
+      "bundle": {
+        "description": "Explicit offline bundle directory",
+        "type": "string"
+      },
+      "name": {
+        "maxLength": 64,
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

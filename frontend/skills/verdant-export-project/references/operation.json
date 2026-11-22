@@ -1,0 +1,49 @@
+{
+  "op": "export.project",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "format": {
+        "type": "string"
+      },
+      "loss_policy": {
+        "enum": [
+          "strict",
+          "allow"
+        ]
+      },
+      "options": {
+        "type": "object"
+      },
+      "output": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "report": {
+        "type": "string"
+      },
+      "track_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "output"
+    ],
+    "type": "object"
+  }
+}

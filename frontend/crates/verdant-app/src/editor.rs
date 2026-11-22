@@ -497,6 +497,7 @@ impl Editor {
             session.viewport.top_pitch = first.midi_note as f64 + 12.0;
         }
         let audio_info = engine.output_info();
+        audio.require_callback_budget();
         let playback = crate::clock::PlaybackViews::new(cx.weak_entity(), cx);
         let chrome = crate::view::ChromeViews::new(cx.weak_entity(), cx);
         let owner = cx.weak_entity();
@@ -1187,7 +1188,7 @@ impl Editor {
         self.note_creation = None;
         self.arrange_drag = None;
         self.cancel_midi_recording("工程切换，MIDI 录音已取消");
-        self.integrations.selected_clip=None;self.integrations.media_ready=false;self.integrations.media_previews.clear();self.integrations.media_save_generation=self.integrations.media_save_generation.wrapping_add(1);
+        self.integrations.selected_clip=None;let clipboard=self.integrations.audio_edit.clipboard.take();self.integrations.audio_edit=Default::default();self.integrations.audio_edit.clipboard=clipboard;self.integrations.timeline_preparation=Default::default();self.integrations.media_ready=false;self.integrations.media_previews.clear();self.integrations.media_save_generation=self.integrations.media_save_generation.wrapping_add(1);
         self.project_path = crate::demos::save_destination(self.persistence.project(), Some(self.persistence.project_path()),
             &crate::files::state_dir().join("documents"));
         self.lyric = None;
@@ -1505,6 +1506,11 @@ impl Editor {
                 else { self.import_project_path(path, window, cx); }
             }
             MenuAction::ExportProject => crate::files::export_dialog(self, window, cx),
+            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.is_focused(window) => {
+                use integrations::audio_edit_ui::AudioUiAction as A;
+                let action=match action{MenuAction::Cut=>A::Cut,MenuAction::Copy=>A::Copy,MenuAction::Paste=>A::Paste,MenuAction::DeleteSelection=>A::Delete,MenuAction::SelectAll=>A::SelectAll,_=>A::Duplicate};
+                if let Err(error)=self.run_audio_ui(action,window,cx){self.notice(error);cx.notify();}
+            }
             MenuAction::Cut => self.cut_notes(window, cx),
             MenuAction::Copy => self.copy_notes(cx),
             MenuAction::Paste => {
@@ -2588,14 +2594,14 @@ impl Editor {
             audio: entry.audio.clone(),
             playback_key: Some((phrase.index, entry.digest.clone())),
         }).collect::<Vec<_>>();
-        let project=self.store().snapshot();let rate=self.audio_info.sample_rate;let policy=self.media_asset_policy();let settings=self.playback_settings();let bindings=self.native_bindings();
+        let project=self.store().snapshot();let rate=self.audio_info.sample_rate;let policy=self.media_asset_policy();let settings=self.playback_settings();let bindings=self.native_bindings();let callback_budget=self.insert_runtime.callback_budget;
         let planned_end = self.scheduler.wanted().iter().map(|wanted| {
             let phrase = &wanted.phrase;
             ((phrase.start_seconds + phrase.seconds) * f64::from(rate)).ceil() as u64
         }).max().unwrap_or(0);
         let cached = self.phrase_pcm.for_sources(&sources, rate);
         let mut media_cache=std::mem::take(&mut self.integrations.media_cache);let mut media_previews=HashMap::new();
-        self.timeline_gen+=1;let generation=self.timeline_gen;
+        self.timeline_gen+=1;let generation=self.timeline_gen;self.integrations.timeline_preparation.begin(generation);
         cx.spawn(async move|this,cx|{
             let result=cx.background_spawn(async move{
                 let policy=policy?;
@@ -2619,9 +2625,9 @@ impl Editor {
                 project_audio::extend_realtime_timeline(&mut prepared.timeline,&bindings)?;
                 Ok::<_,String>((prepared,media_previews,media_cache))
             }).await;
-            let _=this.update(cx,|ed,cx|{if ed.timeline_gen!=generation{return;}match result{
-                Ok((prepared,media_previews,media_cache))=>{ed.integrations.media_cache=media_cache;ed.integrations.media_previews=media_previews;ed.phrase_pcm=prepared.phrase_pcm;ed.timeline_phrases=prepared.phrase_count;ed.timeline_instruments=prepared.instrument_count;ed.integrations.media_ready=prepared.media_count>0;let revision=ed.audio.set_timeline(prepared.timeline);ed.insert_timeline_ready(revision,cx);}
-                Err(error)=>{ed.audio.set_timeline(Timeline::new(rate,Vec::new()));ed.timeline_phrases=0;ed.timeline_instruments=0;ed.integrations.media_ready=false;ed.integrations.media_previews.clear();ed.notice(format!("音频时序 / 资产校验失败：{error}"));}
+            let _=this.update(cx,|ed,cx|{if !ed.integrations.timeline_preparation.finish(generation)||ed.timeline_gen!=generation||ed.audio.callback_budget()!=callback_budget{return;}match result{
+                Ok((prepared,media_previews,media_cache))=>{ed.integrations.media_cache=media_cache;ed.integrations.media_previews=media_previews;ed.phrase_pcm=prepared.phrase_pcm;ed.timeline_phrases=prepared.phrase_count;ed.timeline_instruments=prepared.instrument_count;ed.integrations.media_ready=prepared.media_count>0;let revision=ed.audio.set_timeline_for_callback_budget(prepared.timeline,callback_budget);ed.insert_timeline_ready(revision,cx);}
+                Err(error)=>{ed.audio.pause();ed.stop_insert_transport();let revision=ed.audio.set_timeline_for_callback_budget(Timeline::new(rate,Vec::new()),callback_budget);ed.timeline_phrases=0;ed.timeline_instruments=0;ed.integrations.media_ready=false;ed.integrations.media_previews.clear();ed.insert_timeline_ready(revision,cx);ed.notice(format!("音频时序 / 资产校验失败：{error}"));}
             }cx.notify();});
         }).detach();
     }
@@ -2825,11 +2831,20 @@ impl Editor {
             }
         }
         self.pump_midi(cx);
-        if self.audio.shared.automation_fault.swap(false,std::sync::atomic::Ordering::AcqRel){self.audio.pause();self.notice("原生插件自动化处理被拒绝；播放已暂停，请检查插件和事件密度");cx.notify();}
+        if self.audio.shared.automation_fault.swap(false,std::sync::atomic::Ordering::AcqRel){
+            self.audio.pause();
+            let faults=self.inserts.values().flatten().chain(&self.master_inserts).filter_map(|slot|{
+                let verdant_plugins::InsertSlot::Live(handle)=slot else{return None;};
+                handle.automation_fault_detail().map(|detail|format!("{}: {detail}",handle.spec().name))
+            }).collect::<Vec<_>>();
+            for fault in &faults{eprintln!("native processing stopped: {fault}");}
+            self.notice(if faults.is_empty(){"原生插件自动化处理被拒绝；播放已暂停，请检查插件和事件密度".into()}
+                else{format!("原生插件处理已暂停：{}",faults.join("；"))});cx.notify();
+        }
         let notices = self.notices.len();
         self.maintain(cx);
         if self.notices.len() != notices { cx.notify(); }
-        if self.insert_specs_applied.is_empty() { self.restore_inserts(cx); }
+        if self.insert_specs_applied.is_empty() || self.audio.callback_budget()!=self.insert_runtime.callback_budget { self.restore_inserts(cx); }
         // Device events from the audio driver thread.
         for ev in self.engine.drain_events() {
             match ev {

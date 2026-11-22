@@ -1,0 +1,91 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "preset.import-ffp",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "device": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "instance_id": {
+        "type": "string"
+      },
+      "loss_policy": {
+        "enum": [
+          "strict",
+          "allow"
+        ]
+      },
+      "owner": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "master"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "track",
+                  "instrument"
+                ]
+              },
+              "track_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "track_id"
+            ],
+            "type": "object"
+          }
+        ],
+        "type": "object"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "source": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "source",
+      "device",
+      "owner",
+      "instance_id"
+    ],
+    "type": "object"
+  }
+}

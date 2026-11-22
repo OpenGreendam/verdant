@@ -1,0 +1,24 @@
+{
+  "op": "job.retry",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "job_id": {
+        "type": "string"
+      },
+      "output": {
+        "type": "string"
+      },
+      "report": {
+        "type": "string"
+      },
+      "workspace": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "job_id"
+    ],
+    "type": "object"
+  }
+}

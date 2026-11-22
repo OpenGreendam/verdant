@@ -1,0 +1,105 @@
+{
+  "schema": "verdant-native-studio-integration/1",
+  "date": "2026-11-22",
+  "base_commit": "91a775546ebd21a87d76d76568195a6513437719",
+  "status": "local_integration_passed",
+  "records": [
+    {
+      "file": "followups-workspace-build.log",
+      "sha256": "2f50b371a336302ab2a8af728b5f739cd02ea65b6cd30ccbfb0646d1e51d3137",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "file": "followups-workspace-tests.log",
+      "sha256": "02223bac7e80094b13ed43e75d99d95e36e69dfc2818f385a8cd1a6bc7dfde98",
+      "passed": 1120,
+      "failed": 0,
+      "ignored": 16
+    },
+    {
+      "file": "followups-real-host-tests.log",
+      "sha256": "a660d0ff5d003cd86e8ac294119ae0f11cf39bdac0770c029a25799d5129f8c3",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "file": "followups-sidechain-host-final.log",
+      "sha256": "124ab0e8cee7c6583d4e1947b00930e433a37a584c274c0eadb20d0b952c6cc5",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "file": "followups-entrypoints-final.log",
+      "sha256": "1dff57e946ba64b6b7890aaf884bc94b6023e0c3d6bc812be933b133f84510e4",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "file": "followups-proto-rules.log",
+      "sha256": "46f2925f6c07037a3e73f1c1cc9dffa014ffc42cb4b6d7515c5a3c01432bb21d",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "file": "followups-proto-generated.log",
+      "sha256": "96e9bff2a3dbdea68e692ad15918ef70e846a8c5303a79dc6cd674fc817b7049",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "skills": {
+    "count": 128,
+    "cli_operations": 95,
+    "domain_operations": 32,
+    "overview_skills": 1,
+    "manifest_sha256": "bfe8f79ad5ba70983a4b86cdd17c3364da3d02c731c496cc4b66acdb2113f81b",
+    "all_manifest_files_verified": true,
+    "line_endings": "LF",
+    "bundle_version": "0.1.0"
+  },
+  "native_devices": 14,
+  "factory_presets": 280,
+  "runtime": {
+    "verdant": {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+      "sha256": "6c54dc87d81e1d0e6d16508f39e8704bd04619c0821f9646bd70e40c51d75577"
+    },
+    "verdant-cli": {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-cli",
+      "sha256": "d6144cecd0c978e9fe5f389de3b56bd01a61a3d125d18ffcd2a49498bc5416fa"
+    },
+    "verdant-gui": {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-gui",
+      "sha256": "e5181bd8fa07933dc14e861fcc4db370a89e138365a33d0c00faf0fbedc68b91"
+    },
+    "verdant-launcher": {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-launcher",
+      "sha256": "f302a132f469c2d7e136b4b324976aa4ef1ea0491eac52ed8f098b45bcd794ed"
+    },
+    "verdant-plughost": {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-plughost",
+      "sha256": "575c3cbe40a8c7a9f985d96e3e9c964a09a64bd07a8f55a3511d71faa5a94ac3"
+    }
+  },
+  "pinned_generated_output": "skipped_locally_missing_upstream_checkout",
+  "remaining_opt_in_workspace_cases": 7,
+  "package_preflight_correction": {
+    "observed_head": "6ead70d878d1f1e0bd1a6b175e4a34c2bd8e76f6",
+    "guard_error": "Agent Skills version differs from app version",
+    "previous_bundle_version": "1.0.0",
+    "workspace_and_bundle_version": "0.1.0",
+    "resolution": "Generator reads workspace.package.version from frontend/Cargo.toml; only manifest.version changed. All 128 skill payloads and hashes are unchanged.",
+    "checks": [
+      "all manifest payload hashes verified",
+      "actual CLI skill.list reads 128 skills at workspace version",
+      "generator output exactly reproduces the current manifest"
+    ]
+  }
+}

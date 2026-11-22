@@ -6,16 +6,18 @@
 
 | 平台 | 桌面入口 | worker／效果宿主 | ONNX Runtime 1.23.2 |
 | --- | --- | --- | --- |
-| Linux x64 | `bin/verdant` | `bin/verdant-worker`；`libexec/verdant/verdant-plughost` | `lib/libonnxruntime.so.1.23.2` |
-| Windows x64／MSVC | `bin/verdant.exe` | 同目录 `verdant-worker.exe`、`verdant-plughost.exe` | 同目录 `onnxruntime.dll`、`onnxruntime_providers_shared.dll` |
+| Linux x64 | `verdant-launcher` 或 `bin/verdant gui` | `bin/verdant-worker`；`libexec/verdant/verdant-plughost` | `lib/libonnxruntime.so.1.23.2` |
+| Windows x64／MSVC | `verdant-launcher.exe` 或 `bin/verdant.exe gui` | 同目录 `verdant-worker.exe`、`verdant-plughost.exe` | 同目录 `onnxruntime.dll`、`onnxruntime_providers_shared.dll` |
 | macOS Apple Silicon | `Verdant.app` | `Contents/MacOS/{verdant-worker,verdant-plughost}` | `Contents/Frameworks/libonnxruntime.1.23.2.dylib` |
 
 构建与打包命令由 [RELEASE.md](../RELEASE.md)维护。Windows 与 macOS 的原生验收待完成；macOS 基线声明最低 13.0，临时签名不表示公证或目标机验收。[平台验收](../frontend/docs/PLATFORM-ACCEPTANCE.md)
 
 ```sh
-/path/to/package/bin/verdant /path/to/song.verp
-/path/to/package/bin/verdant --import /path/to/source.ufdata
+/path/to/package/bin/verdant gui /path/to/song.verp
+/path/to/package/bin/verdant gui --import /path/to/source.ufdata
 ```
+
+`verdant` 无参数显示帮助并退出；`verdant gui` 启动独立 GUI。包根 launcher 可直接启动 GUI。`verdant worker --stdio` 为 Agent 的顺序工作流协议，独立 `verdant-worker` 保持音声合成协议；参见 [Agent 自动化手册](../frontend/docs/AGENT-AUTOMATION.md)。
 
 桌面默认启动真实 worker。`--worker-binary FILE` 优先于 `VERDANT_WORKER_BINARY`，随后选择桌面二进制同目录的 worker；显式路径不存在时启动失败。`--silent-audio` 只改播放时钟，合成仍执行真实模型。
 

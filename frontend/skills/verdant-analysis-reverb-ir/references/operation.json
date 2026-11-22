@@ -1,0 +1,22 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "analysis.reverb-ir",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "channel": {
+        "description": "Zero-based source channel; by default analyze the higher-energy channel.",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "source": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "source"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "op": "skill.show",
+  "params": {
+    "additionalProperties": false,
+    "oneOf": [
+      {
+        "not": {
+          "required": [
+            "all"
+          ]
+        },
+        "required": [
+          "name"
+        ]
+      },
+      {
+        "not": {
+          "required": [
+            "name"
+          ]
+        },
+        "properties": {
+          "all": {
+            "const": true
+          }
+        },
+        "required": [
+          "all"
+        ]
+      }
+    ],
+    "properties": {
+      "all": {
+        "type": "boolean"
+      },
+      "bundle": {
+        "description": "Explicit offline bundle directory",
+        "type": "string"
+      },
+      "name": {
+        "maxLength": 64,
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

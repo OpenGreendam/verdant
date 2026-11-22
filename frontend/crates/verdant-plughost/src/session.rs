@@ -51,6 +51,7 @@ pub fn run_host(channel_arg: &str, output: ProtocolOutput) -> Result<()> {
         parameter_events: vec![(0, 0, 0.0); MAX_PARAM_EVENTS],
         automation: Vec::new(),
         telemetry: TelemetryCapture::default(),
+        processing_rate: verdant_plugins::SAMPLE_RATE,
         meter_epoch:0,
         editor_title: None,
         ev_tx,
@@ -92,6 +93,7 @@ struct Session {
     /// Fixed history of successful actual I/O; FFT and display work stay in
     /// the client. It is never shared or locked from the audio callback.
     telemetry: TelemetryCapture,
+    processing_rate: f64,
     meter_epoch:u64,
     /// Whether an editor window is currently open (for service pumping).
     editor_title: Option<String>,
@@ -310,6 +312,7 @@ impl Session {
                         Ok(capture) => capture,
                         Err(error) => return self.send(control::reply(id, false, Some(error.to_string()), data)),
                     };
+                    self.processing_rate = sample_rate;
                     self.plugin = Some(plugin);
                     control::reply(id, true, None, data)
                 }
@@ -319,7 +322,7 @@ impl Session {
                 sample_rate,
                 max_frames,
                 ..
-            } if sample_rate != verdant_plugins::SAMPLE_RATE || max_frames as usize != self.ring.max_frames() => {
+            } if sample_rate != self.processing_rate || max_frames as usize != self.ring.max_frames() => {
                 control::reply(id, false, Some("insert rate/block quantum is fixed".into()), data)
             }
             HostRequest::Reconfigure { sample_rate, max_frames, .. } => match self.plugin.as_mut() {

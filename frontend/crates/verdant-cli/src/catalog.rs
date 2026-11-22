@@ -2,7 +2,7 @@ use serde_json::{Value, json};
 
 use crate::{Outcome, invalid, protocol::{MAX_REQUEST_BYTES, PROTOCOL}};
 
-pub const FAMILIES: &[&str] = &["project", "history", "export", "job", "cache", "voice", "effect", "media"];
+pub const FAMILIES: &[&str] = &["project", "history", "export", "job", "cache", "voice", "effect", "media", "skill"];
 const FORMATS: &[&str] = &["ust", "ustx", "ufdata", "midi", "svp", "vsqx", "vpr"];
 const OPERATIONS: &[&str] = &[
     "capabilities", "schema", "doctor", "project.new", "project.inspect", "project.validate",
@@ -13,9 +13,26 @@ const OPERATIONS: &[&str] = &[
     "media.import", "media.relink", "media.inspect", "media.verify", "effect.scan", "effect.catalog", "effect.status",
 ];
 
+pub fn is_family(name: &str) -> bool {
+    FAMILIES.contains(&name) || crate::studio::FAMILIES.contains(&name)
+}
+
+fn operations() -> Vec<&'static str> {
+    let mut operations = OPERATIONS.to_vec();
+    operations.extend_from_slice(crate::studio::OPERATIONS);
+    operations.extend_from_slice(crate::skills::OPERATIONS);
+    operations.sort_unstable();
+    operations.dedup();
+    operations
+}
+
 pub fn runtime_features() -> Value {
     json!({"schema":"verdant-runtime-features/1","role":"cli","version":env!("CARGO_PKG_VERSION"),
-        "protocol":PROTOCOL,"headless":true,"commands":["request","serve","render","project","voice"]})
+        "voice_package":{"name":"verdant-voice","version":env!("CARGO_PKG_VERSION")},
+        "protocol":PROTOCOL,"headless":true,"default_command":"help",
+        "commands":["gui","request","worker","serve","render","project","voice","plugin","mixer","preset","clip","analysis","skill"],
+        "workflow_worker":{"command":["worker","--stdio"],"protocol":PROTOCOL,"max_active_requests":1},
+        "voice_worker":{"executable":"verdant-worker","protocol":verdant_backend::wire::PROTOCOL}})
 }
 
 pub fn capabilities(params: Value) -> Outcome {
@@ -23,10 +40,14 @@ pub fn capabilities(params: Value) -> Outcome {
         return Err(invalid("capabilities takes no parameters"));
     }
     Ok(json!({"protocol":PROTOCOL,"version":env!("CARGO_PKG_VERSION"),"worker_protocol":verdant_backend::wire::PROTOCOL,
-        "operations":OPERATIONS,"formats":FORMATS,"format_capabilities":crate::exchange::format_catalog(),
+        "operations":operations(),"formats":FORMATS,"format_capabilities":crate::exchange::format_catalog(),
         "project_operations":crate::project::operation_catalog(),"max_request_bytes":MAX_REQUEST_BYTES,
-        "audio":{"sample_rates":[44100,48000,88200,96000,192000],"channels":[1,2],"encodings":["Float32","Pcm16","Pcm24"]},
-        "device":{"playback":false,"capture":false,"midi":false},"stdio":{"max_active_requests":1}}))
+        "audio":{"sample_rates":[44100,48000,88200,96000,192000],"processing_sample_rates":verdant_plugins::OFFLINE_SAMPLE_RATES,"channels":[1,2],"encodings":["Float32","Pcm16","Pcm24"]},
+        "device":{"playback":false,"capture":false,"midi":false},
+        "stdio":{"command":["verdant","worker","--stdio"],"legacy_command":["verdant-cli","serve","--stdio"],
+            "protocol":PROTOCOL,"max_active_requests":1,"request_order":"sequential"},
+        "gui":{"command":["verdant","gui"],"default_wait":false},
+        "skill_bundle":{"schema":"verdant-agent-skills/1","offline":true}}))
 }
 
 pub fn schema(params: Value) -> Outcome {
@@ -35,17 +56,19 @@ pub fn schema(params: Value) -> Outcome {
     struct Query { op: Option<String> }
     let query: Query = serde_json::from_value(params).map_err(|error| invalid(error.to_string()))?;
     match query.op {
-        Some(op) if OPERATIONS.contains(&op.as_str()) => Ok(operation_schema(&op)),
+        Some(op) if operations().contains(&op.as_str()) => Ok(operation_schema(&op)),
         Some(op) => Err(invalid(format!("unknown operation {op}"))),
         None => Ok(json!({"protocol":PROTOCOL,"request":{"type":"object","additionalProperties":false,
             "required":["protocol","request_id","op","params"],"properties":{
                 "protocol":{"const":PROTOCOL},"request_id":{"type":"string","minLength":1,"maxLength":128},
-                "op":{"enum":OPERATIONS},"params":{"type":"object"}}},
-                "operations":OPERATIONS.iter().map(|op| operation_schema(op)).collect::<Vec<_>>() })),
+                "op":{"enum":operations()},"params":{"type":"object"}}},
+                "operations":operations().iter().map(|op| operation_schema(op)).collect::<Vec<_>>() })),
     }
 }
 
-fn operation_schema(op: &str) -> Value {
+pub(crate) fn operation_schema(op: &str) -> Value {
+    if let Some(schema) = crate::studio::schema(op) { return schema; }
+    if let Some(schema) = crate::skills::schema(op) { return schema; }
     let required: &[&str] = match op {
         "project.new" => &["output"],
         "project.apply" => &["path", "expect_revision", "operations"],
@@ -127,6 +150,8 @@ fn field_schema(key: &str) -> Value {
 }
 
 pub fn positionals(op: &str) -> &'static [&'static str] {
+    if let Some(names) = crate::studio::positionals(op) { return names; }
+    if let Some(names) = crate::skills::positionals(op) { return names; }
     match op {
         "schema" => &["op"],
         "import" => &["source"],

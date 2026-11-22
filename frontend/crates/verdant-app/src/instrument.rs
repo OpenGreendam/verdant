@@ -52,6 +52,15 @@ pub fn synth_params(track: &Track) -> Option<SynthParams> {
         .then(|| SynthParams::from_json_for(id, spec.get("params")))
 }
 
+/// Playback admission is separate from editor admission: a bypassed native
+/// instrument remains fully editable and keeps its saved parameters.
+pub(crate) fn synth_monitor_enabled(track:&Track)->bool{
+    track.instrument().is_some_and(|spec|
+        spec.get("bypass").and_then(serde_json::Value::as_bool)!=Some(true)
+        &&spec.get("format").and_then(serde_json::Value::as_str)==Some("builtin")
+        &&spec.get("id").and_then(serde_json::Value::as_str).is_some_and(dsp::is_builtin_instrument))
+}
+
 /// The synth settings as editor parameter descriptors.
 #[cfg(test)]
 pub fn synth_descs(params: &SynthParams) -> Vec<ParamDesc> { synth_descs_for(SYNTH_ID, params) }

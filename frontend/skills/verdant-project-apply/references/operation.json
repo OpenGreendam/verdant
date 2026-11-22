@@ -1,0 +1,487 @@
+{
+  "op": "project.apply",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "label": {
+        "type": "string"
+      },
+      "operations": {
+        "items": {
+          "properties": {
+            "op": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "operations"
+    ],
+    "type": "object"
+  },
+  "project_operations": {
+    "discriminator": "op",
+    "operations": [
+      {
+        "example": {
+          "delta_semitones": 0,
+          "delta_tick": 120,
+          "note_ids": [
+            "INSPECTED_NOTE_ID"
+          ],
+          "op": "move_notes",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_ids",
+          "delta_tick",
+          "delta_semitones"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "move_notes"
+      },
+      {
+        "example": {
+          "delta_tick": 120,
+          "edge": "end",
+          "note_ids": [
+            "INSPECTED_NOTE_ID"
+          ],
+          "op": "resize_notes",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_ids",
+          "edge",
+          "delta_tick"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "resize_notes"
+      },
+      {
+        "example": {
+          "delta_semitones": 0,
+          "delta_tick": 960,
+          "new_ids": [
+            "NEW_UNIQUE_NOTE_ID"
+          ],
+          "op": "duplicate_notes",
+          "source_ids": [
+            "INSPECTED_NOTE_ID"
+          ],
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "source_ids",
+          "new_ids",
+          "delta_tick",
+          "delta_semitones"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "duplicate_notes"
+      },
+      {
+        "example": {
+          "notes": [
+            {
+              "duration_tick": 960,
+              "id": "NEW_UNIQUE_NOTE_ID",
+              "lyric": "la",
+              "midi_note": 60,
+              "start_tick": 0
+            }
+          ],
+          "op": "insert_notes",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "notes"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "insert_notes"
+      },
+      {
+        "example": {
+          "note_ids": [
+            "INSPECTED_NOTE_ID"
+          ],
+          "op": "delete_notes",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_ids"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "delete_notes"
+      },
+      {
+        "example": {
+          "note_id": "INSPECTED_NOTE_ID",
+          "op": "set_lyric",
+          "text": "la",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_id",
+          "text"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_lyric"
+      },
+      {
+        "fields": [
+          "track",
+          "note_id",
+          "pronunciation"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_pronunciation"
+      },
+      {
+        "example": {
+          "detune_millicents": 0,
+          "midi_note": 60,
+          "note_id": "INSPECTED_NOTE_ID",
+          "op": "set_pitch",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_id",
+          "midi_note",
+          "detune_millicents"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_pitch"
+      },
+      {
+        "example": {
+          "duration_tick": 960,
+          "note_id": "INSPECTED_NOTE_ID",
+          "op": "set_timing",
+          "start_tick": 0,
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_id",
+          "start_tick",
+          "duration_tick"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_timing"
+      },
+      {
+        "fields": [
+          "track",
+          "notes"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "replace_notes"
+      },
+      {
+        "example": {
+          "micro_bpm": 120000000,
+          "op": "set_tempo_event",
+          "tick": 0
+        },
+        "fields": [
+          "tick",
+          "micro_bpm"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_tempo_event"
+      },
+      {
+        "example": {
+          "denominator": 4,
+          "numerator": 4,
+          "op": "set_time_signature_event",
+          "tick": 0
+        },
+        "fields": [
+          "tick",
+          "numerator",
+          "denominator"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_time_signature_event"
+      },
+      {
+        "example": {
+          "index": 0,
+          "op": "move_track",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "index"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "move_track"
+      },
+      {
+        "fields": [
+          "track",
+          "key",
+          "value"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_track_data"
+      },
+      {
+        "fields": [
+          "key",
+          "value"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_project_extension"
+      },
+      {
+        "example": {
+          "op": "set_route",
+          "route": "verdant-voice"
+        },
+        "fields": [
+          "route"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_route"
+      },
+      {
+        "fields": [
+          "settings"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_synthesis"
+      },
+      {
+        "fields": [
+          "settings"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_vocal_tract"
+      },
+      {
+        "fields": [
+          "settings"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_model_dynamics"
+      },
+      {
+        "fields": [
+          "settings"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_phoneme_timing"
+      },
+      {
+        "fields": [
+          "settings"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_consonant_dynamics"
+      },
+      {
+        "fields": [
+          "settings"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_output_transients"
+      },
+      {
+        "example": {
+          "index": 1,
+          "op": "add_track",
+          "track": {
+            "color": "teal",
+            "id": "NEW_UNIQUE_TRACK_ID",
+            "monophonic": false,
+            "name": "Audio",
+            "notes": []
+          }
+        },
+        "fields": [
+          "index",
+          "track"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "add_track"
+      },
+      {
+        "example": {
+          "op": "remove_track",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "remove_track"
+      },
+      {
+        "example": {
+          "header": {
+            "color": "teal",
+            "gain_millidecibels": -6000,
+            "monophonic": false,
+            "muted": false,
+            "name": "Audio",
+            "pan_permille": 0,
+            "render_route": null,
+            "solo": false,
+            "voice_ref": null
+          },
+          "op": "set_track_header",
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "header"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_track_header"
+      },
+      {
+        "example": {
+          "note_id": "INSPECTED_NOTE_ID",
+          "op": "set_pitch_curve",
+          "points": [
+            {
+              "id": "NEW_UNIQUE_POINT_ID",
+              "millicents": 0,
+              "tick": 0
+            }
+          ],
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_id",
+          "points"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_pitch_curve"
+      },
+      {
+        "example": {
+          "note_id": "INSPECTED_NOTE_ID",
+          "op": "set_gain_curve",
+          "points": [
+            {
+              "id": "NEW_UNIQUE_POINT_ID",
+              "millidecibels": 0,
+              "tick": 0
+            }
+          ],
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_id",
+          "points"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_gain_curve"
+      },
+      {
+        "fields": [
+          "track",
+          "note_id",
+          "parameter",
+          "points"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_expression_curve"
+      },
+      {
+        "fields": [
+          "track",
+          "note_ids",
+          "vibrato"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_vibrato"
+      },
+      {
+        "example": {
+          "note_ids": [
+            "INSPECTED_NOTE_ID"
+          ],
+          "op": "set_portamento",
+          "portamento_ms": 80,
+          "track": "INSPECTED_TRACK_ID"
+        },
+        "fields": [
+          "track",
+          "note_ids",
+          "portamento_ms"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_portamento"
+      },
+      {
+        "fields": [
+          "track",
+          "inserts"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_track_inserts"
+      },
+      {
+        "fields": [
+          "track",
+          "instrument"
+        ],
+        "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+        "op": "set_track_instrument"
+      }
+    ],
+    "schema": "verdant-project-operations/1",
+    "units": {
+      "curve_tick": "Note-relative ticks; preserve the source note's duration and other fields.",
+      "detune_millicents": "Cents multiplied by 1000; 100 cents is 100000.",
+      "gain_millidecibels": "dB multiplied by 1000; -6 dB is -6000.",
+      "micro_bpm": "BPM multiplied by 1000000; 120 BPM is 120000000. null removes a nonzero tempo event.",
+      "pan_permille": "-1000 left through 0 center to 1000 right.",
+      "tick": "Project ticks; read project.ppq. One quarter note is ppq ticks."
+    }
+  }
+}
