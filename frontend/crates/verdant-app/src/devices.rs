@@ -1025,20 +1025,18 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: u
     }));
     if let Some(next) = eq.bands.iter().position(|band| !band.on) {
         let add_target = target();
-        bands = bands.child(presentation::button(format!("eq-add-band-{slot}"), "＋ 频段", false, th)
-            .aria_label("启用下一个空闲均衡频段")
-            .on_click(cx.listener(move |ed, _, _, cx| {
-                select_band(ed, key, next);
-                write_if_current(ed, &add_target, vec![(dsp::eq_param_id(next, "on"), 1.)], cx);
-            })));
+        let command = semantic_command(cx.weak_entity(), cx.weak_entity(), move |ed, _, window, cx| {
+            if !may_begin_device_input(ed) || !DeviceScope::for_window(window).allows(&add_target.track, ed)
+                || !ed.device_target_matches(&add_target.track, add_target.slot, add_target.key) { return; }
+            select_band(ed, key, next);
+            write_if_current(ed, &add_target, vec![(dsp::eq_param_id(next, "on"), 1.)], cx);
+        });
+        bands = bands.child(semantic_click(presentation::button(format!("eq-add-band-{slot}"), "＋ 频段", false, th)
+            .aria_label("启用下一个空闲均衡频段"), command));
     }
-    let expand_target = target();
-    bands = bands.child(div().flex_1()).child(presentation::button(format!("eq-all-bands-{slot}"), if all_bands { "仅显示当前" } else { "全部 24 段" }, all_bands, th)
-        .on_click(cx.listener(move |ed, _, _, cx| {
-            let mut state = workflow::read_workspace(ed, &expand_target);
-            if !state.expanded_sections.remove("eq-all-bands") { state.expanded_sections.insert("eq-all-bands".into()); }
-            workflow::write_workspace(ed, &expand_target, &state); cx.notify();
-        })));
+    bands = bands.child(div().flex_1()).child(semantic_click(
+        presentation::button(format!("eq-all-bands-{slot}"), if all_bands { "仅显示当前" } else { "全部 24 段" }, all_bands, th),
+        presentation::section_command(target(), "eq-all-bands".into(), cx)));
     let shape_track = track.clone();
     let shape = dropdown_button(SharedString::from(format!("eq-shape-{slot}")), band.kind.label().into(), th, move |ed| {
         let params = ed.live_device_insert(&shape_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
