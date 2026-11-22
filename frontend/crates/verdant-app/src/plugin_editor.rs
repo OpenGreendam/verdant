@@ -45,7 +45,68 @@ impl gpui::Focusable for NativePluginWindow {
     fn focus_handle(&self, _: &gpui::App) -> FocusHandle { self.focus.clone() }
 }
 
+#[derive(Clone, Copy)]
+enum ToolbarAction {
+    Bypass { slot: usize, expected_key: Option<verdant_plugins::InsertKey>, busy: bool },
+    Generic,
+    Close,
+    MidiInput,
+    MidiStop,
+    Instances,
+    Modulation { slot: usize, key: Option<verdant_plugins::InsertKey> },
+    Zoom(f64),
+    ZoomReset,
+    Fullscreen,
+}
+
+fn toolbar_command(editor: WeakEntity<Editor>, view: WeakEntity<NativePluginWindow>, action: ToolbarAction) -> crate::devices::SemanticCommand {
+    crate::devices::semantic_command(editor, view, move |view, _, window, cx| view.toolbar_action(action, window, cx))
+}
+
 impl NativePluginWindow {
+    fn toolbar_action(&mut self, action: ToolbarAction, window: &mut Window, cx: &mut Context<Self>) {
+        if matches!(action, ToolbarAction::Close) {
+            let _ = self.editor.update(cx, |ed, cx| ed.close_menu(window, cx));
+            window.remove_window();
+            return;
+        }
+        let Some(editor) = self.editor.upgrade() else { return };
+        let ed = editor.read(cx);
+        if ed.document_generation != self.generation || ed.project().project_id != self.project { return; }
+        match action {
+            ToolbarAction::Generic => { self.generic = !self.generic; cx.notify(); }
+            ToolbarAction::Fullscreen => window.toggle_fullscreen(),
+            _ => {
+                let target = self.target.clone();
+                editor.update(cx, |ed, cx| match action {
+                    ToolbarAction::Bypass { slot, expected_key, busy } => {
+                        if !busy && expected_key.is_some_and(|key| ed.device_target_matches(&target, slot, key)) {
+                            ed.toggle_device_bypass(target, slot, cx);
+                        }
+                    }
+                    ToolbarAction::MidiInput => ed.open_device_midi_input(target, window, cx),
+                    ToolbarAction::MidiStop => { ed.stop_instrument_monitor(cx); cx.notify(); }
+                    ToolbarAction::Instances => {
+                        let editor = cx.entity();
+                        cx.defer(move |cx| crate::devices::workflow::instances::open(editor, cx));
+                    }
+                    ToolbarAction::Modulation { slot, key } => {
+                        if let Some(key) = key { crate::devices::toggle_modulation_panel(ed, target, slot, key, cx); }
+                    }
+                    ToolbarAction::Zoom(delta) => {
+                        let current = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.);
+                        ed.prefs.extra.insert("plugin_ui_zoom".into(), ((current + delta).clamp(0.75, 2.)).into());
+                        ed.prefs_dirty = true; cx.notify();
+                    }
+                    ToolbarAction::ZoomReset => {
+                        ed.prefs.extra.insert("plugin_ui_zoom".into(), 1.0.into()); ed.prefs_dirty = true; cx.notify();
+                    }
+                    ToolbarAction::Generic | ToolbarAction::Close | ToolbarAction::Fullscreen => unreachable!(),
+                });
+            }
+        }
+    }
+
     fn note(&mut self, note: u8, pressed: bool, cx: &mut gpui::App) {
         // A release before the deferred first press cancels that press.
         if !pressed { self.pending_notes.remove(&note); }
@@ -238,7 +299,6 @@ impl Render for NativePluginWindow {
         let target = &self.target;
         let focus = self.focus.clone();
         let generic = self.generic;
-        let toggle_generic = cx.listener(|view: &mut Self, _: &gpui::ClickEvent, _, cx| { view.generic = !view.generic; cx.notify(); });
         editor.update(cx, |ed, cx| {
             if &ed.project().project_id != project || ed.document_generation != generation {
                 ed.cancel_device_drag_in(window.window_handle(), cx);
@@ -294,21 +354,19 @@ impl Render for NativePluginWindow {
                 }
             };
             window.set_window_title(&format!("{name} — Verdant"));
-            let bypass_target = target.clone();
-            let midi_target = target.clone();
             let is_insert = matches!(binding, Binding::Insert { .. });
             let expected_key = ed.live_device_insert(target, slot).map(|handle| handle.key());
             let modulation_key = expected_key.or_else(|| if let (DeviceTarget::Track(track), Binding::Instrument { id }) = (target, binding) {
                 Some(crate::instrument::instrument_key_for_generation(track, id, generation))
             } else { None });
-            let modulation_target = target.clone();
             let bus = match target {
                 DeviceTarget::Track(track) => ed.project().track(track).map(|track| track.name.clone()).unwrap_or_default(),
                 DeviceTarget::Master => "主总线".into(),
             };
-            let button = |id: &'static str, label: &'static str| div().id(id).role(Role::Button)
+            let button = |id: &'static str, label: &'static str, action| crate::devices::semantic_click(div().id(id).role(Role::Button)
                 .aria_label(label).cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
-                .bg(th.control).hover(move |s| s.bg(th.hover)).text_size(px(14.)).child(label);
+                .bg(th.control).hover(move |s| s.bg(th.hover)).text_size(px(14.)).child(label),
+                toolbar_command(editor_entity.downgrade(), native_entity.downgrade(), action));
             let key_editor = editor_entity.clone();
             let mut root = div().id("builtin-native-editor").role(Role::Group)
                 .aria_label(format!("{name} 原生编辑器")).size_full().relative()
@@ -364,47 +422,20 @@ impl Render for NativePluginWindow {
                         .child(div().truncate().text_size(px(20.)).font_weight(FontWeight::BOLD).child(name.clone()))
                         .child(div().truncate().text_size(px(12.)).text_color(th.text_secondary).child(bus)))
                     .when(is_insert, |header| header
-                        .child(button("native-bypass", if bypassed { "启用" } else { "旁通" })
-                            .aria_selected(bypassed).on_click(cx.listener(move |ed, _, _, cx| {
-                                if !busy && ed.document_generation == generation && expected_key.is_some_and(|key| ed.device_target_matches(&bypass_target, slot, key)) {
-                                    ed.toggle_device_bypass(bypass_target.clone(), slot, cx);
-                                }
-                            })))
-                        .child(button("native-generic", if generic { "图形界面" } else { "参数列表" }).on_click(toggle_generic)))
-                    .child(button("native-close", "关闭").on_click(cx.listener(|ed, _, window, cx| {
-                        ed.cancel_device_drag_in(window.window_handle(), cx);
-                        ed.close_menu(window, cx);
-                        window.remove_window();
-                    }))))
+                        .child(button("native-bypass", if bypassed { "启用" } else { "旁通" }, ToolbarAction::Bypass { slot, expected_key, busy }).aria_selected(bypassed))
+                        .child(button("native-generic", if generic { "图形界面" } else { "参数列表" }, ToolbarAction::Generic)))
+                    .child(button("native-close", "关闭", ToolbarAction::Close)))
                 .child(div().flex_none().px(px(16.)).py(px(6.)).flex().flex_wrap().items_center().gap(px(8.))
-                    .child(button("native-midi-input", "MIDI 输入").on_click(cx.listener(move |ed, _, window, cx| {
-                        ed.open_device_midi_input(midi_target.clone(), window, cx);
-                    })))
-                    .child(button("native-midi-stop", "停止 MIDI").on_click(cx.listener(|ed, _, _, cx| {
-                        ed.stop_instrument_monitor(cx);
-                        cx.notify();
-                    })))
-                    .child(button("native-instances", "全部实例").on_click(cx.listener(|_, _, _, cx| {
-                        let editor = cx.entity();
-                        cx.defer(move |cx| crate::devices::workflow::instances::open(editor, cx));
-                    })))
+                    .child(button("native-midi-input", "MIDI 输入", ToolbarAction::MidiInput))
+                    .child(button("native-midi-stop", "停止 MIDI", ToolbarAction::MidiStop))
+                    .child(button("native-instances", "全部实例", ToolbarAction::Instances))
                     .when(modulation_key.is_some() && !generic, |toolbar| toolbar
-                        .child(button("native-modulation", "调制").on_click(cx.listener(move |ed, _, _, cx| {
-                            if let Some(key) = modulation_key { crate::devices::toggle_modulation_panel(ed, modulation_target.clone(), slot, key, cx); }
-                        }))))
-                    .child(button("native-zoom-out", "−").aria_label("缩小插件界面").on_click(cx.listener(|ed, _, _, cx| {
-                        let current = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.);
-                        ed.prefs.extra.insert("plugin_ui_zoom".into(), ((current - 0.125).clamp(0.75, 2.)).into()); ed.prefs_dirty = true; cx.notify();
-                    })))
+                        .child(button("native-modulation", "调制", ToolbarAction::Modulation { slot, key: modulation_key })))
+                    .child(button("native-zoom-out", "−", ToolbarAction::Zoom(-0.125)).aria_label("缩小插件界面"))
                     .child(div().text_size(px(12.)).child(format!("{:.0}%", zoom * 100.)))
-                    .child(button("native-zoom-in", "＋").aria_label("放大插件界面").on_click(cx.listener(|ed, _, _, cx| {
-                        let current = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.);
-                        ed.prefs.extra.insert("plugin_ui_zoom".into(), ((current + 0.125).clamp(0.75, 2.)).into()); ed.prefs_dirty = true; cx.notify();
-                    })))
-                    .child(button("native-zoom-reset", "100%").on_click(cx.listener(|ed, _, _, cx| {
-                        ed.prefs.extra.insert("plugin_ui_zoom".into(), 1.0.into()); ed.prefs_dirty = true; cx.notify();
-                    })))
-                    .child(button("native-fullscreen", "全屏").on_click(|_, window, _| window.toggle_fullscreen())))
+                    .child(button("native-zoom-in", "＋", ToolbarAction::Zoom(0.125)).aria_label("放大插件界面"))
+                    .child(button("native-zoom-reset", "100%", ToolbarAction::ZoomReset))
+                    .child(button("native-fullscreen", "全屏", ToolbarAction::Fullscreen)))
                 .child(crate::devices::modulation_source_bar(ed, target, slot, if generic { None } else { modulation_key }))
                 .child(div().id("native-plugin-scroll").flex_1().min_h_0().overflow_y_scroll().overflow_x_scroll()
                     .p(gpui::rems(16./16.)).child(body))
@@ -462,6 +493,132 @@ fn performance_keyboard(view: &gpui::Entity<NativePluginWindow>, held: &std::col
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::{App, Entity, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TestAppContext, WindowHandle, point};
+    use verdant_normalized_knob::{NormalizedKnobHandle, native::gpui_native_owner::{all_owners, resolved}};
+
+    fn native_windows(cx: &mut TestAppContext, count: usize) -> (WindowHandle<Editor>, Entity<Editor>, Vec<WindowHandle<NativePluginWindow>>) {
+        let main = cx.open_window(size(px(1300.0), px(900.0)), |window, cx| {
+            let mut project = crate::native_test_support::instrument_project();
+            if count > 1 {
+                project.tracks[1].unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),
+                    crate::instrument::synth_spec(&verdant_plugins::builtin_dsp::SynthParams::default(), "test"));
+            }
+            let mut editor = Editor::for_native_test(project, window, cx);
+            editor.needs_fit = false;
+            editor
+        });
+        let editor = main.update(cx, |ed, _, cx| {
+            let tracks: Vec<_> = ed.project().tracks.iter().take(count).map(|track| track.id.clone()).collect();
+            for track in tracks { ed.open_builtin_instrument_editor(&track, cx); }
+            cx.entity()
+        }).unwrap();
+        cx.run_until_parked();
+        let windows: Vec<_> = main.update(cx, |ed, _, _| ed.native_plugin_windows.values().copied().collect()).unwrap();
+        assert_eq!(windows.len(), count);
+        for window in &windows { crate::native_test_support::frames(*window, cx); }
+        (main, editor, windows)
+    }
+
+    fn gain_knob(window: &Window) -> NormalizedKnobHandle {
+        let owner = all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.declared_events.contains("valueCommit")
+                && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text() == "音量")
+        }).expect("production native window's compiled gain knob");
+        NormalizedKnobHandle { owner }
+    }
+
+    fn hold_knob(handle: &NormalizedKnobHandle, window: &mut Window, cx: &mut App) -> gpui::Point<gpui::Pixels> {
+        let start = handle.owner.borrow().native_hitbox.as_ref().unwrap().bounds.center();
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: start, button: MouseButton::Left, ..Default::default()
+        }), cx);
+        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+            position: start + point(px(0.0), px(-36.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+        }), cx);
+        assert_eq!(handle.state("phase").unwrap(), serde_json::json!("dragging"));
+        start
+    }
+
+    fn release_knob(start: gpui::Point<gpui::Pixels>, window: &mut Window, cx: &mut App) {
+        window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+            position: start + point(px(0.0), px(-36.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+    }
+
+    // GPUI keeps handle_a11y_action crate-private. These tests enter the exact
+    // semantic callback shared by the rendered mouse/accessible handlers while
+    // using real window input, compiled leases and the durable project store.
+    // AT-SPI action transport is validated separately by the OS consumer.
+    #[gpui::test]
+    fn toolbar_close_cancels_a_held_knob_before_detach_and_late_up(cx: &mut TestAppContext) {
+        let (main, editor, windows) = native_windows(cx, 1);
+        cx.update_window(windows[0].into(), |_, window, cx| {
+            let knob = gain_knob(window);
+            let accepted = knob.state("value").unwrap();
+            let start = hold_knob(&knob, window, cx);
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            toolbar_command(editor.downgrade(), view.downgrade(), ToolbarAction::Close)(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
+            assert_eq!(knob.state("value").unwrap(), accepted, "cancel restores accepted state before closing");
+            assert!(!editor.read(cx).has_proto_pointer_contact());
+            assert_eq!(editor.read(cx).revision().get(), 0);
+            // Even if the old rendered input tree receives a queued release
+            // before the window disappears, it has no accepted lease to finish.
+            release_knob(start, window, cx);
+            assert_eq!(editor.read(cx).revision().get(), 0);
+        }).unwrap();
+        crate::native_test_support::frames(main, cx);
+        main.update(cx, |ed, _, _| assert_eq!(ed.revision().get(), 0)).unwrap();
+    }
+
+    #[gpui::test]
+    fn toolbar_activation_preserves_another_window_and_a_replacement_lease(cx: &mut TestAppContext) {
+        let (_main, editor, windows) = native_windows(cx, 2);
+        let second = windows[1];
+        let (knob, accepted, old_start) = cx.update_window(second.into(), |_, window, cx| {
+            let knob = gain_knob(window);
+            let accepted = knob.state("value").unwrap();
+            let start = hold_knob(&knob, window, cx);
+            (knob, accepted, start)
+        }).unwrap();
+        cx.update_window(windows[0].into(), |_, window, cx| {
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            let target = view.read(cx).target.clone();
+            let key = crate::instrument::instrument_key_for_generation(target.track_id().unwrap(),
+                verdant_plugins::builtin_dsp::SYNTH_ID, editor.read(cx).document_generation);
+            toolbar_command(editor.downgrade(), view.downgrade(), ToolbarAction::Modulation {
+                slot: crate::instrument::INSTRUMENT_SLOT, key: Some(key),
+            })(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"), "another window's command cannot cancel the owner");
+        }).unwrap();
+        let new_start = cx.update_window(second.into(), |_, window, cx| {
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            let target = view.read(cx).target.clone();
+            let track = target.track_id().unwrap();
+            let key = crate::instrument::instrument_key_for_generation(track, verdant_plugins::builtin_dsp::SYNTH_ID, editor.read(cx).document_generation);
+            toolbar_command(editor.downgrade(), view.downgrade(), ToolbarAction::Modulation {
+                slot: crate::instrument::INSTRUMENT_SLOT, key: Some(key),
+            })(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
+            assert_eq!(knob.state("value").unwrap(), accepted);
+            release_knob(old_start, window, cx);
+            assert_eq!(editor.read(cx).revision().get(), 0);
+            // Start a new generation before queued observers of the cancelled
+            // preview run. They must leave this accepted lease intact.
+            hold_knob(&knob, window, cx)
+        }).unwrap();
+        crate::native_test_support::frames(second, cx);
+        cx.update_window(second.into(), |_, window, cx| {
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"));
+            assert!(editor.read(cx).has_proto_pointer_contact());
+            release_knob(new_start, window, cx);
+            assert_eq!(editor.read(cx).revision().get(), 1, "only the replacement drag commits");
+            assert!(!editor.read(cx).has_proto_pointer_contact());
+        }).unwrap();
+    }
+
     #[test]
     fn repeated_keypresses_without_held_flag_schedule_only_one_note() {
         let mut held = std::collections::BTreeSet::new();
