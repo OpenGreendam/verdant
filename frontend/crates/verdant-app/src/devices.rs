@@ -266,13 +266,16 @@ impl Editor {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, initial: Vec<(String, f64)>, defaults: Vec<(String, f64)>,
+fn press(ed: &mut Editor, target: &Target, basis: &DeviceBasis, control: Control, start: Vec<f64>, initial: Vec<(String, f64)>, defaults: Vec<(String, f64)>,
     ev: &MouseDownEvent, hitbox: gpui::HitboxId, surface: &crate::host_pointer::SurfaceToken, window: &mut Window, cx: &mut Context<Editor>) -> bool {
     if ed.device_drag.as_ref().is_some_and(|drag| !drag.surface.is_live()) { ed.cancel_device_drag(cx); }
     if !may_begin_device_input(ed) || !surface.is_live() { return false; }
     let scope = DeviceScope::for_window(window);
     if !scope.allows(&target.track, ed) { return false; }
-    let Some(basis) = target.basis(ed) else { return false; };
+    // The rendered hit target and its gesture must share one authority. A
+    // parameter refresh can arrive before the frame is replaced; adopting its
+    // new revision here would authorize writes calculated from an old frame.
+    if target.basis(ed).as_ref() != Some(basis) { return false; }
     let decision = match plan(GesturePhase::Idle, GestureEvent::Down, true, false, ev.modifiers.alt, ev.click_count >= 2) {
         Ok(decision) => decision,
         Err(error) => { ed.notice(format!("交互协议失败：{error}")); cx.notify(); return true; }
@@ -634,6 +637,7 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
     let key = target.key;
     let surface_key = SharedString::from(format!("device-graph-{:?}-{:?}-{}-{}-{name}", editor.entity_id(), target.track, target.slot, key.0));
     let surface_editor = editor.downgrade();
+    let input_target = target.clone();
     div().id(SharedString::from(format!("{name}-{}", target.slot))).role(Role::Image).aria_label(label.to_string())
         .rounded(gpui::rems(10.0/16.)).bg(th.view).border_1().border_color(th.shade).overflow_hidden()
         .child(canvas(move |bounds, window, cx| {
@@ -643,8 +647,12 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     if editor.device_drag.as_ref().is_some_and(|drag| drag.surface.same(&surface)) { editor.cancel_device_drag(cx); }
                 });
             });
-            (window.insert_hitbox(bounds, HitboxBehavior::Normal), surface)
-        }, move |bounds, (hitbox, surface), window, cx| {
+            // Drawing descriptors may contain animated/preview values. Keep
+            // the accepted parameter snapshot separately for input, bound to
+            // the frame that exposed these handles.
+            let basis = surface_editor.upgrade().and_then(|editor| input_target.basis(editor.read(cx)));
+            (window.insert_hitbox(bounds, HitboxBehavior::Normal), surface, basis)
+        }, move |bounds, (hitbox, surface, basis), window, cx| {
             let plot = Plot { o: bounds.origin, w: f64::from(bounds.size.width), h: f64::from(bounds.size.height) };
             let mut texts = Texts::new();
             painter(window, plot, &params, &mut texts);
@@ -693,14 +701,16 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                 let now = hb.is_hovered(window).then(|| near_move(ev.position)).flatten();
                 if now != hovered { window.refresh(); }
             });
-            let (e, hb, t, ps, hs, near_down, menu, double, down_surface) = (editor.clone(), hitbox.clone(), (target.track.clone(), target.slot), params.clone(), handles.clone(), near.clone(), menu.clone(), double.clone(), surface.clone());
+            let (e, hb, t, hs, near_down, menu, double, down_surface) = (editor.clone(), hitbox.clone(), (target.track.clone(), target.slot), handles.clone(), near.clone(), menu.clone(), double.clone(), surface.clone());
             window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
                 if phase != DispatchPhase::Bubble || !hb.is_hovered(window) { return; }
+                let Some(basis) = basis.as_ref() else { return; };
                 let target = Target { track: t.0.clone(), slot: t.1, key };
                 match (ev.button, near_down(ev.position)) {
                     (MouseButton::Right, Some(i)) => {
                         if let Some(menu) = &menu {
                             e.update(cx, |ed, cx| {
+                                if target.basis(ed).as_ref() != Some(basis) || !down_surface.is_live() { return; }
                                 if let Control::Band(band) = hs[i].control { select_band(ed, key, band); }
                                 let items = menu(ed, i);
                                 ed.show_menu(ev.position, items, window, cx);
@@ -710,12 +720,13 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     }
                     (MouseButton::Left, Some(i)) => {
                         let h = &hs[i];
-                        let norm = |axis: &Option<(String, Axis)>| axis.as_ref().and_then(|(id, a)| param(&ps, id).map(|d| a.norm(d.value)));
+                        let ps = &basis.params;
+                        let norm = |axis: &Option<(String, Axis)>| axis.as_ref().and_then(|(id, a)| param(ps, id).map(|d| a.norm(d.value)));
                         let start = vec![norm(&h.x).unwrap_or(h.at.0), norm(&h.y).unwrap_or(h.at.1)];
                         let mut initial: Vec<(String, f64)> = [&h.x, &h.y].into_iter().flatten()
-                            .filter_map(|(id, _)| param(&ps, id).map(|d| (id.clone(), d.value))).collect();
+                            .filter_map(|(id, _)| param(ps, id).map(|d| (id.clone(), d.value))).collect();
                         initial.extend(h.also.iter().cloned());
-                        let consumed = e.update(cx, |ed, cx| press(ed, &target, h.control.clone(), start, initial, h.defaults.clone(), ev, hb.id, &down_surface, window, cx));
+                        let consumed = e.update(cx, |ed, cx| press(ed, &target, basis, h.control.clone(), start, initial, h.defaults.clone(), ev, hb.id, &down_surface, window, cx));
                         if consumed { cx.stop_propagation(); }
                     }
                     (MouseButton::Left, None) if ev.click_count >= 2 => {
@@ -725,7 +736,7 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                         if let Some((writes, select)) = double(n) {
                             e.update(cx, |ed, cx| {
                                 if !DeviceScope::for_window(window).allows(&target.track, ed)
-                                    || !may_begin_device_input(ed) || target.basis(ed).is_none() || !down_surface.is_live() { return; }
+                                    || !may_begin_device_input(ed) || target.basis(ed).as_ref() != Some(basis) || !down_surface.is_live() { return; }
                                 if let Some(band) = select { select_band(ed, key, band); }
                                 write_if_current(ed, &target, writes, cx);
                             });
@@ -2243,6 +2254,74 @@ mod native_tests {
                 assert_eq!(gain(host, cx), host.desc.value);
             }).unwrap();
         }
+    }
+
+    #[gpui::test]
+    fn graph_rejects_a_stale_frame_before_pointer_down(cx: &mut TestAppContext) {
+        let window = open(cx, false);
+        window.update(cx, |host, window, cx| {
+            let position = start(host);
+            let track = host.target.track.track_id().unwrap().clone();
+            host.editor.update(cx, |editor, _| {
+                let mut params = crate::instrument::synth_params(editor.project().track(&track).unwrap()).unwrap();
+                params.set("gain", -18.0).unwrap();
+                editor.persistence.commit(editor.revision(), CommandBatch::single("External value before press", Command::SetTrackInstrument {
+                    track, instrument: Some(crate::instrument::synth_spec(&params, "test")),
+                })).unwrap();
+            });
+            let revision = host.editor.read(cx).revision();
+            // No repaint: the native hit target and its parameter descriptors
+            // still describe the earlier value. A new press cannot adopt the
+            // newer authority token while retaining that old starting value.
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                position, button: MouseButton::Left, ..Default::default()
+            }), cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: position + point(px(0.0), px(-6.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            assert_eq!(gain(host, cx), -18.0, "a stale presentation must not overwrite the newer value");
+            assert_eq!(host.editor.read(cx).revision(), revision, "stale press and late up cannot append an edit");
+            assert!(host.editor.read(cx).device_drag.is_none());
+            assert!(window.captured_hitbox().is_none());
+            host.desc = current_params(host.editor.read(cx), &host.target).unwrap().into_iter().find(|desc| desc.id == "gain").unwrap();
+            cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let revision = host.editor.read(cx).revision();
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: start(host) + point(px(0.0), px(-6.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            assert!(gain(host, cx) > -18.0, "the refreshed graph remains editable");
+            assert_eq!(host.editor.read(cx).revision().get(), revision.get() + 1);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn graph_animation_does_not_become_the_drag_authority(cx: &mut TestAppContext) {
+        let window = open(cx, false);
+        window.update(cx, |host, _, cx| {
+            host.editor.update(cx, |editor, cx| {
+                assert!(editor.set_device_params(host.target.track.clone(), host.target.slot, vec![("gain".into(), -18.0)], cx));
+            });
+            // Keep the earlier displayed descriptor for an animation frame.
+            // The plot may animate, but dragging must start from accepted truth.
+            assert!(host.desc.value > -18.0);
+            cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let revision = host.editor.read(cx).revision();
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: start(host) + point(px(0.0), px(-6.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            let expected = -18.0 + 6.0 * (host.desc.max - host.desc.min) / (f64::from(HEIGHT) - 2.0 - 2.0 * GRAPH_PAD);
+            assert!((gain(host, cx) - expected).abs() < 1e-6,
+                "one six-pixel drag must adjust the accepted value, not the animated display: {} vs {expected}", gain(host, cx));
+            assert_eq!(host.editor.read(cx).revision().get(), revision.get() + 1);
+        }).unwrap();
     }
 
     #[gpui::test]

@@ -23,6 +23,8 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 
 旋钮的捕获拖动可以继续越过控件 hitbox。上游 press adapter 因 hover 离开而发出的 `press.cancel` 不结束这个独立的 move lease；失焦、detach、失去所有权等真正的 lease 取消通过公开 `cancel` 方法清理原型。
 
+曲线图在 prepaint 时另外保存这一帧对应的权威参数快照。若参数或 revision 在绘制后、按下前改变，旧帧的拖动、右键菜单和双击写入都会被拒绝；重绘后可以正常编辑。动画和预览值只决定绘制及命中位置，拖动起点必须来自已接受的权威参数，避免把动画中的旧值写回工程。
+
 ## 再生成与两类检查
 
 当前主线把 GUI binary 命名为 `verdant-gui`，`verdant` 是 CLI；下面的 app 测试命令使用 GUI target。#79 的实际结果仍绑定其原始 checkout 与包格式，后续主线集成的检查另见 PR Checks。
