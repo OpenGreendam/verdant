@@ -13,7 +13,7 @@ the prepared D-Bus/GI environment, `xdotool`, and libX11 for screenshots.
 
 ## Execution status on 2026-11-22
 
-The complete current suite passed **22/22 cases with no skips**: eleven on
+The complete recorded suite passed **22/22 cases with no skips**: eleven on
 X11 and eleven on windowed Wayland, including the actual native plugin
 window close/reopen and preset-menu cancellation cases. The successful
 [CI run 45026004598](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)
@@ -92,10 +92,15 @@ the source offer, exact members/modes/hashes, executable identities and pinned
 runtime library. The same-run build job is the bootstrap trust boundary;
 this is not an independent signature or a reproducible-binary-build claim.
 
-The executed application is `libexec/verdant/verdant`, with its matching
-`bin/verdant-worker` and packaged resource/library environment. The shell
-launcher is not mistaken for the application binary. Manifest, application,
+After integration of main `6ac8a3396f6155e6ade4968169bc43ca0c7469e4`, the
+current gate requires `verdant-native-package/3`. It selects the manifest's
+`verdant-gui` program, role `gpui`, at `libexec/verdant/verdant-gui`, with
+its matching `bin/verdant-worker` and packaged resource/library environment.
+The `bin/verdant` CLI and root `verdant-launcher` remain distinct programs;
+neither can satisfy the GUI name, role and path checks. Manifest, application,
 worker and observation-source hashes are checked again before execution.
+The #79 result above retains its original checkout and package/2 identities;
+validation of the later integration is recorded separately.
 X11 and windowed Wayland run sequentially with no diagnostic options; the
 Wayland attempt still runs after an X11 failure to preserve both observations.
 
@@ -131,14 +136,14 @@ may have another ABI.
 /usr/bin/python3 tools/native-input/run-linux-isolated.py \
   --deps-root /absolute/path/to/extracted-dependencies \
   --repo /absolute/path/to/verdant-repository \
-  --binary /absolute/path/to/verdant \
+  --binary /absolute/path/to/verdant-gui \
   --worker-binary /absolute/path/to/verdant-worker \
   --backend x11 --run-dir /tmp/verdant-x11-new
 
 /usr/bin/python3 tools/native-input/run-linux-isolated.py \
   --deps-root /absolute/path/to/extracted-dependencies \
   --repo /absolute/path/to/verdant-repository \
-  --binary /absolute/path/to/verdant \
+  --binary /absolute/path/to/verdant-gui \
   --worker-binary /absolute/path/to/verdant-worker \
   --backend wayland --run-dir /tmp/verdant-wayland-new
 ```
@@ -163,7 +168,7 @@ probe directly:
 
 ```sh
 python3 tools/native-input/probe.py \
-  --binary /absolute/path/to/verdant \
+  --binary /absolute/path/to/verdant-gui \
   --worker-binary /absolute/path/to/verdant-worker \
   --repo /absolute/path/to/verdant-repository \
   --output-dir /absolute/path/to/new-evidence-directory \
