@@ -71,6 +71,21 @@ def weston_major(version, help_text):
     return int(match[1])
 
 
+def weston_x11_output(log):
+    """Use the owned compositor's observed output ID, never guess by size/title."""
+    outputs = []
+    for line in log.splitlines():
+        match = re.search(r'\bx11 output (\d+)x(\d+), window id (\d+)\s*$', line)
+        if match:
+            width, height, window = map(int, match.groups())
+            if min(width, height, window) <= 0:
+                raise RuntimeError('Weston reported an invalid X11 output/window ID')
+            outputs.append({'width': width, 'height': height, 'window': str(window), 'logLine': line})
+    if len(outputs) > 1:
+        raise RuntimeError('Expected one observed X11 output from the owned Weston compositor')
+    return outputs[0] if outputs else None
+
+
 def main(args):
     deps, repo = args.deps_root.resolve(strict=True), args.repo.resolve(strict=True)
     binary, worker = args.binary.resolve(strict=True), args.worker_binary.resolve(strict=True)
@@ -219,14 +234,18 @@ def main(args):
                              '--log=' + str(run / 'weston-server.log')])
             wait_for(lambda: (run / 'runtime' / env['WAYLAND_DISPLAY']).is_socket(), bool,
                      'private Wayland socket')
-            candidates = wait_for(lambda: xdo('search', '--onlyvisible', '--name', 'Weston'),
-                                  lambda result: result.returncode == 0 and bool(result.stdout.strip()),
-                                  'the nested Weston X11 host window')
-            windows = candidates.stdout.splitlines()
-            if len(windows) != 1:
-                raise RuntimeError(f'Expected one private Weston host window, found {windows}')
-            record['outerWindow'] = windows[0]
-            probe += ['--outer-window', windows[0], '--wayland-windowed', '--weston-debug', debug]
+            server_log = run / 'weston-server.log'
+            output = wait_for(lambda: weston_x11_output(server_log.read_text() if server_log.exists() else ''),
+                              lambda value: value is not None, 'the owned compositor X11 output record')
+            geometry = wait_for(lambda: xdo('getwindowgeometry', '--shell', output['window']),
+                                lambda result: result.returncode == 0, 'the observed Weston X11 window geometry')
+            fields = dict(line.split('=', 1) for line in geometry.stdout.splitlines() if '=' in line)
+            actual = {name: int(fields[name]) for name in ('X', 'Y', 'WIDTH', 'HEIGHT')}
+            if (actual['WIDTH'], actual['HEIGHT']) != (output['width'], output['height']):
+                raise RuntimeError('Observed Weston X11 window geometry differs from its output record')
+            record['outerWindow'] = output['window']
+            record['outerWindowEvidence'] = {**output, 'evidence': 'weston-server.log', 'x11Geometry': actual}
+            probe += ['--outer-window', output['window'], '--wayland-windowed', '--weston-debug', debug]
         probe += args.probe_options
         runner = [str(python), str(repo / 'tools/a11y/run-isolated.py'), '--deps-root', str(deps),
                   '--run-dir', str(run / 'a11y'), '--', *probe]
