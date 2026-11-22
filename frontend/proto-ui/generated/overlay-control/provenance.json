@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "76614277b5d439ac492670388c71beae980fc96e83525c58d06b13db894b745b",
+    "contentSha256": "27af6e2995e3c6d9a35ccbc4859a6273ed58b0c613ef4d3247284da1030b4691",
     "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
     "bundled": false
   },
