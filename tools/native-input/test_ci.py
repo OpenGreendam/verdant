@@ -91,6 +91,17 @@ class CiRefusals(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'advertise'):
             check('weston 13.0.0', '--debug')
 
+    def test_weston_output_id_comes_from_the_actual_owned_server_record(self):
+        parse = runpy.run_path(str(Path(__file__).with_name('run-linux-isolated.py')))['weston_x11_output']
+        line = '[13:01:13.066] x11 output 1600x1000, window id 2097157'
+        output = parse('other startup log\n' + line + '\n')
+        self.assertEqual(output, {'width': 1600, 'height': 1000, 'window': '2097157', 'logLine': line})
+        self.assertIsNone(parse('x11 output size 1600x1000 without an observed ID'))
+        with self.assertRaisesRegex(RuntimeError, 'invalid X11 output'):
+            parse(line.replace('2097157', '0'))
+        with self.assertRaisesRegex(RuntimeError, 'one observed X11 output'):
+            parse(line + '\n' + line.replace('2097157', '2097158'))
+
 
 if __name__ == '__main__':
     unittest.main()
