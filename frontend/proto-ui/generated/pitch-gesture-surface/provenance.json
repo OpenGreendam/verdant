@@ -2,7 +2,7 @@
   "source": {
     "file": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
     "exportName": "default",
-    "sha256": "8e606b7530872fcc212d10e360058d757460bb74224720266f0bef34087a792d"
+    "sha256": "1d5daf959ac9fdcb953cf4f449933c0d70203b5c081cf61dad92b548e098198e"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
@@ -88,7 +88,7 @@
   "sourceFiles": [
     {
       "file": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
-      "sha256": "525c5ac3e54e7a327ae7eb07b556fd810e071899656bc0fe904aded6d299ae78"
+      "sha256": "2fd4b73f88ec7d01454e5fba5e626897800fd22a9b897e5dc02a8f655e09d159"
     }
   ],
   "generatedSha256": "06459ce82a8f6f8444b9dc42f5e0be6c5467cbf7f07c0bd33175dfad3f6f09d2",
@@ -186,7 +186,7 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "3518d72c2c7ba8489ae939822855eb4ab496e6fb21676fd527bdbd1e1cd0feb4"
+      "sha256": "84bf4ea2071c882d1e38b965b35df388a9ecc806fbccf3fa5d40b0605b693192"
     }
   ]
 }
