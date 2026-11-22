@@ -21,7 +21,8 @@ import tarfile
 from probe import CASES, INITIAL_GAIN, sha256
 
 
-PROGRAM_PATHS = {'verdant': 'libexec/verdant/verdant', 'verdant-worker': 'bin/verdant-worker'}
+PROGRAM_PATHS = {'verdant-gui': 'libexec/verdant/verdant-gui', 'verdant-worker': 'bin/verdant-worker'}
+PROGRAM_ROLES = {'verdant-gui': 'gpui', 'verdant-worker': 'worker'}
 SOURCE_FILES = ('frontend/Cargo.lock', 'frontend/proto-ui/compiler.pin.json',
                 'tools/native-input/probe.py', 'tools/native-input/run-linux-isolated.py',
                 'tools/native-input/ci.py', 'tools/native-input/x11_screenshot.py',
@@ -43,6 +44,23 @@ def run_logged(command, evidence, label, **kwargs):
     if result.returncode:
         raise RuntimeError(f'{label} failed ({result.returncode}); see its retained stdout/stderr')
     return result.stdout
+
+
+def observed_programs(manifest):
+    """Bind observed roles after the release checker validates the full manifest."""
+    if manifest.get('format') != 'verdant-native-package/3' or manifest.get('target') != 'linux-x86_64':
+        raise RuntimeError('Unexpected Linux package manifest identity')
+    entries = manifest.get('programs')
+    if not isinstance(entries, list):
+        raise RuntimeError('Missing packaged program identities')
+    selected = {}
+    for name, relative in PROGRAM_PATHS.items():
+        matches = [entry for entry in entries if isinstance(entry, dict) and entry.get('name') == name]
+        if len(matches) != 1 or matches[0].get('path') != relative \
+                or matches[0].get('role') != PROGRAM_ROLES[name]:
+            raise RuntimeError(f'Unexpected packaged identity for {name}')
+        selected[name] = matches[0]
+    return selected
 
 
 def prepare(args):
@@ -110,18 +128,14 @@ def prepare(args):
                 '--write', evidence / 'extracted-check.json'], evidence, 'extracted-check')
     manifest_path = package / 'RELEASE-ASSETS.json'
     manifest = json.loads(manifest_path.read_text())
-    if manifest.get('format') != 'verdant-native-package/2' or manifest.get('target') != 'linux-x86_64':
-        raise RuntimeError('Unexpected Linux package manifest identity')
+    selected_programs = observed_programs(manifest)
     programs = {}
-    for name, relative in PROGRAM_PATHS.items():
-        matches = [entry for entry in manifest['programs'] if entry['name'] == name]
-        if len(matches) != 1 or matches[0]['path'] != relative:
-            raise RuntimeError(f'Unexpected packaged path for {name}')
-        path = package / relative
+    for name, entry in selected_programs.items():
+        path = package / entry['path']
         digest = sha256(path)
-        if digest != matches[0]['sha256']:
+        if digest != entry['sha256']:
             raise RuntimeError(f'Extracted {name} differs from its verified manifest')
-        programs[name] = {'path': str(path), 'sha256': digest, 'role': matches[0]['role']}
+        programs[name] = {'path': str(path), 'sha256': digest, 'role': entry['role']}
         libraries = run_logged(['ldd', path], evidence, f'{name}-shared-libraries')
         if 'not found' in libraries:
             raise RuntimeError(f'Installed OS dependencies do not satisfy {name}; see its ldd evidence')
@@ -166,7 +180,7 @@ def run_backend(args):
     env = dict(os.environ, **identity['environment'])
     command = [sys.executable, str(repo / 'tools/native-input/run-linux-isolated.py'),
                '--deps-root', str(args.deps_root), '--repo', str(repo),
-               '--binary', identity['programs']['verdant']['path'],
+               '--binary', identity['programs']['verdant-gui']['path'],
                '--worker-binary', identity['programs']['verdant-worker']['path'],
                '--backend', args.backend, '--run-dir', str(args.run_dir), '--python', sys.executable]
     # No diagnostic options are accepted by this CI entry point.
@@ -199,7 +213,7 @@ def validate_run(identity, backend, run):
         raise RuntimeError(f'{backend}: observation backend mismatch')
     if len(CASES) != 11 or report.get('cases') != [{'name': name, 'status': 'passed'} for name in CASES]:
         raise RuntimeError(f'{backend}: every one of the 11 expected cases must pass exactly once')
-    for name, report_key, harness_key in [('verdant', 'binary', 'binarySha256'),
+    for name, report_key, harness_key in [('verdant-gui', 'binary', 'binarySha256'),
                                           ('verdant-worker', 'worker', 'workerSha256')]:
         digest = identity['programs'][name]['sha256']
         if report.get(report_key, {}).get('sha256') != digest or harness.get(harness_key) != digest:
