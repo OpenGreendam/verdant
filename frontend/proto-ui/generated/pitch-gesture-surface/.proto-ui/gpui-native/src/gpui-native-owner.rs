@@ -920,7 +920,16 @@ pub fn outer_key_scope(focus:&FocusHandle,window:&Window)->bool{let id=window.wi
 // Hooks and listeners are installed during checked setup; these direct host
 // predicates acquire only the native input resources actually requested.
 pub fn native_focus_observation_needed(owner:&OwnerRef)->bool{let o=owner.borrow();o.focusable||o.modules.hooks.iter().any(|hook|matches!(*hook,"focus"|"focus-entry"|"focus-scope"|"focus-roving"|"trigger"|"text-control"))||o.listeners.iter().any(|listener|matches!(listener.kind.as_str(),"host:focus"|"host:blur"|"focus"|"blur")||listener.kind.starts_with("press."))}
-pub fn native_pointer_input_needed(owner:&OwnerRef)->bool{let o=owner.borrow();o.modules.hooks.contains("trigger")||o.modules.hooks.contains("text-control")||o.modules.control_label.kind==Some("label")&&o.modules.control_label.activation||o.listeners.iter().any(|listener|listener.kind.starts_with("pointer.")||listener.kind.starts_with("press.")||listener.kind.starts_with("host:mouse")||matches!(listener.kind.as_str(),"host:click"|"context.menu"))}
+// A visible Label borrows pointer activation without becoming a focus target.
+// Its pending request must still retire when this native window deactivates.
+pub fn native_window_observation_needed(owner:&OwnerRef)->bool{native_focus_observation_needed(owner)||crate::gpui_native_move::move_owner_has_binding(owner)||control_label_action_enabled(owner)}
+pub fn native_pointer_input_needed(owner:&OwnerRef)->bool{
+    // An attached MoveGesture owns this physical target even when the source
+    // consumes only its exposed sampling methods. Its root must claim the
+    // ordinary pointer/click route so an ancestor Trigger cannot also activate.
+    if crate::gpui_native_move::move_owner_has_binding(owner){return true}
+    let o=owner.borrow();o.modules.hooks.contains("trigger")||o.modules.hooks.contains("text-control")||o.modules.control_label.kind==Some("label")&&o.modules.control_label.activation||o.listeners.iter().any(|listener|listener.kind.starts_with("pointer.")||listener.kind.starts_with("press.")||listener.kind.starts_with("host:mouse")||matches!(listener.kind.as_str(),"host:click"|"context.menu"))
+}
 pub fn native_key_input_needed(owner:&OwnerRef)->bool{let o=owner.borrow();o.focusable||o.modules.hooks.iter().any(|hook|matches!(*hook,"focus-scope"|"focus-roving"|"trigger"|"text-control"))||o.listeners.iter().any(|listener|listener.kind.starts_with("key.")||listener.kind.starts_with("press.")||matches!(listener.kind.as_str(),"host:keydown"|"host:keyup"))}
 pub fn native_boundary_input_needed(owner:&OwnerRef)->bool{let o=owner.borrow();o.modules.boundary.observing||o.modules.hooks.contains("overlay")}
 pub fn window_input_needed(owner:&OwnerRef)->bool{let owner=owner.borrow();owner.modules.hooks.contains("focus-scope")||owner.modules.focus.roving_declared||owner.listeners.iter().any(|listener|listener.global&&(listener.kind.starts_with("key.")||listener.kind.starts_with("press.")||matches!(listener.kind.as_str(),"host:keydown"|"host:keyup")))}
@@ -2228,14 +2237,17 @@ pub fn scroll_frame(owner:&OwnerRef,window:&mut Window){
     let follow=field(&s.config,"endFollow");
     let configured=!follow.nullish()&&text_or(follow.member("mode",false),"off")=="while-at-end";
     let axis=if configured{text_or(follow.member("axis",false),"vertical")}else{"vertical".into()};
+    let axes=text_or(field(&s.config,"axes"),"both");
     let mut end=None;
     let mut retired_end=false;
     if let Some((horizontal,requested_epoch))=s.pending_end.take(){
-        if requested_epoch==epoch{end=Some(horizontal)}else{s.request_status="rejected".into();retired_end=true;}
+        if requested_epoch==epoch&&(axes=="both"||horizontal==(axes=="horizontal")){end=Some(horizontal)}else{s.request_status="rejected".into();retired_end=true;}
     }
     // Retirement discards this frame's growth observation; updating previous_max
     // below consumes it rather than deferring old-view movement to a later frame.
-    if !retired_end&&end.is_none()&&configured&&s.following&&max!=s.previous_max{end=Some(axis=="horizontal");}
+    // Axis sync suspends this projection without rewriting authored follow
+    // policy. Consume unavailable-axis growth so re-enabling cannot replay it.
+    if !retired_end&&end.is_none()&&configured&&(axes=="both"||axes==axis)&&s.following&&max!=s.previous_max{end=Some(axis=="horizontal");}
     if let Some(horizontal)=end{
         let mut offset=s.handle().offset();
         if horizontal{offset.x=-max.x}else{offset.y=-max.y}

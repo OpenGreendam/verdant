@@ -734,7 +734,12 @@ fn mixer_scalar(editor: Entity<Editor>, track: Option<TrackId>, control: MixerCo
         move |sample, bounds, initial| {
             if pan {
                 let delta = sample.total_delta.x / (f64::from(bounds.size.width) - 16.0).max(1.0) * 200.0;
-                Sample { value: initial + delta, fine: initial + delta * 0.1, jump: false }
+                // The audio/project boundary stores integer permille. Give
+                // the source that same value before it publishes a preview,
+                // so a normal repaint echoes this gesture instead of looking
+                // like a competing authoritative edit.
+                Sample { value: ((initial + delta) * 10.0).round() / 10.0,
+                    fine: ((initial + delta * 0.1) * 10.0).round() / 10.0, jump: false }
             } else {
                 let delta = -sample.total_delta.y / (f64::from(bounds.size.height) - 14.0).max(1.0);
                 let origin = fader_pos((initial * 1000.0).round() as i32);
@@ -811,12 +816,23 @@ mod pointer_boundary_tests {
     struct Harness { editor: Entity<Editor>, master: bool, control: MixerControl }
     impl Render for Harness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            let track = self.editor.read(cx).session.track.clone();
+            let ed = self.editor.read(cx);
+            let track = ed.session.track.clone();
+            // Use the production preview/project readback. A constant value
+            // would conceal precision loss when a gesture survives a frame.
+            let raw = if self.master {
+                let settings = ed.master_bus();
+                if self.control == MixerControl::Pan { settings.pan_permille } else { settings.gain_millidecibels }
+            } else {
+                let header = ed.mixer_drag.as_ref().filter(|drag| drag.track == track)
+                    .map(|drag| drag.header.clone()).unwrap_or_else(|| ed.project().track(&track).unwrap().header());
+                if self.control == MixerControl::Pan { header.pan_permille } else { header.gain_millidecibels }
+            };
             let control = match (self.master, self.control) {
-                (false, MixerControl::Pan) => pan_control(self.editor.clone(), track, 0).into_any_element(),
-                (false, MixerControl::Fader) => fader(self.editor.clone(), track, 0).into_any_element(),
-                (true, MixerControl::Pan) => master_pan_control(self.editor.clone(), 0).into_any_element(),
-                (true, MixerControl::Fader) => master_fader(self.editor.clone(), 0).into_any_element(),
+                (false, MixerControl::Pan) => pan_control(self.editor.clone(), track, raw).into_any_element(),
+                (false, MixerControl::Fader) => fader(self.editor.clone(), track, raw).into_any_element(),
+                (true, MixerControl::Pan) => master_pan_control(self.editor.clone(), raw).into_any_element(),
+                (true, MixerControl::Fader) => master_fader(self.editor.clone(), raw).into_any_element(),
             };
             div().size_full().child(div().w(px(140.0)).h(px(120.0)).child(control))
                 .child(canvas(|_, _, _| {}, |_, _, window, _| {
@@ -834,7 +850,7 @@ mod pointer_boundary_tests {
         crate::native_test_support::frames(window, cx);
         window
     }
-    fn down(host: &Harness, window: &mut Window, cx: &mut gpui::App) {
+    fn source(host: &Harness, window: &Window) -> verdant_continuous_control::ContinuousControlHandle {
         let label=match(host.master,host.control) {
             (false,MixerControl::Pan)=>"轨道声像",(false,MixerControl::Fader)=>"轨道推子",
             (true,MixerControl::Pan)=>"主声像",(true,MixerControl::Fader)=>"主推子",
@@ -843,7 +859,10 @@ mod pointer_boundary_tests {
             let owner=owner.borrow();owner.window_id==Some(window.window_handle().window_id())
                 && owner.props.get("label").and_then(serde_json::Value::as_str)==Some(label)
         }).expect("mixer renders an actual compiled scalar");
-        let source=verdant_continuous_control::ContinuousControlHandle{owner};
+        verdant_continuous_control::ContinuousControlHandle{owner}
+    }
+    fn down(host: &Harness, window: &mut Window, cx: &mut gpui::App) {
+        let source = source(host, window);
         let position=point(px(70.0),px(60.0));
         assert!(source.owner.borrow().bounds.is_some_and(|bounds|bounds.contains(&position)),
             "compiled mixer scalar must cover the native fader/pan allocation; bounds={:?}",source.owner.borrow().bounds);
@@ -889,6 +908,54 @@ mod pointer_boundary_tests {
                 assert_eq!(host.editor.read(cx).revision().get(), 1, "a stopped bubble cannot discard the valid terminal sample");
                 assert!(host.editor.read(cx).mixer_drag.is_none() && host.editor.read(cx).master_drag.is_none());
                 assert!(window.captured_hitbox().is_none());
+            }).unwrap();
+        } }
+    }
+
+    #[gpui::test]
+    fn pan_previews_survive_quantized_repaint_and_commit_once(cx: &mut TestAppContext) {
+        for master in [false, true] { for fine in [false, true] {
+            let window = open(cx, master, MixerControl::Pan);
+            window.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
+            crate::native_test_support::frames(window, cx);
+            for x in [80.0, 95.0] {
+                window.update(cx, |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                        position: point(px(x), px(60.0)), pressed_button: Some(MouseButton::Left),
+                        modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                    }), cx);
+                    cx.notify();
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+                window.update(cx, |host, window, cx| {
+                    let source = source(host, window);
+                    assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"),
+                        "integer audio preview must remain the current gesture after repaint");
+                    let ed = host.editor.read(cx);
+                    let raw = if master { ed.master_drag.as_ref().expect("master preview survives").settings.pan_permille }
+                        else { ed.mixer_drag.as_ref().expect("track preview survives").header.pan_permille };
+                    assert_eq!(source.state("value").unwrap().as_f64(), Some(raw as f64 / 10.0));
+                    assert_eq!(ed.revision().get(), 0, "preview does not write an undo step");
+                }).unwrap();
+            }
+            window.update(cx, |host, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: point(px(95.0), px(60.0)), button: MouseButton::Left,
+                    modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                }), cx);
+                let ed = host.editor.read(cx);
+                assert_eq!(ed.revision().get(), 1, "one completed drag creates one transaction");
+                let raw = if master { crate::mix::MasterBusSettings::from_project(ed.project()).pan_permille }
+                    else { ed.project().track(&ed.session.track).unwrap().header().pan_permille };
+                assert_eq!(raw, if fine { 40 } else { 403 });
+                assert!(ed.mixer_drag.is_none() && ed.master_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+                cx.notify();
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                assert_eq!(source(host, window).state("phase").unwrap(), serde_json::json!("idle"));
+                assert_eq!(host.editor.read(cx).revision().get(), 1);
             }).unwrap();
         } }
     }

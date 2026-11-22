@@ -326,6 +326,62 @@ mod tests {
     }
 
     #[gpui::test]
+    fn native_note_table_selects_first_row_and_collapses_a_range_at_the_current_cursor(cx: &mut TestAppContext) {
+        let mut project = verdant_domain::Project::new_empty();
+        let notes = vec![Note::new(0, 240, 60), Note::new(480, 240, 62), Note::new(960, 240, 64)];
+        let ids = notes.iter().map(|note| note.id.clone()).collect::<Vec<_>>();
+        project.tracks[0].notes = notes;
+        project.tracks[0].refresh_index();
+        let window = cx.open_window(size(px(640.0), px(360.0)), |window, cx| {
+            let editor = cx.new(|cx| Editor::for_native_test(project, window, cx));
+            let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+            Harness { editor, _changed: changed }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let editor = host.editor.read(cx);
+            assert_eq!(editor.table_cursor, 0);
+            assert!(editor.session.selection.is_empty(), "initial cursor is not yet a domain selection");
+        }).unwrap();
+        for (index, extend, count) in [(0, false, 1), (2, true, 3), (2, false, 1)] {
+            // The production list has a 32 px header and 34 px rows. Use the
+            // start-time cell, away from its independently editable pitch.
+            let position = gpui::point(px(20.0), px(32.0 + index as f32*34.0 + 17.0));
+            cx.update_window(window.into(), |_, window, cx| {
+                let modifiers = gpui::Modifiers { shift: extend, ..Default::default() };
+                window.dispatch_event(gpui::PlatformInput::MouseDown(gpui::MouseDownEvent {
+                    position, button: gpui::MouseButton::Left, modifiers, click_count: 1, ..Default::default()
+                }), cx);
+                window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                    position, button: gpui::MouseButton::Left, modifiers, click_count: 1, ..Default::default()
+                }), cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                let editor = host.editor.read(cx);
+                assert_eq!(editor.table_cursor, index);
+                assert_eq!(editor.session.selection.len(), count, "row={index}, extend={extend}");
+                assert!(editor.session.selection.contains(&ids[index]));
+                if extend { assert!(ids.iter().all(|id| editor.session.selection.contains(id))); }
+                assert!(editor.focus_table.is_focused(window));
+                assert_eq!(editor.revision().get(), 0, "selection never edits the document");
+            }).unwrap();
+        }
+        for (key, count) in [("shift-home", 3), ("home", 1)] {
+            cx.simulate_keystrokes(window.into(), key);
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, _, cx| {
+                let editor = host.editor.read(cx);
+                assert_eq!(editor.table_cursor, 0);
+                assert_eq!(editor.session.selection.len(), count, "{key} must explicitly select at the unchanged endpoint");
+                assert!(editor.session.selection.contains(&ids[0]));
+                assert_eq!(editor.revision().get(), 0);
+            }).unwrap();
+        }
+    }
+
+    #[gpui::test]
     fn native_point_table_separates_scalar_value_keys_from_collection_navigation(cx: &mut TestAppContext) {
         let mut project = verdant_domain::Project::new_empty();
         let mut note = Note::new(0, 960, 60);

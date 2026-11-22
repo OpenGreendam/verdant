@@ -694,7 +694,13 @@ impl gpui::RenderOnce for Splitter {
         let control = scalar(self.editor, id, spec,
             move |sample, _, initial| {
                 let delta = if vertical { sample.total_delta.x } else { sample.total_delta.y } * sign;
-                Sample { value: initial + delta, fine: initial + delta * 0.1, jump: false }
+                // LayoutPrefs stores f32. Propose that same representation so
+                // its preview echo remains exact across a native repaint.
+                Sample {
+                    value: f64::from((initial + delta) as f32),
+                    fine: f64::from((initial + delta * 0.1) as f32),
+                    jump: false,
+                }
             },
             move |display, _, _, _| canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
                 move |bounds, hitbox, window, _| {
@@ -724,6 +730,107 @@ impl gpui::RenderOnce for Splitter {
             });
         div().id(id).flex_none().when(vertical, |d| d.w(px(5.0)).h_full())
             .when(!vertical, |d| d.h(px(5.0)).w_full()).bg(th.surface).child(control)
+    }
+}
+
+#[cfg(test)]
+mod splitter_precision_tests {
+    use super::*;
+    use gpui::{AppContext, Render, Subscription, TestAppContext, point, size};
+
+    struct Harness { editor: Entity<Editor>, kind: SplitterKind, _changed: Subscription }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let theme = self.editor.read(cx).theme;
+            div().size_full().child(div().w(px(200.0)).h(px(100.0))
+                .child(splitter_bar(self.editor.clone(), self.kind, theme)))
+        }
+    }
+    fn value(layout: LayoutPrefs, kind: SplitterKind) -> f32 {
+        match kind {
+            SplitterKind::InspectorWidth => layout.inspector_width,
+            SplitterKind::RightDockWidth => layout.right_dock_width,
+            SplitterKind::ArrangeHeight => layout.arrange_height,
+            SplitterKind::LaneHeight => layout.lane_height,
+        }
+    }
+
+    #[gpui::test]
+    fn native_splitters_keep_f32_previews_through_repaint_and_release(cx: &mut TestAppContext) {
+        for kind in [SplitterKind::InspectorWidth, SplitterKind::RightDockWidth,
+            SplitterKind::ArrangeHeight, SplitterKind::LaneHeight] {
+            for fine in [false, true] {
+                let window = cx.open_window(size(px(400.0), px(240.0)), |window, cx| {
+                    let editor = cx.new(|cx| Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx));
+                    let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+                    Harness { editor, kind, _changed: changed }
+                });
+                window.update(cx, |_, window, _| window.activate_window()).unwrap();
+                crate::native_test_support::frames(window, cx);
+                let (source, start, initial) = window.update(cx, |host, window, cx| {
+                    let owners = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter()
+                        .filter(|owner| {
+                            let owner = owner.borrow();
+                            owner.window_id == Some(window.window_handle().window_id()) && owner.mounted
+                                && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("separator")
+                        }).collect::<Vec<_>>();
+                    assert_eq!(owners.len(), 1, "the production splitter has one compiled scalar");
+                    let source = verdant_continuous_control::ContinuousControlHandle { owner: owners[0].clone() };
+                    let bounds = source.owner.borrow().native_hitbox.as_ref().expect("painted production splitter").bounds;
+                    assert!(bounds.size.width > px(0.0) && bounds.size.height > px(0.0));
+                    let start = bounds.center();
+                    (source, start, f64::from(value(host.editor.read(cx).layout, kind)))
+                }).unwrap();
+                cx.update_window(window.into(), |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                        position: start, button: MouseButton::Left, ..Default::default()
+                    }), cx);
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+                let vertical = matches!(kind, SplitterKind::InspectorWidth | SplitterKind::RightDockWidth);
+                let sign = if matches!(kind, SplitterKind::RightDockWidth | SplitterKind::LaneHeight) { -1.0 } else { 1.0 };
+                let mut last = start;
+                let mut expected = initial as f32;
+                for delta in [13.37, 27.19] {
+                    last = if vertical { point(start.x + px(delta), start.y) } else { point(start.x, start.y + px(delta)) };
+                    let distance = if vertical { f64::from(last.x) - f64::from(start.x) } else { f64::from(last.y) - f64::from(start.y) };
+                    expected = (initial + distance * sign * if fine { 0.1 } else { 1.0 }) as f32;
+                    cx.update_window(window.into(), |_, window, cx| {
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: last, pressed_button: Some(MouseButton::Left),
+                            modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                        }), cx);
+                    }).unwrap();
+                    // The observed Editor is rendered again with its f32 draft;
+                    // retaining only the initial props would hide this bug.
+                    crate::native_test_support::frames(window, cx);
+                    window.update(cx, |host, window, cx| {
+                        let editor = host.editor.read(cx);
+                        assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"), "{kind:?}, fine={fine}");
+                        assert_eq!(value(editor.layout, kind), expected);
+                        assert_eq!(source.state("value").unwrap().as_f64(), Some(f64::from(expected)));
+                        assert!(!editor.prefs_dirty, "preview must not persist layout preferences");
+                        assert!(window.captured_hitbox().is_some(), "the same drag must retain native capture after repaint");
+                    }).unwrap();
+                }
+                cx.update_window(window.into(), |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                        position: last, button: MouseButton::Left,
+                        modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                    }), cx);
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+                window.update(cx, |host, window, cx| {
+                    let editor = host.editor.read(cx);
+                    assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
+                    assert_eq!(value(editor.layout, kind), expected);
+                    assert!(editor.prefs_dirty, "release commits the production layout callback");
+                    assert_eq!(LayoutPrefs::from_prefs(&editor.prefs), editor.layout);
+                    assert!(window.captured_hitbox().is_none());
+                    assert!(source.take_failures().is_empty());
+                }).unwrap();
+            }
+        }
     }
 }
 

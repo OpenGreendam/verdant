@@ -131,6 +131,46 @@ runtimeTest('collection activation emits once even with synchronous owner accept
   const n = f.events.length; f.event('key.down', { key: 'Enter' }); assert.equal(f.events.length, n);
 });
 
+runtimeTest('explicit current-row selection selects an initial row and collapses a range while hover stays deduplicated', async t => {
+  for (const mode of ['table', 'listbox']) {
+    const f = await fixture(t, 'collection-control', { mode, cursor: 0 });
+    f.call('setItems', [1, 1, 1]);
+    assert.equal(f.call('selectIndex', 0, false, 'document:1'), true);
+    assert.deepEqual(f.events, [], 'an unchanged hover cursor does not select the first row');
+    assert.equal(f.call('selectAndFocus', 0, false, 'document:1'), true);
+    assert.equal(f.call('selectAndFocus', 2, true, 'document:1'), true);
+    assert.equal(f.call('selectAndFocus', 2, false, 'document:1'), true);
+    assert.deepEqual(f.events.map(({ name, payload }) => [name, payload.index, payload.extend]), [
+      ['select', 0, false], ['select', 2, true], ['select', 2, false],
+    ], 'plain click at the current range endpoint must be a new selection intent');
+    assert.equal(f.call('selectIndex', 2, false, 'document:1'), true);
+    assert.equal(f.events.length, 3, 'repeat hover remains deduplicated after explicit selection');
+    assert.equal(f.call('selectAndFocus', 2, false, 'stale'), false);
+    f.update({ disabled: true });
+    assert.equal(f.call('selectAndFocus', 2, false, 'document:1'), false);
+    assert.equal(f.events.length, 3, 'explicit intent retains revision and disabled guards');
+  }
+});
+
+runtimeTest('current-row keyboard navigation remains an explicit selection intent at boundaries', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'table', cursor: 0 });
+  f.call('setItems', [1, 1, 1]);
+  const keys = [
+    { key: 'Home' },
+    { key: 'End', shiftKey: true },
+    { key: 'End' },
+    { key: 'Home', shiftKey: true },
+    { key: 'ArrowUp' },
+  ];
+  for (const key of keys) assert.equal(f.event('key.down', key).defaultPrevented, true);
+  assert.deepEqual(f.events.map(({ name, payload }) => [name, payload.index, payload.extend]), [
+    ['select', 0, false], ['select', 2, true], ['select', 2, false],
+    ['select', 0, true], ['select', 0, false],
+  ], 'Home/End and an unmodified edge arrow must collapse selection even without cursor movement');
+  assert.equal(f.call('selectIndex', 0, false, 'document:1'), true);
+  assert.equal(f.events.length, keys.length, 'hover does not gain keyboard semantics');
+});
+
 runtimeTest('table semantics and addressed row commands reject stale and reentrant authority', async t => {
   const f = await fixture(t, 'collection-control', { mode: 'table', columns: 5 });
   f.call('setItems', [1, 1, 1]);

@@ -82,12 +82,46 @@ pub enum ModalDialog {
 pub fn horizontal_slider(editor: Entity<Editor>, id: impl Into<SharedString>,
     value: f64, min: f64, max: f64, default_val: Option<f64>, th: Theme,
     on_change: impl Fn(&mut Editor, f64, bool, &mut Context<Editor>) + Clone + 'static) -> impl IntoElement {
+    horizontal_slider_with_precision(editor, id, value, min, max, default_val, SliderPrecision::Continuous, th, on_change)
+}
+
+/// Precision is part of each host value's representation, independent of its
+/// element ID. Match both pointer candidates to the value the draft will echo.
+#[derive(Clone, Copy)]
+enum SliderPrecision { Continuous, Whole, Half, Twentieth }
+impl SliderPrecision {
+    fn canonical(self, value: f64) -> f64 {
+        match self {
+            Self::Continuous => value,
+            Self::Whole => value.round(),
+            Self::Half => (value * 2.0).round() / 2.0,
+            Self::Twentieth => (value * 20.0).round() / 20.0,
+        }
+    }
+    fn step(self, value: f64) -> f64 {
+        let quantum = match self {
+            Self::Continuous => return value,
+            Self::Whole => 1.0,
+            Self::Half => 0.5,
+            Self::Twentieth => 0.05,
+        };
+        self.canonical(value).max(quantum)
+    }
+}
+
+fn horizontal_slider_with_precision(editor: Entity<Editor>, id: impl Into<SharedString>,
+    value: f64, min: f64, max: f64, default_val: Option<f64>, precision: SliderPrecision, th: Theme,
+    on_change: impl Fn(&mut Editor, f64, bool, &mut Context<Editor>) + Clone + 'static) -> impl IntoElement {
     use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
     let id: SharedString = id.into();
     let label = if id.contains("gain") { "增益" } else if id.contains("pan") { "声像" }
         else if id.contains("time-scale") { "时间缩放" } else if id.contains("offset") { "偏移" }
         else if id.contains("scale") { "数值缩放" } else { "参数值" };
     let mut spec = Spec::slider(value, min, max, label);
+    // The source still owns key and assistive actions. Give it steps the
+    // draft can represent, including a useful minimum Shift increment.
+    spec.step = precision.step(spec.step);
+    spec.fine_step = precision.step(spec.fine_step);
     spec.default_value = default_val.unwrap_or(value);
     spec.double_action = if default_val.is_some() { "reset" } else { "none" };
     spec.preview_echo = true;
@@ -95,7 +129,11 @@ pub fn horizontal_slider(editor: Entity<Editor>, id: impl Into<SharedString>,
         move |sample, bounds, initial| {
             let width = (f64::from(bounds.size.width) - 12.0).max(1.0);
             let candidate = min + (sample.position.x - 6.0) / width * (max-min);
-            Sample { value: candidate, fine: initial + (candidate-initial)*0.1, jump: true }
+            Sample {
+                value: precision.canonical(candidate),
+                fine: precision.canonical(initial + (candidate-initial)*0.1),
+                jump: true,
+            }
         },
         move |display, _, _, _| canvas(|_, _, _| {}, move |bounds, _, window, _| {
             let (w, h) = (f64::from(bounds.size.width), f64::from(bounds.size.height));
@@ -914,7 +952,7 @@ fn render_vibrato_body(
     th: Theme,
     cx: &mut Context<Editor>,
 ) -> Div {
-    let slider_row = |key: &'static str, label: &'static str, readout: String, val: f64, min: f64, max: f64, def: f64,
+    let slider_row = |key: &'static str, label: &'static str, readout: String, val: f64, min: f64, max: f64, def: f64, precision: SliderPrecision,
                       setter: fn(&mut ModalDialog, f64)| {
         div()
             .flex()
@@ -928,7 +966,7 @@ fn render_vibrato_body(
                     .child(div().text_color(th.text_secondary).child(label))
                     .child(readout),
             )
-            .child(horizontal_slider(entity.clone(), key, val, min, max, Some(def), th, move |ed, v, _, cx| {
+            .child(horizontal_slider_with_precision(entity.clone(), key, val, min, max, Some(def), precision, th, move |ed, v, _, cx| {
                 if let Some(d) = &mut ed.modal_dialog {
                     setter(d, v);
                     cx.notify();
@@ -973,25 +1011,25 @@ fn render_vibrato_body(
                     }
                 }))),
         )
-        .child(slider_row("vib-depth", "颤音深度", format!("{depth_cents:.0} ¢"), depth_cents, 0.0, 200.0, 35.0, |d, v| {
+        .child(slider_row("vib-depth", "颤音深度", format!("{depth_cents:.0} ¢"), depth_cents, 0.0, 200.0, 35.0, SliderPrecision::Whole, |d, v| {
             if let ModalDialog::VibratoShape { depth_cents, .. } = d { *depth_cents = v.round(); }
         }))
-        .child(slider_row("vib-rate", "颤音速率", format!("{rate_hz:.2} Hz"), rate_hz, 1.0, 12.0, 5.5, |d, v| {
+        .child(slider_row("vib-rate", "颤音速率", format!("{rate_hz:.2} Hz"), rate_hz, 1.0, 12.0, 5.5, SliderPrecision::Twentieth, |d, v| {
             if let ModalDialog::VibratoShape { rate_hz, .. } = d { *rate_hz = (v * 20.0).round() / 20.0; }
         }))
-        .child(slider_row("vib-delay", "起始延迟 (音符前段平直占比)", format!("{delay_percent:.0}%"), delay_percent, 0.0, 100.0, 35.0, |d, v| {
+        .child(slider_row("vib-delay", "起始延迟 (音符前段平直占比)", format!("{delay_percent:.0}%"), delay_percent, 0.0, 100.0, 35.0, SliderPrecision::Whole, |d, v| {
             if let ModalDialog::VibratoShape { delay_percent, .. } = d { *delay_percent = v.round(); }
         }))
-        .child(slider_row("vib-fadein", "包络淡入", format!("{fade_in_percent:.0}%"), fade_in_percent, 0.0, 100.0, 15.0, |d, v| {
+        .child(slider_row("vib-fadein", "包络淡入", format!("{fade_in_percent:.0}%"), fade_in_percent, 0.0, 100.0, 15.0, SliderPrecision::Whole, |d, v| {
             if let ModalDialog::VibratoShape { fade_in_percent, .. } = d { *fade_in_percent = v.round(); }
         }))
-        .child(slider_row("vib-fadeout", "包络淡出", format!("{fade_out_percent:.0}%"), fade_out_percent, 0.0, 100.0, 15.0, |d, v| {
+        .child(slider_row("vib-fadeout", "包络淡出", format!("{fade_out_percent:.0}%"), fade_out_percent, 0.0, 100.0, 15.0, SliderPrecision::Whole, |d, v| {
             if let ModalDialog::VibratoShape { fade_out_percent, .. } = d { *fade_out_percent = v.round(); }
         }))
-        .child(slider_row("vib-phase", "起始相位", format!("{phase_deg:.0}°"), phase_deg, 0.0, 360.0, 0.0, |d, v| {
+        .child(slider_row("vib-phase", "起始相位", format!("{phase_deg:.0}°"), phase_deg, 0.0, 360.0, 0.0, SliderPrecision::Whole, |d, v| {
             if let ModalDialog::VibratoShape { phase_deg, .. } = d { *phase_deg = v.round(); }
         }))
-        .child(slider_row("vib-porta-curve", "入音滑音曲率 (S型 / 急弯)", format!("{portamento_curve:+.0}%"), portamento_curve, -100.0, 100.0, 0.0, |d, v| {
+        .child(slider_row("vib-porta-curve", "入音滑音曲率 (S型 / 急弯)", format!("{portamento_curve:+.0}%"), portamento_curve, -100.0, 100.0, 0.0, SliderPrecision::Whole, |d, v| {
             if let ModalDialog::VibratoShape { portamento_curve, .. } = d { *portamento_curve = v.round(); }
         }))
 }
@@ -1065,7 +1103,7 @@ fn render_transform_body(
                 .child(div().text_color(th.text_secondary).child("时间平移 (tick)"))
                 .child(format!("{offset_ticks:+} tick")),
         )
-        .child(horizontal_slider(entity.clone(), "tf-offset-ticks", offset_ticks as f64, -960.0, 960.0, Some(0.0), th, |ed, v, _, cx| {
+        .child(horizontal_slider_with_precision(entity.clone(), "tf-offset-ticks", offset_ticks as f64, -960.0, 960.0, Some(0.0), SliderPrecision::Whole, th, |ed, v, _, cx| {
             if let Some(ModalDialog::TransformPoints { offset_ticks, .. }) = &mut ed.modal_dialog {
                 *offset_ticks = v.round() as i64;
                 cx.notify();
@@ -1079,7 +1117,7 @@ fn render_transform_body(
                 .child(div().text_color(th.text_secondary).child("时间伸缩 (%)"))
                 .child(format!("{time_scale_percent:.0}%")),
         )
-        .child(horizontal_slider(entity.clone(), "tf-time-scale", time_scale_percent, 25.0, 200.0, Some(100.0), th, |ed, v, _, cx| {
+        .child(horizontal_slider_with_precision(entity.clone(), "tf-time-scale", time_scale_percent, 25.0, 200.0, Some(100.0), SliderPrecision::Whole, th, |ed, v, _, cx| {
             if let Some(ModalDialog::TransformPoints { time_scale_percent, .. }) = &mut ed.modal_dialog {
                 *time_scale_percent = v.round();
                 cx.notify();
@@ -1093,7 +1131,7 @@ fn render_transform_body(
                 .child(div().text_color(th.text_secondary).child("数值偏移 (¢ / dB / 表达量)"))
                 .child(format!("{value_offset:+.1}")),
         )
-        .child(horizontal_slider(entity.clone(), "tf-val-offset", value_offset, -100.0, 100.0, Some(0.0), th, |ed, v, _, cx| {
+        .child(horizontal_slider_with_precision(entity.clone(), "tf-val-offset", value_offset, -100.0, 100.0, Some(0.0), SliderPrecision::Half, th, |ed, v, _, cx| {
             if let Some(ModalDialog::TransformPoints { value_offset, .. }) = &mut ed.modal_dialog {
                 *value_offset = (v * 2.0).round() / 2.0;
                 cx.notify();
@@ -1107,7 +1145,7 @@ fn render_transform_body(
                 .child(div().text_color(th.text_secondary).child("数值缩放 (%)"))
                 .child(format!("{value_scale_percent:.0}%")),
         )
-        .child(horizontal_slider(entity, "tf-val-scale", value_scale_percent, -200.0, 200.0, Some(100.0), th, |ed, v, _, cx| {
+        .child(horizontal_slider_with_precision(entity, "tf-val-scale", value_scale_percent, -200.0, 200.0, Some(100.0), SliderPrecision::Whole, th, |ed, v, _, cx| {
             if let Some(ModalDialog::TransformPoints { value_scale_percent, .. }) = &mut ed.modal_dialog {
                 *value_scale_percent = v.round();
                 cx.notify();
@@ -1264,5 +1302,188 @@ mod tests {
                 assert!(pair[0] < pair[1] && pair[1] < 12, "{name} invalid degrees: {degrees:?}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod slider_precision_tests {
+    use super::*;
+    use gpui::{AppContext, Render, Subscription, TestAppContext, point, size};
+
+    #[derive(Clone, Copy)]
+    enum Family { Vibrato, Transform }
+    struct Case { id: &'static str, family: Family, units: f64, read: fn(&ModalDialog) -> f64 }
+    const CASES: [Case; 11] = [
+        Case { id: "vib-depth", family: Family::Vibrato, units: 1.0, read: |d| match d {
+            ModalDialog::VibratoShape { depth_cents, .. } => *depth_cents, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "vib-rate", family: Family::Vibrato, units: 20.0, read: |d| match d {
+            ModalDialog::VibratoShape { rate_hz, .. } => *rate_hz, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "vib-delay", family: Family::Vibrato, units: 1.0, read: |d| match d {
+            ModalDialog::VibratoShape { delay_percent, .. } => *delay_percent, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "vib-fadein", family: Family::Vibrato, units: 1.0, read: |d| match d {
+            ModalDialog::VibratoShape { fade_in_percent, .. } => *fade_in_percent, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "vib-fadeout", family: Family::Vibrato, units: 1.0, read: |d| match d {
+            ModalDialog::VibratoShape { fade_out_percent, .. } => *fade_out_percent, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "vib-phase", family: Family::Vibrato, units: 1.0, read: |d| match d {
+            ModalDialog::VibratoShape { phase_deg, .. } => *phase_deg, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "vib-porta-curve", family: Family::Vibrato, units: 1.0, read: |d| match d {
+            ModalDialog::VibratoShape { portamento_curve, .. } => *portamento_curve, _ => panic!("vibrato draft"),
+        } },
+        Case { id: "tf-offset-ticks", family: Family::Transform, units: 1.0, read: |d| match d {
+            ModalDialog::TransformPoints { offset_ticks, .. } => *offset_ticks as f64, _ => panic!("transform draft"),
+        } },
+        Case { id: "tf-time-scale", family: Family::Transform, units: 1.0, read: |d| match d {
+            ModalDialog::TransformPoints { time_scale_percent, .. } => *time_scale_percent, _ => panic!("transform draft"),
+        } },
+        Case { id: "tf-val-offset", family: Family::Transform, units: 2.0, read: |d| match d {
+            ModalDialog::TransformPoints { value_offset, .. } => *value_offset, _ => panic!("transform draft"),
+        } },
+        Case { id: "tf-val-scale", family: Family::Transform, units: 1.0, read: |d| match d {
+            ModalDialog::TransformPoints { value_scale_percent, .. } => *value_scale_percent, _ => panic!("transform draft"),
+        } },
+    ];
+    struct Harness { editor: Entity<Editor>, _changed: Subscription }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.editor.update(cx, |ed, cx| {
+                let entity = cx.entity();
+                div().size_full().children(modal_dialog_layer(ed, &entity, cx))
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn native_modal_sliders_keep_quantized_previews_through_normal_and_fine_repaints(cx: &mut TestAppContext) {
+        for case in CASES { for fine in [false, true] {
+            let window = cx.open_window(size(px(760.0), px(780.0)), |window, cx| {
+                let editor = cx.new(|cx| {
+                    let mut ed = Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx);
+                    ed.modal_dialog = Some(match case.family {
+                        Family::Vibrato => ModalDialog::VibratoShape {
+                            depth_cents: 35.0, rate_hz: 5.5, delay_percent: 35.0,
+                            fade_in_percent: 15.0, fade_out_percent: 15.0,
+                            phase_deg: 0.0, portamento_curve: 0.0, base: ed.revision(),
+                        },
+                        Family::Transform => ModalDialog::TransformPoints {
+                            track: ed.session.track.clone(), offset_ticks: 0,
+                            time_scale_percent: 100.0, value_offset: 0.0,
+                            value_scale_percent: 100.0, base: ed.revision(),
+                        },
+                    });
+                    ed
+                });
+                let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+                Harness { editor, _changed: changed }
+            });
+            window.update(cx, |_, window, _| window.activate_window()).unwrap();
+            crate::native_test_support::frames(window, cx);
+            let (source, min, max, initial) = window.update(cx, |host, window, cx| {
+                let owners = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter()
+                    .filter(|owner| {
+                        let owner = owner.borrow();
+                        owner.window_id == Some(window.window_handle().window_id()) && owner.mounted
+                            && owner.declared_events.contains("valueCommit")
+                            && owner.props.get("revision").and_then(serde_json::Value::as_str)
+                                .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+                                .is_some_and(|value| value.get("control").and_then(serde_json::Value::as_str) == Some(case.id))
+                    }).collect::<Vec<_>>();
+                assert_eq!(owners.len(), 1, "{} must render one actual compiled scalar", case.id);
+                let source = verdant_continuous_control::ContinuousControlHandle { owner: owners[0].clone() };
+                let (min, max) = { let owner = source.owner.borrow();
+                    (owner.props["min"].as_f64().unwrap(), owner.props["max"].as_f64().unwrap()) };
+                let initial = (case.read)(host.editor.read(cx).modal_dialog.as_ref().unwrap());
+                (source, min, max, initial)
+            }).unwrap();
+            let bounds = source.owner.borrow().native_hitbox.as_ref().expect("painted dialog slider").bounds;
+            assert!(bounds.size.width > px(12.0) && bounds.size.height > px(0.0));
+            let start = point(bounds.origin.x + px((6.0 + (initial-min)/(max-min)
+                * (f64::from(bounds.size.width)-12.0)) as f32), bounds.center().y);
+            cx.update_window(window.into(), |_, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                    position: start, button: MouseButton::Left, ..Default::default()
+                }), cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            let mut last = start;
+            let mut expected = initial;
+            for fraction in [0.4321, 0.7689] {
+                let bounds = source.owner.borrow().native_hitbox.as_ref().expect("same slider after repaint").bounds;
+                let width = f64::from(bounds.size.width) - 12.0;
+                last = point(bounds.origin.x + px((6.0 + fraction*width) as f32), bounds.center().y);
+                let candidate = min + (f64::from(last.x)-f64::from(bounds.origin.x)-6.0)/width*(max-min);
+                let requested = if fine { initial + (candidate-initial)*0.1 } else { candidate };
+                expected = (requested*case.units).round()/case.units;
+                cx.update_window(window.into(), |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                        position: last, pressed_button: Some(MouseButton::Left),
+                        modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                    }), cx);
+                }).unwrap();
+                // Rebuild the complete production dialog from its accepted
+                // draft before the next physical sample reaches the source.
+                crate::native_test_support::frames(window, cx);
+                window.update(cx, |host, window, cx| {
+                    let editor = host.editor.read(cx);
+                    assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"), "{}, fine={fine}", case.id);
+                    assert_eq!((case.read)(editor.modal_dialog.as_ref().unwrap()), expected, "{}, fine={fine}", case.id);
+                    assert_eq!(source.state("value").unwrap().as_f64(), Some(expected));
+                    assert_eq!(editor.revision().get(), 0, "dialog previews modify only the draft");
+                    assert!(window.captured_hitbox().is_some());
+                }).unwrap();
+            }
+            cx.update_window(window.into(), |_, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: last, button: MouseButton::Left,
+                    modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                }), cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
+                assert_eq!((case.read)(host.editor.read(cx).modal_dialog.as_ref().unwrap()), expected);
+                assert_ne!(expected, initial, "the completed gesture must change this draft");
+                assert_eq!(host.editor.read(cx).revision().get(), 0, "Apply remains the project transaction boundary");
+                assert!(window.captured_hitbox().is_none());
+                assert!(source.take_failures().is_empty());
+            }).unwrap();
+            assert_eq!(source.state("focused").unwrap(), serde_json::json!(true), "the real pointer gesture focuses its scalar");
+            let quantum = 1.0/case.units;
+            let fine_step = (((max-min)/1000.0*case.units).round()/case.units).max(quantum);
+            let step = (((max-min)/100.0*case.units).round()/case.units).max(quantum);
+            for _ in 0..2 {
+                let before = expected;
+                expected = ((expected+fine_step)*case.units).round()/case.units;
+                cx.simulate_keystrokes(window.into(), "shift-right");
+                crate::native_test_support::frames(window, cx);
+                window.update(cx, |host, _, cx| {
+                    let editor = host.editor.read(cx);
+                    assert_eq!((case.read)(editor.modal_dialog.as_ref().unwrap()), expected, "{} Shift+Right", case.id);
+                    assert!(expected > before, "each fine key must advance by a representable increment");
+                    assert_eq!(source.state("value").unwrap().as_f64(), Some(expected));
+                    assert_eq!(editor.revision().get(), 0);
+                }).unwrap();
+            }
+            expected = ((expected+step)*case.units).round()/case.units;
+            cx.update_window(window.into(), |_, window, cx| {
+                use verdant_continuous_control::native::gpui_native_owner::{dispatch_accessibility_action, drive_owners};
+                assert!(dispatch_accessibility_action(&source.owner, "increment", None));
+                drive_owners(window, cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, _, cx| {
+                let editor = host.editor.read(cx);
+                assert_eq!((case.read)(editor.modal_dialog.as_ref().unwrap()), expected, "{} assistive Increment", case.id);
+                assert_eq!(source.state("value").unwrap().as_f64(), Some(expected));
+                assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
+                assert_eq!(editor.revision().get(), 0);
+                assert!(source.take_failures().is_empty());
+            }).unwrap();
+        } }
     }
 }

@@ -84,9 +84,11 @@ export default definePrototype<Props>({
       if (current && ticket === epoch) current.update();
       return true;
     };
-    const select = (index: number, extend: boolean): boolean => {
+    const select = (index: number, extend: boolean, explicit: boolean): boolean => {
       if (!ready() || kind(index) === 0) return false;
-      if (index === cursor.get() && !extend) return true;
+      // Hovering the cursor again is redundant; an explicit click or key may
+      // select the initially unselected row or collapse an existing range.
+      if (!explicit && index === cursor.get() && !extend) return true;
       const ticket = ++epoch;
       cursor.set(index, 'reason: collection selection');
       if (ticket !== epoch || !ready()) return false;
@@ -115,7 +117,7 @@ export default definePrototype<Props>({
       if (mode === 'points' && name === 'Tab') {
         const next = cursor.get() + (shift ? -1 : 1);
         if (next < 0 || next >= count()) emit('close', cursor.get(), shift, name);
-        else select(next, false);
+        else select(next, false, true);
         return true;
       }
       if (mode === 'points' && (name === 'ArrowUp' || name === 'ArrowDown' || name === '+' || name === '=' || name === '-')) { emit('command', cursor.get(), shift, name); return true; }
@@ -143,7 +145,8 @@ export default definePrototype<Props>({
       else if (name === 'PageUp') next = seek(max(0, cursor.get() - (mode === 'points' ? 4 : 20)), -1, count(), false);
       else if (name === 'PageDown') next = seek(min(count() - 1, cursor.get() + (mode === 'points' ? 4 : 20)), 1, count(), false);
       else return false;
-      if (next >= 0) select(next, shift);
+      if (next >= 0) select(next, shift, true);
+      else if (!shift && kind(cursor.get()) > 0) select(cursor.get(), false, true);
       return true;
     };
     def.expose.method('setItems', (next: number[]) => {
@@ -158,7 +161,7 @@ export default definePrototype<Props>({
     });
     def.expose.method('selectIndex', (index: number, extend: boolean, basis: string) => {
       if (basis !== (current?.props.get().revision ?? '')) return false;
-      return select(index, extend);
+      return select(index, extend, false);
     });
     // Native virtualized row callbacks carry their accepted collection revision.
     // Selection must not let a suspended callback command a replacement row.
@@ -181,7 +184,7 @@ export default definePrototype<Props>({
     });
     def.expose.method('selectAndFocus', (index: number, extend: boolean, basis: string) => {
       if (!current || basis !== (current.props.get().revision ?? '')) return false;
-      if (!select(index, extend) || basis !== (current?.props.get().revision ?? '')) return false;
+      if (!select(index, extend, true) || basis !== (current?.props.get().revision ?? '')) return false;
       focus.focusSelf();
       return true;
     });

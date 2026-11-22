@@ -304,7 +304,7 @@ pub struct GeneratedData0 {
             let v_6368616e6765457870616e73696f6e: LexicalBinding<Value> = lexical_binding();
             let v_73656c656374: LexicalBinding<Value> = lexical_binding();
             let v_63686f6f7365: LexicalBinding<Value> = lexical_binding();
-            let v_6b65795f5f39313366343138336236386238386637: LexicalBinding<Value> = lexical_binding();
+            let v_6b65795f5f33653136666361613234643562356135: LexicalBinding<Value> = lexical_binding();
             let v_73796e63: LexicalBinding<Value> = lexical_binding();
             // Source "frontend/proto-ui/src/collection-control.proto.ts":14:5
             { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("mode", record(vec![("type", Value::string("string")), ("default", Value::string("listbox"))])), ("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("cursor", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("expanded", record(vec![("type", Value::string("number")), ("default", Value::number(-(Value::number(1.0)).scalar_number()))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("columns", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))]))])) };
@@ -524,193 +524,194 @@ pub struct GeneratedData0 {
             v_73656c656374.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_696e6465785f5f66636662326563386334386331643335: Value = arg(&arguments, 0);
                 let v_657874656e645f5f64313431663165323866663262373866: Value = arg(&arguments, 1);
+                let v_6578706c69636974: Value = arg(&arguments, 2);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":88:7
                 if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f66636662326563386334386331643335.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/collection-control.proto.ts":88:42
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":89:7
-                if ({ let left = Value::boolean(strict_equal(&(v_696e6465785f5f66636662326563386334386331643335.clone()), &({ let v_7075695f6e61746976655f3333 = v_637572736f72.read(); (v_7075695f6e61746976655f3333.clone()).get() }))); if left.truthy() { Value::boolean(!(v_657874656e645f5f64313431663165323866663262373866.clone()).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":89:46
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":91:7
+                if ({ let left = { let left = Value::boolean(!(v_6578706c69636974.clone()).truthy()); if left.truthy() { Value::boolean(strict_equal(&(v_696e6465785f5f66636662326563386334386331643335.clone()), &({ let v_7075695f6e61746976655f3333 = v_637572736f72.read(); (v_7075695f6e61746976655f3333.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!(v_657874656e645f5f64313431663165323866663262373866.clone()).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":91:59
                     return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":90:13
-                let v_7469636b65745f5f63396264623830353062306131653535 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":91:7
-                { let v_7075695f6e61746976655f3334 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3334.clone(), v_696e6465785f5f66636662326563386334386331643335.clone(), Value::string("reason: collection selection")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":92:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f63396264623830353062306131653535.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":92:41
-                    return Value::boolean(false);
-                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":92:13
+                let v_7469636b65745f5f31633732336131366165353631356664 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":93:7
-                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f66636662326563386334386331643335.clone(), v_657874656e645f5f64313431663165323866663262373866.clone(), Value::string("")]);
+                { let v_7075695f6e61746976655f3334 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3334.clone(), v_696e6465785f5f66636662326563386334386331643335.clone(), Value::string("reason: collection selection")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":94:7
-                if ({ let left = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(strict_equal(&(v_7469636b65745f5f63396264623830353062306131653535.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":94:40
-                    { let v_7075695f6e61746976655f3335 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3335.clone()).owner()) };
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f31633732336131366165353631356664.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":94:41
+                    return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":95:7
+                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f66636662326563386334386331643335.clone(), v_657874656e645f5f64313431663165323866663262373866.clone(), Value::string("")]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":96:7
+                if ({ let left = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(strict_equal(&(v_7469636b65745f5f31633732336131366165353631356664.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":96:40
+                    { let v_7075695f6e61746976655f3335 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3335.clone()).owner()) };
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":97:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":97:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":99:11
             v_63686f6f7365.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f35653566636562626431646233316361: Value = arg(&arguments, 0);
-                let v_657874656e645f5f35653763376134333531343939396430: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":98:7
-                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f35653566636562626431646233316361.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":98:42
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":99:13
-                let v_7469636b65745f5f36346334663636333866333033326638 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                let v_696e6465785f5f31303933366663333430356362356538: Value = arg(&arguments, 0);
+                let v_657874656e645f5f36653734353665663531393662383762: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":100:7
-                { let v_7075695f6e61746976655f3336 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3336.clone(), v_696e6465785f5f35653566636562626431646233316361.clone(), Value::string("reason: collection activation cursor")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":101:7
-                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f36346334663636333866333033326638.clone()))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":101:41
+                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f31303933366663333430356362356538.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":100:42
                     return Value::boolean(false);
                 }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":101:13
+                let v_7469636b65745f5f31313034623130643764656138376162 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":102:7
-                if (Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f35653566636562626431646233316361.clone()])), &(Value::number(2.0))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":103:15
-                    let v_6e6578745f5f33646430363131373061646664643436 = if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3337 = v_657870616e646564.read(); (v_7075695f6e61746976655f3337.clone()).get() }), &(v_696e6465785f5f35653566636562626431646233316361.clone())))).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { v_696e6465785f5f35653566636562626431646233316361.clone() };
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":104:9
-                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![v_6e6578745f5f33646430363131373061646664643436.clone(), Value::string("")]);
-                } else {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":105:14
-                    v_656d6974.read().call_authored(vec![Value::string("activate"), v_696e6465785f5f35653566636562626431646233316361.clone(), v_657874656e645f5f35653763376134333531343939396430.clone(), Value::string("")]);
+                { let v_7075695f6e61746976655f3336 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3336.clone(), v_696e6465785f5f31303933366663333430356362356538.clone(), Value::string("reason: collection activation cursor")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":103:7
+                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f31313034623130643764656138376162.clone()))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":103:41
+                    return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":106:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":104:7
+                if (Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f31303933366663333430356362356538.clone()])), &(Value::number(2.0))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":105:15
+                    let v_6e6578745f5f39386434313764643562303565303935 = if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3337 = v_657870616e646564.read(); (v_7075695f6e61746976655f3337.clone()).get() }), &(v_696e6465785f5f31303933366663333430356362356538.clone())))).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { v_696e6465785f5f31303933366663333430356362356538.clone() };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":106:9
+                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![v_6e6578745f5f39386434313764643562303565303935.clone(), Value::string("")]);
+                } else {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":107:14
+                    v_656d6974.read().call_authored(vec![Value::string("activate"), v_696e6465785f5f31303933366663333430356362356538.clone(), v_657874656e645f5f36653734353665663531393662383762.clone(), Value::string("")]);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":108:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":108:11
-            v_6b65795f5f39313366343138336236386238386637.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); let v_73656c656374 = v_73656c656374.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e616d655f5f33653937393464303464373033653265: Value = arg(&arguments, 0);
-                let v_73686966745f5f30326334646633626363646532323464: Value = arg(&arguments, 1);
-                let v_636f6d6d616e645f5f39643866663062323633363262333166: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":109:7
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":110:11
+            v_6b65795f5f33653136666361613234643562356135.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); let v_73656c656374 = v_73656c656374.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e616d655f5f66316363656631636166656366613938: Value = arg(&arguments, 0);
+                let v_73686966745f5f30306631393732336363613366373633: Value = arg(&arguments, 1);
+                let v_636f6d6d616e645f5f63393436336161386137383466613761: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":111:7
                 if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":109:33
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":111:33
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":110:13
-                let v_6d6f64655f5f30363837616536363163323266373237 = { let left = ({ let v_7075695f6e61746976655f3338 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3338.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":111:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("searchlist")))); if left.truthy() { v_636f6d6d616e645f5f39643866663062323633363262333166.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":112:9
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":112:13
+                let v_6d6f64655f5f65306330663134393432653465666439 = { let left = ({ let v_7075695f6e61746976655f3338 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3338.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":113:7
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("searchlist")))); if left.truthy() { v_636f6d6d616e645f5f63393436336161386137383466613761.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":114:9
                     v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3339 = v_637572736f72.read(); (v_7075695f6e61746976655f3339.clone()).get() }, Value::boolean(false), Value::string("Find")]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":112:55
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":114:55
                     return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":114:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("points")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Enter")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":114:75
-                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3430 = v_637572736f72.read(); (v_7075695f6e61746976655f3430.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone(), v_6e616d655f5f33653937393464303464373033653265.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":114:117
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":116:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Enter")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":116:75
+                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3430 = v_637572736f72.read(); (v_7075695f6e61746976655f3430.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":116:117
                     return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":115:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("points")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Tab")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":116:15
-                    let v_5f5f7075694d6f64756c6530 = add({ let v_7075695f6e61746976655f3431 = v_637572736f72.read(); (v_7075695f6e61746976655f3431.clone()).get() }, if (v_73686966745f5f30326334646633626363646532323464.clone()).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { Value::number(1.0) });
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":117:9
-                    if ({ let left = { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if !left.truthy() { { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = v_636f756e74.read().call_authored(vec![]); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":117:42
-                        v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3432 = v_637572736f72.read(); (v_7075695f6e61746976655f3432.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone(), v_6e616d655f5f33653937393464303464373033653265.clone()]);
-                    } else {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":118:14
-                        v_73656c656374.read().call_authored(vec![v_5f5f7075694d6f64756c6530.clone(), Value::boolean(false)]);
-                    }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":117:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Tab")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":118:15
+                    let v_5f5f7075694d6f64756c6530 = add({ let v_7075695f6e61746976655f3431 = v_637572736f72.read(); (v_7075695f6e61746976655f3431.clone()).get() }, if (v_73686966745f5f30306631393732336363613366373633.clone()).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { Value::number(1.0) });
                     // Source "frontend/proto-ui/src/collection-control.proto.ts":119:9
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":121:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("+")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("-")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":121:128
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3433 = v_637572736f72.read(); (v_7075695f6e61746976655f3433.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone(), v_6e616d655f5f33653937393464303464373033653265.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":121:172
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":122:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Escape")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Tab")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("menu")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":122:71
-                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3434 = v_637572736f72.read(); (v_7075695f6e61746976655f3434.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone(), v_6e616d655f5f33653937393464303464373033653265.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":122:113
+                    if ({ let left = { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if !left.truthy() { { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = v_636f756e74.read().call_authored(vec![]); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":119:42
+                        v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3432 = v_637572736f72.read(); (v_7075695f6e61746976655f3432.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    } else {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":120:14
+                        v_73656c656374.read().call_authored(vec![v_5f5f7075694d6f64756c6530.clone(), Value::boolean(false), Value::boolean(true)]);
+                    }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":121:9
                     return Value::boolean(true);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":123:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Enter")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("F2")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("table")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":123:84
-                    return v_63686f6f7365.read().call_authored(vec![{ let v_7075695f6e61746976655f3435 = v_637572736f72.read(); (v_7075695f6e61746976655f3435.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone()]);
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("+")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("-")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":123:128
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3433 = v_637572736f72.read(); (v_7075695f6e61746976655f3433.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":123:172
+                    return Value::boolean(true);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":124:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Delete")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Backspace")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Tab")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":125:9
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3436 = v_637572736f72.read(); (v_7075695f6e61746976655f3436.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone(), v_6e616d655f5f33653937393464303464373033653265.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":125:53
+                if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Escape")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Tab")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":124:71
+                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3434 = v_637572736f72.read(); (v_7075695f6e61746976655f3434.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":124:113
                     return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":127:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("table")))); if left.truthy() { v_636f6d6d616e645f5f39643866663062323633363262333166.clone() } else { left } }; if left.truthy() { { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowLeft")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowDown")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":128:9
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3437 = v_637572736f72.read(); (v_7075695f6e61746976655f3437.clone()).get() }, v_73686966745f5f30326334646633626363646532323464.clone(), v_6e616d655f5f33653937393464303464373033653265.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":128:53
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":125:7
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Enter")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("F2")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("table")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":125:84
+                    return v_63686f6f7365.read().call_authored(vec![{ let v_7075695f6e61746976655f3435 = v_637572736f72.read(); (v_7075695f6e61746976655f3435.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone()]);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":126:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Delete")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Backspace")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Tab")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":127:9
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3436 = v_637572736f72.read(); (v_7075695f6e61746976655f3436.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":127:53
                     return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":130:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":131:9
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":129:7
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("table")))); if left.truthy() { v_636f6d6d616e645f5f63393436336161386137383466613761.clone() } else { left } }; if left.truthy() { { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowLeft")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowDown")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":130:9
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3437 = v_637572736f72.read(); (v_7075695f6e61746976655f3437.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":130:53
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":132:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":133:9
                     if ({ let relational_left = { let v_7075695f6e61746976655f3438 = v_657870616e646564.read(); (v_7075695f6e61746976655f3438.clone()).get() }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":131:33
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":133:33
                         return Value::boolean(false);
                     }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":132:9
-                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![Value::number(-(Value::number(1.0)).scalar_number()), v_6e616d655f5f33653937393464303464373033653265.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":134:9
+                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![Value::number(-(Value::number(1.0)).scalar_number()), v_6e616d655f5f66316363656631636166656366613938.clone()]);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":134:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":135:9
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":136:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":137:9
                     if (Value::boolean(!strict_equal(&(v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f3439 = v_637572736f72.read(); (v_7075695f6e61746976655f3439.clone()).get() }])), &(Value::number(2.0))))).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":135:39
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":137:39
                         return Value::boolean(false);
                     }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":136:9
-                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![{ let v_7075695f6e61746976655f3530 = v_637572736f72.read(); (v_7075695f6e61746976655f3530.clone()).get() }, v_6e616d655f5f33653937393464303464373033653265.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":138:9
+                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![{ let v_7075695f6e61746976655f3530 = v_637572736f72.read(); (v_7075695f6e61746976655f3530.clone()).get() }, v_6e616d655f5f66316363656631636166656366613938.clone()]);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":138:11
-                let v_6e6578745f5f61623135333963633735383339313635 = Rc::new(std::cell::RefCell::new(Value::number(-(Value::number(1.0)).scalar_number())));
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":139:7
-                if (Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("Home"))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":139:28
-                    { let value = v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f61623135333963633735383339313635.clone()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":140:11
+                let v_6e6578745f5f63333064316432366164346565353263 = Rc::new(std::cell::RefCell::new(Value::number(-(Value::number(1.0)).scalar_number())));
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":141:7
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Home"))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":141:28
+                    { let value = v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
                 } else {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":140:12
-                    if (Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("End"))))).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":140:32
-                        { let value = v_7365656b.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f61623135333963633735383339313635.clone()).borrow_mut() = value; }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":142:12
+                    if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("End"))))).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":142:32
+                        { let value = v_7365656b.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
                     } else {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":141:12
-                        if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
-                            // Source "frontend/proto-ui/src/collection-control.proto.ts":141:60
-                            { let value = v_7365656b.read().call_authored(vec![Value::number(({ let v_7075695f6e61746976655f3531 = v_637572736f72.read(); (v_7075695f6e61746976655f3531.clone()).get() }).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f61623135333963633735383339313635.clone()).borrow_mut() = value; }
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":143:12
+                        if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":143:60
+                            { let value = v_7365656b.read().call_authored(vec![Value::number(({ let v_7075695f6e61746976655f3531 = v_637572736f72.read(); (v_7075695f6e61746976655f3531.clone()).get() }).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
                         } else {
-                            // Source "frontend/proto-ui/src/collection-control.proto.ts":142:12
-                            if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowDown")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
-                                // Source "frontend/proto-ui/src/collection-control.proto.ts":142:63
-                                { let value = v_7365656b.read().call_authored(vec![add({ let v_7075695f6e61746976655f3532 = v_637572736f72.read(); (v_7075695f6e61746976655f3532.clone()).get() }, Value::number(1.0)), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f61623135333963633735383339313635.clone()).borrow_mut() = value; }
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":144:12
+                            if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowDown")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":144:63
+                                { let value = v_7365656b.read().call_authored(vec![add({ let v_7075695f6e61746976655f3532 = v_637572736f72.read(); (v_7075695f6e61746976655f3532.clone()).get() }, Value::number(1.0)), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
                             } else {
-                                // Source "frontend/proto-ui/src/collection-control.proto.ts":143:12
-                                if (Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("PageUp"))))).truthy() {
-                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":143:35
-                                    { let value = v_7365656b.read().call_authored(vec![v_6d6178.read().call_authored(vec![Value::number(0.0), Value::number(({ let v_7075695f6e61746976655f3533 = v_637572736f72.read(); (v_7075695f6e61746976655f3533.clone()).get() }).scalar_number() - (if (Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) }).scalar_number())]), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f61623135333963633735383339313635.clone()).borrow_mut() = value; }
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":145:12
+                                if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("PageUp"))))).truthy() {
+                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":145:35
+                                    { let value = v_7365656b.read().call_authored(vec![v_6d6178.read().call_authored(vec![Value::number(0.0), Value::number(({ let v_7075695f6e61746976655f3533 = v_637572736f72.read(); (v_7075695f6e61746976655f3533.clone()).get() }).scalar_number() - (if (Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) }).scalar_number())]), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
                                 } else {
-                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":144:12
-                                    if (Value::boolean(strict_equal(&(v_6e616d655f5f33653937393464303464373033653265.clone()), &(Value::string("PageDown"))))).truthy() {
-                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":144:37
-                                        { let value = v_7365656b.read().call_authored(vec![v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), add({ let v_7075695f6e61746976655f3534 = v_637572736f72.read(); (v_7075695f6e61746976655f3534.clone()).get() }, if (Value::boolean(strict_equal(&(v_6d6f64655f5f30363837616536363163323266373237.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) })]), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f61623135333963633735383339313635.clone()).borrow_mut() = value; }
+                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":146:12
+                                    if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("PageDown"))))).truthy() {
+                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":146:37
+                                        { let value = v_7365656b.read().call_authored(vec![v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), add({ let v_7075695f6e61746976655f3534 = v_637572736f72.read(); (v_7075695f6e61746976655f3534.clone()).get() }, if (Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) })]), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
                                     } else {
-                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":145:12
+                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":147:12
                                         return Value::boolean(false);
                                     }
                                 }
@@ -718,315 +719,321 @@ pub struct GeneratedData0 {
                         }
                     }
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":146:7
-                if ({ let relational_left = { let value = (v_6e6578745f5f61623135333963633735383339313635.clone()).borrow().clone(); value }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":146:22
-                    v_73656c656374.read().call_authored(vec![{ let value = (v_6e6578745f5f61623135333963633735383339313635.clone()).borrow().clone(); value }, v_73686966745f5f30326334646633626363646532323464.clone()]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":148:7
+                if ({ let relational_left = { let value = (v_6e6578745f5f63333064316432366164346565353263.clone()).borrow().clone(); value }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":148:22
+                    v_73656c656374.read().call_authored(vec![{ let value = (v_6e6578745f5f63333064316432366164346565353263.clone()).borrow().clone(); value }, v_73686966745f5f30306631393732336363613366373633.clone(), Value::boolean(true)]);
+                } else {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":149:12
+                    if ({ let left = Value::boolean(!(v_73686966745f5f30306631393732336363613366373633.clone()).truthy()); if left.truthy() { { let relational_left = v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f3535 = v_637572736f72.read(); (v_7075695f6e61746976655f3535.clone()).get() }]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":149:50
+                        v_73656c656374.read().call_authored(vec![{ let v_7075695f6e61746976655f3536 = v_637572736f72.read(); (v_7075695f6e61746976655f3536.clone()).get() }, Value::boolean(false), Value::boolean(true)]);
+                    }
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":147:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":150:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":149:5
-            { let v_7075695f6e61746976655f3535 = v_646566.clone(); expose_method(&owner, Value::string("setItems"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6974656d73 = v_6974656d73.clone(); let v_76616c69644974656d73 = v_76616c69644974656d73.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f30303234316132353065346664633465: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":150:7
-                if ({ let left = { let left = { let value = (v_646973706f736564.read()).borrow().clone(); value }; if !left.truthy() { { let relational_left = (v_6e6578745f5f30303234316132353065346664633465.clone()).member("length", false); let relational_right = Value::number(1000000.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }; if !left.truthy() { Value::boolean(!(v_76616c69644974656d73.read().call_authored(vec![v_6e6578745f5f30303234316132353065346664633465.clone(), Value::number(0.0), (v_6e6578745f5f30303234316132353065346664633465.clone()).member("length", false)])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":150:83
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":152:5
+            { let v_7075695f6e61746976655f3537 = v_646566.clone(); expose_method(&owner, Value::string("setItems"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6974656d73 = v_6974656d73.clone(); let v_76616c69644974656d73 = v_76616c69644974656d73.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e6578745f5f63336462363239303163653033336462: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":153:7
+                if ({ let left = { let left = { let value = (v_646973706f736564.read()).borrow().clone(); value }; if !left.truthy() { { let relational_left = (v_6e6578745f5f63336462363239303163653033336462.clone()).member("length", false); let relational_right = Value::number(1000000.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }; if !left.truthy() { Value::boolean(!(v_76616c69644974656d73.read().call_authored(vec![v_6e6578745f5f63336462363239303163653033336462.clone(), Value::number(0.0), (v_6e6578745f5f63336462363239303163653033336462.clone()).member("length", false)])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":153:83
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":151:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":154:7
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":151:16
-                { let value = v_6e6578745f5f30303234316132353065346664633465.clone(); *(v_6974656d73.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":152:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":154:16
+                { let value = v_6e6578745f5f63336462363239303163653033336462.clone(); *(v_6974656d73.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":155:7
                 if ({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":152:20
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":155:20
                     v_73796e63.read().call_authored(vec![{ let value = (v_63757272656e74.read()).borrow().clone(); value }]);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":153:7
-                return Value::boolean(true);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":155:5
-            { let v_7075695f6e61746976655f3536 = v_646566.clone(); expose_method(&owner, Value::string("choose"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f63386466373564643766613637316533: Value = arg(&arguments, 0);
-                let v_657874656e645f5f61306539653736306132633339326437: Value = arg(&arguments, 1);
-                let v_62617369735f5f38336534306362363763346133363837: Value = arg(&arguments, 2);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":156:7
-                if (Value::boolean(!strict_equal(&(v_62617369735f5f38336534306362363763346133363837.clone()), &({ let left = ({ let v_7075695f6e61746976655f3537 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3537.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3537.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":156:60
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":157:7
-                return v_63686f6f7365.read().call_authored(vec![v_696e6465785f5f63386466373564643766613637316533.clone(), v_657874656e645f5f61306539653736306132633339326437.clone()]);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":159:5
-            { let v_7075695f6e61746976655f3538 = v_646566.clone(); expose_method(&owner, Value::string("selectIndex"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f35653864323233333135313233643138: Value = arg(&arguments, 0);
-                let v_657874656e645f5f64313938613534373866613965383336: Value = arg(&arguments, 1);
-                let v_62617369735f5f65646233393432613265333130323930: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":160:7
-                if (Value::boolean(!strict_equal(&(v_62617369735f5f65646233393432613265333130323930.clone()), &({ let left = ({ let v_7075695f6e61746976655f3539 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3539.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3539.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":160:60
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":161:7
-                return v_73656c656374.read().call_authored(vec![v_696e6465785f5f35653864323233333135313233643138.clone(), v_657874656e645f5f64313938613534373866613965383336.clone()]);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":165:5
-            { let v_7075695f6e61746976655f3630 = v_646566.clone(); expose_method(&owner, Value::string("keyAt"), {  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6b65795f5f39313366343138336236386238386637 = v_6b65795f5f39313366343138336236386238386637.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f65326638323263303262626136616563: Value = arg(&arguments, 0);
-                let v_6e616d655f5f38643930643361306561313963643232: Value = arg(&arguments, 1);
-                let v_73686966745f5f31346631323861656236613866373265: Value = arg(&arguments, 2);
-                let v_636f6d6d616e645f5f37633966353734623236333333356661: Value = arg(&arguments, 3);
-                let v_62617369735f5f61666533333433396665626533313833: Value = arg(&arguments, 4);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":166:7
-                if ({ let left = { let left = { let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f61666533333433396665626533313833.clone()), &({ let left = ({ let v_7075695f6e61746976655f3631 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3631.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f65326638323263303262626136616563.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":166:104
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":167:13
-                let v_6d6f64655f5f36363338353937616266366563663631 = { let left = ({ let v_7075695f6e61746976655f3632 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3632.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":168:13
-                let v_68616e646c6564 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("Enter")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("Home")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("End")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("ArrowLeft")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("PageUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("PageDown")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("Tab")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f36363338353937616266366563663631.clone()), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f36363338353937616266366563663631.clone()), &(Value::string("table")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f36363338353937616266366563663631.clone()), &(Value::string("menu")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f36363338353937616266366563663631.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("F2")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("Delete")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("Backspace")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f36363338353937616266366563663631.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("+")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("-")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f36363338353937616266366563663631.clone()), &(Value::string("searchlist")))); if left.truthy() { v_636f6d6d616e645f5f37633966353734623236333333356661.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f38643930643361306561313963643232.clone()), &(Value::string("F")))) } else { left } } } else { left } } } else { left } };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":174:7
-                if (Value::boolean(!(v_68616e646c6564.clone()).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":174:21
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":175:13
-                let v_7469636b65745f5f35356237343836333431636230313432 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":176:7
-                { let v_7075695f6e61746976655f3633 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3633.clone(), v_696e6465785f5f65326638323263303262626136616563.clone(), Value::string("reason: addressed collection key")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":177:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f35356237343836333431636230313432.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":177:41
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":178:7
-                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f65326638323263303262626136616563.clone(), Value::boolean(false), Value::string("")]);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":179:7
-                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f35356237343836333431636230313432.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f61666533333433396665626533313833.clone()), &({ let left = ({ let v_7075695f6e61746976655f3634 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3634.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3634.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":179:92
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":180:7
-                return v_6b65795f5f39313366343138336236386238386637.read().call_authored(vec![v_6e616d655f5f38643930643361306561313963643232.clone(), v_73686966745f5f31346631323861656236613866373265.clone(), v_636f6d6d616e645f5f37633966353734623236333333356661.clone()]);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":182:5
-            { let v_7075695f6e61746976655f3635 = v_646566.clone(); expose_method(&owner, Value::string("selectAndFocus"), {  let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f39373662646161313066653533393065: Value = arg(&arguments, 0);
-                let v_657874656e645f5f66656635366631343064346564343837: Value = arg(&arguments, 1);
-                let v_62617369735f5f31303331313533646666316234616338: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":183:7
-                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f31303331313533646666316234616338.clone()), &({ let left = ({ let v_7075695f6e61746976655f3636 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3636.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":183:71
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":184:7
-                if ({ let left = Value::boolean(!(v_73656c656374.read().call_authored(vec![v_696e6465785f5f39373662646161313066653533393065.clone(), v_657874656e645f5f66656635366631343064346564343837.clone()])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f31303331313533646666316234616338.clone()), &({ let left = ({ let v_7075695f6e61746976655f3637 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3637.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3637.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":184:86
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":185:7
-                { let v_7075695f6e61746976655f3638 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3638.clone()).owner(), Value::Undefined, false) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":186:7
                 return Value::boolean(true);
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":188:5
-            { let v_7075695f6e61746976655f3639 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b65795f5f39313366343138336236386238386637.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":192:5
-            { let v_7075695f6e61746976655f3730 = v_646566.clone(); expose_method(&owner, Value::string("keyFrom"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6b65795f5f39313366343138336236386238386637 = v_6b65795f5f39313366343138336236386238386637.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6f726967696e: Value = arg(&arguments, 0);
-                let v_6e616d655f5f36316430313166613264653161373064: Value = arg(&arguments, 1);
-                let v_73686966745f5f30393962643735616230623938356163: Value = arg(&arguments, 2);
-                let v_636f6d6d616e645f5f32656137663833623738383361613232: Value = arg(&arguments, 3);
-                let v_62617369735f5f34326266623533636435386464323231: Value = arg(&arguments, 4);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":193:7
-                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f34326266623533636435386464323231.clone()), &({ let left = ({ let v_7075695f6e61746976655f3731 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3731.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":193:71
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":158:5
+            { let v_7075695f6e61746976655f3538 = v_646566.clone(); expose_method(&owner, Value::string("choose"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f66353737353231626163366539343165: Value = arg(&arguments, 0);
+                let v_657874656e645f5f65396264633562613335356664396136: Value = arg(&arguments, 1);
+                let v_62617369735f5f38363834363564666435393761333634: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":159:7
+                if (Value::boolean(!strict_equal(&(v_62617369735f5f38363834363564666435393761333634.clone()), &({ let left = ({ let v_7075695f6e61746976655f3539 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3539.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3539.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":159:60
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":194:7
-                if (Value::boolean(strict_equal(&(v_6f726967696e.clone()), &(Value::string("form"))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":194:30
-                    return if (Value::boolean(strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("Escape"))))).truthy() { v_6b65795f5f39313366343138336236386238386637.read().call_authored(vec![v_6e616d655f5f36316430313166613264653161373064.clone(), v_73686966745f5f30393962643735616230623938356163.clone(), v_636f6d6d616e645f5f32656137663833623738383361613232.clone()]) } else { Value::boolean(false) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":160:7
+                return v_63686f6f7365.read().call_authored(vec![v_696e6465785f5f66353737353231626163366539343165.clone(), v_657874656e645f5f65396264633562613335356664396136.clone()]);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":162:5
+            { let v_7075695f6e61746976655f3630 = v_646566.clone(); expose_method(&owner, Value::string("selectIndex"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f63353036383464353233643634356363: Value = arg(&arguments, 0);
+                let v_657874656e645f5f39663461633861653036333862643166: Value = arg(&arguments, 1);
+                let v_62617369735f5f62633662396166316630393466636466: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":163:7
+                if (Value::boolean(!strict_equal(&(v_62617369735f5f62633662396166316630393466636466.clone()), &({ let left = ({ let v_7075695f6e61746976655f3631 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3631.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3631.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":163:60
+                    return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":195:7
-                if ({ let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6f726967696e.clone()), &(Value::string("search")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("Enter")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("Escape")))) } else { left } }; if left.truthy() { Value::boolean(!({ let left = v_636f6d6d616e645f5f32656137663833623738383361613232.clone(); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f36316430313166613264653161373064.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":196:58
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":164:7
+                return v_73656c656374.read().call_authored(vec![v_696e6465785f5f63353036383464353233643634356363.clone(), v_657874656e645f5f39663461633861653036333862643166.clone(), Value::boolean(false)]);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":168:5
+            { let v_7075695f6e61746976655f3632 = v_646566.clone(); expose_method(&owner, Value::string("keyAt"), {  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6b65795f5f33653136666361613234643562356135 = v_6b65795f5f33653136666361613234643562356135.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f64306165326638646339316538393238: Value = arg(&arguments, 0);
+                let v_6e616d655f5f37633037336565656331383435386633: Value = arg(&arguments, 1);
+                let v_73686966745f5f36656666326561356338393366363434: Value = arg(&arguments, 2);
+                let v_636f6d6d616e645f5f66616363653966383038376163323264: Value = arg(&arguments, 3);
+                let v_62617369735f5f30313765626163333033336265303963: Value = arg(&arguments, 4);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":169:7
+                if ({ let left = { let left = { let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f30313765626163333033336265303963.clone()), &({ let left = ({ let v_7075695f6e61746976655f3633 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3633.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f64306165326638646339316538393238.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":169:104
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":170:13
+                let v_6d6f64655f5f66353666336236626638373938313438 = { let left = ({ let v_7075695f6e61746976655f3634 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3634.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":171:13
+                let v_68616e646c6564 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Enter")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Home")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("End")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowLeft")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("PageUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("PageDown")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Tab")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("table")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("menu")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("F2")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Delete")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Backspace")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("+")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("-")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("searchlist")))); if left.truthy() { v_636f6d6d616e645f5f66616363653966383038376163323264.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("F")))) } else { left } } } else { left } } } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":177:7
+                if (Value::boolean(!(v_68616e646c6564.clone()).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":177:21
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":178:13
+                let v_7469636b65745f5f66386464366565353362663562323165 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":179:7
+                { let v_7075695f6e61746976655f3635 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3635.clone(), v_696e6465785f5f64306165326638646339316538393238.clone(), Value::string("reason: addressed collection key")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":180:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f66386464366565353362663562323165.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":180:41
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":181:7
+                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f64306165326638646339316538393238.clone(), Value::boolean(false), Value::string("")]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":182:7
+                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f66386464366565353362663562323165.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f30313765626163333033336265303963.clone()), &({ let left = ({ let v_7075695f6e61746976655f3636 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3636.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3636.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":182:92
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":183:7
+                return v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![v_6e616d655f5f37633037336565656331383435386633.clone(), v_73686966745f5f36656666326561356338393366363434.clone(), v_636f6d6d616e645f5f66616363653966383038376163323264.clone()]);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":185:5
+            { let v_7075695f6e61746976655f3637 = v_646566.clone(); expose_method(&owner, Value::string("selectAndFocus"), {  let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f66353962396636653339316335646135: Value = arg(&arguments, 0);
+                let v_657874656e645f5f66353030356433613765343738326139: Value = arg(&arguments, 1);
+                let v_62617369735f5f35373963656437353235666236363134: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":186:7
+                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f35373963656437353235666236363134.clone()), &({ let left = ({ let v_7075695f6e61746976655f3638 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3638.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":186:71
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":187:7
+                if ({ let left = Value::boolean(!(v_73656c656374.read().call_authored(vec![v_696e6465785f5f66353962396636653339316335646135.clone(), v_657874656e645f5f66353030356433613765343738326139.clone(), Value::boolean(true)])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f35373963656437353235666236363134.clone()), &({ let left = ({ let v_7075695f6e61746976655f3639 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3639.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3639.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":187:92
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":188:7
+                { let v_7075695f6e61746976655f3730 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3730.clone()).owner(), Value::Undefined, false) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":189:7
+                return Value::boolean(true);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":191:5
+            { let v_7075695f6e61746976655f3731 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b65795f5f33653136666361613234643562356135.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":195:5
+            { let v_7075695f6e61746976655f3732 = v_646566.clone(); expose_method(&owner, Value::string("keyFrom"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6b65795f5f33653136666361613234643562356135 = v_6b65795f5f33653136666361613234643562356135.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6f726967696e: Value = arg(&arguments, 0);
+                let v_6e616d655f5f32326433386338663766393631363137: Value = arg(&arguments, 1);
+                let v_73686966745f5f31656661333433333861393737353465: Value = arg(&arguments, 2);
+                let v_636f6d6d616e645f5f38363831366138306238346364386536: Value = arg(&arguments, 3);
+                let v_62617369735f5f65633266346237343965623538623863: Value = arg(&arguments, 4);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":196:7
+                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f65633266346237343965623538623863.clone()), &({ let left = ({ let v_7075695f6e61746976655f3733 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3733.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":196:71
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":197:7
-                return v_6b65795f5f39313366343138336236386238386637.read().call_authored(vec![v_6e616d655f5f36316430313166613264653161373064.clone(), v_73686966745f5f30393962643735616230623938356163.clone(), v_636f6d6d616e645f5f32656137663833623738383361613232.clone()]);
+                if (Value::boolean(strict_equal(&(v_6f726967696e.clone()), &(Value::string("form"))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":197:30
+                    return if (Value::boolean(strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("Escape"))))).truthy() { v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![v_6e616d655f5f32326433386338663766393631363137.clone(), v_73686966745f5f31656661333433333861393737353465.clone(), v_636f6d6d616e645f5f38363831366138306238346364386536.clone()]) } else { Value::boolean(false) };
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":198:7
+                if ({ let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6f726967696e.clone()), &(Value::string("search")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("Enter")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("Escape")))) } else { left } }; if left.truthy() { Value::boolean(!({ let left = v_636f6d6d616e645f5f38363831366138306238346364386536.clone(); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":199:58
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":200:7
+                return v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![v_6e616d655f5f32326433386338663766393631363137.clone(), v_73686966745f5f31656661333433333861393737353465.clone(), v_636f6d6d616e645f5f38363831366138306238346364386536.clone()]);
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":199:5
-            { let v_7075695f6e61746976655f3732 = v_646566.clone(); expose_method(&owner, Value::string("dismiss"), {  let v_637572736f72 = v_637572736f72.clone(); let v_7265616479 = v_7265616479.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":199:42
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":202:5
+            { let v_7075695f6e61746976655f3734 = v_646566.clone(); expose_method(&owner, Value::string("dismiss"), {  let v_637572736f72 = v_637572736f72.clone(); let v_7265616479 = v_7265616479.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":202:42
                 if (v_7265616479.read().call_authored(vec![])).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":199:55
-                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3733 = v_637572736f72.read(); (v_7075695f6e61746976655f3733.clone()).get() }, Value::boolean(false), Value::string("outside")]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":202:55
+                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3735 = v_637572736f72.read(); (v_7075695f6e61746976655f3735.clone()).get() }, Value::boolean(false), Value::string("outside")]);
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":200:5
-            { let v_7075695f6e61746976655f3734 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":200:44
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":203:5
+            { let v_7075695f6e61746976655f3736 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":203:44
                 if (v_7265616479.read().call_authored(vec![])).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":200:57
-                    { let v_7075695f6e61746976655f3735 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3735.clone()).owner(), Value::Undefined, false) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":203:57
+                    { let v_7075695f6e61746976655f3737 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3737.clone()).owner(), Value::Undefined, false) };
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":201:5
-            { let v_7075695f6e61746976655f3736 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b65795f5f39313366343138336236386238386637 = v_6b65795f5f39313366343138336236386238386637.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":204:5
+            { let v_7075695f6e61746976655f3738 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b65795f5f33653136666361613234643562356135 = v_6b65795f5f33653136666361613234643562356135.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_5f72756e: Value = arg(&arguments, 0);
                 let v_6576656e74: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":202:7
-                if (v_6b65795f5f39313366343138336236386238386637.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("shiftKey", false)), &(Value::boolean(true)))), { let left = Value::boolean(strict_equal(&((v_6576656e74.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e74.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } }])).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":202:108
-                    { let v_7075695f6e61746976655f3737 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f3737.clone()) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":205:7
+                if (v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("shiftKey", false)), &(Value::boolean(true)))), { let left = Value::boolean(strict_equal(&((v_6576656e74.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e74.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } }])).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":205:108
+                    { let v_7075695f6e61746976655f3739 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f3739.clone()) };
                 }
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":204:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":207:11
             v_73796e63.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_6c6162656c = v_6c6162656c.clone(); let v_7461626c65 = v_7461626c65.clone(); let v_726f7773 = v_726f7773.clone(); let v_636f6c756d6e73 = v_636f6c756d6e73.clone(); let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_72756e5f5f62313362633532353461396566333233: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":205:7
-                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":205:21
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":206:13
-                let v_7469636b65745f5f39633833643639353363396566313539 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":206:31
-                { let value = v_72756e5f5f62313362633532353461396566333233.clone(); *(v_63757272656e74.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":207:13
-                let v_70726f7073 = { let v_7075695f6e61746976655f3738 = v_72756e5f5f62313362633532353461396566333233.clone(); read_props(&(v_7075695f6e61746976655f3738.clone()).owner(), false) };
+                let v_72756e5f5f39656636646635343466353536393832: Value = arg(&arguments, 0);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":208:7
-                { let v_7075695f6e61746976655f3739 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f3739.clone(), if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("searchlist")))) } else { left } }).truthy() { Value::string("listbox") } else { { let left = (v_70726f7073.clone()).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } } }, Value::string("reason: collection role")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":209:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":209:41
+                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":208:21
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":210:7
-                { let v_7075695f6e61746976655f3830 = v_7461626c65.read(); state_set(v_7075695f6e61746976655f3830.clone(), Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("table")))), Value::string("reason: collection table semantics")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":209:13
+                let v_7469636b65745f5f63383763303339616431316635383666 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":209:31
+                { let value = v_72756e5f5f39656636646635343466353536393832.clone(); *(v_63757272656e74.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":210:13
+                let v_70726f7073 = { let v_7075695f6e61746976655f3830 = v_72756e5f5f39656636646635343466353536393832.clone(); read_props(&(v_7075695f6e61746976655f3830.clone()).owner(), false) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":211:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":211:41
-                    return Value::Undefined;
-                }
+                { let v_7075695f6e61746976655f3831 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f3831.clone(), if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("searchlist")))) } else { left } }).truthy() { Value::string("listbox") } else { { let left = (v_70726f7073.clone()).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } } }, Value::string("reason: collection role")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":212:7
-                { let v_7075695f6e61746976655f3831 = v_726f7773.read(); state_set(v_7075695f6e61746976655f3831.clone(), v_636f756e74.read().call_authored(vec![]), Value::string("reason: collection rows")) };
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":212:41
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":213:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":213:41
-                    return Value::Undefined;
-                }
+                { let v_7075695f6e61746976655f3832 = v_7461626c65.read(); state_set(v_7075695f6e61746976655f3832.clone(), Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("table")))), Value::string("reason: collection table semantics")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":214:7
-                { let v_7075695f6e61746976655f3832 = v_636f6c756d6e73.read(); state_set(v_7075695f6e61746976655f3832.clone(), { let left = (v_70726f7073.clone()).member("columns", false); if left.nullish() { Value::number(0.0) } else { left } }, Value::string("reason: collection columns")) };
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":214:41
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":215:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":215:41
-                    return Value::Undefined;
-                }
+                { let v_7075695f6e61746976655f3833 = v_726f7773.read(); state_set(v_7075695f6e61746976655f3833.clone(), v_636f756e74.read().call_authored(vec![]), Value::string("reason: collection rows")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":216:7
-                { let v_7075695f6e61746976655f3833 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f3833.clone(), { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: collection name")) };
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":216:41
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":217:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":217:41
-                    return Value::Undefined;
-                }
+                { let v_7075695f6e61746976655f3834 = v_636f6c756d6e73.read(); state_set(v_7075695f6e61746976655f3834.clone(), { let left = (v_70726f7073.clone()).member("columns", false); if left.nullish() { Value::number(0.0) } else { left } }, Value::string("reason: collection columns")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":218:7
-                { let v_7075695f6e61746976655f3834 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f3834.clone(), { let left = (v_70726f7073.clone()).member("disabled", false); if left.nullish() { Value::boolean(false) } else { left } }, Value::string("reason: collection policy")) };
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":218:41
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":219:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":219:41
-                    return Value::Undefined;
-                }
+                { let v_7075695f6e61746976655f3835 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f3835.clone(), { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: collection name")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":220:7
-                { let v_7075695f6e61746976655f3835 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f3835.clone()).owner(), { let v_7075695f6e61746976655f3836 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3836.clone()).get() }) };
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":220:41
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":221:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":221:41
+                { let v_7075695f6e61746976655f3836 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f3836.clone(), { let left = (v_70726f7073.clone()).member("disabled", false); if left.nullish() { Value::boolean(false) } else { left } }, Value::string("reason: collection policy")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":222:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":222:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":222:13
-                let v_7265717565737465645f5f38306537623739333431393066333035 = { let left = (v_70726f7073.clone()).member("cursor", false); if left.nullish() { Value::number(0.0) } else { left } };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":223:13
-                let v_6163636570746564 = if ({ let left = number_is_finite(&(v_7265717565737465645f5f38306537623739333431393066333035.clone())); if left.truthy() { Value::boolean(strict_equal(&(Value::number((v_7265717565737465645f5f38306537623739333431393066333035.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }).truthy() { v_6d6178.read().call_authored(vec![Value::number(0.0), v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), v_7265717565737465645f5f38306537623739333431393066333035.clone()])]) } else { Value::number(0.0) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":223:7
+                { let v_7075695f6e61746976655f3837 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f3837.clone()).owner(), { let v_7075695f6e61746976655f3838 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3838.clone()).get() }) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":224:7
-                { let v_7075695f6e61746976655f3837 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3837.clone(), if ({ let relational_left = v_6b696e64.read().call_authored(vec![v_6163636570746564.clone()]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_6163636570746564.clone() } else { v_6d6178.read().call_authored(vec![Value::number(0.0), v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)])]) }, Value::string("reason: accepted collection cursor")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":225:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":225:41
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":224:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":226:7
-                { let v_7075695f6e61746976655f3838 = v_657870616e646564.read(); state_set(v_7075695f6e61746976655f3838.clone(), { let left = (v_70726f7073.clone()).member("expanded", false); if left.nullish() { Value::number(-(Value::number(1.0)).scalar_number()) } else { left } }, Value::string("reason: accepted expanded item")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":225:13
+                let v_7265717565737465645f5f66663965366438396166386135326663 = { let left = (v_70726f7073.clone()).member("cursor", false); if left.nullish() { Value::number(0.0) } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":226:13
+                let v_6163636570746564 = if ({ let left = number_is_finite(&(v_7265717565737465645f5f66663965366438396166386135326663.clone())); if left.truthy() { Value::boolean(strict_equal(&(Value::number((v_7265717565737465645f5f66663965366438396166386135326663.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }).truthy() { v_6d6178.read().call_authored(vec![Value::number(0.0), v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), v_7265717565737465645f5f66663965366438396166386135326663.clone()])]) } else { Value::number(0.0) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":227:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39633833643639353363396566313539.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":227:41
+                { let v_7075695f6e61746976655f3839 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3839.clone(), if ({ let relational_left = v_6b696e64.read().call_authored(vec![v_6163636570746564.clone()]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_6163636570746564.clone() } else { v_6d6178.read().call_authored(vec![Value::number(0.0), v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)])]) }, Value::string("reason: accepted collection cursor")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":228:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":228:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":228:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":229:7
+                { let v_7075695f6e61746976655f3930 = v_657870616e646564.read(); state_set(v_7075695f6e61746976655f3930.clone(), { let left = (v_70726f7073.clone()).member("expanded", false); if left.nullish() { Value::number(-(Value::number(1.0)).scalar_number()) } else { left } }, Value::string("reason: accepted expanded item")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":230:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":230:41
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":231:7
                 if ({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":228:21
-                    { let v_7075695f6e61746976655f3839 = v_72756e5f5f62313362633532353461396566333233.clone(); request_update(&(v_7075695f6e61746976655f3839.clone()).owner()) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":231:21
+                    { let v_7075695f6e61746976655f3931 = v_72756e5f5f39656636646635343466353536393832.clone(); request_update(&(v_7075695f6e61746976655f3931.clone()).owner()) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":230:5
-            { let v_7075695f6e61746976655f3930 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":231:5
-            { let v_7075695f6e61746976655f3931 = v_646566.clone(); register_life(&owner, "mounted", {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_72756e5f5f30326137353735633038333963646435: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":231:40
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":233:5
+            { let v_7075695f6e61746976655f3932 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":234:5
+            { let v_7075695f6e61746976655f3933 = v_646566.clone(); register_life(&owner, "mounted", {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_72756e5f5f35363539376232613461383236383766: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":234:40
                 if (Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":231:57
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":234:57
                     { let value = Value::boolean(true); *(v_6174746163686564.read()).borrow_mut() = value; }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":231:74
-                    v_73796e63.read().call_authored(vec![v_72756e5f5f30326137353735633038333963646435.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":231:85
-                    if (({ let v_7075695f6e61746976655f3932 = v_72756e5f5f30326137353735633038333963646435.clone(); read_props(&(v_7075695f6e61746976655f3932.clone()).owner(), false) }).member("autoFocus", false)).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":231:116
-                        { let v_7075695f6e61746976655f3933 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3933.clone()).owner(), Value::Undefined, false) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":234:74
+                    v_73796e63.read().call_authored(vec![v_72756e5f5f35363539376232613461383236383766.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":234:85
+                    if (({ let v_7075695f6e61746976655f3934 = v_72756e5f5f35363539376232613461383236383766.clone(); read_props(&(v_7075695f6e61746976655f3934.clone()).owner(), false) }).member("autoFocus", false)).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":234:116
+                        { let v_7075695f6e61746976655f3935 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3935.clone()).owner(), Value::Undefined, false) };
                     }
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":232:5
-            { let v_7075695f6e61746976655f3934 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("mode"), Value::string("label"), Value::string("cursor"), Value::string("expanded"), Value::string("revision"), Value::string("disabled"), Value::string("autoFocus"), Value::string("columns")]))), false, v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":233:5
-            { let v_7075695f6e61746976655f3935 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":233:39
-                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":233:48
-                { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":233:66
-                { let value = Value::Json(Json::Null); *(v_63757272656e74.read()).borrow_mut() = value; }
-                Value::Undefined
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":234:5
-            { let v_7075695f6e61746976655f3936 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":234:43
-                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":234:52
-                { let value = Value::boolean(true); *(v_646973706f736564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":234:69
-                { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":234:87
-                { let value = Value::Json(Json::Null); *(v_63757272656e74.read()).borrow_mut() = value; }
-                Value::Undefined
-            })) }) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":235:5
-            { let v_7075695f6e61746976655f3937 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
+            { let v_7075695f6e61746976655f3936 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("mode"), Value::string("label"), Value::string("cursor"), Value::string("expanded"), Value::string("revision"), Value::string("disabled"), Value::string("autoFocus"), Value::string("columns")]))), false, v_73796e63.read()) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":236:5
-            return { let callable={ let pui_native_98={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
+            { let v_7075695f6e61746976655f3937 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:39
+                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:48
+                { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:66
+                { let value = Value::Json(Json::Null); *(v_63757272656e74.read()).borrow_mut() = value; }
+                Value::Undefined
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":237:5
+            { let v_7075695f6e61746976655f3938 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:43
+                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:52
+                { let value = Value::boolean(true); *(v_646973706f736564.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:69
+                { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:87
+                { let value = Value::Json(Json::Null); *(v_63757272656e74.read()).borrow_mut() = value; }
+                Value::Undefined
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":238:5
+            { let v_7075695f6e61746976655f3939 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":239:5
+            return { let callable={ let pui_native_100={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:26
-                return { let v_7075695f6e61746976655f3939 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
-            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_98.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_98.call)(arg(&arguments,0))})} }; match callable {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":239:26
+                return { let v_7075695f6e61746976655f313031 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
+            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_100.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_100.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{render,..} => Value::Renderer(render),
       Value::Renderer(render) => Value::Renderer(render),
       Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
@@ -1077,7 +1084,7 @@ pub struct GeneratedData0 {
       pub fn set_slot(&mut self, slot: Vec<native::gpui_native_owner::NativeSnapshot>, cx: &mut Context<Self>) -> Result<(), Value> { catch_authored(|| { ensure(&Rc::downgrade(&self.owner)); assert_native_slot_children(&slot); let mut owner = self.owner.borrow_mut(); owner.slot = slot; owner.dirty = true; cx.notify(); }) }
       pub fn set_parent(&mut self, parent: Option<OwnerWeak>, cx: &mut Context<Self>) -> Result<(), Value> { catch_authored(|| { if let Err(error)=set_native_parent(&self.owner, parent.unwrap_or_default()){throw_error("NATIVE_PARENT_INVALID", error)} cx.notify(); }) }
       fn bind_window_activation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-          if !native_focus_observation_needed(&self.owner) && !native::gpui_native_move::move_owner_has_binding(&self.owner) { self._window_activation.take(); return; }
+          if !native_window_observation_needed(&self.owner) { self._window_activation.take(); return; }
           let id = window.window_handle().window_id();
           if self._window_activation.as_ref().is_some_and(|(bound, _)| *bound == id) { return; }
           self._window_activation.take();
@@ -1106,14 +1113,22 @@ pub struct GeneratedData0 {
           });
           self._entry_readiness = Some((window_id, subscription));
       }
+      fn notify_after_turn(&self, cx: &mut Context<Self>) {
+          let view = cx.entity().downgrade();
+          // GPUI suppresses Entity observer effects while a window is drawing,
+          // including its focus/blur phase. Keep authored state synchronous,
+          // then publish the host change after that physical draw lease ends.
+          // A weak target cannot keep a detached component alive for delivery.
+          cx.defer(move |cx| { let _ = view.update(cx, |_, cx| cx.notify()); });
+      }
       pub fn drive(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Result<(), Value> {
           catch_authored(|| {
-          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); cx.notify(); return; }
+          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); self.notify_after_turn(cx); return; }
           modules_drive(&self.owner, &self.focus, window, cx);
-          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); cx.notify(); return; }
+          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); self.notify_after_turn(cx); return; }
           self.focus = self.focus.clone().tab_stop(native_tab_participation(&self.owner));
           drive_queued_focus(&self.owner, window, cx);
-          let dirty = std::mem::take(&mut self.owner.borrow_mut().dirty); if dirty { cx.notify(); }
+          let dirty = std::mem::take(&mut self.owner.borrow_mut().dirty); if dirty { self.notify_after_turn(cx); }
           })
       }
   }
@@ -1131,7 +1146,9 @@ pub struct GeneratedData0 {
           self.bind_window_activation(window, cx);
           #[cfg(feature = "experimental-focus-tree")] self.bind_entry_readiness(window, cx);
           let drive = self.owner.borrow().native_drive.as_ref().expect("live native owner drive").clone();
-          self.owner.borrow_mut().dirty = false;
+          // Rendering projects the current source; only drive may consume its
+          // pending observer signal. A parent native Render can call an exposed
+          // method before this child is laid out and before deferred drive runs.
           let snapshot = self.owner.borrow().projection.clone().expect("live native projection");
           self.focus = self.focus.clone().tab_stop(native_tab_participation(&self.owner));
           let element = paint_native_root(&snapshot, &self.owner, &self.focus, format!("compiled-root-{}", Rc::as_ptr(&self.owner) as usize), drive);

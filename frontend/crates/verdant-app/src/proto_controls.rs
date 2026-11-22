@@ -3,7 +3,7 @@
 //! Fluent `on_click` installs a domain command, not a second input handler:
 //! commands are dispatched only from the compiled root's accepted activation.
 use std::{cell::RefCell, rc::Rc};
-use gpui::{prelude::*, App, ClickEvent, Context, Div, ElementId, Entity, Focusable,
+use gpui::{prelude::*, App, ClickEvent, Context, Div, ElementId, Entity,
     IntoElement, Role, SharedString, Stateful, StyleRefinement, Subscription, Window, div};
 use serde_json::{Value, json};
 use verdant_action_control::{ActionControl, native::gpui_native_owner::{NativeFailure, OwnerRef}};
@@ -232,7 +232,7 @@ impl RenderOnce for Action {
             Binding { root, clicks: Vec::new(), assistive: None, navigation: None, context_menu: None, props: initial_props,
                 revision: 0, pending: Vec::new(), _changes: changes }
         });
-        let (root, focus) = state.update(cx, |binding, cx| {
+        let root = state.update(cx, |binding, cx| {
             binding.clicks = self.clicks; binding.assistive = self.assistive; binding.navigation = self.navigation; binding.context_menu = self.context_menu;
             if crate::proto_parent::changed(&binding.root.read(cx).handle().owner, &parent) {
                 binding.root.update(cx, |root, cx| root.set_parent(parent, cx)).unwrap_or_else(|error| panic!("compiled action parent: {error:?}"));
@@ -246,10 +246,12 @@ impl RenderOnce for Action {
                     .unwrap_or_else(|error| panic!("compiled action props: {error:?}"));
                 binding.props = props;
             }
-            (binding.root.clone(), binding.root.read(cx).focus_handle(cx))
+            binding.root.clone()
         });
         let clicks = state.clone();
-        self.shell.track_focus(&focus)
+        // Only the generated root registers its focus handle. Registering it
+        // again on the shell duplicates Tab stops and bypasses disabled focus.
+        self.shell
             .on_click(move |event, window, cx| deliver(&clicks, event, window, cx))
             .when(has_context_menu, |shell| shell.on_mouse_down(gpui::MouseButton::Right, move |event, window, cx| {
                 state.update(cx, |binding, cx| collect(binding, None, Some(event), cx));
@@ -346,6 +348,44 @@ mod tests {
         }).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, _, _| assert_eq!(host.activations, 4)).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_action_has_one_reverse_tab_stop_and_disabled_click_does_not_steal_focus(cx: &mut TestAppContext) {
+        let window = open(cx);
+        cx.update_window(window.into(), |_, window, cx| {
+            handle("Separate assistive action", window).call("focusSelf", vec![], window, cx).unwrap();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "shift-tab");
+        crate::native_test_support::frames(window, cx);
+        cx.update_window(window.into(), |_, window, _| {
+            assert_eq!(handle("Native tab 0", window).state("focused").unwrap(), Value::Bool(true),
+                "Shift+Tab must leave the action instead of finding its duplicate shell handle");
+            assert_eq!(handle("Separate assistive action", window).state("focused").unwrap(), Value::Bool(false));
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(), "shift-tab");
+        crate::native_test_support::frames(window, cx);
+        cx.update_window(window.into(), |_, window, _| {
+            assert_eq!(handle("Native compiled action", window).state("focused").unwrap(), Value::Bool(true));
+        }).unwrap();
+        window.update(cx, |host, _, cx| { host.disabled = true; cx.notify(); }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.update_window(window.into(), |_, window, cx| {
+            handle("Separate assistive action", window).call("focusSelf", vec![], window, cx).unwrap();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.update_window(window.into(), |_, window, cx| {
+            let position = handle("Native compiled action", window).owner.borrow().bounds.unwrap().center();
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent { position, button: MouseButton::Left, ..Default::default() }), cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position, button: MouseButton::Left, ..Default::default() }), cx);
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, _| {
+            assert_eq!(handle("Native compiled action", window).state("focused").unwrap(), Value::Bool(false));
+            assert_eq!(handle("Separate assistive action", window).state("focused").unwrap(), Value::Bool(true));
+            assert_eq!(host.activations, 0);
+        }).unwrap();
     }
 
     #[gpui::test]

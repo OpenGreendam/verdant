@@ -1765,6 +1765,7 @@ mod native_tests {
         let main = open(cx, false);
         let (editor, target, desc) = main.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
         let window = cx.open_window(size(px(520.), px(220.)), |_, _| EqTabHarness { editor, target, desc });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
         crate::native_test_support::frames(window, cx);
         let (knob, start, accepted) = window.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
