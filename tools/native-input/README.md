@@ -53,7 +53,11 @@ mismatched CI observations:
 python3 -B -m unittest discover -s tools/native-input -p 'test_*.py' -v
 ```
 
-These eleven tests do not start GPUI, D-Bus or an operating-system window.
+These offline regressions do not start GPUI, D-Bus or an operating-system window.
+The native preset selector cases run the actual `Probe.native_preset_cancel`
+lookup through `snapshot`, `nodes` and `node`, stopping before the accessibility
+transport. They reject another window's matching name, a wrong role, the legacy
+label and ambiguous native matches.
 
 ### Retained failed attempts
 
@@ -274,7 +278,7 @@ windowed exit case must contain a measured outside-window motion sample.
 | Numeric takeover | Write the same numeric value during a pointer preview, save before up, send another move and late up, and require no second revision or document change; undo once. |
 | Lease reuse | Perform another real drag and undo after the cancellation cases, demonstrating that a new pointer edit can start and finish. |
 | Native window close | Click the instrument card's **打开界面** button, drag its native window's gain while held, invoke that window's advertised **关闭** push-button action, observe the frame disappear, send the late up, and save in the main window with identical gain/revision/hash. Reopen through the same real button, make a new 18-pixel drag, close, then save and undo once. |
-| Native preset menu | Open the native window, hold a gain preview, invoke its **自定义** combobox's advertised click, observe **上下文菜单** and the restored gain, dismiss with Escape while still held, then release, close and verify the main saved document is unchanged. |
+| Native preset menu | Open the native window, hold a gain preview, invoke its **预设** combobox's advertised click, observe **上下文菜单** and the restored gain, dismiss with Escape while still held, then release, close and verify the main saved document is unchanged. |
 
 The fixture's native editor is opened through the actual instrument card,
 not by creating an application entity or calling an editor command. Its title
@@ -284,6 +288,12 @@ the shared Rust semantic executor. The preset case likewise requires the
 real advertised action and an observed menu. Saving occurs only after a real
 click focuses the original main window, since the plugin window has separate
 keyboard handling.
+
+The current native synth toolbar exposes **预设** as a combobox. The lookup
+requires that exact name and role inside the observed native frame, where one
+match must exist; the main window also has **预设** and **自定义** controls.
+The retained #79 observation used the earlier native **自定义** chooser and
+keeps that original label in its historical evidence.
 
 A second primary-button click cannot occur while that same physical button is
 already held. Therefore the focus and active-toolbar cases explicitly use
