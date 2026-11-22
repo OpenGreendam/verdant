@@ -237,6 +237,14 @@ fn cancel_source(handle: &NormalizedKnobHandle, target: &Target, window: &mut Wi
 }
 
 impl Binding {
+    fn sample_in_window(&self, sample: &MoveGestureSample, window: &Window) -> bool {
+        // The SDK supplies target-local positions. Use the same live native
+        // origin as its mapper rather than the control's own dimensions.
+        let origin = self.handle.owner.borrow().native_hitbox.as_ref().map(|hitbox| hitbox.bounds.origin);
+        origin.is_some_and(|origin| crate::host_pointer::contains_window_point(window,
+            (f64::from(origin.x) + sample.position.x, f64::from(origin.y) + sample.position.y)))
+    }
+
     fn invoke(&self, target: &Target, method: &str, arguments: Vec<Value>, window: &mut Window, cx: &mut App) -> bool {
         match call(&self.handle, method, arguments, window, cx) {
             Ok(consumed) => consumed,
@@ -284,8 +292,9 @@ fn defer_lease_cancel(lease: Rc<MoveGestureLease>, handle: NormalizedKnobHandle,
 }
 
 impl MoveGestureBinding for Binding {
-    fn should_start(&self, sample: &MoveGestureSample, _: &mut Window, cx: &mut App) -> bool {
-        if !matches!(sample.input, MoveGestureInput::Mouse | MoveGestureInput::Touch) { return false; }
+    fn should_start(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) -> bool {
+        if !matches!(sample.input, MoveGestureInput::Mouse | MoveGestureInput::Touch)
+            || !self.sample_in_window(sample, window) { return false; }
         let target = self.target.borrow();
         let available = target.editor.upgrade().is_some_and(|entity| {
             let editor = entity.read(cx);
@@ -332,6 +341,11 @@ impl MoveGestureBinding for Binding {
     fn on_move(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         if self.contact.input.get() != Some(sample.input) { return; }
         let target = self.target.borrow().clone();
+        if !self.sample_in_window(sample, window) {
+            self.contact.input.set(None);
+            cancel_source(&self.handle, &target, window, cx);
+            return;
+        }
         match sample_arguments(sample) {
             Ok(arguments) => { self.invoke(&target, "sample", arguments, window, cx); }
             Err(error) => {
@@ -347,6 +361,10 @@ impl MoveGestureBinding for Binding {
         if self.contact.input.get() != Some(sample.input) { return; }
         self.contact.input.set(None);
         let target = self.target.borrow().clone();
+        if !self.sample_in_window(sample, window) {
+            cancel_source(&self.handle, &target, window, cx);
+            return;
+        }
         match sample_arguments(sample) {
             Ok(arguments) => { self.invoke(&target, "finish", arguments, window, cx); }
             Err(error) => {
@@ -961,6 +979,73 @@ mod tests {
             production_up(window, cx);
             assert_eq!(host.editor.read(cx).revision(), revision);
         }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_production_window_bounds_cancel_without_a_leave_event(cx: &mut TestAppContext) {
+        for touch in [false, true] {
+            let window = open_production(cx);
+            let (handle, accepted, revision) = window.update(cx, |host, window, cx| {
+                let handle = production_handle(window);
+                let accepted = state::<f64>(&handle, "value").unwrap();
+                (handle, accepted, host.editor.read(cx).revision())
+            }).unwrap();
+            for outside in [("left", -20.0, 50.0), ("right", 320.0, 50.0),
+                ("top", 32.0, -20.0), ("bottom", 32.0, 220.0)] {
+                for terminal_only in [false, true] {
+                    window.update(cx, |host, window, cx| {
+                        let dispatch_touch = |window: &mut Window, cx: &mut App, phase, position| {
+                            window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+                                id: gpui::TouchId(71), phase, position, ..Default::default()
+                            }), cx);
+                        };
+                        let start = gpui::point(px(32.0), px(50.0));
+                        let preview = gpui::point(px(132.0), px(14.0));
+                        if touch {
+                            dispatch_touch(window, cx, gpui::TouchPhase::Started, start);
+                            dispatch_touch(window, cx, gpui::TouchPhase::Moved, preview);
+                        } else {
+                            production_down(window, cx);
+                            window.dispatch_event(gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+                                position: preview, pressed_button: Some(MouseButton::Left), ..Default::default()
+                            }), cx);
+                        }
+                        assert_eq!(phase(&handle).unwrap(), GesturePhase::Dragging);
+                        assert!(state::<f64>(&handle, "value").unwrap() > accepted,
+                            "leaving the knob inside its window must still preview");
+                        let position = gpui::point(px(outside.1), px(outside.2));
+                        // Deliberately omit MouseExited. A Wayland implicit
+                        // grab only reports these coordinates until release.
+                        if touch {
+                            dispatch_touch(window, cx, if terminal_only { gpui::TouchPhase::Ended } else { gpui::TouchPhase::Moved }, position);
+                        } else if terminal_only {
+                            window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                                position, button: MouseButton::Left, ..Default::default()
+                            }), cx);
+                        } else {
+                            window.dispatch_event(gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+                                position, pressed_button: Some(MouseButton::Left), ..Default::default()
+                            }), cx);
+                        }
+                        assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle, "{} touch={touch} up={terminal_only}", outside.0);
+                        close_to(state::<f64>(&handle, "value").unwrap(), accepted);
+                        assert!(!host.editor.read(cx).has_proto_pointer_contact());
+                        // Even a release that returns into the window cannot
+                        // revive the retired contact or commit its old preview.
+                        if !terminal_only {
+                            if touch { dispatch_touch(window, cx, gpui::TouchPhase::Ended, preview); }
+                            else { production_up(window, cx); }
+                        }
+                        assert_eq!(host.editor.read(cx).revision(), revision);
+                    }).unwrap();
+                    crate::native_test_support::frames(window, cx);
+                    window.update(cx, |_, window, _| {
+                        assert!(window.captured_hitbox().is_none());
+                        close_to(resolved(&handle.owner.borrow().accessible_states["valueNow"]).num(), accepted);
+                    }).unwrap();
+                }
+            }
+        }
     }
 
     #[gpui::test]

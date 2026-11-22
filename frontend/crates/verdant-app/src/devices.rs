@@ -171,6 +171,12 @@ impl Editor {
         if let Some(capture) = drag.capture.take() { capture.release_deferred(cx); }
         cx.notify();
     }
+
+    fn cancel_device_drag_in_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let capture = self.device_drag.as_mut().and_then(|drag| drag.capture.take());
+        self.cancel_device_drag(cx);
+        if let Some(capture) = capture { capture.release(window, cx); }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -256,6 +262,10 @@ fn sampled(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate::
 fn released(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate::host_pointer::SurfaceToken, ev: &MouseUpEvent, window: &mut Window, cx: &mut Context<Editor>,
     preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> bool {
     if !ed.device_drag.as_ref().is_some_and(|d| d.key == key && &d.control == control && d.surface.same(surface)) { return false; }
+    if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+        ed.cancel_device_drag_in_window(window, cx);
+        return true;
+    }
     let mut drag = ed.device_drag.take().expect("checked control owner");
     if !drag.target_is_current(ed) {
         if let Some(capture) = drag.capture.take() { capture.release(window, cx); }
@@ -537,7 +547,20 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                 }
             });
             let (e, hs, move_surface) = (editor.clone(), handles.clone(), surface.clone());
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
+            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                    // Implicit grabs can report outside coordinates without
+                    // MouseExited. Cancel before child bubble handlers run.
+                    if phase == DispatchPhase::Capture {
+                        let consumed = e.update(cx, |ed, cx| {
+                            if !ed.device_drag.as_ref().is_some_and(|drag| drag.key == key && drag.surface.same(&move_surface)) { return false; }
+                            ed.cancel_device_drag_in_window(window, cx);
+                            true
+                        });
+                        if consumed { cx.stop_propagation(); }
+                    }
+                    return;
+                }
                 if phase != DispatchPhase::Bubble { return; }
                 let consumed = e.update(cx, |ed, cx| {
                     let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) else { return false };
@@ -559,10 +582,10 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                 if consumed { cx.stop_propagation(); }
             });
             let e = editor.clone();
-            window.on_mouse_event(move |_: &gpui::MouseExitEvent, phase, _, cx| {
+            window.on_mouse_event(move |_: &gpui::MouseExitEvent, phase, window, cx| {
                 if phase != DispatchPhase::Capture { return; }
                 e.update(cx, |ed, cx| {
-                    if ed.device_drag.as_ref().is_some_and(|drag| drag.surface.same(&surface)) { ed.cancel_device_drag(cx); }
+                    if ed.device_drag.as_ref().is_some_and(|drag| drag.surface.same(&surface)) { ed.cancel_device_drag_in_window(window, cx); }
                 });
             });
         }).size_full())
@@ -1430,6 +1453,37 @@ mod native_tests {
             assert!(host.editor.read(cx).device_drag.is_none());
             assert!(window.captured_hitbox().is_none());
         }).unwrap();
+    }
+
+    #[gpui::test]
+    fn graph_window_bounds_cancel_without_mouse_exit_and_reject_late_up(cx: &mut TestAppContext) {
+        for terminal_only in [false, true] {
+            let window = open(cx, false);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: start(host) + point(px(30.0), px(-10.0)),
+                    pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                assert_eq!(host.editor.read(cx).device_drag.as_ref().unwrap().phase, GesturePhase::Dragging);
+                let outside = if terminal_only { point(px(540.0), px(20.0)) } else { point(px(-20.0), px(60.0)) };
+                // An implicit window grab need not emit MouseExited before up.
+                if terminal_only {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                        position: outside, button: MouseButton::Left, ..Default::default()
+                    }), cx);
+                } else {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                        position: outside, pressed_button: Some(MouseButton::Left), ..Default::default()
+                    }), cx);
+                }
+                assert!(host.editor.read(cx).device_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+                if !terminal_only { up(window, cx); }
+                assert_eq!(host.editor.read(cx).revision().get(), 0);
+                assert_eq!(gain(host, cx), host.desc.value);
+            }).unwrap();
+        }
     }
 
     #[gpui::test]

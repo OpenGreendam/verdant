@@ -216,3 +216,88 @@ fn invalid_terminal_sample_cancels_note_pencil_and_pitch_previews(cx: &mut TestA
         }).unwrap();
     }
 }
+
+#[gpui::test]
+fn production_roll_window_bounds_cancel_mouse_and_touch_without_leave(cx: &mut TestAppContext) {
+    for tool in [Tool::Pointer, Tool::Pencil, Tool::Pitch] {
+        for is_touch in [false, true] {
+            for terminal_only in [false, true] {
+                let window = open(cx, tool == Tool::Pitch);
+                window.update(cx, |host, window, cx| {
+                    host.editor.update(cx, |editor, _| editor.tool = tool);
+                    let start = if tool == Tool::Pencil { point(px(260.0), px(90.0)) } else { point(px(150.0), px(90.0)) };
+                    let preview = start + point(px(30.0), px(-10.0));
+                    if is_touch {
+                        touch(window, cx, TouchPhase::Started, start);
+                        touch(window, cx, TouchPhase::Moved, preview);
+                    } else {
+                        mouse_down(window, cx, start);
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: preview, pressed_button: Some(MouseButton::Left), ..Default::default()
+                        }), cx);
+                    }
+                    let editor = host.editor.read(cx);
+                    assert!(editor.session.pointer_owner().is_some() || editor.note_creation.is_some() || editor.lane_stroke.is_some());
+                    // No MouseExited notification: reproduce an implicit grab
+                    // delivering a negative move or an outside terminal sample.
+                    let outside = if terminal_only { point(px(610.0), px(90.0)) } else { point(px(-20.0), px(90.0)) };
+                    if is_touch {
+                        touch(window, cx, if terminal_only { TouchPhase::Ended } else { TouchPhase::Moved }, outside);
+                    } else if terminal_only { mouse_up(window, cx, outside); }
+                    else {
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: outside, pressed_button: Some(MouseButton::Left), ..Default::default()
+                        }), cx);
+                    }
+                    let editor = host.editor.read(cx);
+                    assert!(editor.note_creation.is_none(), "{tool:?} touch={is_touch} up={terminal_only}");
+                    assert!(editor.lane_stroke.is_none());
+                    assert!(editor.session.pointer_owner().is_none());
+                    assert!(window.captured_hitbox().is_none());
+                    assert_eq!(editor.revision().get(), 0);
+                    if !terminal_only {
+                        if is_touch { touch(window, cx, TouchPhase::Ended, preview); }
+                        else { mouse_up(window, cx, preview); }
+                    }
+                    assert_eq!(host.editor.read(cx).revision().get(), 0, "late release cannot revive the cancelled edit");
+                    assert_eq!(note(host, cx).start_tick, 100);
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+            }
+        }
+    }
+}
+
+#[gpui::test]
+fn note_mod_window_bounds_cancel_before_outside_sample_or_commit(cx: &mut TestAppContext) {
+    for terminal_only in [false, true] {
+        let window = open(cx, false);
+        window.update(cx, |host, _, cx| host.editor.update(cx, |editor, cx| {
+            editor.session.selection.insert(editor.project().tracks[0].notes[0].id.clone());
+            cx.notify();
+        })).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let position = {
+                let editor = host.editor.read(cx);
+                let note = &editor.project().tracks[0].notes[0];
+                let (portamento, _) = note_mod_handle_positions(editor, note, &editor.session.viewport.note_rect(note), &editor.tempo());
+                point(px(portamento.0 as f32), px(portamento.1 as f32))
+            };
+            mouse_down(window, cx, position);
+            assert!(has_note_mod_drag(host.editor.entity_id(), cx));
+            let outside = point(px(170.0), px(-20.0));
+            if terminal_only { mouse_up(window, cx, outside); }
+            else {
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: outside, pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+            }
+            assert!(!has_note_mod_drag(host.editor.entity_id(), cx));
+            assert!(window.captured_hitbox().is_none());
+            if !terminal_only { mouse_up(window, cx, point(px(190.0), px(80.0))); }
+            assert_eq!(host.editor.read(cx).revision().get(), 0);
+            assert_eq!(note(host, cx).portamento_ms, None);
+        }).unwrap();
+    }
+}

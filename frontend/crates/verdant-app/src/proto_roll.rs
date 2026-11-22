@@ -10,7 +10,7 @@ use verdant_pitch_gesture_surface::{
             MoveGestureBinding, MoveGestureCancelContext, MoveGestureCancelReason,
             MoveGestureInput, MoveGestureLease, MoveGestureSample, attach_move_gesture,
         },
-        gpui_native_owner::NativeSnapshot,
+        gpui_native_owner::{NativeSnapshot, OwnerWeak},
     },
 };
 use verdant_session::PointerId;
@@ -60,7 +60,7 @@ pub(crate) fn mount(
     let started = Rc::new(Cell::new(None));
     let generation = Rc::new(Cell::new(0));
     let target = root.read(cx).handle().owner();
-    let binding = RollMove { editor, app: cx.to_async(), started: started.clone(), generation: generation.clone() };
+    let binding = RollMove { editor, target: target.clone(), app: cx.to_async(), started: started.clone(), generation: generation.clone() };
     let lease = attach_move_gesture(target, Box::new(binding))
         .unwrap_or_else(|error| panic!("compiled pitch surface cannot attach its pointer binding: {error}"));
     (root, PitchMove { lease: Rc::new(lease), started, generation, window: window.window_handle() })
@@ -81,6 +81,7 @@ impl Render for NativeRoll {
 
 struct RollMove {
     editor: WeakEntity<Editor>,
+    target: OwnerWeak,
     app: AsyncApp,
     started: Rc<Cell<Option<PointerId>>>,
     generation: Rc<Cell<u64>>,
@@ -97,6 +98,13 @@ fn sample_pointer(input: MoveGestureInput) -> Option<PointerId> {
 }
 
 impl RollMove {
+    fn sample_in_window(&self, sample: &MoveGestureSample, window: &Window) -> bool {
+        let origin = self.target.upgrade().and_then(|owner|
+            owner.borrow().native_hitbox.as_ref().map(|hitbox| hitbox.bounds.origin));
+        origin.is_some_and(|origin| crate::host_pointer::contains_window_point(window,
+            (f64::from(origin.x) + sample.position.x, f64::from(origin.y) + sample.position.y)))
+    }
+
     fn sample(editor: &mut Editor, sample: &MoveGestureSample) -> bool {
         let x = f64::from(sample.position.x);
         let y = f64::from(sample.position.y);
@@ -126,8 +134,8 @@ impl RollMove {
 }
 
 impl MoveGestureBinding for RollMove {
-    fn should_start(&self, sample: &MoveGestureSample, _: &mut Window, cx: &mut App) -> bool {
-        sample.position.x.is_finite() && sample.position.y.is_finite()
+    fn should_start(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) -> bool {
+        self.sample_in_window(sample, window)
             && sample_pointer(sample.input).is_some() && self.editor.upgrade().is_some_and(|entity| {
             let editor = entity.read(cx);
             editor.tool == Tool::Pitch && editor.lane_stroke.is_none()
@@ -153,8 +161,12 @@ impl MoveGestureBinding for RollMove {
 
     fn on_move(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         if self.started.get().is_some() && self.started.get() == sample_pointer(sample.input) {
+            let inside = self.sample_in_window(sample, window);
             let _ = self.editor.update(cx, |editor, cx| {
-                if !Self::sample(editor, sample) {
+                if !inside {
+                    editor.lane_stroke = None;
+                    editor.compiled_pitch_move.cancel(window, cx);
+                } else if !Self::sample(editor, sample) {
                     editor.lane_stroke = None;
                     editor.compiled_pitch_move.cancel(window, cx);
                     editor.notice("音高笔画坐标无效；已取消这次修改");
@@ -164,13 +176,17 @@ impl MoveGestureBinding for RollMove {
         }
     }
 
-    fn on_end(&self, sample: &MoveGestureSample, _: &mut Window, cx: &mut App) {
+    fn on_end(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         let Some(pointer) = sample_pointer(sample.input) else { return };
         if self.started.get() == Some(pointer) {
             self.started.set(None);
+            let inside = self.sample_in_window(sample, window);
             let _ = self.editor.update(cx, |editor, cx| {
                 if editor.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll && stroke.pointer == pointer) {
-                    if Self::sample(editor, sample) { editor.commit_roll_pitch(cx); }
+                    if !inside {
+                        editor.lane_stroke = None;
+                        cx.notify();
+                    } else if Self::sample(editor, sample) { editor.commit_roll_pitch(cx); }
                     else {
                         editor.lane_stroke = None;
                         editor.notice("音高笔画终止坐标无效；未提交修改");

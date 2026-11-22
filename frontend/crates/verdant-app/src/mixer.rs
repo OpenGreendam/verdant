@@ -692,6 +692,59 @@ fn paint_fader_surface(window: &mut gpui::Window, cx: &mut gpui::App, bounds: gp
     flush_texts(window, cx, bounds, texts);
 }
 
+/// One native ingress for both move and release. A release may be the first
+/// out-of-window sample under Wayland's implicit grab, so it cannot authorize
+/// a commit before this ownership/bounds check.
+fn mixer_pointer_sample(ed: &mut Editor, track: Option<&TrackId>, control: MixerControl,
+    position: gpui::Point<gpui::Pixels>, bounds: gpui::Bounds<gpui::Pixels>, modifiers: gpui::Modifiers,
+    finish: bool, window: &mut gpui::Window, cx: &mut Context<Editor>) {
+    let origin = if let Some(track) = track {
+        ed.mixer_drag.as_ref().filter(|drag| &drag.track == track && drag.control == control)
+            .map(|drag| (drag.origin_pos, drag.origin_value))
+    } else {
+        ed.master_drag.as_ref().filter(|drag| drag.control == control)
+            .map(|drag| (drag.origin_pos, drag.origin_value))
+    };
+    let Some((origin_pos, origin_value)) = origin else { return; };
+    if !crate::host_pointer::contains_window_point(window, (f64::from(position.x), f64::from(position.y))) {
+        if track.is_some() { ed.mixer_drag = None; } else { ed.master_drag = None; }
+        ed.sync_mixer();
+        window.release_pointer();
+        cx.notify();
+        return;
+    }
+    let local = position - bounds.origin;
+    let value = match control {
+        MixerControl::Pan => {
+            let fine = if modifiers.shift { 0.1 } else { 1.0 };
+            (origin_value + (f64::from(local.x) - origin_pos)
+                / (f64::from(bounds.size.width) - 16.0).max(1.0) * 2000.0 * fine)
+                .round().clamp(-1000.0, 1000.0) as i32
+        }
+        MixerControl::Fader => {
+            let fine = if modifiers.shift { 0.25 } else { 1.0 };
+            fader_mdb((origin_value - (f64::from(local.y) - origin_pos)
+                / (f64::from(bounds.size.height) - 14.0).max(1.0) * fine).clamp(0.0, 1.0))
+        }
+    };
+    if track.is_some() {
+        ed.update_mixer_drag(|header| match control {
+            MixerControl::Pan => header.pan_permille = value,
+            MixerControl::Fader => header.gain_millidecibels = value,
+        });
+    } else {
+        ed.update_master_drag(|settings| match control {
+            MixerControl::Pan => settings.pan_permille = value,
+            MixerControl::Fader => settings.gain_millidecibels = value,
+        });
+    }
+    if finish {
+        window.release_pointer();
+        if track.is_some() { ed.end_mixer_drag(cx); } else { ed.end_master_drag(cx); }
+    }
+    cx.notify();
+}
+
 fn pan_control(editor: Entity<Editor>, id: TrackId, pan: i32) -> impl IntoElement {
     canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
         let th = editor.read(cx).theme;
@@ -717,27 +770,16 @@ fn pan_control(editor: Entity<Editor>, id: TrackId, pan: i32) -> impl IntoElemen
             cx.stop_propagation();
         });
         let (e, id2) = (editor.clone(), id.clone());
-        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-            if phase != DispatchPhase::Bubble { return; }
-            let x = (ev.position - bounds.origin).x.as_f32() as f64;
-            e.update(cx, |ed, cx| {
-                let Some(drag) = ed.mixer_drag.as_ref().filter(|d| d.track == id2 && d.control == MixerControl::Pan) else { return };
-                let fine = if ev.modifiers.shift { 0.1 } else { 1.0 };
-                let value = (drag.origin_value + (x - drag.origin_pos) / (w - 16.0).max(1.0) * 2000.0 * fine).round().clamp(-1000.0, 1000.0) as i32;
-                ed.update_mixer_drag(|h| h.pan_permille = value);
-                cx.notify();
-            });
+        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+            if phase != DispatchPhase::Capture { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, Some(&id2), MixerControl::Pan,
+                ev.position, bounds, ev.modifiers, false, window, cx));
         });
         let e = editor.clone();
         window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-            if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left {
-                e.update(cx, |ed, cx| {
-                    if ed.mixer_drag.as_ref().is_some_and(|d| d.track == id && d.control == MixerControl::Pan) {
-                        window.release_pointer();
-                        ed.end_mixer_drag(cx);
-                    }
-                });
-            }
+            if phase != DispatchPhase::Capture || ev.button != MouseButton::Left { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, Some(&id), MixerControl::Pan,
+                ev.position, bounds, ev.modifiers, true, window, cx));
         });
     }).size_full()
 }
@@ -745,8 +787,6 @@ fn pan_control(editor: Entity<Editor>, id: TrackId, pan: i32) -> impl IntoElemen
 fn fader(editor: Entity<Editor>, id: TrackId, mdb: i32) -> impl IntoElement {
     canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
         let th = editor.read(cx).theme;
-        let h = bounds.size.height.as_f32() as f64;
-        let usable = (h - 14.0).max(1.0);
         paint_fader_surface(window, cx, bounds, th, mdb);
         let (e, h1, id1) = (editor.clone(), hitbox.clone(), id.clone());
         window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
@@ -761,27 +801,16 @@ fn fader(editor: Entity<Editor>, id: TrackId, mdb: i32) -> impl IntoElement {
             cx.stop_propagation();
         });
         let (e, id2) = (editor.clone(), id.clone());
-        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-            if phase != DispatchPhase::Bubble { return; }
-            let y = (ev.position - bounds.origin).y.as_f32() as f64;
-            e.update(cx, |ed, cx| {
-                let Some(drag) = ed.mixer_drag.as_ref().filter(|d| d.track == id2 && d.control == MixerControl::Fader) else { return };
-                let fine = if ev.modifiers.shift { 0.25 } else { 1.0 };
-                let value = fader_mdb((drag.origin_value - (y - drag.origin_pos) / usable * fine).clamp(0.0, 1.0));
-                ed.update_mixer_drag(|h| h.gain_millidecibels = value);
-                cx.notify();
-            });
+        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+            if phase != DispatchPhase::Capture { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, Some(&id2), MixerControl::Fader,
+                ev.position, bounds, ev.modifiers, false, window, cx));
         });
         let e = editor.clone();
         window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-            if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left {
-                e.update(cx, |ed, cx| {
-                    if ed.mixer_drag.as_ref().is_some_and(|d| d.track == id && d.control == MixerControl::Fader) {
-                        window.release_pointer();
-                        ed.end_mixer_drag(cx);
-                    }
-                });
-            }
+            if phase != DispatchPhase::Capture || ev.button != MouseButton::Left { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, Some(&id), MixerControl::Fader,
+                ev.position, bounds, ev.modifiers, true, window, cx));
         });
     }).size_full()
 }
@@ -811,27 +840,16 @@ fn master_pan_control(editor: Entity<Editor>, pan: i32) -> impl IntoElement {
             cx.stop_propagation();
         });
         let e = editor.clone();
-        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-            if phase != DispatchPhase::Bubble { return; }
-            let x = (ev.position - bounds.origin).x.as_f32() as f64;
-            e.update(cx, |ed, cx| {
-                let Some(drag) = ed.master_drag.as_ref().filter(|d| d.control == MixerControl::Pan) else { return };
-                let fine = if ev.modifiers.shift { 0.1 } else { 1.0 };
-                let value = (drag.origin_value + (x - drag.origin_pos) / (w - 16.0).max(1.0) * 2000.0 * fine).round().clamp(-1000.0, 1000.0) as i32;
-                ed.update_master_drag(|m| m.pan_permille = value);
-                cx.notify();
-            });
+        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+            if phase != DispatchPhase::Capture { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, None, MixerControl::Pan,
+                ev.position, bounds, ev.modifiers, false, window, cx));
         });
         let e = editor.clone();
         window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-            if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left {
-                e.update(cx, |ed, cx| {
-                    if ed.master_drag.as_ref().is_some_and(|d| d.control == MixerControl::Pan) {
-                        window.release_pointer();
-                        ed.end_master_drag(cx);
-                    }
-                });
-            }
+            if phase != DispatchPhase::Capture || ev.button != MouseButton::Left { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, None, MixerControl::Pan,
+                ev.position, bounds, ev.modifiers, true, window, cx));
         });
     }).size_full()
 }
@@ -839,8 +857,6 @@ fn master_pan_control(editor: Entity<Editor>, pan: i32) -> impl IntoElement {
 fn master_fader(editor: Entity<Editor>, mdb: i32) -> impl IntoElement {
     canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
         let th = editor.read(cx).theme;
-        let h = bounds.size.height.as_f32() as f64;
-        let usable = (h - 14.0).max(1.0);
         paint_fader_surface(window, cx, bounds, th, mdb);
         let (e, h1) = (editor.clone(), hitbox.clone());
         window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
@@ -855,27 +871,93 @@ fn master_fader(editor: Entity<Editor>, mdb: i32) -> impl IntoElement {
             cx.stop_propagation();
         });
         let e = editor.clone();
-        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-            if phase != DispatchPhase::Bubble { return; }
-            let y = (ev.position - bounds.origin).y.as_f32() as f64;
-            e.update(cx, |ed, cx| {
-                let Some(drag) = ed.master_drag.as_ref().filter(|d| d.control == MixerControl::Fader) else { return };
-                let fine = if ev.modifiers.shift { 0.25 } else { 1.0 };
-                let value = fader_mdb((drag.origin_value - (y - drag.origin_pos) / usable * fine).clamp(0.0, 1.0));
-                ed.update_master_drag(|m| m.gain_millidecibels = value);
-                cx.notify();
-            });
+        window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+            if phase != DispatchPhase::Capture { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, None, MixerControl::Fader,
+                ev.position, bounds, ev.modifiers, false, window, cx));
         });
         let e = editor.clone();
         window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-            if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left {
-                e.update(cx, |ed, cx| {
-                    if ed.master_drag.as_ref().is_some_and(|d| d.control == MixerControl::Fader) {
-                        window.release_pointer();
-                        ed.end_master_drag(cx);
-                    }
-                });
-            }
+            if phase != DispatchPhase::Capture || ev.button != MouseButton::Left { return; }
+            e.update(cx, |ed, cx| mixer_pointer_sample(ed, None, MixerControl::Fader,
+                ev.position, bounds, ev.modifiers, true, window, cx));
         });
     }).size_full()
+}
+
+#[cfg(test)]
+mod pointer_boundary_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, Window, WindowHandle, size};
+
+    struct Harness { editor: Entity<Editor>, master: bool, control: MixerControl }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let track = self.editor.read(cx).session.track.clone();
+            let control = match (self.master, self.control) {
+                (false, MixerControl::Pan) => pan_control(self.editor.clone(), track, 0).into_any_element(),
+                (false, MixerControl::Fader) => fader(self.editor.clone(), track, 0).into_any_element(),
+                (true, MixerControl::Pan) => master_pan_control(self.editor.clone(), 0).into_any_element(),
+                (true, MixerControl::Fader) => master_fader(self.editor.clone(), 0).into_any_element(),
+            };
+            div().size_full().child(div().w(px(140.0)).h(px(120.0)).child(control))
+                .child(canvas(|_, _, _| {}, |_, _, window, _| {
+                    window.on_mouse_event(|_: &MouseUpEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Bubble { cx.stop_propagation(); }
+                    });
+                }).size(px(0.0)))
+        }
+    }
+    fn open(cx: &mut TestAppContext, master: bool, control: MixerControl) -> WindowHandle<Harness> {
+        let window = cx.open_window(size(px(320.0), px(200.0)), |window, cx| Harness {
+            editor: cx.new(|cx| Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx)), master, control,
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window
+    }
+    fn down(host: &Harness, window: &mut Window, cx: &mut gpui::App) {
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: point(px(70.0), px(60.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+        assert!(if host.master { host.editor.read(cx).master_drag.is_some() } else { host.editor.read(cx).mixer_drag.is_some() });
+        assert!(window.captured_hitbox().is_some());
+    }
+    #[gpui::test]
+    fn all_mixer_controls_discard_outside_motion_or_terminal_sample(cx: &mut TestAppContext) {
+        for master in [false, true] { for control in [MixerControl::Pan, MixerControl::Fader] { for terminal in [false, true] {
+            let window = open(cx, master, control);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: point(px(100.0), px(30.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                let outside = point(px(-20.0), px(60.0));
+                if terminal {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: outside, button: MouseButton::Left, ..Default::default() }), cx);
+                } else {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent { position: outside, pressed_button: Some(MouseButton::Left), ..Default::default() }), cx);
+                }
+                assert!(host.editor.read(cx).mixer_drag.is_none() && host.editor.read(cx).master_drag.is_none());
+                assert!(window.captured_hitbox().is_none(), "outside motion cancels before a leave/up event");
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: point(px(100.0), px(30.0)), button: MouseButton::Left, ..Default::default() }), cx);
+                assert_eq!(host.editor.read(cx).revision().get(), 0);
+            }).unwrap();
+        } } }
+    }
+    #[gpui::test]
+    fn all_mixer_controls_commit_the_in_window_up_sample_outside_the_control(cx: &mut TestAppContext) {
+        for master in [false, true] { for control in [MixerControl::Pan, MixerControl::Fader] {
+            let window = open(cx, master, control);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: point(px(240.0), px(170.0)), button: MouseButton::Left, ..Default::default()
+                }), cx);
+                assert_eq!(host.editor.read(cx).revision().get(), 1, "a stopped bubble cannot discard the valid terminal sample");
+                assert!(host.editor.read(cx).mixer_drag.is_none() && host.editor.read(cx).master_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+            }).unwrap();
+        } }
+    }
 }

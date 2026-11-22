@@ -776,6 +776,14 @@ fn hit_mod_handle(ed: &Editor, x: f64, y: f64) -> Option<NoteModDrag> {
     None
 }
 
+fn cancel_roll_mouse(ed: &mut Editor, window: &mut Window, cx: &mut gpui::Context<Editor>) {
+    let owns_mouse = ed.session.pointer_owner() == Some(PointerId::Mouse)
+        || ed.note_creation.as_ref().is_some_and(|creation| creation.pointer == PointerId::Mouse)
+        || ed.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll && stroke.pointer == PointerId::Mouse)
+        || has_note_mod_drag(cx.entity_id(), cx);
+    if owns_mouse { ed.cancel_edits(CancelReason::PointerCancel, window, cx); }
+}
+
 fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox,
     surface: &crate::host_pointer::SurfaceToken, window: &mut Window, cx: &mut App) {
     if cx.try_global::<RollExtraDragState>().is_none() {
@@ -839,6 +847,10 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     });
     let e = editor.clone();
     window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            if phase == DispatchPhase::Capture { e.update(cx, |ed, cx| cancel_roll_mouse(ed, window, cx)); }
+            return;
+        }
         if phase != DispatchPhase::Bubble {
             return;
         }
@@ -870,6 +882,10 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     let up_surface = surface.clone();
     window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
         if phase != DispatchPhase::Capture || ev.button != MouseButton::Left || !up_surface.is_live() {
+            return;
+        }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            e.update(cx, |ed, cx| cancel_roll_mouse(ed, window, cx));
             return;
         }
         if cx.try_global::<RollExtraDragState>().and_then(|s| s.mod_drag.as_ref()).is_some_and(|d| d.editor == e.entity_id()) {
@@ -930,13 +946,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     let exit_surface = surface.clone();
     window.on_mouse_event(move |_: &gpui::MouseExitEvent, phase, window, cx| {
         if phase != DispatchPhase::Capture || !exit_surface.is_live() { return; }
-        e.update(cx, |ed, cx| {
-            let owns_mouse = ed.session.pointer_owner() == Some(PointerId::Mouse)
-                || ed.note_creation.as_ref().is_some_and(|creation| creation.pointer == PointerId::Mouse)
-                || ed.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll && stroke.pointer == PointerId::Mouse)
-                || has_note_mod_drag(cx.entity_id(), cx);
-            if owns_mouse { ed.cancel_edits(CancelReason::PointerCancel, window, cx); }
-        });
+        e.update(cx, |ed, cx| cancel_roll_mouse(ed, window, cx));
     });
 
     // ---- touch: claim drags that start on a note (or with an editing tool);
@@ -949,6 +959,10 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
         // mouse and touch; this path owns note/pencil gestures only.
         let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
         if phase != expected_phase || e.read(cx).tool == Tool::Pitch || !touch_surface.is_live() {
+            return;
+        }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx));
             return;
         }
         let l = ev.position - bounds.origin;
@@ -996,6 +1010,10 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     window.on_mouse_event(move |ev: &LongPressEvent, phase, window, cx| {
         let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
         if phase != expected_phase || e.read(cx).tool == Tool::Pitch || !long_surface.is_live() {
+            return;
+        }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx));
             return;
         }
         let l = ev.position - bounds.origin;

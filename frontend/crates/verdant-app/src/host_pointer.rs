@@ -9,6 +9,16 @@
 use std::{cell::Cell, collections::HashMap, rc::Rc};
 use gpui::{AnyWindowHandle, App, AppContext, AsyncApp, HitboxId, SharedString, Window, WindowId};
 
+/// Verdant cancels an edit when its pointer leaves the application window.
+/// Wayland's implicit grab can keep delivering out-of-window coordinates until
+/// release without a MouseExited event. Check every move and terminal sample,
+/// in window coordinates: leaving an individual control still permits a drag.
+pub(crate) fn contains_window_point(window: &Window, (x, y): (f64, f64)) -> bool {
+    let viewport = window.viewport_size();
+    x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0
+        && x < f64::from(viewport.width) && y < f64::from(viewport.height)
+}
+
 /// Identity of one actually rendered native input subtree. It survives
 /// redraws, but a detach/remount always gets a different identity.
 #[derive(Clone)]
