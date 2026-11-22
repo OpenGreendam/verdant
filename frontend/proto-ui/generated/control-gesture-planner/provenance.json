@@ -1,0 +1,108 @@
+{
+  "source": {
+    "file": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
+    "exportName": "default",
+    "sha256": "b193b6e5f063bf4369264160a4141f4f2420d9a55707634526a1a6cf66215981"
+  },
+  "irVersion": 7,
+  "backend": "gpui-source-v1",
+  "observableSemantics": {
+    "version": "proto-ui-observables-v1",
+    "props": {
+      "input": "full-raw-snapshot",
+      "update": "explicit",
+      "initialNotification": "silent"
+    },
+    "state": {
+      "write": "synchronous",
+      "notifications": "fifo-recorded-snapshot-v1",
+      "update": "explicit"
+    },
+    "context": {
+      "update": "explicit",
+      "identity": "nominal"
+    },
+    "lifecycle": {
+      "update": "coalescible-intent",
+      "completion": "host-commit-before-updated",
+      "detach": "preserve-owner",
+      "disposal": "invalidate-retained-handles"
+    },
+    "composition": {
+      "nativeChildren": "ordinary-host-slots",
+      "sharedIdentity": "explicit-artifact-link"
+    }
+  },
+  "sourceResolution": {
+    "version": 1,
+    "imports": {},
+    "packages": []
+  },
+  "profile": "gpui-source-v1",
+  "dependencies": [
+    {
+      "name": "gpui",
+      "version": "workspace",
+      "role": "target"
+    },
+    {
+      "name": "serde",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "role": "host-bridge"
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "=1.13.3",
+      "role": "target"
+    },
+    {
+      "name": "data-url",
+      "version": "=0.3.2",
+      "role": "target"
+    },
+    {
+      "name": "image",
+      "version": "=0.25.10",
+      "role": "target"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
+      "sha256": "13a95ceb48374943fe4c5f98e943dbda0bc6b5da40664a5e3cf3cdfb3778b613"
+    }
+  ],
+  "generatedSha256": "172e0f756ea6e0e1f7bd120ef868c5bc9316e621b915006129556619fbee9843",
+  "artifacts": [
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "172e0f756ea6e0e1f7bd120ef868c5bc9316e621b915006129556619fbee9843"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "ee07e080e6fd6e51d7bb546030cb0f31046d371adb27c5895f326e8e2a1501bc"
+    },
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "12b3425ed6fb483d253671f809fd09e7114edf5dc218bee849415b87892356c5"
+    }
+  ]
+}

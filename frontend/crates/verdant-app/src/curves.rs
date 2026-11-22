@@ -132,6 +132,15 @@ impl Editor {
     }
 
     pub fn cancel_edits(&mut self, reason: CancelReason, window: &mut Window, cx: &mut Context<Self>) {
+        // The remaining native-only lane/mixer controls predate the owned
+        // planner capture tokens. Limit their cleanup to an active editor
+        // interaction and its currently captured hitbox.
+        let legacy_capture = (self.arrange_drag.is_some() || self.mixer_drag.is_some()
+            || self.master_drag.is_some() || self.numeric_preview.is_some()
+            || self.lane_stroke.as_ref().is_some_and(|stroke| !stroke.roll)
+            || crate::ui_controls::has_numeric_scrub(cx.entity_id(), cx)
+            || crate::roll::has_extra_drag(cx.entity_id(), cx))
+            .then(|| window.captured_hitbox()).flatten();
         crate::ruler_navigation::cancel(cx.entity_id(), window, cx);
         let project = self.store().snapshot();
         let effects = self.session.handle_pointer(&project, self.revision(), PointerId::Mouse, InputEvent::Cancel(reason));
@@ -142,7 +151,8 @@ impl Editor {
         self.mixer_drag = None;
         self.cancel_control_drags(cx);
         self.sync_mixer();
-        window.release_pointer();
+        self.release_roll_capture(window, cx);
+        if legacy_capture.is_some() && window.captured_hitbox() == legacy_capture { window.release_pointer(); }
         self.apply_effects(effects, window, cx);
     }
 

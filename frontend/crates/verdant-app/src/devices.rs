@@ -8,7 +8,7 @@
 //! Displayed values glide to their new values after any external change.
 //!
 //! Interaction decisions come from the compiled Proto UI control protocol
-//! (`planControlGesture`, `dragNormalized` in the pitch-gesture unit): a
+//! (`planControlGesture`, `dragNormalized` in the control-gesture unit): a
 //! press selects, only a drag past the threshold edits, the edit previews
 //! locally and is committed once on release as a single undo step; double
 //! click or Alt-click restores the default. Cancellation drops only the local
@@ -19,7 +19,7 @@ use gpui::{
     MouseMoveEvent, MouseUpEvent, Pixels, Role, SharedString, Window, canvas, div, fill, prelude::*, px, quad, svg,
 };
 use verdant_domain::TrackId;
-use verdant_pitch_gesture_surface::PitchGestureSurfaceHandle;
+use verdant_ui_protocol::{ControlEffect, ControlGuards, GestureEvent, GesturePhase, PlannerError, plan_control, drag_normalized};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use verdant_plugins::builtin_dsp::{self as dsp, BandKind, EqParams, Placement, TableEffect};
@@ -33,7 +33,7 @@ use crate::theme::{Theme, with_alpha};
 
 /// Which control a drag edits.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Control { Knob(String), Band(usize), Handle(&'static str) }
+pub enum Control { Band(usize), Handle(&'static str) }
 
 /// A pressed or dragged control. Values preview locally and are committed
 /// to the plug-in once, on release.
@@ -42,34 +42,18 @@ pub struct DeviceDrag {
     slot: usize,
     key: InsertKey,
     control: Control,
-    phase: String,
+    phase: GesturePhase,
     origin: (f64, f64),
-    window: gpui::AnyWindowHandle,
-    hitbox: gpui::HitboxId,
+    capture: Option<crate::host_pointer::OwnedPointerCapture>,
     /// Normalized (0…1) start positions of the edited values.
     start: Vec<f64>,
     preview: Vec<(String, f64)>,
 }
 
-#[derive(serde::Deserialize)]
-struct Decision {
-    #[serde(rename = "nextPhase")]
-    next_phase: String,
-    effects: Vec<String>,
-}
-
-fn plan(phase: &str, event: &str, hit: bool, crossed: bool, reset: bool, double: bool) -> Decision {
-    let value = PitchGestureSurfaceHandle::call_data_method("planControlGesture", vec![
-        phase.into(),
-        event.into(),
-        serde_json::json!({ "hit_control": hit, "threshold_crossed": crossed, "reset_modifier": reset, "double_click": double }),
-    ]).unwrap_or_else(|error| panic!("compiled control gesture planner failed: {error:?}"));
-    serde_json::from_value(value).unwrap_or_else(|error| panic!("compiled control gesture planner returned an incompatible decision: {error}"))
-}
-
-fn drag_normalized(start: f64, delta: f64, travel: f64, fine: bool) -> f64 {
-    PitchGestureSurfaceHandle::call_data_method("dragNormalized", vec![start.into(), delta.into(), travel.into(), fine.into()])
-        .ok().and_then(|v| v.as_f64()).unwrap_or(start)
+fn plan(phase: GesturePhase, event: GestureEvent, hit: bool, crossed: bool, reset: bool, double: bool) -> Result<verdant_ui_protocol::ControlPlan, PlannerError> {
+    plan_control(phase, event, ControlGuards {
+        hit_control: hit, threshold_crossed: crossed, reset_modifier: reset, double_click: double,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -138,142 +122,122 @@ fn param<'a>(params: &'a [ParamDesc], id: &str) -> Option<&'a ParamDesc> { param
 struct Target { track: TrackId, slot: usize, key: InsertKey }
 
 impl Editor {
-    /// Device previews never reach the plug-in until release. Discarding one
-    /// restores the cached values and lets parameter refresh resume immediately.
+    /// Device previews never reach the plug-in until release. All cancellation
+    /// paths retire the same owned capture, including failures and detachment.
     pub(crate) fn cancel_device_drag(&mut self, cx: &mut Context<Self>) {
-        let Some(drag) = self.device_drag.take() else { return };
-        let decision = plan(&drag.phase, "Cancel", false, false, false, false);
-        if decision.effects.iter().any(|effect| effect == "Host.ReleasePointer") {
-            // Undo and track changes do not have a Window borrow. Defer until
-            // the current update returns, and release only this drag's capture.
-            let (window, hitbox) = (drag.window, drag.hitbox);
-            cx.defer(move |cx| {
-                let _ = window.update(cx, |_, window, _| {
-                    if window.captured_hitbox() == Some(hitbox) {
-                        window.release_pointer();
+        let Some(mut drag) = self.device_drag.take() else { return };
+        match plan(drag.phase, GestureEvent::Cancel, false, false, false, false) {
+            Ok(decision) => {
+                for effect in decision.effects {
+                    match effect {
+                        ControlEffect::Discard | ControlEffect::Release => {},
+                        _ => unreachable!("validated cancellation effect"),
                     }
-                });
-            });
+                }
+            }
+            Err(error) => self.notice(format!("交互协议失败，已取消控件编辑：{error}")),
         }
+        if let Some(capture) = drag.capture.take() { capture.release_deferred(cx); }
         cx.notify();
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, initial: Vec<(String, f64)>, defaults: Vec<(String, f64)>,
-    ev: &MouseDownEvent, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Editor>) {
-    if ed.device_drag.is_some() { return; }
-    let decision = plan("idle", "PointerDown", true, false, ev.modifiers.alt, ev.click_count >= 2);
+    ev: &MouseDownEvent, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Editor>) -> bool {
+    if ed.device_drag.is_some() || ed.session.pointer_owner().is_some() || ed.lane_stroke.is_some()
+        || ed.note_creation.is_some() || ed.mixer_drag.is_some() { return false; }
+    let decision = match plan(GesturePhase::Idle, GestureEvent::Down, true, false, ev.modifiers.alt, ev.click_count >= 2) {
+        Ok(decision) => decision,
+        Err(error) => { ed.notice(format!("交互协议失败：{error}")); cx.notify(); return true; }
+    };
     for effect in &decision.effects {
-        match effect.as_str() {
-            "Control.Select" => if let Control::Band(band) = control { ed.device_band = band; },
-            "Control.Reset" => ed.set_track_insert_params(target.track.clone(), target.slot, defaults.clone(), cx),
-            "Control.Begin" => ed.device_drag = Some(DeviceDrag {
+        match effect {
+            ControlEffect::Select => if let Control::Band(band) = control { ed.device_band = band; },
+            ControlEffect::Reset => ed.set_track_insert_params(target.track.clone(), target.slot, defaults.clone(), cx),
+            ControlEffect::Begin => ed.device_drag = Some(DeviceDrag {
                 track: target.track.clone(), slot: target.slot, key: target.key, control: control.clone(),
-                phase: decision.next_phase.clone(), origin: (f64::from(ev.position.x), f64::from(ev.position.y)),
-                window: window.window_handle(), hitbox,
-                start: start.clone(), preview: initial.clone(),
+                phase: decision.next_phase, origin: (f64::from(ev.position.x), f64::from(ev.position.y)),
+                capture: None, start: start.clone(), preview: initial.clone(),
             }),
-            "Host.CapturePointer" => window.capture_pointer(hitbox),
-            _ => {}
+            ControlEffect::Capture => {
+                let capture = crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx);
+                ed.device_drag.as_mut().expect("control capture follows begin").capture = Some(capture);
+            }
+            _ => unreachable!("validated press effect"),
         }
     }
-    cx.notify();
+    if decision.consumed { cx.notify(); }
+    decision.consumed
 }
 
-fn moved(ed: &mut Editor, control: &Control, key: InsertKey, ev: &MouseMoveEvent, cx: &mut Context<Editor>,
-    preview: impl Fn(&[f64], (f64, f64), bool) -> Vec<(String, f64)>) {
-    let Some(drag) = ed.device_drag.as_mut().filter(|d| d.key == key && &d.control == control) else { return };
-    let delta = (f64::from(ev.position.x) - drag.origin.0, f64::from(ev.position.y) - drag.origin.1);
-    let crossed = delta.0.hypot(delta.1) >= 3.0;
-    let decision = plan(&drag.phase, "PointerMove", true, crossed, false, false);
-    if decision.effects.iter().any(|e| e == "Control.Preview") {
-        drag.preview = preview(&drag.start, delta, ev.modifiers.shift);
+impl DeviceDrag {
+    fn sample(&mut self, position: (f64, f64), fine: bool,
+        preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> Result<bool, PlannerError> {
+        let delta = (position.0 - self.origin.0, position.1 - self.origin.1);
+        let decision = plan(self.phase, GestureEvent::Move, true, delta.0.hypot(delta.1) >= 3.0, false, false)?;
+        let next = if decision.effects.contains(&ControlEffect::Preview) { Some(preview(&self.start, delta, fine)?) } else { None };
+        if decision.consumed {
+            if let Some(next) = next { self.preview = next; }
+            self.phase = decision.next_phase;
+        }
+        Ok(decision.consumed)
     }
-    drag.phase = decision.next_phase;
-    cx.notify();
+
+    fn finish(&mut self, position: (f64, f64), fine: bool,
+        preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> Result<verdant_ui_protocol::ControlPlan, PlannerError> {
+        // Terminal coordinates and modifiers are sampled even when the OS
+        // coalesced away all MouseMove events between press and release.
+        self.sample(position, fine, preview)?;
+        plan(self.phase, GestureEvent::Up, true, false, false, false)
+    }
 }
 
-fn released(ed: &mut Editor, control: &Control, key: InsertKey, window: &mut Window, cx: &mut Context<Editor>) {
-    if !ed.device_drag.as_ref().is_some_and(|d| d.key == key && &d.control == control) { return; }
-    let drag = ed.device_drag.take().expect("checked drag");
-    let decision = plan(&drag.phase, "PointerUp", true, false, false, false);
+fn sampled(ed: &mut Editor, control: &Control, key: InsertKey, position: (f64, f64), fine: bool, cx: &mut Context<Editor>,
+    preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> bool {
+    let Some(drag) = ed.device_drag.as_mut().filter(|d| d.key == key && &d.control == control) else { return false };
+    match drag.sample(position, fine, preview) {
+        Ok(consumed) => { if consumed { cx.notify(); } consumed }
+        Err(error) => {
+            ed.notice(format!("控件采样失败，已取消编辑：{error}"));
+            ed.cancel_device_drag(cx);
+            true
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn released(ed: &mut Editor, control: &Control, key: InsertKey, ev: &MouseUpEvent, window: &mut Window, cx: &mut Context<Editor>,
+    preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> bool {
+    if !ed.device_drag.as_ref().is_some_and(|d| d.key == key && &d.control == control) { return false; }
+    let mut drag = ed.device_drag.take().expect("checked control owner");
+    let decision = match drag.finish((f64::from(ev.position.x), f64::from(ev.position.y)), ev.modifiers.shift, preview) {
+        Ok(decision) => decision,
+        Err(error) => {
+            if let Some(capture) = drag.capture.take() { capture.release(window, cx); }
+            ed.notice(format!("交互协议失败，未提交控件编辑：{error}")); cx.notify(); return true;
+        }
+    };
     for effect in decision.effects {
-        match effect.as_str() {
-            "Control.Commit" => ed.set_track_insert_params(drag.track.clone(), drag.slot, drag.preview.clone(), cx),
-            "Host.ReleasePointer" => window.release_pointer(),
-            _ => {}
+        match effect {
+            ControlEffect::Commit => ed.set_track_insert_params(drag.track.clone(), drag.slot, drag.preview.clone(), cx),
+            ControlEffect::Release => if let Some(capture) = drag.capture.take() { capture.release(window, cx); },
+            ControlEffect::Discard => {},
+            _ => unreachable!("validated terminal effect"),
         }
     }
     cx.notify();
+    decision.consumed
 }
 
 // ---------------------------------------------------------------------------
 // Knob
 // ---------------------------------------------------------------------------
 
-const KNOB_SWEEP: f64 = 270.0;
-
-fn arc_points(cx: f64, cy: f64, r: f64, from: f64, to: f64) -> Vec<Option<(f64, f64)>> {
-    let steps = ((to - from).abs() / 4.0).ceil().max(1.0) as usize;
-    (0..=steps).map(|i| {
-        let a = (from + (to - from) * i as f64 / steps as f64).to_radians();
-        Some((cx + r * a.cos(), cy + r * a.sin()))
-    }).collect()
-}
-
-/// An Adwaita-styled rotary knob: trough arc, accent value arc (from zero
-/// for bipolar ranges), round body with an indicator. Drag vertically.
+/// A source-owned Proto-UI slider interaction with an Adwaita drawing slot.
+/// The host retains plugin unit conversion and the domain commit boundary.
 fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th: Theme, size: f32) -> impl IntoElement {
-    let value_text = format_value(&desc, desc.value);
-    let control = Control::Knob(desc.id.clone());
-    let key = target.key;
-    let paint_desc = desc.clone();
-    div().id(SharedString::from(format!("knob-{}-{}", target.slot, desc.id))).role(Role::Slider)
-        .aria_label(label.to_string()).aria_value(value_text.clone())
-        .flex().flex_col().items_center().gap(px(2.0)).w(px(size + 26.0))
-        .child(canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
-            let o = bounds.origin;
-            let s = f64::from(bounds.size.width.min(bounds.size.height));
-            let (c, r) = (s / 2.0, s / 2.0 - 3.0);
-            let start = 135.0;
-            let n = to_norm(&paint_desc, paint_desc.value);
-            let zero = if paint_desc.min < 0.0 && paint_desc.max > 0.0 { to_norm(&paint_desc, 0.0) } else { 0.0 };
-            polyline(window, o, arc_points(c, c, r, start, start + KNOB_SWEEP), 3.5, th.control_pressed);
-            let (a, z) = if n < zero { (n, zero) } else { (zero, n) };
-            if (z - a) > 0.002 { polyline(window, o, arc_points(c, c, r, start + KNOB_SWEEP * a, start + KNOB_SWEEP * z), 3.5, th.accent); }
-            let body = r - 7.0;
-            window.paint_quad(quad(b(c - body, c - body, body * 2.0, body * 2.0, o), px(body as f32), th.control, px(1.0), th.shade, gpui::BorderStyle::Solid));
-            let ang = (start + KNOB_SWEEP * n).to_radians();
-            let (ix, iy) = (c + (body - 4.0) * ang.cos(), c + (body - 4.0) * ang.sin());
-            window.paint_quad(quad(b(ix - 2.5, iy - 2.5, 5.0, 5.0, o), px(2.5), th.text, px(0.0), th.text, gpui::BorderStyle::Solid));
-            if hitbox.is_hovered(window) { window.set_cursor_style(gpui::CursorStyle::ResizeUpDown, &hitbox); }
-
-            let (e, h, t, d, ctl) = (editor.clone(), hitbox.clone(), (target.track.clone(), target.slot), paint_desc.clone(), control.clone());
-            window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left || !h.is_hovered(window) { return; }
-                let default = d.default_value.unwrap_or(d.value);
-                e.update(cx, |ed, cx| press(ed, &Target { track: t.0.clone(), slot: t.1, key }, ctl.clone(),
-                    vec![to_norm(&d, d.value)], vec![(d.id.clone(), d.value)], vec![(d.id.clone(), default)], ev, h.id, window, cx));
-                cx.stop_propagation();
-            });
-            let (e, d, ctl) = (editor.clone(), paint_desc.clone(), control.clone());
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                if phase != DispatchPhase::Bubble { return; }
-                let d = d.clone();
-                e.update(cx, |ed, cx| moved(ed, &ctl, key, ev, cx, move |start, delta, fine| {
-                    vec![(d.id.clone(), from_norm(&d, drag_normalized(start[0], -delta.1, 180.0, fine)))]
-                }));
-            });
-            let (e, ctl) = (editor.clone(), control.clone());
-            window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left { return; }
-                e.update(cx, |ed, cx| released(ed, &ctl, key, window, cx));
-            });
-            let _ = cx;
-        }).size(px(size)))
-        .child(div().text_xs().text_color(th.text_secondary).child(label.to_string()))
-        .child(div().text_sm().text_color(th.text).whitespace_nowrap().child(value_text))
+    crate::proto_knob::knob(editor, target.track, target.slot, target.key, desc, label, th, size)
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +335,18 @@ struct Handle {
     /// Extra writes made by the drag (turning a band on).
     also: Vec<(String, f64)>,
     defaults: Vec<(String, f64)>,
+}
+
+fn handle_preview(handle: &Handle, plot: Plot, start: &[f64], (dx, dy): (f64, f64), fine: bool) -> Result<Vec<(String, f64)>, PlannerError> {
+    let mut values = Vec::new();
+    if let Some((id, axis)) = &handle.x {
+        values.push((id.clone(), axis.value(drag_normalized(start[0], dx, plot.inner_w(), fine)?)));
+    }
+    if let Some((id, axis)) = &handle.y {
+        values.push((id.clone(), axis.value(drag_normalized(start[1], -dy, plot.inner_h(), fine)?)));
+    }
+    values.extend(handle.also.iter().cloned());
+    Ok(values)
 }
 
 type Painter = Rc<dyn Fn(&mut Window, Plot, &[ParamDesc], &mut Texts)>;
@@ -477,8 +453,8 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                         let mut initial: Vec<(String, f64)> = [&h.x, &h.y].into_iter().flatten()
                             .filter_map(|(id, _)| param(&ps, id).map(|d| (id.clone(), d.value))).collect();
                         initial.extend(h.also.iter().cloned());
-                        e.update(cx, |ed, cx| press(ed, &target, h.control.clone(), start, initial, h.defaults.clone(), ev, hb.id, window, cx));
-                        cx.stop_propagation();
+                        let consumed = e.update(cx, |ed, cx| press(ed, &target, h.control.clone(), start, initial, h.defaults.clone(), ev, hb.id, window, cx));
+                        if consumed { cx.stop_propagation(); }
                     }
                     (MouseButton::Left, None) if ev.click_count >= 2 => {
                         let Some(double) = &double else { return };
@@ -500,26 +476,23 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
             let (e, hs) = (editor.clone(), handles.clone());
             window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
                 if phase != DispatchPhase::Bubble { return; }
-                e.update(cx, |ed, cx| {
-                    let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) else { return };
-                    let Some(h) = hs.iter().find(|h| h.control == control).cloned() else { return };
-                    moved(ed, &control, key, ev, cx, move |start, (dx, dy), fine| {
-                        let mut out = Vec::new();
-                        if let Some((id, axis)) = &h.x { out.push((id.clone(), axis.value(drag_normalized(start[0], dx, plot.inner_w(), fine)))); }
-                        if let Some((id, axis)) = &h.y { out.push((id.clone(), axis.value(drag_normalized(start[1], -dy, plot.inner_h(), fine)))); }
-                        out.extend(h.also.iter().cloned());
-                        out
-                    });
+                let consumed = e.update(cx, |ed, cx| {
+                    let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) else { return false };
+                    let Some(h) = hs.iter().find(|h| h.control == control) else { return false };
+                    sampled(ed, &control, key, (f64::from(ev.position.x), f64::from(ev.position.y)), ev.modifiers.shift, cx,
+                        |start, delta, fine| handle_preview(h, plot, start, delta, fine))
                 });
+                if consumed { cx.stop_propagation(); }
             });
-            let e = editor.clone();
+            let (e, hs) = (editor.clone(), handles.clone());
             window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
                 if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left { return; }
-                e.update(cx, |ed, cx| {
-                    if let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) {
-                        released(ed, &control, key, window, cx);
-                    }
+                let consumed = e.update(cx, |ed, cx| {
+                    let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) else { return false };
+                    let Some(h) = hs.iter().find(|h| h.control == control) else { return false };
+                    released(ed, &control, key, ev, window, cx, |start, delta, fine| handle_preview(h, plot, start, delta, fine))
                 });
+                if consumed { cx.stop_propagation(); }
             });
         }).size_full())
 }
@@ -1204,19 +1177,23 @@ mod tests {
 
     #[test]
     fn compiled_control_protocol_selects_drags_commits_and_resets() {
-        let down = plan("idle", "PointerDown", true, false, false, false);
-        assert_eq!(down.next_phase, "armed");
-        assert_eq!(down.effects, ["Control.Select", "Control.Begin", "Host.CapturePointer"]);
-        assert_eq!(plan("armed", "PointerMove", true, false, false, false).effects, Vec::<String>::new());
-        assert_eq!(plan("armed", "PointerMove", true, true, false, false).next_phase, "dragging");
-        assert_eq!(plan("dragging", "PointerUp", true, false, false, false).effects, ["Control.Commit", "Host.ReleasePointer"]);
-        assert_eq!(plan("armed", "PointerUp", true, false, false, false).effects, ["Control.Discard", "Host.ReleasePointer"]);
-        assert_eq!(plan("idle", "PointerDown", true, false, false, true).effects, ["Control.Select", "Control.Reset"]);
-        assert_eq!(plan("idle", "PointerDown", true, false, true, false).effects, ["Control.Select", "Control.Reset"]);
-        assert!(plan("idle", "PointerDown", false, false, false, false).effects.is_empty());
-        assert_eq!(drag_normalized(0.5, 90.0, 180.0, false), 1.0);
-        assert!((drag_normalized(0.5, 90.0, 180.0, true) - 0.55).abs() < 1e-9, "Shift is ten times finer");
-        assert_eq!(drag_normalized(0.2, -500.0, 180.0, false), 0.0);
+        use ControlEffect::*;
+        use GestureEvent::*;
+        use GesturePhase::*;
+        let down = plan(Idle, Down, true, false, false, false).unwrap();
+        assert_eq!(down.next_phase, Armed);
+        assert!(down.consumed);
+        assert_eq!(down.effects, [Select, Begin, Capture]);
+        assert!(plan(Armed, Move, true, false, false, false).unwrap().effects.is_empty());
+        assert_eq!(plan(Armed, Move, true, true, false, false).unwrap().next_phase, Dragging);
+        assert_eq!(plan(Dragging, Up, true, false, false, false).unwrap().effects, [Commit, Release]);
+        assert_eq!(plan(Armed, Up, true, false, false, false).unwrap().effects, [Discard, Release]);
+        assert_eq!(plan(Idle, Down, true, false, false, true).unwrap().effects, [Select, Reset]);
+        assert_eq!(plan(Idle, Down, true, false, true, false).unwrap().effects, [Select, Reset]);
+        assert!(!plan(Idle, Down, false, false, false, false).unwrap().consumed);
+        assert_eq!(drag_normalized(0.5, 90.0, 180.0, false).unwrap(), 1.0);
+        assert!((drag_normalized(0.5, 90.0, 180.0, true).unwrap() - 0.55).abs() < 1e-9);
+        assert_eq!(drag_normalized(0.2, -500.0, 180.0, false).unwrap(), 0.0);
     }
 
     #[test]
@@ -1239,16 +1216,43 @@ mod tests {
 
     #[test]
     fn compiled_control_cancel_discards_armed_and_previewed_edits() {
-        for phase in ["armed", "dragging"] {
-            let cancel = plan(phase, "Cancel", false, false, false, false);
-            assert_eq!(cancel.next_phase, "idle");
-            assert_eq!(cancel.effects, ["Control.Discard", "Host.ReleasePointer"]);
-            assert!(plan(&cancel.next_phase, "PointerUp", true, false, false, false).effects.is_empty(),
+        for phase in [GesturePhase::Armed, GesturePhase::Dragging] {
+            let cancel = plan(phase, GestureEvent::Cancel, false, false, false, false).unwrap();
+            assert_eq!(cancel.next_phase, GesturePhase::Idle);
+            assert_eq!(cancel.effects, [ControlEffect::Discard, ControlEffect::Release]);
+            assert!(plan(cancel.next_phase, GestureEvent::Up, true, false, false, false).unwrap().effects.is_empty(),
                 "a late release must not commit a cancelled preview");
-            let next = plan(&cancel.next_phase, "PointerDown", true, false, false, false);
-            assert_eq!(next.next_phase, "armed");
-            assert!(next.effects.iter().any(|effect| effect == "Control.Begin"),
-                "cancellation must allow the next control edit");
+            let next = plan(cancel.next_phase, GestureEvent::Down, true, false, false, false).unwrap();
+            assert_eq!(next.next_phase, GesturePhase::Armed);
+            assert!(next.effects.contains(&ControlEffect::Begin));
         }
+    }
+
+    fn test_drag() -> DeviceDrag {
+        DeviceDrag {
+            track: "track".into(), slot: 0, key: InsertKey(1), control: Control::Handle("test"),
+            phase: GesturePhase::Armed, origin: (0.0, 0.0), capture: None,
+            start: vec![0.5], preview: vec![("value".into(), 0.5)],
+        }
+    }
+
+    fn test_preview(start: &[f64], delta: (f64, f64), fine: bool) -> Result<Vec<(String, f64)>, PlannerError> {
+        Ok(vec![("value".into(), drag_normalized(start[0], -delta.1, 180.0, fine)?)])
+    }
+
+    #[test]
+    fn control_terminal_sampling_uses_up_position_and_modifiers_before_commit() {
+        let mut drag = test_drag();
+        drag.sample((0.0, -18.0), false, test_preview).unwrap();
+        assert!((drag.preview[0].1 - 0.6).abs() < 1e-9);
+        let terminal = drag.finish((0.0, -90.0), true, test_preview).unwrap();
+        assert_eq!(terminal.effects, [ControlEffect::Commit, ControlEffect::Release]);
+        assert!((drag.preview[0].1 - 0.55).abs() < 1e-9, "release has the latest Shift modifier and position");
+        let mut coalesced = test_drag();
+        assert!(coalesced.finish((0.0, -90.0), false, test_preview).unwrap().effects.contains(&ControlEffect::Commit));
+        assert_eq!(coalesced.preview[0].1, 1.0);
+        let mut invalid = test_drag();
+        invalid.sample((0.0, -18.0), false, test_preview).unwrap();
+        assert!(invalid.finish((0.0, f64::NAN), false, test_preview).is_err(), "invalid release cannot authorize a stale commit");
     }
 }

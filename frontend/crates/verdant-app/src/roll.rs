@@ -672,6 +672,16 @@ impl NoteModDrag {
     fn test_matches(&self, ed: &Editor) -> bool {
         self.track == ed.session.track && self.base == ed.revision()
     }
+
+    fn sample_values(&self, ed: &Editor, x: f64, y: f64) -> (u32, u32, u32) {
+        let tick = ed.session.viewport.x_to_tick(x).max(0.0);
+        let sec = ed.tempo().seconds_at(tick);
+        (
+            ((sec - self.note_start_seconds).max(0.0) * 1000.0).round().clamp(0.0, 2000.0) as u32,
+            (((x - self.note_rect_x) / self.note_rect_w.max(1.0)).clamp(0.0, 1.0) * 1000.0).round() as u32,
+            (self.initial_depth + (self.origin_y - y) * 1.5).round().clamp(0.0, 200.0) as u32,
+        )
+    }
 }
 
 fn hit_mod_handle(ed: &Editor, x: f64, y: f64) -> Option<NoteModDrag> {
@@ -766,8 +776,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                 let maybe_mod = hit_mod_handle(e.read(cx), x, y).map(|mut d| { d.editor = e.entity_id(); d });
                 if let Some(mod_drag) = maybe_mod {
                     cx.global_mut::<RollExtraDragState>().mod_drag = Some(mod_drag);
-                    window.capture_pointer(h.id);
-                    e.update(cx, |ed, cx| { window.focus(&ed.focus_roll, cx); cx.notify(); });
+                    e.update(cx, |ed, cx| { ed.capture_roll_pointer(h.id, window, cx); window.focus(&ed.focus_roll, cx); cx.notify(); });
                     cx.stop_propagation();
                     return;
                 }
@@ -801,12 +810,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
             };
             if drag.editor != e.entity_id() { return; }
             let ed = e.read(cx);
-            let tick = ed.session.viewport.x_to_tick(lx).max(0.0);
-            let sec = ed.tempo().seconds_at(tick);
-            let next_porta = ((sec - drag.note_start_seconds).max(0.0) * 1000.0).round().clamp(0.0, 2000.0) as u32;
-            let next_delay = (((lx - drag.note_rect_x) / drag.note_rect_w.max(1.0)).clamp(0.0, 1.0) * 1000.0).round() as u32;
-            let next_depth = (drag.initial_depth + (drag.origin_y - ly) * 1.5).round().clamp(0.0, 200.0) as u32;
-            Some((next_porta, next_delay, next_depth))
+            Some(drag.sample_values(ed, lx, ly))
         };
         if let Some((p_ms, dl_pm, dp_c)) = updated_mod {
             if let Some(drag) = cx.global_mut::<RollExtraDragState>().mod_drag.as_mut() {
@@ -824,10 +828,12 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
         }
         if cx.try_global::<RollExtraDragState>().and_then(|s| s.mod_drag.as_ref()).is_some_and(|d| d.editor == e.entity_id()) {
             let finished = cx.global_mut::<RollExtraDragState>().mod_drag.take();
-            window.release_pointer();
-            if let Some(drag) = finished {
+            if let Some(mut drag) = finished {
                 e.update(cx, |ed, cx| {
+                    ed.release_roll_capture(window, cx);
                     if !drag.test_matches(ed) { cx.notify(); return; }
+                    let l = ev.position - bounds.origin;
+                    (drag.portamento_ms, drag.delay_permille, drag.depth_cents) = drag.sample_values(ed, f64::from(l.x), f64::from(l.y));
                     let ids: Vec<NoteId> = if ed.session.selection.contains(&drag.note_id) {
                         ed.session.selection_in_order(ed.project())
                     } else {
@@ -867,12 +873,9 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
             return;
         }
         e.update(cx, |ed, cx| {
-            if ed.note_creation.as_ref().is_some_and(|c| c.pointer == PointerId::Mouse) {
-                let l = ev.position - bounds.origin;
-                pointer_move(ed, PointerId::Mouse, l.x.as_f32() as f64, l.y.as_f32() as f64, mods(&ev.modifiers), window, cx);
-            }
             if ed.note_creation.as_ref().is_some_and(|c|c.pointer==PointerId::Mouse) || matches!(ed.session.pointer_owner(), Some(PointerId::Mouse)) {
-                pointer_up(ed, PointerId::Mouse, window, cx)
+                let l = ev.position - bounds.origin;
+                pointer_up(ed, PointerId::Mouse, f64::from(l.x), f64::from(l.y), mods(&ev.modifiers), window, cx)
             }
         });
     });
@@ -882,7 +885,9 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     let h = hitbox.clone();
     let e = editor.clone();
     window.on_mouse_event(move |ev: &TouchDragEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble {
+        // Pitch strokes use the compiled root's MoveGestureLease for both
+        // mouse and touch; this path owns note/pencil gestures only.
+        if phase != DispatchPhase::Bubble || e.read(cx).tool == Tool::Pitch {
             return;
         }
         let l = ev.position - bounds.origin;
@@ -913,13 +918,8 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                 }
             }),
             TouchPhase::Ended => e.update(cx, |ed, cx| {
-                if ed.note_creation.as_ref().is_some_and(|c| c.pointer == PointerId::Touch(0))
-                    || ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == PointerId::Touch(0) && s.roll)
-                {
-                    pointer_move(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
-                }
                 if ed.note_creation.as_ref().is_some_and(|c|c.pointer==PointerId::Touch(0)) || matches!(ed.session.pointer_owner(), Some(PointerId::Touch(0))) || ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == PointerId::Touch(0) && s.roll) {
-                    pointer_up(ed, PointerId::Touch(0), window, cx);
+                    pointer_up(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
                 }
             }),
             TouchPhase::Cancelled => e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx)),
@@ -928,7 +928,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     let h = hitbox.clone();
     let e = editor.clone();
     window.on_mouse_event(move |ev: &LongPressEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble {
+        if phase != DispatchPhase::Bubble || e.read(cx).tool == Tool::Pitch {
             return;
         }
         let l = ev.position - bounds.origin;
@@ -961,7 +961,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                                     click_count: 1,
                                 },
                             );
-                            ed.apply_effects(fx, window, cx);
+                            ed.apply_pointer_effects(fx, h.id, window, cx);
                         }
                     }
                 });
@@ -973,7 +973,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
             }),
             TouchPhase::Ended => e.update(cx, |ed, cx| {
                 if matches!(ed.session.pointer_owner(), Some(PointerId::Touch(_))) {
-                    pointer_up(ed, PointerId::Touch(0), window, cx);
+                    pointer_up(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
                 }
             }),
             TouchPhase::Cancelled => e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx)),
@@ -1000,7 +1000,7 @@ pub(crate) fn begin_pitch_stroke(
     cx: &mut gpui::Context<Editor>,
 ) -> bool {
     if ed.tool != Tool::Pitch || ed.note_creation.is_some() || ed.session.pointer_owner().is_some()
-        || ed.lane_stroke.is_some() || ed.mixer_drag.is_some()
+        || ed.lane_stroke.is_some() || ed.mixer_drag.is_some() || ed.device_drag.is_some()
     {
         return false;
     }
@@ -1035,10 +1035,11 @@ fn pointer_down(
     cx: &mut gpui::Context<Editor>,
 ) {
     if ed.tool == Tool::Pitch {
-        if begin_pitch_stroke(ed, pointer, x, y, window, cx) { window.capture_pointer(h.id); }
+        if begin_pitch_stroke(ed, pointer, x, y, window, cx) { ed.capture_roll_pointer(h.id, window, cx); }
         return;
     }
-    if ed.note_creation.is_some() || ed.session.pointer_owner().is_some() || ed.lane_stroke.is_some() || ed.mixer_drag.is_some() { return; }
+    if ed.note_creation.is_some() || ed.session.pointer_owner().is_some() || ed.lane_stroke.is_some()
+        || ed.mixer_drag.is_some() || ed.device_drag.is_some() { return; }
     if ed.lyric.is_some() {
         ed.end_lyric(true, None, window, cx);
         if ed.lyric.is_some() { return; }
@@ -1071,16 +1072,13 @@ fn pointer_down(
             // Zero is an armed preview only; finish_note_draw refuses it.
             let note = Note::new(start, 0, (music.pitch.floor() as i32).clamp(0,127));
             ed.note_creation = Some(crate::editor::workflow::NoteCreation { pointer, base: ed.revision(), origin_tick: start, note });
-            window.capture_pointer(h.id); cx.notify(); return;
+            ed.capture_roll_pointer(h.id, window, cx); cx.notify(); return;
         }
         _ => {}
     }
     let fx =
         ed.session.handle_pointer(&p, ed.revision(), pointer, InputEvent::PointerDown { hit, music, screen: (x, y), mods: m, click_count: clicks });
-    if fx.contains(&Effect::CapturePointer) {
-        window.capture_pointer(h.id);
-    }
-    ed.apply_effects(fx, window, cx);
+    ed.apply_pointer_effects(fx, h.id, window, cx);
 }
 
 fn pointer_move(ed: &mut Editor, pointer: PointerId, mut x: f64, y: f64, m: Modifiers, window: &mut Window, cx: &mut gpui::Context<Editor>) {
@@ -1120,10 +1118,15 @@ fn pointer_move(ed: &mut Editor, pointer: PointerId, mut x: f64, y: f64, m: Modi
     ed.apply_effects(fx, window, cx);
 }
 
-fn pointer_up(ed: &mut Editor, pointer: PointerId, window: &mut Window, cx: &mut gpui::Context<Editor>) {
+#[allow(clippy::too_many_arguments)]
+fn pointer_up(ed: &mut Editor, pointer: PointerId, x: f64, y: f64, mods: Modifiers, window: &mut Window, cx: &mut gpui::Context<Editor>) {
+    if ed.note_creation.as_ref().is_some_and(|c| c.pointer == pointer)
+        || ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && s.roll) {
+        pointer_move(ed, pointer, x, y, mods, window, cx);
+    }
     if ed.note_creation.as_ref().is_some_and(|c|c.pointer==pointer){
         let creation = ed.note_creation.take().expect("owned creation");
-        window.release_pointer();
+        ed.release_roll_capture(window, cx);
         let id = creation.note.id.clone();
         if let Some(batch) = verdant_domain::editing::finish_note_draw(ed.session.track.clone(), Some(creation.note)) {
             if ed.commit(creation.base, batch, cx) { ed.session.selection = [id].into(); }
@@ -1132,11 +1135,11 @@ fn pointer_up(ed: &mut Editor, pointer: PointerId, window: &mut Window, cx: &mut
         return;
     }
     if ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && s.roll) {
-        window.release_pointer(); ed.commit_roll_pitch(cx); return;
+        ed.release_roll_capture(window, cx); ed.commit_roll_pitch(cx); return;
     }
     let p = ed.store().snapshot();
-    let fx = ed.session.handle_pointer(&p, ed.revision(), pointer, InputEvent::PointerUp);
-    window.release_pointer();
+    let music = ed.session.viewport.to_music(x, y);
+    let fx = ed.session.handle_pointer(&p, ed.revision(), pointer, InputEvent::PointerUpAt { music, screen: (x, y), mods });
     ed.apply_effects(fx, window, cx);
 }
 
@@ -1147,7 +1150,7 @@ fn cancel(ed: &mut Editor, pointer: PointerId, reason: CancelReason, window: &mu
     if !owns { return; }
     if ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer) { ed.lane_stroke = None; }
     let fx = ed.session.handle_pointer(&p, ed.revision(), pointer, InputEvent::Cancel(reason));
-    window.release_pointer();
+    ed.release_roll_capture(window, cx);
     ed.apply_effects(fx, window, cx);
 }
 

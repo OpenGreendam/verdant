@@ -15,10 +15,92 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux:
+  proto-retained:
+    name: Proto-UI retained artifacts and regression tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.32.1'
+      - name: Install locked producer dependencies
+        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
+      - name: Check retained artifacts without an upstream checkout
+        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
+      - name: Regress TOML, pin, and publication boundaries
+        run: pnpm --dir frontend/proto-ui test
+
+  proto-fresh:
+    name: Proto-UI fresh pinned compilation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      - name: Read the compiler pin
+        id: compiler-pin
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const pin = JSON.parse(readFileSync('frontend/proto-ui/compiler.pin.json', 'utf8'));
+          if (pin.upstream.repository !== 'https://github.com/Proto-UI/Proto-UI'
+            || !/^[0-9a-f]{40}$/.test(pin.upstream.revision)
+            || !/^pnpm@\d+\.\d+\.\d+$/.test(pin.packageVersions.packageManager)) {
+            throw new Error('Unsupported compiler repository, revision, or package-manager pin');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT,
+            `revision=${pin.upstream.revision}\npnpm=${pin.packageVersions.packageManager.slice(5)}\n`);
+          JS
+      - uses: actions/checkout@v4
+        with:
+          repository: Proto-UI/Proto-UI
+          ref: ${{ steps.compiler-pin.outputs.revision }}
+          path: .ci/proto-ui-upstream
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ steps.compiler-pin.outputs.pnpm }}
+      - name: Install full pinned compiler and producer dependency closures
+        run: |
+          pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
+          pnpm --dir .ci/proto-ui-upstream install --frozen-lockfile --ignore-scripts
+      - name: Recompile every unit with the pinned compiler
+        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check --upstream .ci/proto-ui-upstream
+      - name: Verify source-graph changes and producer boundaries
+        env:
+          PROTO_UI_UPSTREAM: ${{ github.workspace }}/.ci/proto-ui-upstream
+        run: pnpm --dir frontend/proto-ui test
+      - name: Prepare a native consumer source-mutation experiment
+        run: node frontend/proto-ui/tools/check-native-source-mutation.mjs --prepare .ci/proto-ui-source-mutation --upstream .ci/proto-ui-upstream
+      - name: Pass verbatim compiler outputs to the native Rust lane
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-ui-source-mutation-fixtures
+          path: .ci/proto-ui-source-mutation/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  linux:
+    needs: [proto-retained, proto-fresh]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.32.1'
+      - name: Install locked retained-artifact checker
+        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: proto-ui-source-mutation-fixtures
+          path: .ci/proto-ui-source-mutation
       - uses: actions/cache@v4
         with:
           path: |
@@ -29,16 +111,35 @@ jobs:
           restore-keys: ${{ runner.os }}-verdant-
       - name: Build the development image
         run: docker build --tag verdant-dev --file frontend/Dockerfile frontend
-      - name: Test, compile, check generated output, and package
+      - name: Validate retained artifacts, resolve Cargo identities, build, test, and package
         run: |
           mkdir -p .ci/cargo .ci/target
           docker run --rm --memory=8g --cpus=2 \
             --mount type=bind,src="$PWD",dst=/workspace \
             --mount type=bind,src="$PWD/.ci/cargo",dst=/cargo-cache \
             --mount type=bind,src="$PWD/.ci/target",dst=/build \
+            --env VERDANT_PROTO_UI_MODE=retained \
             --env CARGO_HOME=/cargo-cache --env GIT_CONFIG_COUNT=1 \
             --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/workspace verdant-dev \
             sh /workspace/tools/check_frontend.sh
+      - name: Execute baseline and mutated source in compiled Rust consumers
+        run: |
+          docker run --rm --memory=8g --cpus=2 \
+            --mount type=bind,src="$PWD",dst=/workspace \
+            --mount type=bind,src="$PWD/.ci/cargo",dst=/cargo-cache \
+            --mount type=bind,src="$PWD/.ci/target",dst=/build \
+            --env CARGO_HOME=/cargo-cache --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/workspace verdant-dev \
+            node /workspace/frontend/proto-ui/tools/check-native-source-mutation.mjs --run /workspace/.ci/proto-ui-source-mutation
+      - name: Retain native source-mutation observations
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-ui-native-source-mutation
+          path: |
+            .ci/proto-ui-source-mutation/experiment.json
+            .ci/proto-ui-source-mutation/result.json
+            .ci/proto-ui-source-mutation/*-cargo-graph.json
+          if-no-files-found: error
       - name: Retain the guarded Linux package
         uses: actions/upload-artifact@v4
         with:
@@ -47,8 +148,15 @@ jobs:
             .ci/target/package-smoke.*/*.tar.gz
             .ci/target/package-smoke.*/*.sha256
           if-no-files-found: error
+      - name: Retain Cargo graph evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-ui-cargo-linux
+          path: .ci/target/proto-ui-gpui-graph.json
+          if-no-files-found: error
 
   native:
+    needs: [proto-retained, proto-fresh]
     strategy:
       fail-fast: false
       matrix:
@@ -66,9 +174,30 @@ jobs:
         if: runner.os == 'Windows'
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.32.1'
+      - name: Install locked retained-artifact checker
+        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
+      - name: Validate retained Proto-UI artifacts on this platform
+        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
       - name: Fetch locked build inputs
         working-directory: frontend
         run: cargo fetch --locked
+      - name: Check complete Cargo GPUI and shared SDK identities
+        run: |
+          mkdir -p .ci
+          node frontend/proto-ui/tools/check-cargo-gpui.mjs --offline > .ci/proto-ui-gpui-graph.json
+          cat .ci/proto-ui-gpui-graph.json
+      - name: Retain Cargo graph evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-ui-cargo-${{ matrix.target }}
+          path: .ci/proto-ui-gpui-graph.json
+          if-no-files-found: error
       - name: Build and test native executables
         working-directory: frontend
         env:
@@ -76,6 +205,9 @@ jobs:
         run: |
           cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
           cargo test --offline --locked --release -p verdant-app --bin verdant theme::tests
+          cargo test --offline --locked --release -p verdant-ui-protocol -p verdant-session
+          cargo test --offline --locked --release -p verdant-app --bin verdant host_pointer::tests
+          cargo test --offline --locked --release -p verdant-app --bin verdant proto_knob::tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
           if [ "$RUNNER_OS" = Windows ]; then
             cargo test --offline --locked --release -p verdant-cli windows_path_tests

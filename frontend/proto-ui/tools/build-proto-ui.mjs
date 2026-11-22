@@ -1,437 +1,322 @@
 #!/usr/bin/env node
-// Verdant Proto UI compiler producer.
+// Compile the pinned source graph into verbatim compiler-owned Rust artifacts.
 //
-// Compiles one authored Proto UI unit with the pinned upstream Proto UI
-// compiler and publishes the compiler-owned artifact set into the pinned
-// output directory. The generated Rust is copied verbatim: this producer never
-// rewrites compiler output.
+// --check requires a fresh pinned compilation; --check-retained proves only the
+// retained input/artifact/receipt bindings and never reports fresh compilation.
+// All offline checks precede upstream discovery, in both modes.
 //
-// The producer refuses every upstream source state other than the one named by
-// the explicit pin, and it admits only artifact sets that inherit a single
-// GPUI dependency from the embedding Cargo workspace.
+// Usage: node frontend/proto-ui/tools/build-proto-ui.mjs
+//   [--pin <file>] [--upstream <dir>] [--check | --check-retained]
+//   [--recover-publication]
 //
-// Usage:
-//   node frontend/proto-ui/tools/build-proto-ui.mjs [--pin <file>] [--upstream <dir>] [--source <file>]
-//        [--out <dir>] [--receipt <file>] [--check]
-//
-// Exit codes:
-//   0  artifacts published, or the published artifacts match a fresh compilation
-//   2  the upstream revision differs from the pin
-//   3  the upstream source state differs from the pin
-//   4  the pin or an argument is invalid
-//   5  the compiler toolchain is unavailable
-//   6  the compiler rejected the authored source
-//   7  the published artifacts differ from a fresh compilation
-//   8  the emitted artifacts are not a single-workspace GPUI artifact set
-//   9  refused to replace a directory that is not a compiler artifact set
-//  10  the pinned upstream checkout is absent
-//  11  no published artifacts exist yet
+// Exit: 0 success; 2 upstream revision; 3 upstream source state; 4 invalid pin;
+// 5 unavailable/inexact toolchain; 6 compiler rejection; 7 retained/fresh drift;
+// 8 GPUI/SDK admission; 9 unsafe publication/lock; 10 absent upstream;
+// 11 absent retained artifacts. Exit 10 is a failure, never a successful check.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { findWorkspaceGpuiViolations } from './lib/workspace-gpui.mjs';
+import { findWorkspaceGpuiViolations, parseCargoManifest, readWorkspaceGpuiIdentity } from './lib/workspace-gpui.mjs';
+import { acquireProducerLock, assertOwnedInventory, insidePath, publishBatch, recoverPublication } from './lib/artifact-publication.mjs';
 
-const EXIT = {
-  ok: 0,
-  revision: 2,
-  sourceState: 3,
-  pin: 4,
-  toolchain: 5,
-  compile: 6,
-  drift: 7,
-  admission: 8,
-  replace: 9,
-  upstreamAbsent: 10,
-  artifactsAbsent: 11,
-};
-
-class ProducerError extends Error {
-  constructor(code, message) {
-    super(message);
-    this.code = code;
-  }
+export const EXIT = { ok: 0, revision: 2, sourceState: 3, pin: 4, toolchain: 5, compile: 6, drift: 7, admission: 8, replace: 9, upstreamAbsent: 10, artifactsAbsent: 11 };
+export class ProducerError extends Error {
+  constructor(code, message) { super(message); this.code = code; }
+}
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const defaultRoot = path.resolve(scriptDirectory, '../../..');
+const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+const slash = (value) => value.split(path.sep).join('/');
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const artifactText = (artifacts, filename) => artifacts.find((artifact) => artifact.path === filename)?.contents;
+const json = (filename) => JSON.parse(readFileSync(filename, 'utf8'));
+const artifactJson = (artifacts, filename) => JSON.parse(artifactText(artifacts, filename));
+const fail = (code, message) => { throw new ProducerError(code, message); };
+function checked(code, work) {
+  try { return work(); } catch (error) { if (error instanceof ProducerError) throw error; fail(code, error.message); }
 }
 
-const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(scriptDirectory, '../../..');
-const sha256 = (value) => createHash('sha256').update(value).digest('hex');
-
-function parseArguments(argv) {
-  const options = {
-    pin: path.join(repoRoot, 'frontend/proto-ui/compiler.pin.json'),
-    check: false,
-  };
+export function parseArguments(argv, root = defaultRoot) {
+  const options = { pin: path.join(root, 'frontend/proto-ui/compiler.pin.json'), mode: 'publish' };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    const next = () => {
-      index += 1;
-      const value = argv[index];
-      if (typeof value !== 'string' || value === '') {
-        throw new ProducerError(EXIT.pin, `${argument} needs a value.`);
-      }
-      return value;
+    const value = () => {
+      const next = argv[++index];
+      if (!next || next.startsWith('--')) fail(EXIT.pin, `${argument} needs a value.`);
+      return path.resolve(next);
     };
-    if (argument === '--check') options.check = true;
-    else if (argument === '--pin') options.pin = path.resolve(next());
-    else if (argument === '--upstream') options.upstream = path.resolve(next());
-    else if (argument === '--source') options.source = path.resolve(next());
-    else if (argument === '--out') options.out = path.resolve(next());
-    else if (argument === '--receipt') options.receipt = path.resolve(next());
-    else throw new ProducerError(EXIT.pin, `Unknown argument: ${argument}`);
+    if (argument === '--pin') options.pin = value();
+    else if (argument === '--upstream') options.upstream = value();
+    else if (['--check', '--check-retained', '--recover-publication'].includes(argument)) {
+      if (options.mode !== 'publish') fail(EXIT.pin, 'Choose one producer mode.');
+      options.mode = argument.slice(2);
+    } else fail(EXIT.pin, `Unknown argument: ${argument}`);
   }
   return options;
 }
 
-function loadPin(file) {
-  let pin;
-  try {
-    pin = JSON.parse(readFileSync(file, 'utf8'));
-  } catch (error) {
-    throw new ProducerError(EXIT.pin, `Unreadable pin ${file}: ${error.message}`);
+export function loadPin(filename, root = defaultRoot) {
+  const pin = checked(EXIT.pin, () => json(filename));
+  if (pin?.schema !== 'verdant.proto-ui.compiler-pin.v2') fail(EXIT.pin, `Unsupported pin schema: ${pin?.schema}`);
+  for (const [label, value] of [['upstream.revision', pin.upstream?.revision], ['gpu.workspaceGpuiRevision', pin.gpu?.workspaceGpuiRevision], ['gpu.upstreamGpuiRevision', pin.gpu?.upstreamGpuiRevision]]) {
+    if (!/^[0-9a-f]{40}$/.test(value ?? '')) fail(EXIT.pin, `Pin ${label} must be a full 40-hex revision.`);
   }
-  const requireRevision = (value, label) => {
-    if (typeof value !== 'string' || !/^[0-9a-f]{40}$/.test(value)) {
-      throw new ProducerError(EXIT.pin, `Pin ${label} is not a full 40-hex revision: ${value}`);
-    }
-  };
-  if (!pin || typeof pin !== 'object') throw new ProducerError(EXIT.pin, 'The pin is not an object.');
-  if (pin.schema !== 'verdant.proto-ui.compiler-pin.v1') {
-    throw new ProducerError(EXIT.pin, `Unsupported pin schema: ${pin.schema}`);
+  if (typeof pin.upstream.repository !== 'string' || !pin.upstream.repository.startsWith('https://')) fail(EXIT.pin, 'Pin upstream.repository must be an HTTPS URL.');
+  if (pin.target?.profile !== 'gpui-source-v1' || pin.target.gpuiDependency !== 'workspace') fail(EXIT.pin, 'Only the workspace GPUI source profile is admitted.');
+  if (!pin.gpu.workspace || pin.gpu.workspace.name !== 'gpui' || pin.gpu.workspace.rev !== pin.gpu.workspaceGpuiRevision || typeof pin.gpu.workspace.git !== 'string' || !Array.isArray(pin.gpu.workspace.features) || typeof pin.gpu.workspace.defaultFeatures !== 'boolean') fail(EXIT.pin, 'Pin must describe the complete workspace GPUI identity.');
+  if (!/^pnpm@\d+\.\d+\.\d+$/.test(pin.packageVersions?.packageManager ?? '') || pin.packageVersions.nodeEngine !== '24.x') fail(EXIT.pin, 'Pin requires Node 24.x and an exact pnpm version.');
+  if (!/^[0-9a-f]{64}$/.test(pin.toolchain?.lockSha256 ?? '') || !pin.toolchain.packages?.typescript || !pin.toolchain.packages?.tsx) fail(EXIT.pin, 'Pin must bind the upstream lockfile and executed compiler package versions.');
+  if (!Array.isArray(pin.units) || pin.units.length === 0) fail(EXIT.pin, 'Pin has no compilation units.');
+  const names = new Set();
+  const outputs = [];
+  const receipts = new Set();
+  for (const unit of pin.units) {
+    if (!/^[a-z][a-z0-9-]*$/.test(unit.name) || names.has(unit.name)) fail(EXIT.pin, `Invalid or duplicate unit: ${unit.name}`);
+    names.add(unit.name);
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(unit.componentName)) fail(EXIT.pin, `Invalid component name: ${unit.componentName}`);
+    checked(EXIT.pin, () => {
+      insidePath(root, unit.source);
+      insidePath(root, unit.output?.directory);
+      insidePath(root, unit.output?.receipt);
+    });
+    if (!unit.source.startsWith('frontend/proto-ui/src/') || !unit.source.endsWith('.proto.ts')) fail(EXIT.pin, `Unit source must be an authored Proto UI entry: ${unit.source}`);
+    if (!unit.output.directory.startsWith('frontend/proto-ui/generated/') || !unit.output.receipt.startsWith('frontend/proto-ui/receipts/')) fail(EXIT.pin, 'Unit outputs and receipts must stay in their dedicated directories.');
+    if (outputs.some((output) => output === unit.output.directory || output.startsWith(`${unit.output.directory}/`) || unit.output.directory.startsWith(`${output}/`)) || receipts.has(unit.output.receipt)) fail(EXIT.pin, 'Compilation outputs overlap.');
+    outputs.push(unit.output.directory); receipts.add(unit.output.receipt);
   }
-  if (!pin.upstream || typeof pin.upstream.repository !== 'string') {
-    throw new ProducerError(EXIT.pin, 'The pin does not name an upstream repository.');
-  }
-  requireRevision(pin.upstream.revision, 'upstream.revision');
-  requireRevision(pin.gpu?.workspaceGpuiRevision, 'gpu.workspaceGpuiRevision');
-  requireRevision(pin.gpu?.upstreamGpuiRevision, 'gpu.upstreamGpuiRevision');
-  if (pin.target?.profile !== 'gpui-source-v1') {
-    throw new ProducerError(EXIT.pin, `Unsupported target profile: ${pin.target?.profile}`);
-  }
-  if (pin.target?.gpuiDependency !== 'workspace') {
-    throw new ProducerError(EXIT.pin, 'The pin must request the workspace GPUI dependency.');
-  }
-  for (const key of ['source', 'output.directory', 'output.receipt']) {
-    const value = key.split('.').reduce((node, part) => node?.[part], pin);
-    if (typeof value !== 'string' || value === '') {
-      throw new ProducerError(EXIT.pin, `The pin does not name ${key}.`);
+  const sdk = pin.sharedSdk;
+  if (!sdk || !names.has(sdk.owner) || sdk.package !== 'proto-ui-gpui-native' || !/^\d+\.\d+\.\d+$/.test(sdk.version) || !Array.isArray(sdk.features) || !/^[0-9a-f]{64}$/.test(sdk.contentSha256)) fail(EXIT.pin, 'Pin must bind the shared native SDK owner, ABI and content.');
+  checked(EXIT.pin, () => insidePath(root, sdk.directory));
+  const owner = pin.units.find((unit) => unit.name === sdk.owner);
+  for (const unit of pin.units) {
+    if (unit === owner) {
+      if (unit.nativeSdkPath !== undefined) fail(EXIT.pin, 'The SDK owner must emit its SDK.');
+    } else {
+      const expected = slash(path.relative(path.resolve(root, unit.output.directory), path.resolve(root, owner.output.directory, sdk.directory)));
+      if (unit.nativeSdkPath !== expected) fail(EXIT.pin, `${unit.name} must reference its pinned shared SDK owner at ${expected}.`);
     }
   }
   return pin;
 }
 
 function git(upstream, args) {
-  try {
-    return execFileSync('git', ['-C', upstream, ...args], { encoding: 'utf8' }).trim();
-  } catch (error) {
-    throw new ProducerError(EXIT.sourceState, `git ${args.join(' ')} failed in ${upstream}: ${error.message}`);
-  }
+  return checked(EXIT.sourceState, () => execFileSync('git', ['-C', upstream, ...args], { encoding: 'utf8' }).trim());
 }
-
 function verifyUpstreamSource(upstream, pin) {
   const head = git(upstream, ['rev-parse', 'HEAD']);
-  if (head !== pin.upstream.revision) {
-    throw new ProducerError(
-      EXIT.revision,
-      `The pinned upstream revision ${pin.upstream.revision} is not the checked-out revision ${head}. ` +
-        'Point the pin at the revision that is actually checked out, or check out the pinned revision.',
-    );
-  }
+  if (head !== pin.upstream.revision) fail(EXIT.revision, `Pinned upstream ${pin.upstream.revision} differs from checkout ${head}.`);
   const modified = git(upstream, ['status', '--porcelain', '--untracked-files=all']);
-  if (modified) {
-    throw new ProducerError(EXIT.sourceState, `The pinned compiler checkout has local changes:\n${modified}`);
-  }
+  if (modified) fail(EXIT.sourceState, `Pinned compiler checkout has local changes:\n${modified}`);
 }
 
-function verifyPackageVersions(upstream, pin) {
-  const version = readFileSync(path.join(upstream, 'VERSION'), 'utf8').trim();
-  if (version !== pin.packageVersions.protoUi) {
-    throw new ProducerError(
-      EXIT.sourceState,
-      `The upstream package version ${version} does not match the pinned ${pin.packageVersions.protoUi}.`,
-    );
-  }
-  const manifest = JSON.parse(readFileSync(path.join(upstream, 'package.json'), 'utf8'));
-  if (manifest.packageManager !== pin.packageVersions.packageManager) {
-    throw new ProducerError(
-      EXIT.sourceState,
-      `The upstream package manager ${manifest.packageManager} does not match the pinned ${pin.packageVersions.packageManager}.`,
-    );
-  }
-  if (manifest.engines?.node !== pin.packageVersions.nodeEngine) {
-    throw new ProducerError(
-      EXIT.sourceState,
-      `The upstream Node engine ${manifest.engines?.node} does not match the pinned ${pin.packageVersions.nodeEngine}.`,
-    );
-  }
+export function verifyToolchain(upstream, pin) {
+  if (!process.version.startsWith('v24.') || typeof process.features.typescript !== 'string') fail(EXIT.toolchain, `Node ${process.version} does not satisfy pinned Node 24.x TypeScript execution.`);
+  const manifest = checked(EXIT.sourceState, () => json(path.join(upstream, 'package.json')));
+  if (readFileSync(path.join(upstream, 'VERSION'), 'utf8').trim() !== pin.packageVersions.protoUi || manifest.packageManager !== pin.packageVersions.packageManager || manifest.engines?.node !== pin.packageVersions.nodeEngine) fail(EXIT.sourceState, 'Upstream version/package-manager/Node declarations differ from the compiler pin.');
+  const lock = readFileSync(path.join(upstream, 'pnpm-lock.yaml'));
+  if (sha256(lock) !== pin.toolchain.lockSha256) fail(EXIT.sourceState, 'Upstream lockfile content differs from the compiler pin.');
+  return checked(EXIT.toolchain, () => {
+    const require = createRequire(path.join(upstream, 'package.json'));
+    const compilerRequire = createRequire(path.join(upstream, 'packages/compiler/package.json'));
+    const installed = {
+      typescript: JSON.parse(readFileSync(compilerRequire.resolve('typescript/package.json'), 'utf8')).version,
+      tsx: JSON.parse(readFileSync(require.resolve('tsx/package.json'), 'utf8')).version,
+    };
+    if (!same(installed, pin.toolchain.packages)) throw new Error(`Executed compiler packages ${JSON.stringify(installed)} differ from pinned ${JSON.stringify(pin.toolchain.packages)}.`);
+    const installedLock = readFileSync(path.join(upstream, 'node_modules/.pnpm/lock.yaml'));
+    if (!lock.equals(installedLock)) throw new Error('Installed dependency lock differs from pnpm-lock.yaml; run a full pnpm install --frozen-lockfile.');
+    const modules = require('yaml').parse(readFileSync(path.join(upstream, 'node_modules/.modules.yaml'), 'utf8'));
+    if (modules.packageManager !== pin.packageVersions.packageManager) throw new Error(`Installed dependencies were produced by ${modules.packageManager}, expected ${pin.packageVersions.packageManager}.`);
+    let manager;
+    let runner = 'pnpm';
+    try {
+      manager = execFileSync('pnpm', ['--version'], { cwd: upstream, encoding: 'utf8' }).trim();
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    // CI may install the exact executable directly. Do not force Corepack to
+    // download a redundant copy during an otherwise offline verification.
+    if (`pnpm@${manager}` !== pin.packageVersions.packageManager) {
+      manager = execFileSync('corepack', [pin.packageVersions.packageManager, '--version'], { cwd: upstream, encoding: 'utf8' }).trim();
+      runner = `corepack ${pin.packageVersions.packageManager}`;
+    }
+    if (`pnpm@${manager}` !== pin.packageVersions.packageManager) throw new Error(`Executed pnpm ${manager} differs from ${pin.packageVersions.packageManager}.`);
+    return { node: process.version, packageManager: `pnpm@${manager}`, runner, packages: installed, lockSha256: sha256(installedLock) };
+  });
 }
 
-function verifyToolchain(upstream) {
-  if (typeof process.features.typescript !== 'string') {
-    throw new ProducerError(
-      EXIT.toolchain,
-      `Node ${process.version} cannot run TypeScript sources at all; use Node 24 or newer.`,
-    );
-  }
-  const require = createRequire(path.join(upstream, 'packages/compiler/package.json'));
+function verifyWorkspace(root, pin) {
+  const manifest = checked(EXIT.admission, () => readFileSync(path.join(root, 'frontend/Cargo.toml'), 'utf8'));
+  const identity = checked(EXIT.admission, () => readWorkspaceGpuiIdentity(manifest));
+  if (!same(identity, pin.gpu.workspace)) fail(EXIT.admission, `frontend/Cargo.toml GPUI identity ${JSON.stringify(identity)} differs from pin ${JSON.stringify(pin.gpu.workspace)}.`);
+  return manifest;
+}
+
+const records = (artifacts) => artifacts.map((artifact) => ({ path: artifact.path, kind: artifact.kind, sha256: sha256(artifact.contents) })).sort((a, b) => a.path.localeCompare(b.path));
+function sdkIdentity(pin, ownerArtifacts) {
+  const artifacts = records(ownerArtifacts).filter((artifact) => artifact.path.startsWith(`${pin.sharedSdk.directory}/`));
+  const contentSha256 = sha256(JSON.stringify(artifacts));
+  if (contentSha256 !== pin.sharedSdk.contentSha256) fail(EXIT.admission, 'Shared SDK content differs from its pinned identity.');
+  const sdkManifest = artifactText(ownerArtifacts, `${pin.sharedSdk.directory}/Cargo.toml`);
+  const manifest = checked(EXIT.admission, () => parseCargoManifest(sdkManifest));
+  if (manifest.package?.name !== pin.sharedSdk.package || manifest.package?.version !== pin.sharedSdk.version) fail(EXIT.admission, 'Shared SDK package/ABI version differs from the pin.');
+  for (const feature of pin.sharedSdk.features) if (!Object.hasOwn(manifest.features ?? {}, feature)) fail(EXIT.admission, `Shared SDK is missing ABI feature ${feature}.`);
+  return { ...pin.sharedSdk, contentSha256 };
+}
+
+function verifyUnitAdmission(pin, unit, artifacts, ownerArtifacts, workspaceManifest, root) {
+  const sdkManifest = artifactText(ownerArtifacts, `${pin.sharedSdk.directory}/Cargo.toml`);
+  const violations = findWorkspaceGpuiViolations({ crateManifest: artifactText(artifacts, 'Cargo.toml'), sdkManifest, provenance: artifactJson(artifacts, 'provenance.json'), workspaceManifest });
+  if (violations.length) fail(EXIT.admission, `${unit.name}:\n${violations.join('\n')}`);
+  const manifest = parseCargoManifest(artifactText(artifacts, 'Cargo.toml'));
+  const dependency = manifest.dependencies?.[pin.sharedSdk.package];
+  const owner = pin.units.find((entry) => entry.name === pin.sharedSdk.owner);
+  const actualSdk = path.resolve(root, unit.output.directory, dependency?.path ?? '');
+  const expectedSdk = path.resolve(root, owner.output.directory, pin.sharedSdk.directory);
+  if (actualSdk !== expectedSdk || dependency?.version !== `=${pin.sharedSdk.version}` || !same([...(dependency.features ?? [])].sort(), [...pin.sharedSdk.features].sort())) fail(EXIT.admission, `${unit.name} does not link the pinned shared SDK path/version/ABI features.`);
+  if (unit.name !== owner.name && artifacts.some((artifact) => artifact.path.startsWith(`${pin.sharedSdk.directory}/`))) fail(EXIT.admission, `${unit.name} must not copy the shared SDK.`);
+}
+
+function receiptFor(pin, unit, artifacts, inputs, sharedSdk) {
+  return {
+    schema: 'verdant.proto-ui.receipt.v2', unit: unit.name, source: unit.source,
+    sourceInputs: inputs, upstream: pin.upstream, packageVersions: pin.packageVersions,
+    toolchainRequirements: pin.toolchain, target: { ...pin.target, componentName: unit.componentName, ...(unit.nativeSdkPath ? { nativeSdkPath: unit.nativeSdkPath } : {}) },
+    gpu: pin.gpu, sharedSdk, artifacts: records(artifacts),
+  };
+}
+function readInput(root, input) {
+  const filename = insidePath(root, input.path);
   try {
-    require.resolve('typescript');
-  } catch {
-    throw new ProducerError(
-      EXIT.toolchain,
-      `The pinned upstream checkout has no installed compiler dependencies. Install them with ` +
-        `pnpm install --frozen-lockfile in ${upstream}.`,
-    );
-  }
-  try {
-    createRequire(path.join(upstream, 'package.json')).resolve('tsx/esm/api');
-  } catch {
-    throw new ProducerError(
-      EXIT.toolchain,
-      `The pinned upstream checkout has no TypeScript loader. Install it with ` +
-        `pnpm install --frozen-lockfile in ${upstream}.`,
-    );
+    const canonical = realpathSync(filename);
+    const relative = slash(path.relative(root, canonical));
+    insidePath(root, relative);
+    return sha256(readFileSync(filename));
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null;
+    throw error;
   }
 }
 
-function readWorkspaceGpuiRevision() {
-  const manifest = readFileSync(path.join(repoRoot, 'frontend/Cargo.toml'), 'utf8');
-  const match = /^\s*gpui\s*=\s*\{[^}]*rev\s*=\s*"([0-9a-f]{40})"/m.exec(manifest);
-  if (!match) throw new ProducerError(EXIT.admission, 'frontend/Cargo.toml does not pin a gpui revision.');
-  return match[1];
+function verifyRetained(root, pin, workspaceManifest) {
+  const retained = pin.units.map((unit) => checked(EXIT.drift, () => {
+    const outDirectory = insidePath(root, unit.output.directory);
+    const receiptPath = insidePath(root, unit.output.receipt);
+    if (!existsSync(outDirectory) || !existsSync(receiptPath)) fail(EXIT.artifactsAbsent, `Retained artifacts/receipt are absent for ${unit.name}.`);
+    assertOwnedInventory(outDirectory, receiptPath, root);
+    const receipt = json(receiptPath);
+    if (receipt.schema !== 'verdant.proto-ui.receipt.v2' || !Array.isArray(receipt.sourceInputs) || receipt.sourceInputs.length === 0) fail(EXIT.drift, `${unit.name} needs a v2 source-graph receipt.`);
+    const inputs = receipt.sourceInputs;
+    if (new Set(inputs.map((input) => input.path)).size !== inputs.length || !inputs.some((input) => input.path === unit.source && typeof input.sha256 === 'string')) fail(EXIT.drift, `${unit.name} source-input inventory is invalid.`);
+    for (const input of inputs) if (input.sha256 !== readInput(root, input)) fail(EXIT.drift, `Retained source/resolution input changed: ${input.path}`);
+    const artifacts = receipt.artifacts.map((artifact) => ({ path: artifact.path, kind: artifact.kind, contents: readFileSync(insidePath(outDirectory, artifact.path), 'utf8') }));
+    for (const required of ['Component.rs', 'Cargo.toml', 'provenance.json']) if (!artifacts.some((artifact) => artifact.path === required)) fail(EXIT.drift, `Required artifact missing: ${unit.name}/${required}`);
+    const provenance = artifactJson(artifacts, 'provenance.json');
+    for (const source of provenance.sourceFiles ?? []) {
+      if (!inputs.some((input) => input.path === source.file && input.sha256 === source.sha256)) fail(EXIT.drift, `Compiler source is absent from receipt closure: ${source.file}`);
+    }
+    return { unit, outDirectory, receiptPath, receipt, artifacts, inputs };
+  }));
+  const owner = retained.find((entry) => entry.unit.name === pin.sharedSdk.owner);
+  const sharedSdk = sdkIdentity(pin, owner.artifacts);
+  for (const entry of retained) {
+    verifyUnitAdmission(pin, entry.unit, entry.artifacts, owner.artifacts, workspaceManifest, root);
+    if (!same(entry.receipt, receiptFor(pin, entry.unit, entry.artifacts, entry.inputs, sharedSdk))) fail(EXIT.drift, `${entry.unit.name} retained receipt differs from its pin/source/artifacts.`);
+  }
+  return retained;
 }
 
-async function registerTypeScriptLoader(upstream) {
-  const apiPath = createRequire(path.join(upstream, 'package.json')).resolve('tsx/esm/api');
-  const { register } = await import(pathToFileURL(apiPath).href);
+async function compilerModules(upstream, pin) {
+  const require = createRequire(path.join(upstream, 'package.json'));
+  const { register } = await import(pathToFileURL(require.resolve('tsx/esm/api')).href);
   register();
+  const load = (filename) => import(pathToFileURL(path.join(upstream, 'packages/compiler/src', filename)).href);
+  const compiler = await load('compile.ts');
+  const { TARGET_PROFILES } = await load('targets.ts');
+  const profile = TARGET_PROFILES[pin.target.profile];
+  const gpui = profile?.dependencies?.find((dependency) => dependency.name === 'gpui');
+  const sdk = profile?.dependencies?.find((dependency) => dependency.name === pin.sharedSdk.package);
+  if (profile?.version !== `git:${pin.gpu.upstreamGpuiRevision}` || gpui?.version !== `git:${pin.gpu.upstreamGpuiRevision}` || sdk?.version !== pin.sharedSdk.version) fail(EXIT.admission, 'Compiler target GPUI/SDK profile pins differ from the recorded upstream identity.');
+  const { FileSourceGraph } = await load('source-loader.ts');
+  return { compiler, FileSourceGraph };
 }
 
-async function compileUnit(upstream, sourcePath, pin) {
-  const compilerUrl = pathToFileURL(path.join(upstream, 'packages/compiler/src/compile.ts')).href;
-  const compiler = await import(compilerUrl);
-  const source = readFileSync(sourcePath, 'utf8');
-  const compiled = compiler.compilePrototype(source, {
-    fileName: path.basename(sourcePath),
-    profile: pin.target.profile,
-    componentName: pin.target.componentName,
-    gpuiDependency: pin.target.gpuiDependency,
-  });
-  if (!compiled.ok) {
-    throw new ProducerError(
-      EXIT.compile,
-      `The compiler rejected ${path.relative(repoRoot, sourcePath)}:\n${JSON.stringify(compiled.diagnostics, null, 2)}`,
-    );
+async function compileUnit(root, pin, unit, { compiler, FileSourceGraph }) {
+  const graph = new FileSourceGraph(root);
+  const snapshot = await graph.load(await graph.entry(insidePath(root, unit.source)));
+  if (snapshot.failures.length) fail(EXIT.compile, `${unit.name} source graph rejected: ${snapshot.failures.map((error) => error.message).join('\n')}`);
+  const inputs = [];
+  for (const dependency of graph.dependencies) {
+    const filename = path.resolve(root, dependency);
+    const relative = slash(path.relative(root, filename));
+    if (relative.startsWith('../') || path.isAbsolute(relative)) {
+      // The loader probes ancestor node_modules for intrinsic imports. Absent
+      // candidates outside the repository are not portable source artifacts.
+      // Existing out-of-repository packages must be brought into the pinned
+      // project instead of hashing machine-specific absolute locations.
+      if (existsSync(filename)) fail(EXIT.compile, `Source resolution escaped the repository: ${dependency}`);
+      continue;
+    }
+    inputs.push({ path: relative, sha256: readInput(root, { path: relative }) });
   }
-  return {
-    compilation: compiled.value,
-    artifacts: compiler.compilationArtifacts(compiled.value),
-    diffCompilation: compiler.diffCompilation,
-  };
+  inputs.sort((a, b) => a.path.localeCompare(b.path));
+  for (const [filename, source] of Object.entries(snapshot.files)) {
+    if (!inputs.some((input) => input.path === filename && input.sha256 === sha256(source))) fail(EXIT.compile, `Source changed while capturing compilation inputs: ${filename}`);
+  }
+  const result = await compiler.compileFile(unit.source, { root, sourceSnapshot: snapshot, ...pin.target, componentName: unit.componentName, ...(unit.nativeSdkPath ? { nativeSdkPath: unit.nativeSdkPath } : {}) });
+  if (!result.ok) fail(EXIT.compile, `Compiler rejected ${unit.source}:\n${JSON.stringify(result.diagnostics, null, 2)}`);
+  return { unit, compilation: result.value, artifacts: compiler.compilationArtifacts(result.value), inputs, sourceGraphIdentity: snapshot.identity, outDirectory: insidePath(root, unit.output.directory), receiptPath: insidePath(root, unit.output.receipt) };
 }
 
-const artifactText = (artifacts, artifactPath) =>
-  artifacts.find((artifact) => artifact.path === artifactPath)?.contents;
-const artifactJson = (artifacts, artifactPath) => {
-  const contents = artifactText(artifacts, artifactPath);
-  if (typeof contents !== 'string') return undefined;
+export async function runProducer(argv, root = defaultRoot) {
+  const options = parseArguments(argv, root);
+  const lockDirectory = path.join(root, 'frontend/proto-ui/.producer.lock');
+  if (options.mode === 'recover-publication') return { ok: true, mode: options.mode, recovered: checked(EXIT.replace, () => recoverPublication(lockDirectory, root)) };
+  const pin = loadPin(options.pin, root);
+  // This must happen before upstream existence checks, including --check.
+  const workspaceManifest = verifyWorkspace(root, pin);
+  const release = checked(EXIT.replace, () => acquireProducerLock(lockDirectory, root));
   try {
-    return JSON.parse(contents);
-  } catch {
-    return undefined;
-  }
-};
-
-function buildReceipt({ pin, artifacts, sourcePath }) {
-  return {
-    schema: 'verdant.proto-ui.receipt.v1',
-    unit: path.basename(pin.output.directory),
-    source: path.relative(repoRoot, sourcePath),
-    sourceSha256: sha256(readFileSync(sourcePath)),
-    upstream: {
-      repository: pin.upstream.repository,
-      revision: pin.upstream.revision,
-    },
-    packageVersions: pin.packageVersions,
-    target: pin.target,
-    gpu: pin.gpu,
-    artifacts: artifacts
-      .map((artifact) => ({ path: artifact.path, kind: artifact.kind, sha256: sha256(artifact.contents) }))
-      .sort((left, right) => left.path.localeCompare(right.path)),
-  };
-}
-
-function publishArtifacts({ artifacts, outDirectory }) {
-  if (existsSync(outDirectory)) {
-    const entries = readdirSync(outDirectory);
-    if (!entries.includes('provenance.json')) {
-      throw new ProducerError(
-        EXIT.replace,
-        `Refusing to replace ${outDirectory}: it is not a compiler artifact directory.`,
-      );
+    if (options.mode === 'check' || options.mode === 'check-retained') verifyRetained(root, pin, workspaceManifest);
+    if (options.mode === 'check-retained') return { ok: true, mode: 'retained-artifacts', freshCompilation: false, units: pin.units.map((unit) => unit.name), upstreamRevision: pin.upstream.revision };
+    const upstream = options.upstream ?? path.resolve(root, '../Proto-UI');
+    if (!existsSync(upstream)) fail(EXIT.upstreamAbsent, `Pinned upstream checkout ${upstream} is absent; fresh compilation is required. Use --check-retained only for explicitly offline retained-artifact evidence.`);
+    verifyUpstreamSource(upstream, pin);
+    const executedToolchain = verifyToolchain(upstream, pin);
+    const modules = await compilerModules(upstream, pin);
+    const compiled = [];
+    for (const unit of pin.units) compiled.push(await compileUnit(root, pin, unit, modules));
+    const owner = compiled.find((entry) => entry.unit.name === pin.sharedSdk.owner);
+    const sharedSdk = sdkIdentity(pin, owner.artifacts);
+    for (const entry of compiled) {
+      // Validate the complete resolution snapshot as well as file bytes. This
+      // catches package-export or nearer-candidate changes between loader reads
+      // and receipt capture, even when the entry source itself is unchanged.
+      const replayGraph = new modules.FileSourceGraph(root);
+      const replay = await replayGraph.load(await replayGraph.entry(insidePath(root, entry.unit.source)));
+      if (replay.failures.length || replay.identity !== entry.sourceGraphIdentity) fail(EXIT.compile, `Source/resolution graph changed during compilation: ${entry.unit.source}`);
+      verifyUnitAdmission(pin, entry.unit, entry.artifacts, owner.artifacts, workspaceManifest, root);
+      entry.receipt = receiptFor(pin, entry.unit, entry.artifacts, entry.inputs, sharedSdk);
+      // Recheck inputs before publishing/checking; no mixed read generations.
+      for (const input of entry.inputs) if (readInput(root, input) !== input.sha256) fail(EXIT.compile, `Source input changed during compilation: ${input.path}`);
     }
-  }
-  const staging = `${outDirectory}.staging`;
-  rmSync(staging, { recursive: true, force: true });
-  mkdirSync(staging, { recursive: true });
-  for (const artifact of artifacts) {
-    const target = path.join(staging, artifact.path);
-    mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(target, artifact.contents);
-  }
-  rmSync(outDirectory, { recursive: true, force: true });
-  renameSync(staging, outDirectory);
-}
-
-async function verifyPublished({ compilation, diffCompilation, outDirectory, receipt, receiptPath }) {
-  if (!existsSync(outDirectory)) {
-    throw new ProducerError(
-      EXIT.artifactsAbsent,
-      `No published Proto UI artifacts in ${outDirectory}. Publish them before checking them.`,
-    );
-  }
-  const diff = await diffCompilation(compilation, outDirectory);
-  if (!diff.ok) {
-    throw new ProducerError(
-      EXIT.drift,
-      `The published artifacts are not a compiler artifact set:\n${JSON.stringify(diff.diagnostics, null, 2)}`,
-    );
-  }
-  const drift = diff.value.changes.filter(
-    (change) => change.status !== 'unchanged' || change.consumerModified,
-  );
-  if (drift.length > 0) {
-    throw new ProducerError(
-      EXIT.drift,
-      `The published artifacts differ from a fresh compilation:\n${JSON.stringify(drift, null, 2)}`,
-    );
-  }
-  if (!existsSync(receiptPath)) {
-    throw new ProducerError(EXIT.drift, `The published receipt ${receiptPath} is absent.`);
-  }
-  const expected = `${JSON.stringify(receipt, null, 2)}\n`;
-  if (readFileSync(receiptPath, 'utf8') !== expected) {
-    throw new ProducerError(
-      EXIT.drift,
-      `The published receipt ${receiptPath} does not describe the pinned compilation.`,
-    );
-  }
-}
-
-async function main(argv) {
-  const options = parseArguments(argv);
-  const pin = loadPin(options.pin);
-  const sourcePath = options.source ?? path.resolve(repoRoot, pin.source);
-  const outDirectory = options.out ?? path.resolve(repoRoot, pin.output.directory);
-  const receiptPath = options.receipt ?? path.resolve(repoRoot, pin.output.receipt);
-  if (options.check) {
-    if (!existsSync(outDirectory) || !existsSync(receiptPath)) {
-      throw new ProducerError(EXIT.artifactsAbsent, 'Published Proto UI artifacts or their receipt are absent.');
-    }
-    const retained = JSON.parse(readFileSync(receiptPath, 'utf8'));
-    if (!Array.isArray(retained.artifacts) || retained.artifacts.length === 0) {
-      throw new ProducerError(EXIT.drift, 'The retained Proto UI receipt has no artifact records.');
-    }
-    for (const required of ['Component.rs', 'Cargo.toml', 'provenance.json', '.proto-ui/gpui-native/Cargo.toml']) {
-      if (!retained.artifacts.some((artifact) => artifact.path === required)) {
-        throw new ProducerError(EXIT.drift, `Required retained artifact is unrecorded: ${required}`);
+    if (options.mode === 'check') {
+      for (const entry of compiled) {
+        const diff = await modules.compiler.diffCompilation(entry.compilation, entry.outDirectory);
+        if (!diff.ok) fail(EXIT.drift, `${entry.unit.name} artifact diff rejected: ${JSON.stringify(diff.diagnostics)}`);
+        const changes = diff.value.changes.filter((change) => change.status !== 'unchanged' || change.consumerModified);
+        if (changes.length || !same(json(entry.receiptPath), entry.receipt)) fail(EXIT.drift, `${entry.unit.name} differs from fresh compilation: ${JSON.stringify(changes)}`);
       }
-    }
-    const artifacts = retained.artifacts.map((artifact) => {
-      const filename = path.resolve(outDirectory, artifact.path);
-      if (!filename.startsWith(`${outDirectory}${path.sep}`)) {
-        throw new ProducerError(EXIT.drift, `Invalid retained artifact path: ${artifact.path}`);
-      }
-      return { path: artifact.path, kind: artifact.kind, contents: readFileSync(filename, 'utf8') };
-    });
-    const expected = buildReceipt({ pin, artifacts, sourcePath });
-    if (JSON.stringify(retained) !== JSON.stringify(expected)) {
-      throw new ProducerError(EXIT.drift, 'Retained Proto UI artifacts, source or pin differ from their receipt.');
-    }
-    const violations = findWorkspaceGpuiViolations({
-      crateManifest: artifactText(artifacts, 'Cargo.toml'),
-      sdkManifest: artifactText(artifacts, '.proto-ui/gpui-native/Cargo.toml'),
-      provenance: artifactJson(artifacts, 'provenance.json'),
-    });
-    if (violations.length) {
-      throw new ProducerError(EXIT.admission, violations.join('\n'));
-    }
-  }
-  const upstream = options.upstream ?? path.resolve(repoRoot, '../Proto-UI');
-  if (!existsSync(upstream)) {
-    throw new ProducerError(
-      EXIT.upstreamAbsent,
-      `The pinned upstream checkout ${upstream} is absent.`,
-    );
-  }
-  verifyUpstreamSource(upstream, pin);
-  verifyPackageVersions(upstream, pin);
-  verifyToolchain(upstream);
-
-  const workspaceRevision = readWorkspaceGpuiRevision();
-  if (workspaceRevision !== pin.gpu.workspaceGpuiRevision) {
-    throw new ProducerError(
-      EXIT.admission,
-      `frontend/Cargo.toml pins gpui ${workspaceRevision} but the pin records ${pin.gpu.workspaceGpuiRevision}.`,
-    );
-  }
-
-  await registerTypeScriptLoader(upstream);
-  const { compilation, artifacts, diffCompilation } = await compileUnit(upstream, sourcePath, pin);
-
-  const violations = findWorkspaceGpuiViolations({
-    crateManifest: artifactText(artifacts, 'Cargo.toml'),
-    sdkManifest: artifactText(artifacts, '.proto-ui/gpui-native/Cargo.toml'),
-    provenance: artifactJson(artifacts, 'provenance.json'),
-  });
-  if (violations.length > 0) {
-    throw new ProducerError(
-      EXIT.admission,
-      `The emitted artifacts are not a single-workspace GPUI artifact set:\n- ${violations.join('\n- ')}`,
-    );
-  }
-
-  const receipt = buildReceipt({ pin, artifacts, sourcePath });
-
-  if (options.check) {
-    await verifyPublished({ compilation, diffCompilation, outDirectory, receipt, receiptPath });
-  } else {
-    publishArtifacts({ artifacts, outDirectory });
-    mkdirSync(path.dirname(receiptPath), { recursive: true });
-    writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  }
-
-  const crateManifest = artifactText(artifacts, 'Cargo.toml') ?? '';
-  const packageName = /name\s*=\s*"([^"]+)"/.exec(crateManifest)?.[1] ?? 'unknown';
-  console.log(
-    JSON.stringify(
-      {
-        ok: true,
-        mode: options.check ? 'check' : 'publish',
-        unit: path.basename(pin.output.directory),
-        upstreamRevision: pin.upstream.revision,
-        packageName,
-        componentName: pin.target.componentName,
-        artifacts: artifacts.length,
-        outputDirectory: path.relative(repoRoot, outDirectory),
-        receipt: path.relative(repoRoot, receiptPath),
-      },
-      null,
-      2,
-    ),
-  );
+    } else checked(EXIT.replace, () => publishBatch(compiled, { root, lockDirectory }));
+    return { ok: true, mode: options.mode === 'check' ? 'fresh-compilation' : 'publish', freshCompilation: true, upstreamRevision: pin.upstream.revision, executedToolchain, sharedSdk, units: compiled.map((entry) => ({ name: entry.unit.name, componentName: entry.unit.componentName, packageName: parseCargoManifest(artifactText(entry.artifacts, 'Cargo.toml')).package.name, artifacts: entry.artifacts.length, sourceInputs: entry.inputs.length, outputDirectory: entry.unit.output.directory, receipt: entry.unit.output.receipt })) };
+  } finally { release(); }
 }
 
-try {
-  await main(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof ProducerError) {
-    console.error(error.message);
-    process.exit(error.code);
-  }
-  console.error(error?.stack ?? String(error));
-  process.exit(EXIT.toolchain);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { console.log(JSON.stringify(await runProducer(process.argv.slice(2)), null, 2)); }
+  catch (error) { console.error(error?.stack ?? String(error)); process.exit(error instanceof ProducerError ? error.code : EXIT.toolchain); }
 }

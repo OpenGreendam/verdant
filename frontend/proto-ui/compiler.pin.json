@@ -1,5 +1,5 @@
 {
-  "schema": "verdant.proto-ui.compiler-pin.v1",
+  "schema": "verdant.proto-ui.compiler-pin.v2",
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
     "revision": "e56b2d1a3d6b688a1cbc6930dab1d6757304d733"
@@ -11,16 +11,75 @@
   },
   "target": {
     "profile": "gpui-source-v1",
-    "gpuiDependency": "workspace",
-    "componentName": "PitchGestureSurface"
+    "gpuiDependency": "workspace"
   },
   "gpu": {
     "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
-    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab"
+    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+    "workspace": {
+      "name": "gpui",
+      "git": "https://github.com/cyjin-yl/z3rm",
+      "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "features": [],
+      "defaultFeatures": true
+    }
   },
-  "source": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
-  "output": {
-    "directory": "frontend/proto-ui/generated/pitch-gesture-surface",
-    "receipt": "frontend/proto-ui/receipts/pitch-gesture-surface.json"
-  }
+  "toolchain": {
+    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "packages": {
+      "typescript": "5.9.3",
+      "tsx": "4.21.0"
+    }
+  },
+  "sharedSdk": {
+    "owner": "pitch-gesture-surface",
+    "directory": ".proto-ui/gpui-native",
+    "package": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "features": [
+      "gpui-modern-element-api"
+    ],
+    "contentSha256": "379b97bad8d0082097c7944506323fb58936eb880856eb5707e52a7244d483ed"
+  },
+  "units": [
+    {
+      "name": "pitch-gesture-surface",
+      "source": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
+      "componentName": "PitchGestureSurface",
+      "output": {
+        "directory": "frontend/proto-ui/generated/pitch-gesture-surface",
+        "receipt": "frontend/proto-ui/receipts/pitch-gesture-surface.json"
+      }
+    },
+    {
+      "name": "note-gesture-planner",
+      "source": "frontend/proto-ui/src/note-gesture-planner.proto.ts",
+      "componentName": "NoteGesturePlanner",
+      "output": {
+        "directory": "frontend/proto-ui/generated/note-gesture-planner",
+        "receipt": "frontend/proto-ui/receipts/note-gesture-planner.json"
+      },
+      "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+    },
+    {
+      "name": "control-gesture-planner",
+      "source": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
+      "componentName": "ControlGesturePlanner",
+      "output": {
+        "directory": "frontend/proto-ui/generated/control-gesture-planner",
+        "receipt": "frontend/proto-ui/receipts/control-gesture-planner.json"
+      },
+      "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+    },
+    {
+      "name": "normalized-knob",
+      "source": "frontend/proto-ui/src/normalized-knob.proto.ts",
+      "componentName": "NormalizedKnob",
+      "output": {
+        "directory": "frontend/proto-ui/generated/normalized-knob",
+        "receipt": "frontend/proto-ui/receipts/normalized-knob.json"
+      },
+      "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+    }
+  ]
 }

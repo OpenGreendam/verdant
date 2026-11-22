@@ -36,6 +36,10 @@ pub enum CancelReason { Escape, FocusLost, PointerCancel, ProjectChanged }
 pub enum InputEvent {
     PointerDown { hit: Hit, music: MusicPoint, screen: (f64, f64), mods: Modifiers, click_count: u32 },
     PointerMove { music: MusicPoint, screen: (f64, f64), mods: Modifiers },
+    /// Native terminal events carry their own final sample. A host must not
+    /// assume the OS dispatched a matching PointerMove before release.
+    PointerUpAt { music: MusicPoint, screen: (f64, f64), mods: Modifiers },
+    /// Synthetic release using an already sampled position (trace compatibility).
     PointerUp,
     Cancel(CancelReason),
 }
@@ -177,6 +181,16 @@ impl EditorSession {
     pub fn handle_pointer(&mut self, project: &Project, revision: Revision, pointer: PointerId, event: InputEvent) -> Vec<Effect> {
         let global_cancel = matches!(event, InputEvent::Cancel(CancelReason::Escape | CancelReason::FocusLost | CancelReason::ProjectChanged));
         if self.pointer_owner.is_some_and(|owner| owner != pointer) && !global_cancel { return Vec::new(); }
+        if let InputEvent::PointerUpAt { music, screen, mods } = event {
+            if !music.tick.is_finite() || !music.pitch.is_finite() || !screen.0.is_finite() || !screen.1.is_finite() {
+                // An invalid terminal coordinate cannot commit an older preview
+                // and must still relinquish the matching pointer's ownership.
+                return self.handle_pointer(project, revision, pointer, InputEvent::Cancel(CancelReason::PointerCancel));
+            }
+            let mut effects = self.handle_pointer(project, revision, pointer, InputEvent::PointerMove { music, screen, mods });
+            effects.extend(self.handle_pointer(project, revision, pointer, InputEvent::PointerUp));
+            return effects;
+        }
         if matches!(event, InputEvent::PointerDown { .. }) && self.gesture.is_some() { return Vec::new(); }
         if let InputEvent::PointerDown { music, screen, .. } | InputEvent::PointerMove { music, screen, .. } = &event {
             if !music.tick.is_finite() || !music.pitch.is_finite() || !screen.0.is_finite() || !screen.1.is_finite() { return Vec::new(); }

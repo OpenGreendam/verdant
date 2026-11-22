@@ -29,6 +29,7 @@ mod files;
 mod generated {
     pub mod controls;
 }
+mod host_pointer;
 mod index;
 mod instrument;
 mod lanes;
@@ -39,6 +40,7 @@ mod mixer;
 mod paint;
 mod phoneme_lane;
 mod proto_roll;
+mod proto_knob;
 mod roll;
 mod ruler_navigation;
 mod shortcuts;

@@ -3,45 +3,32 @@
 //! this file implements only the named operations over immutable input and
 //! the real EditorSession/ProjectStore command boundary.
 
-use serde::{Deserialize, Serialize};
-use verdant_pitch_gesture_surface::PitchGestureSurfaceHandle;
+use verdant_ui_protocol::{
+    GestureEvent, GesturePhase as NoteGesturePhase, NoteEffect as Op,
+    NoteGuards as GuardFacts, NoteMachine as Machine, NotePlan as NoteGesturePlan,
+    PlannerError, plan_note,
+};
 
 use crate::session::{DRAG_THRESHOLD_PX, TOUCH_DRAG_THRESHOLD_PX};
 use crate::{EditorSession, Effect, Gesture, GestureKind, Hit, InputEvent, Phase, PointerId, Preview};
 use verdant_domain::{Command, CommandBatch, Edge, NoteId, Project, Revision};
 use verdant_domain::command::{clamp_group_move, resized};
 
-#[derive(Clone, Copy)]
-pub(crate) enum Machine { Move, Duplicate, Resize, Marquee }
-
-impl Machine {
-    fn active(session: &EditorSession) -> Option<Self> {
-        session.gesture.as_ref().map(|g| match g.kind {
-            GestureKind::Move { duplicate: false } => Self::Move,
-            GestureKind::Move { duplicate: true } => Self::Duplicate,
-            GestureKind::Resize { .. } => Self::Resize,
-            GestureKind::RubberBand { .. } => Self::Marquee,
-        })
-    }
-
-    fn as_str(self) -> &'static str {
-        match self { Self::Move => "move", Self::Duplicate => "duplicate", Self::Resize => "resize", Self::Marquee => "marquee" }
-    }
+fn active_machine(session: &EditorSession) -> Option<Machine> {
+    session.gesture.as_ref().map(|g| match g.kind {
+        GestureKind::Move { duplicate: false } => Machine::Move,
+        GestureKind::Move { duplicate: true } => Machine::Duplicate,
+        GestureKind::Resize { .. } => Machine::Resize,
+        GestureKind::RubberBand { .. } => Machine::Marquee,
+    })
 }
 
-#[derive(Default, Serialize)]
-struct GuardFacts {
-    hit_background: bool,
-    hit_selected_note: bool,
-    hit_unselected_note: bool,
-    hit_note_body: bool,
-    hit_resize_handle: bool,
-    toggle_modifier: bool,
-    extend_modifier: bool,
-    duplicate_modifier: bool,
-    pointer_threshold_crossed: bool,
-    base_revision_matches: bool,
-    base_revision_matches_and_delta_nonzero: bool,
+fn current_phase(session: &EditorSession) -> NoteGesturePhase {
+    match session.gesture.as_ref().map(|g| g.phase) {
+        None => NoteGesturePhase::Idle,
+        Some(Phase::Armed) => NoteGesturePhase::Armed,
+        Some(Phase::Dragging) => NoteGesturePhase::Dragging,
+    }
 }
 
 fn guard_facts(session: &EditorSession, project: &Project, revision: Revision, event: &InputEvent) -> GuardFacts {
@@ -94,115 +81,40 @@ fn guard_facts(session: &EditorSession, project: &Project, revision: Revision, e
     facts
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-enum NoteGesturePhase {
-    #[serde(rename = "idle")]
-    Idle,
-    #[serde(rename = "armed")]
-    Armed,
-    #[serde(rename = "dragging")]
-    Dragging,
-}
-
-impl NoteGesturePhase {
-    fn current(session: &EditorSession) -> Self {
-        match session.gesture.as_ref().map(|g| g.phase) {
-            None => Self::Idle,
-            Some(Phase::Armed) => Self::Armed,
-            Some(Phase::Dragging) => Self::Dragging,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self { Self::Idle => "idle", Self::Armed => "armed", Self::Dragging => "dragging" }
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NoteGesturePlan {
-    #[serde(rename = "nextPhase")]
-    next_phase: NoteGesturePhase,
-    consumed: bool,
-    effects: Vec<Op>,
-}
-
-/// Effect implementations are explicit bindings, shared across protocol
-/// units. This is an operation vocabulary, not another transition machine.
-#[derive(Clone, Copy, Deserialize)]
-enum Op {
-    #[serde(rename = "Session.SelectOnlyHitNote")]
-    SelectOnly,
-    #[serde(rename = "Session.ToggleHitNote")]
-    Toggle,
-    #[serde(rename = "Session.ExtendSelectionToHit")]
-    Extend,
-    #[serde(rename = "Session.SelectIfUnselectedHit")]
-    SelectIfUnselected,
-    #[serde(rename = "Session.BeginMoveGesture")]
-    BeginMove,
-    #[serde(rename = "Session.BeginDuplicateGesture")]
-    BeginDuplicate,
-    #[serde(rename = "Session.BeginResizeGesture")]
-    BeginResize,
-    #[serde(rename = "Session.BeginMarqueeGesture")]
-    BeginMarquee,
-    #[serde(rename = "Session.UpdateMovePreview")]
-    UpdateMove,
-    #[serde(rename = "Session.UpdateResizePreview")]
-    UpdateResize,
-    #[serde(rename = "Session.UpdateMarqueePreview")]
-    UpdateMarquee,
-    #[serde(rename = "Domain.CommitMoveNotes")]
-    CommitMove,
-    #[serde(rename = "Domain.CommitDuplicateNotes")]
-    CommitDuplicate,
-    #[serde(rename = "Domain.CommitResizeNotes")]
-    CommitResize,
-    #[serde(rename = "Session.CommitMarqueeSelection")]
-    CommitMarquee,
-    #[serde(rename = "Session.ClickReleaseSelection")]
-    ClickSelection,
-    #[serde(rename = "Session.ReportConflictIfStale")]
-    Conflict,
-    #[serde(rename = "Session.ClearGesturePreview")]
-    Clear,
-    #[serde(rename = "Host.CapturePointer")]
-    Capture,
-    #[serde(rename = "Host.ReleasePointer")]
-    Release,
-}
-
-fn plan(machine: Machine, phase: NoteGesturePhase, event: &InputEvent, facts: &GuardFacts) -> NoteGesturePlan {
+fn plan(machine: Machine, phase: NoteGesturePhase, event: &InputEvent, facts: &GuardFacts) -> Result<NoteGesturePlan, PlannerError> {
     let event = match event {
-        InputEvent::PointerDown { .. } => "PointerDown",
-        InputEvent::PointerMove { .. } => "PointerMove",
-        InputEvent::PointerUp => "PointerUp",
-        InputEvent::Cancel(_) => "Cancel",
+        InputEvent::PointerDown { .. } => GestureEvent::Down,
+        InputEvent::PointerMove { .. } => GestureEvent::Move,
+        InputEvent::PointerUp => GestureEvent::Up,
+        InputEvent::PointerUpAt { .. } => unreachable!("terminal sample is normalized by EditorSession"),
+        InputEvent::Cancel(_) => GestureEvent::Cancel,
     };
-    let decision = PitchGestureSurfaceHandle::call_data_method("planNoteGesture", vec![
-        machine.as_str().into(),
-        phase.as_str().into(),
-        event.into(),
-        serde_json::to_value(facts).expect("serializable note gesture guard facts"),
-    ]).unwrap_or_else(|error| panic!("compiled note gesture planner failed: {error:?}"));
-    // Decode every phase and effect before any operation can mutate the session.
-    serde_json::from_value(decision)
-        .unwrap_or_else(|error| panic!("compiled note gesture planner returned an incompatible decision: {error}"))
+    plan_note(machine, phase, event, facts)
 }
 
 pub(crate) fn dispatch(session: &mut EditorSession, project: &Project, revision: Revision, event: &InputEvent, pointer: PointerId) -> Vec<Effect> {
-    let active = Machine::active(session);
+    let active = active_machine(session);
     let idle = [Machine::Resize, Machine::Duplicate, Machine::Move, Machine::Marquee];
     let candidates = match &active { Some(machine) => std::slice::from_ref(machine), None => &idle };
-    let phase = NoteGesturePhase::current(session);
+    let phase = current_phase(session);
     let facts = guard_facts(session, project, revision, event);
     // Source-selected SelectOnly / Extend / Toggle operations may change
     // selection before Begin, so retain the pre-effect click semantics.
     let click_only = facts.hit_selected_note && !facts.toggle_modifier && !facts.extend_modifier && session.selection.len() > 1;
     let mut out = Vec::new();
     for &machine in candidates {
-        let decision = plan(machine, phase, event, &facts);
+        let decision = match plan(machine, phase, event, &facts) {
+            Ok(decision) => decision,
+            Err(error) => {
+                // An incompatible generated protocol cancels the preview before
+                // any decoded effect is applied, and reports the real failure.
+                session.gesture = None;
+                session.autoscroll_active = false;
+                session.release_pointer(&mut out);
+                out.push(Effect::Notice(format!("交互协议失败，已取消拖拽：{error}")));
+                return out;
+            }
+        };
         if decision.effects.is_empty() {
             assert_eq!(decision.next_phase, phase, "compiled note gesture planner changed phase without effects");
         } else {

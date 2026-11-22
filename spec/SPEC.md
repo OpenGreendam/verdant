@@ -10,12 +10,16 @@ Verdant 0.1.0 的完整合同见[主规格](../SPEC.md)，源码入口为
 |---|---|
 | `frontend/crates/verdant-app/src/generated/controls.rs` | 检入的控件与命令表 Rust 源码。 |
 | `frontend/crates/verdant-session/` | Rust 会话、手势守卫与领域副作用。 |
-| `frontend/proto-ui/src/pitch-gesture-surface.proto.ts` | 原生根、slot 以及移动、复制、调整长度和框选的状态转换声明。 |
+| `frontend/proto-ui/src/pitch-gesture-surface.proto.ts` | 原生根、尺寸/裁剪和 slot；共享 SDK artifact owner。 |
+| `frontend/proto-ui/src/note-gesture-planner.proto.ts` | 移动、复制、调整长度和框选的纯决策函数。 |
+| `frontend/proto-ui/src/control-gesture-planner.proto.ts` | 连续控制的纯决策函数和归一化拖动计算。 |
+| `frontend/proto-ui/src/normalized-knob.proto.ts` | 每实例值/phase、props 同步、取消、键盘、焦点、辅助功能和提交事件。 |
+| `frontend/crates/verdant-ui-protocol/` | 生成 API 到 app/session 的强类型边界；当前仍传递依赖 GPUI。 |
 | `frontend/proto-ui/compiler.pin.json` | 上游提交、工具链、目标 profile 和 GPUI 版本绑定。 |
-| `frontend/proto-ui/generated/pitch-gesture-surface/` | 上游编译输出、source map 与 provenance。 |
-| `frontend/proto-ui/receipts/pitch-gesture-surface.json` | 源输入与生成制品的哈希记录。 |
+| `frontend/proto-ui/generated/` | 四个单元的上游编译输出、source map 与 provenance；共用一份 native SDK。 |
+| `frontend/proto-ui/receipts/` | 仓库边界内完整来源/解析输入闭包与生成制品的哈希记录。 |
 
-桌面直接编译控件 Rust 源码。卷帘声明由 `frontend/proto-ui/` 下的入口调用上游 Proto UI 编译器，版本、工具链和目标见 `compiler.pin.json`。编译输出包括原生投影与独立数据方法。Rust 会话调用同一份声明编译出的状态转换逻辑，并负责守卫判断与领域副作用。宿主负责卷帘绘制和音乐坐标事件转换。
+桌面直接编译控件 Rust 源码。`frontend/proto-ui/` 下的入口调用上游 Proto UI 编译器，版本、工具链和目标见 `compiler.pin.json`。卷帘属于 Proto 编译的 gesture planner + native GPUI surface：Rust 会话通过强类型 adapter 调用编译出的状态转换逻辑，负责守卫判断、pointer/capture 与领域副作用；宿主负责绘图和音乐坐标。旋钮作为有状态原型实例承担交互和公开语义，宿主提供绘图 slot 和经目标/revision 校验的领域提交。不能将这些局部集成描述为整个 DAW 已统一采用 Proto-UI 控件契约。[具体边界](../frontend/proto-ui/README.md)
 
 ## 当前版本
 
@@ -56,7 +60,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --upstream /path/to/Proto-UI
 node frontend/proto-ui/tools/build-proto-ui.mjs --upstream /path/to/Proto-UI --check
 ```
 
-第一条命令重新编译卷帘投影与手势数据方法，第二条核对产物字节与来源记录。窗口、IME 与辅助技术按目标平台独立验收。
+第一条命令重新编译四个单元，第二条新鲜编译并核对产物字节与来源记录；缺失上游时必须失败。显式 `--check-retained` 只证明保留制品自洽，不证明新鲜编译。workspace GPUI 的来源、rev 和 feature 在检查上游存在之前核验，完整 Cargo resolve graph 另行准入。CI 的 Rust 构建依赖强制 fresh lane。窗口、IME 与辅助技术按目标平台独立验收。
 构建方法见[前端手册](../frontend/README.md)。
 
 ## 来源与历史材料

@@ -264,6 +264,7 @@ pub struct Editor {
     pub project_path: Option<PathBuf>,
     pub audition_projects: Vec<crate::auditions::AuditionProject>,
     pub session: EditorSession,
+    pub(crate) roll_capture: Option<crate::host_pointer::OwnedPointerCapture>,
     pub lyric: Option<LyricSession>,
     pub focus_roll: FocusHandle,
     pub focus_lyric: FocusHandle,
@@ -440,6 +441,12 @@ impl Editor {
             this.end_lyric(true, None, window, cx);
         })
         .detach();
+        cx.on_blur(&focus_roll, window, |this: &mut Self, window, cx| {
+            if this.session.pointer_owner().is_some() || this.note_creation.is_some()
+                || this.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll) {
+                this.cancel_edits(verdant_session::CancelReason::FocusLost, window, cx);
+            }
+        }).detach();
         cx.observe_window_activation(window, |this: &mut Self, window, cx| {
             if !window.is_window_active() {
                 this.menu = None;
@@ -495,6 +502,7 @@ impl Editor {
             project_path,
             audition_projects: opts.audition_projects,
             session,
+            roll_capture: None,
             lyric: None,
             focus_roll,
             focus_lyric,
@@ -801,10 +809,16 @@ impl Editor {
         self.lane_stroke = None;
         self.mixer_drag = None;
         for f in fx {
-            if let Effect::Notice(n) = f {
-                self.notice(n);
+            match f {
+                Effect::Notice(n) => self.notice(n),
+                Effect::ReleasePointer => self.release_roll_capture_deferred(cx),
+                _ => unreachable!("project-change cancellation may only release ownership and report a notice"),
             }
         }
+        // Pencil/touch-pitch previews have the same native capture executor,
+        // even though their domain geometry is intentionally not a planner.
+        self.release_roll_capture_deferred(cx);
+        self.compiled_pitch_move.cancel_deferred(cx);
         self.prepare_insert_topology(cx);
         self.sync_mixer();
         self.restore_inserts(cx);
@@ -813,6 +827,27 @@ impl Editor {
     }
 
     pub fn apply_effects(&mut self, fx: Vec<Effect>, window: &mut Window, cx: &mut Context<Self>) {
+        self.apply_effects_at(fx, None, window, cx);
+    }
+
+    pub(crate) fn apply_pointer_effects(&mut self, fx: Vec<Effect>, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        self.apply_effects_at(fx, Some(hitbox), window, cx);
+    }
+
+    pub(crate) fn capture_roll_pointer(&mut self, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        self.release_roll_capture(window, cx);
+        self.roll_capture = Some(crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx));
+    }
+
+    pub(crate) fn release_roll_capture(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(capture) = self.roll_capture.take() { capture.release(window, cx); }
+    }
+
+    pub(crate) fn release_roll_capture_deferred(&mut self, cx: &mut Context<Self>) {
+        if let Some(capture) = self.roll_capture.take() { capture.release_deferred(cx); }
+    }
+
+    fn apply_effects_at(&mut self, fx: Vec<Effect>, capture_target: Option<gpui::HitboxId>, window: &mut Window, cx: &mut Context<Self>) {
         for f in fx {
             match f {
                 Effect::Commit { base, batch, select_after } => {
@@ -824,7 +859,9 @@ impl Editor {
                 }
                 Effect::BeginLyricEdit(id) => self.begin_lyric(id, window, cx),
                 Effect::Notice(n) => self.notice(n),
-                Effect::CapturePointer | Effect::ReleasePointer => {}
+                Effect::CapturePointer => self.capture_roll_pointer(
+                    capture_target.expect("CapturePointer requires the originating native hitbox"), window, cx),
+                Effect::ReleasePointer => self.release_roll_capture(window, cx),
             }
         }
         self.sync_table_cursor();
@@ -1666,7 +1703,10 @@ impl Editor {
         if !self.commit_pending_lyric(cx) {
             return false;
         }
-        self.cancel_device_drag(cx);
+        self.cancel_control_drags(cx);
+        self.release_roll_capture_deferred(cx);
+        self.compiled_pitch_move.cancel_deferred(cx);
+        self.note_creation = None;
         self.change_active_track(id);
         self.sync_index();
         self.sync_mixer();
