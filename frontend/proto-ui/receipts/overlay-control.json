@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "84a9d7eedafb8118bdbcc5e42ec75f723e3e1680"
+    "revision": "35a2769d718e7764c1654b88394f3e005d1e5315"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -81,7 +81,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "d79fa3ff8d112e6e491b9f9343ea44068a11acde30ab37a9dbafceb47e25fd0d"
+    "contentSha256": "a3552fe04a37d8cf1dc82084fb5934af8ca846e082df3a72d68702f88aaebd3a"
   },
   "artifacts": [
     {
@@ -107,7 +107,7 @@
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "0b0d19b420b998cef3a7a5c26f550869dcf1c6398711fc0365402853302e60c6"
+      "sha256": "2c0ab339fe4cb916f26fef10695e9ec048609e6f4f80a9a26f8fc00ce857ad22"
     }
   ]
 }

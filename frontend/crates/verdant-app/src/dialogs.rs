@@ -1474,7 +1474,10 @@ mod slider_precision_tests {
             expected = ((expected+step)*case.units).round()/case.units;
             cx.update_window(window.into(), |_, window, cx| {
                 use verdant_continuous_control::native::gpui_native_owner::{dispatch_accessibility_action, drive_owners};
-                assert!(dispatch_accessibility_action(&source.owner, "increment", None));
+                // The bridge reports default prevention, not acceptance.
+                // This authored action proposes the value without requesting
+                // prevention; the draft/source assertions below prove delivery.
+                assert!(!dispatch_accessibility_action(&source.owner, "increment", None));
                 drive_owners(window, cx);
             }).unwrap();
             crate::native_test_support::frames(window, cx);
