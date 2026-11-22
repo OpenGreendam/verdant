@@ -11,6 +11,10 @@ pub struct CapturedEvent {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventKind {
+    Control { controller:u8, value:u8 },
+    PitchBend { value:i16 },
+    ChannelPressure { pressure:u8 },
+    PolyPressure { midi_note:u8, pressure:u8 },
     NoteOn { midi_note: u8, velocity: u8 },
     NoteOff { midi_note: u8, velocity: u8 },
     Sustain { down: bool },
@@ -42,8 +46,11 @@ pub fn parse_message(timestamp_micros: u64, bytes: &[u8]) -> Result<Option<Captu
             120 => EventKind::AllSoundOff,
             121 => EventKind::ResetControllers,
             123 => EventKind::AllNotesOff,
-            _ => return Ok(None),
+            controller => EventKind::Control {controller,value:bytes[2]},
         },
+        0xe0 => EventKind::PitchBend {value:((u16::from(bytes[2])<<7)|u16::from(bytes[1]))as i16-8192},
+        0xd0 => EventKind::ChannelPressure {pressure:bytes[1]},
+        0xa0 => EventKind::PolyPressure {midi_note:bytes[1],pressure:bytes[2]},
         _ => return Ok(None),
     };
     Ok(Some(CapturedEvent { timestamp_micros, channel: status & 15, kind }))

@@ -1,0 +1,244 @@
+WORKSPACE: {'log': 'advanced-workspace-tests4.log', 'original_sha256': 'bded07ab32e19c2ff5944e46bdcc6437d681895f249aefd9ed6703bb3ea31bad', 'targets': 107, 'passed': 1056, 'failed': 0, 'ignored': 15}
+     Running unittests Component.rs (<build>/target/debug/deps/generated_gpui_component-aeffd11b4b5631a7)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (<build>/target/debug/deps/proto_ui_gpui_native-cab8ac0e70f4e40a)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant-81702efdadce928e)
+test result: ok. 158 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_audio-28934284c775a146)
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+     Running tests/device_formats.rs (<build>/target/debug/deps/device_formats-a7221072b527e836)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/engine.rs (<build>/target/debug/deps/engine-ddbaa1a4d1977d5c)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+     Running tests/master_bus.rs (<build>/target/debug/deps/master_bus-c0e8c91b830226c8)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/playback_integrity.rs (<build>/target/debug/deps/playback_integrity-fde6e6a1439a354d)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_backend-d73d0a2b5e197141)
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/automation_consumer.rs (<build>/target/debug/deps/automation_consumer-66248be465238d05)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/backend.rs (<build>/target/debug/deps/backend-03f60961f3bcdd1a)
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.10s
+     Running tests/compact_phone_states.rs (<build>/target/debug/deps/compact_phone_states-c152c39acfd9e8df)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/consonant_dynamics.rs (<build>/target/debug/deps/consonant_dynamics-7b057aeba7883e0d)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/control_timing.rs (<build>/target/debug/deps/control_timing-e52e8382ad12aa5f)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/expression_controls.rs (<build>/target/debug/deps/expression_controls-edbb8aeb838c2e57)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+     Running tests/f0_artifacts.rs (<build>/target/debug/deps/f0_artifacts-fca2cc8361d21217)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/high_pitch.rs (<build>/target/debug/deps/high_pitch-af1c487ee36315ac)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/main_merge.rs (<build>/target/debug/deps/main_merge-a29ad156bcb6e027)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/model_dynamics.rs (<build>/target/debug/deps/model_dynamics-c3d04d6f609bde29)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/multilingual_notes.rs (<build>/target/debug/deps/multilingual_notes-d07362e47b11923e)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/native_v10.rs (<build>/target/debug/deps/native_v10-d3bc91a405d06611)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/phoneme_boundary_drag.rs (<build>/target/debug/deps/phoneme_boundary_drag-22341b6c11894b13)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/phoneme_dyn.rs (<build>/target/debug/deps/phoneme_dyn-d945aea2e2daa7f4)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/phoneme_parity.rs (<build>/target/debug/deps/phoneme_parity-b90f239ba440908c)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/phoneme_timing.rs (<build>/target/debug/deps/phoneme_timing-fa9a9d1758618fa7)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/phonemizer_dictionary.rs (<build>/target/debug/deps/phonemizer_dictionary-8d0dfd9d268ffb11)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/phonemizer_segments.rs (<build>/target/debug/deps/phonemizer_segments-d373f79bb1df61c9)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/phonetic_alphabet.rs (<build>/target/debug/deps/phonetic_alphabet-614f167a1a3a30d9)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.87s
+     Running tests/phonetic_correction.rs (<build>/target/debug/deps/phonetic_correction-ecc92404b106abfd)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/render_scheduling.rs (<build>/target/debug/deps/render_scheduling-fb9e124211ba9343)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/singer_selection.rs (<build>/target/debug/deps/singer_selection-2953a46c850eefee)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/singing_prosody.rs (<build>/target/debug/deps/singing_prosody-3223cb3347a6847b)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/vocal_tract.rs (<build>/target/debug/deps/vocal_tract-7cc8109b3f00f453)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/vocoder_highband.rs (<build>/target/debug/deps/vocoder_highband-a1e0d3693f5e006c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/voice_music.rs (<build>/target/debug/deps/voice_music-0aacd05c274e077e)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/voice_package.rs (<build>/target/debug/deps/voice_package-19676227f10b1a26)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/voice_receipt.rs (<build>/target/debug/deps/voice_receipt-7b94ff9cad773cfa)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/voices_registry.rs (<build>/target/debug/deps/voices_registry-51ae95f1901c4a40)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_cli-b738d96097fbbfc2)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_domain-1d4dd37ff94a7ecf)
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+     Running tests/autosave_recovery.rs (<build>/target/debug/deps/autosave_recovery-c828359285ce46ab)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/consonant_dynamics.rs (<build>/target/debug/deps/consonant_dynamics-aea6341eeeb5b763)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/expression_controls.rs (<build>/target/debug/deps/expression_controls-841c1a56a0233613)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/history_navigation.rs (<build>/target/debug/deps/history_navigation-61a17fae106b0837)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/journal_persistence.rs (<build>/target/debug/deps/journal_persistence-7f4cf0f676162aef)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.28s
+     Running tests/model_dynamics.rs (<build>/target/debug/deps/model_dynamics-c67ae2b9f161f8ed)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/native_project_files.rs (<build>/target/debug/deps/native_project_files-35b24f277fa120bd)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/note_drawing.rs (<build>/target/debug/deps/note_drawing-7ffd6c51584a1316)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/phoneme_timing.rs (<build>/target/debug/deps/phoneme_timing-86797422ea491474)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/store.rs (<build>/target/debug/deps/store-ea9de6d7c9a7f27d)
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/synthesis.rs (<build>/target/debug/deps/synthesis-cdc67d311257265e)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/tempo_lane.rs (<build>/target/debug/deps/tempo_lane-a1c40d04da43fde0)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/vocal_tract.rs (<build>/target/debug/deps/vocal_tract-b765c454301b18ed)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_exchange-70a5146d99fb7b2c)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_exchange-4780f4c6e2fa2fa6)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cli.rs (<build>/target/debug/deps/cli-a60cf6e613750ef9)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/formats.rs (<build>/target/debug/deps/formats-70d513f340e33c40)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/native_admission.rs (<build>/target/debug/deps/native_admission-2bf6d2d2f26f84bc)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ufdata.rs (<build>/target/debug/deps/ufdata-a6b4211d8eb7ec6f)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_import-7b81ca7065d26c73)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_import-e6a23f0dcb6842b1)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cli.rs (<build>/target/debug/deps/cli-1a84662e8345b6a0)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/entry.rs (<build>/target/debug/deps/entry-910583d2a2ce82f8)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/import.rs (<build>/target/debug/deps/import-84eec96f967ca596)
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_media-81c7763bddbe9ed7)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/assets.rs (<build>/target/debug/deps/assets-056ee31647ee7b50)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/clips.rs (<build>/target/debug/deps/clips-4d9706f4ed2a62d7)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/formats.rs (<build>/target/debug/deps/formats-06aaeff8f1cd3d28)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/region_edits.rs (<build>/target/debug/deps/region_edits-b9dd97ed61842a39)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/waveform_cache.rs (<build>/target/debug/deps/waveform_cache-3f3a7ec2f41de1be)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_midi-b227dda3cb5c650c)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/recording.rs (<build>/target/debug/deps/recording-b641f1e9ec60fae4)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_plughost-f294a8aba8f7d276)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_plughost-b3c0d0ca37f49059)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/builtin_suite.rs (<build>/target/debug/deps/builtin_suite-dd1095242ff28e2d)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.25s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_plugins-c26b693145ee2b8a)
+test result: ok. 162 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.56s
+     Running tests/builtin_signal.rs (<build>/target/debug/deps/builtin_signal-3f80020cedfabc30)
+test result: ok. 1 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/plugin_browser.rs (<build>/target/debug/deps/plugin_browser-ffb35b12f64857ca)
+test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_release-88dfe23ff5f1adc1)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_service-1eb2f46f366d9492)
+test result: ok. 19 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.59s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_session-b3dd2f694e182401)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/contract_traces.rs (<build>/target/debug/deps/contract_traces-4841882305dc0aed)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/generated_gestures.rs (<build>/target/debug/deps/generated_gestures-b55f4aa47b21f0b4)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_synthesis-689439bcad3f10fd)
+test result: ok. 113 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 2.79s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_test_clap_instrument-da6908ad2207d767)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_voice-12c377ab9f406ad0)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_voice-08a818dc7fbfa896)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (<build>/target/debug/deps/verdant_voice_format-8920afadab4e64b7)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/main.rs (<build>/target/debug/deps/verdant_worker-d9d0bb8e745ed9a2)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/voice_package.rs (<build>/target/debug/deps/voice_package-db31a8a0e1d25852)
+test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.13s
+   Doc-tests generated_gpui_component
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests proto_ui_gpui_native
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_audio
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_backend
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_domain
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_exchange
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_import
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_media
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_midi
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_plughost
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_plugins
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_service
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_session
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_synthesis
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_test_clap_instrument
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_voice
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests verdant_voice_format
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+native-host: {'target': 'native-host', 'log': 'advanced-final-native-host.log', 'original_sha256': 'b98960471e132d481fe1191e4b672ff03cf10e23e00dbd5c55200875218e7620', 'targets': 1, 'passed': 5, 'failed': 0, 'ignored': 0}
+
+running 5 tests
+test deliberate_host_retirement_is_silent_but_explicit_kill_reports_a_crash ... ok
+test isolated_delay_transport_events_reach_exact_samples_without_changing_saved_tempo ... ok
+test isolated_host_signal_reports_real_pcm_and_stops_when_audio_stops ... ok
+test limiter_meter_pause_and_reset_control_the_displayed_integrated_history ... ok
+test native_midi_loudness_and_meter_reset_cross_the_real_control_protocol ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 3.43s
+
+
+service-host: {'target': 'service-host', 'log': 'advanced-final-service-host.log', 'original_sha256': '69d0a2ed3b50b7c4b0e2c0b603f1820138b2fe0378d4534328a8dfbcd05329c6', 'targets': 1, 'passed': 2, 'failed': 0, 'ignored': 0}
+
+running 2 tests
+test project_audio::tempo_tests::real_host_bindings_keep_legacy_sidechains_and_tempo_on_physical_slots ... ok
+test project_audio::tests::a_hosted_clap_instrument_plays_track_notes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.91s
+
+
+factory-corpus: {'target': 'factory-corpus', 'log': 'advanced-final-factory-corpus.log', 'original_sha256': 'b15a085178e8e1c2cfe2ecb67d3864ef131004b54278c7f59357a95f4b385550', 'targets': 1, 'passed': 1, 'failed': 0, 'ignored': 0}
+
+running 1 test
+test preset_interop::tests::external_factory_corpus_probe ... FFP corpus: signature => [recognized, complete-parameter-translation, partial-with-diagnostics, identified-only] {"F3Ts": [118, 0, 0, 118], "FC3p": [122, 0, 122, 0], "FFPr": [109, 0, 0, 109], "FL2p": [58, 0, 0, 58], "FMic": [16, 0, 0, 16], "FPGr": [57, 0, 0, 57], "FPMb": [55, 0, 55, 0], "FPRr": [162, 0, 0, 162], "FPSr": [9, 0, 0, 9], "FQ4p": [171, 23, 148, 0], "FR2p": [112, 0, 112, 0], "FS2a": [71, 0, 0, 71], "FSat": [6, 0, 0, 6], "FSim": [22, 0, 0, 22], "FT3i": [573, 0, 0, 573], "FV3l": [108, 0, 0, 108]}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 162 filtered out; finished in 3.82s

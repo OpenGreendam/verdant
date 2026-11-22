@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 5;
 /// The host announces itself with this string.
 pub const HOST_NAME: &str = "verdant-plughost";
 
@@ -143,6 +143,36 @@ pub fn decode_note(id: u32, value: f64) -> Option<NoteEvent> {
     Some(if id & NOTE_ON != 0 { NoteEvent::On { key, velocity: value } } else { NoteEvent::Off { key } })
 }
 
+
+/// Bounded channel-expression events for native instruments and effect MIDI learn.
+/// The namespace is separate from notes and from stable parameter indices.
+pub const MIDI_EVENT:u32=1<<30;
+#[derive(Clone,Copy,Debug,PartialEq)]
+pub enum MidiEvent {
+ Control{channel:u8,controller:u8,value:f64},
+ PitchBend{channel:u8,value:f64},
+ Pressure{channel:u8,value:f64},
+ PolyPressure{channel:u8,key:u8,value:f64},
+}
+pub fn midi_control(channel:u8,controller:u8,offset:u32,value:f64)->ParamEvent{(MIDI_EVENT|((channel as u32&15)<<16)|(controller as u32&127),offset,value)}
+pub fn midi_pitch_bend(channel:u8,offset:u32,value:f64)->ParamEvent{(MIDI_EVENT|((channel as u32&15)<<16)|0x100,offset,value)}
+pub fn midi_pressure(channel:u8,offset:u32,value:f64)->ParamEvent{(MIDI_EVENT|((channel as u32&15)<<16)|0x200,offset,value)}
+pub fn midi_poly_pressure(channel:u8,key:u8,offset:u32,value:f64)->ParamEvent{(MIDI_EVENT|((channel as u32&15)<<16)|0x300|(key as u32&127),offset,value)}
+pub fn note_on_channel(channel:u8,key:u8,offset:u32,velocity:f64)->ParamEvent{let(mut id,o,v)=note_on(key,offset,velocity);id|=(channel as u32&15)<<16;(id,o,v)}
+pub fn note_off_channel(channel:u8,key:u8,offset:u32)->ParamEvent{let(mut id,o,v)=note_off(key,offset);id|=(channel as u32&15)<<16;(id,o,v)}
+pub fn valid_note_event(id:u32,value:f64)->bool {id&NOTE_EVENT!=0&&id&!(NOTE_EVENT|NOTE_ON|0xf0000|127)==0&&value.is_finite()&&(0.0..=1.0).contains(&value)}
+pub fn decode_midi(id:u32,value:f64)->Option<MidiEvent>{
+ if id&MIDI_EVENT==0||id&!(MIDI_EVENT|0xf0000|0x37f)!=0||!value.is_finite(){return None;}
+ let channel=((id>>16)&15)as u8;
+ match id&0x300 {
+  0 if (0.0..=1.0).contains(&value)=>Some(MidiEvent::Control{channel,controller:(id&127)as u8,value}),
+  0x100 if id&127==0&&(-1.0..=1.0).contains(&value)=>Some(MidiEvent::PitchBend{channel,value}),
+  0x200 if id&127==0&&(0.0..=1.0).contains(&value)=>Some(MidiEvent::Pressure{channel,value}),
+  0x300 if (0.0..=1.0).contains(&value)=>Some(MidiEvent::PolyPressure{channel,key:(id&127)as u8,value}),
+  _=>None,
+ }
+}
+
 pub(crate) fn validate_event_quanta(events: &[ParamEvent], frames: usize,
     quantum: usize, carry_frames: usize, carry_events: usize) -> Result<(), AutomationError> {
     if quantum == 0 || carry_frames >= quantum || carry_events > MAX_PARAM_EVENTS {
@@ -202,6 +232,11 @@ pub enum HostRequest {
     GetParams { id: u64 },
     /// Control-only admission of native automation targets; never sent by RT.
     GetAutomationParams { id: u64 },
+    /// Bounded measured input/output history; analyzed on a client background
+    /// thread. This request never runs in an audio callback.
+    GetTelemetry { id: u64 },
+    ResetMeters { id:u64 },
+    MidiEvents { id:u64, events:Vec<(u32,f64)> },
     GetState { id: u64 },
     /// Base64 blob previously produced by GetState on the same plugin id+version.
     SetState { id: u64, state_b64: String },
@@ -243,6 +278,7 @@ pub enum HostMessage {
 /// - `instantiate` ok: `{"plugin_id": "…", "latency": n, "has_editor": bool, "name": "…"}`
 /// - `get_params` ok: `{"params": [{"id","name","value","min","max","default","unit","step_count"}]}`
 /// - `get_state` ok: `{"state_b64": "…"}`
+/// - `get_telemetry` ok: `{"telemetry": TelemetryFrame}` (see `telemetry` module)
 /// - `open_editor` ok: `{}` (failure → ok:false with error)
 ///
 /// `Event.event` names: `"param_changed"`, `"latency_changed"`,

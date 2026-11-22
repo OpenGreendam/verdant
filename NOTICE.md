@@ -114,3 +114,19 @@ CFinal 的条件网络、ONNX 实数 DFT/WOLA 解码器与宿主分块算法由 
 - **黄亦天 / L8N DEMO 素材制作者**：用户提供的 `L8N DEMO.zip` 内署名与说明，将该素材描述为某商业歌声合成软件的 2010 童声，并说明做过限幅处理。压缩包 SHA-256 为 `74fa274ebc30590d93ac414fda1f539d4c2d8ffc9a0d4e7f6fc3e2ed90b8be2e`。这些是经过处理的参考录音；其来源链和原 sn16k HMM 的来源链分别记录，不声称它们是已经核实的逐样本原引擎输出。语料清单保留全部 403 个 WAV 的指纹、实际解析标签、固定划分与排除原因。
 
 CFinal 研究的原始 TKN、叶统计量、学习权重与参考录音保留各自来源。随包 ONNX 基座按 0.1.0 的角色和 SHA-256 清单分发。本地安装记录原始文件匹配与本地使用声明。[发行](RELEASE.md) · [授权清单](frontend/packaging/verdant-voice/POLICY.json)
+
+
+## 原生音频设备与 FFP 参数互操作研究
+
+内置效果器、合成器、调制矩阵和 Adwaita 风格界面由 Verdant 独立实现。FabFilter 产品名用于说明功能参照，原厂商标、界面位图、安装包、出厂预设和专有 DSP 不作为本仓库素材分发。官方用户手册为交互与功能定义的研究来源，具体对应与实现边界见[原生插件说明](frontend/docs/NATIVE-PLUGIN-SUITE.md)。
+
+FFP 导入器依据公开格式记录、作者测量的参数表及仅在本地检查的原厂预设结构编写。参数翻译报告保留不可映射内容，不将格式识别或数值翻译表述为音色等价：
+
+- **William Viker**，2026，[rew2fabfilter](https://github.com/willosof/rew2fabfilter)：FFP/Q4 结构研究，含 **Per Ivar Nerseth** 的早期格式工作归属；[MIT 原文](spec/licenses/FFP-rew2fabfilter-MIT.txt)。
+- **RaoulDotSH**，2024，[preset-toolkit](https://github.com/raoulsh/preset-toolkit)：Q3 二进制字段研究；[MIT 原文](spec/licenses/FFP-preset-toolkit-MIT.txt)。
+- **Per Ivar Nerseth**，2017，[REWEQ2EQPreset](https://github.com/perivar/REWEQ2EQPreset)：早期 FFP 格式研究；[MIT 原文](spec/licenses/FFP-REWEQ2EQPreset-MIT.txt)。
+- **phierceweb / logicxkit 贡献者**，[logicxkit](https://github.com/phierceweb/logicxkit)：Q4 与 Pro-MB 的实测参数序号／转换表；[Apache 2.0 原文](spec/licenses/FFP-logicxkit-APACHE-2.0.txt)。
+
+仓库中的预设解析测试使用独立编写的合成数据，不包含商业预设集合。官方样本集合的本地结构检验数量只证明当次解析覆盖，不改变原文件的权利归属，也不构成 FabFilter 兼容性认证。
+
+响度计算参考 [ITU-R BS.1770](https://www.itu.int/rec/R-REC-BS.1770) 的 K 加权与节目响度算法，以及 [EBU Tech 3341](https://tech.ebu.ch/docs/tech/tech3341.pdf) 的测量窗口／门限约定。当前是立体声独立实现与校准回归，没有声明取得广播、Dolby Atmos 或其他第三方认证。

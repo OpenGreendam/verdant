@@ -301,9 +301,9 @@ impl CommandTarget for Editor {
             (C::StartWorker, A::None) => { self.start_worker(cx); return; }
             (C::RenderNow, A::None) => { self.render_now(cx); return; }
             (C::PluginAdd, A::TrackSlot(id, slot)) => { self.plugin_picker(id, slot as usize, window.mouse_position(), window, cx); return; }
-            (C::PluginBypass, A::TrackSlot(track, slot)) => MenuAction::BypassInsert { track, slot: slot as usize },
-            (C::PluginRemove, A::TrackSlot(track, slot)) => MenuAction::RemoveInsert { track, slot: slot as usize },
-            (C::PluginOpenEditor, A::TrackSlot(track, slot)) => MenuAction::OpenInsertEditor { track, slot: slot as usize },
+            (C::PluginBypass, A::TrackSlot(track, slot)) => MenuAction::BypassInsert { track, slot: slot as usize, expected_key: None },
+            (C::PluginRemove, A::TrackSlot(track, slot)) => MenuAction::RemoveInsert { track, slot: slot as usize, expected_key: None },
+            (C::PluginOpenEditor, A::TrackSlot(track, slot)) => MenuAction::OpenInsertEditor { track, slot: slot as usize, expected_key: None },
             (C::ChooseDevice, A::Text(id)) => MenuAction::ChooseDevice(id.to_string()),
             (C::ReopenDevice, A::None) => MenuAction::ReopenDevice,
             (C::OpenShortcuts, A::None) => MenuAction::ShowShortcutsWindow,

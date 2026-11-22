@@ -167,6 +167,8 @@ impl Timeline {
 /// (CLAP / VST3, out of process — see `frontend/docs/PLUGIN-HOST.md`) attach.
 pub trait Processor: Send {
     fn name(&self) -> &str;
+    /// Clear live voices after disconnect or bounded-event queue overflow.
+    fn reset(&mut self) {}
     fn process(&mut self, left: &mut [f32], right: &mut [f32]);
     /// Native parameter events are precompiled and bounded on the control side.
     /// An unsupported processor rejects the entire nonempty event call.
@@ -292,6 +294,7 @@ pub struct Shared {
     pub sample_rate: AtomicU64,
     pub swaps: AtomicU64,
     pub automation_fault: AtomicBool,
+    monitor_reset: AtomicU64,
     timeline_revision: AtomicU64,
     pub channels: Vec<ChannelCtl>,
     pub master: ChannelCtl,
@@ -313,6 +316,7 @@ impl Shared {
             sample_rate: AtomicU64::new(sample_rate as u64),
             swaps: AtomicU64::new(0),
             automation_fault: AtomicBool::new(false),
+            monitor_reset: AtomicU64::new(0),
             timeline_revision: AtomicU64::new(0),
             channels: (0..MAX_TRACKS).map(|_| ChannelCtl::default()).collect(),
             master: ChannelCtl::default(),
@@ -423,6 +427,11 @@ pub struct RtState {
     overlay_retire:rtrb::Producer<Box<Overlay>>,
     overlay:Option<Box<Overlay>>,
     overlay_position:usize,
+    monitor_in:rtrb::Consumer<Box<MonitorSwap>>,
+    monitor_retire:rtrb::Producer<Box<MonitorSwap>>,
+    monitor_events:rtrb::Consumer<(u64,u32,f64)>,
+    monitor:Option<Box<MonitorSwap>>,
+    monitor_l:Vec<f32>,monitor_r:Vec<f32>,monitor_offset:usize,
     playing: bool,
     transport_intent: u64,
     pos: u64,
@@ -445,8 +454,13 @@ pub struct Control {
     pending: Option<Box<TimelineSwap>>,
     overlay_out:rtrb::Producer<Box<Overlay>>,
     overlay_retired:rtrb::Consumer<Box<Overlay>>,
+    monitor_out:rtrb::Producer<Box<MonitorSwap>>,
+    monitor_retired:rtrb::Consumer<Box<MonitorSwap>>,
+    monitor_events:rtrb::Producer<(u64,u32,f64)>,monitor_revision:u64,
     block: usize,
 }
+
+struct MonitorSwap{revision:u64,track:usize,source:Option<Box<dyn Processor>>,retain:bool}
 
 struct Overlay{samples:Arc<[f32]>,block_transport:bool}
 
@@ -458,13 +472,16 @@ pub fn channel(sample_rate: u32, max_block: usize) -> (Control, RtState) {
     let (chain_retire, chain_retired) = rtrb::RingBuffer::new(MAX_TRACKS * 2);
     let (overlay_out,overlay_in)=rtrb::RingBuffer::new(4);
     let (overlay_retire,overlay_retired)=rtrb::RingBuffer::new(8);
+    let (monitor_out,monitor_in)=rtrb::RingBuffer::new(4);
+    let (monitor_retire,monitor_retired)=rtrb::RingBuffer::new(8);
+    let (monitor_events_out,monitor_events_in)=rtrb::RingBuffer::new(1024);
     let block = max_block.max(64);
     (
         Control {
             #[cfg(feature = "audio-device")]
             output_owner: None,
             shared: shared.clone(), outgoing, retired, chain_out, chain_retired,
-            chain_lengths: [0; MIXER_BUSES], chain_revision: 0, retired_chain_revision: 0, timeline_revision: 0, pending: None, overlay_out, overlay_retired, block },
+            chain_lengths: [0; MIXER_BUSES], chain_revision: 0, retired_chain_revision: 0, timeline_revision: 0, pending: None, overlay_out, overlay_retired, monitor_out,monitor_retired,monitor_events:monitor_events_out,monitor_revision:0,block },
         RtState {
             shared,
             incoming,
@@ -483,6 +500,8 @@ pub fn channel(sample_rate: u32, max_block: usize) -> (Control, RtState) {
             fade_tmp_r: vec![0.0; CROSSFADE_FRAMES as usize],
             parameter_events: vec![(0,0,0.);4096],
             overlay_in,overlay_retire,overlay:None,overlay_position:0,
+            monitor_in,monitor_retire,monitor_events:monitor_events_in,monitor:None,
+            monitor_l:vec![0.;block],monitor_r:vec![0.;block],monitor_offset:0,
             playing: false,
             transport_intent: INTENT_STOPPED,
             pos: 0,
@@ -500,6 +519,32 @@ pub struct ChannelSettings {
 }
 
 impl Control {
+    /// Install a bounded live instrument on a track before its insert chain.
+    /// Retire replaced allocations on the control side.
+    pub fn set_monitor(&mut self,track:usize,source:Option<Box<dyn Processor>>)->bool{
+        self.maintain();if track>=MAX_TRACKS||self.monitor_out.is_full(){return false;}
+        let revision=self.monitor_revision.wrapping_add(1);
+        if self.monitor_out.push(Box::new(MonitorSwap{revision,track,source,retain:false})).is_err(){return false;}
+        self.monitor_revision=revision;true
+    }
+    /// Move the current live source with its track while preserving its voices.
+    pub fn move_monitor(&mut self,track:usize)->bool{
+        self.maintain();if track>=MAX_TRACKS||self.monitor_out.is_full(){return false;}
+        self.monitor_out.push(Box::new(MonitorSwap{revision:self.monitor_revision,track,source:None,retain:true})).is_ok()
+    }
+    pub fn monitor_event(&mut self,id:u32,value:f64)->bool{
+        if !value.is_finite(){return false;}
+        if self.monitor_events.push((self.monitor_revision,id,value)).is_err(){self.shared.monitor_reset.store(self.monitor_revision,Ordering::Release);return false;}true
+    }
+    /// Publish a complete control-side parameter transaction in one release.
+    /// Lack of space leaves every event queued unchanged for a later retry.
+    pub fn monitor_events(&mut self,events:&[(u32,f64)])->bool{
+        if events.len()>1024||events.iter().any(|(_,value)|!value.is_finite()){return false;}
+        let revision=self.monitor_revision;
+        let Ok(chunk)=self.monitor_events.write_chunk_uninit(events.len())else{return false;};
+        chunk.fill_from_iter(events.iter().map(|&(id,value)|(revision,id,value)))==events.len()
+    }
+    pub fn reset_monitor(&self){self.shared.monitor_reset.store(self.monitor_revision,Ordering::Release);}
     pub fn play(&self) {
         // Do not cancel an unconsumed Stop: stop followed immediately by play
         // still restarts at the loop/project start on the next callback.
@@ -577,7 +622,7 @@ impl Control {
         self.timeline_revision += 1;
         let start = t.loop_range.filter(|(start, end)| start < end).map_or(0, |(start, _)| start);
         self.shared.return_position.store(start, Ordering::Release);
-        let keys = t.sidechains.iter().filter(|r| (r.source as usize) < MAX_TRACKS && (r.track as usize) < MAX_TRACKS && r.source != r.track)
+        let keys = t.sidechains.iter().filter(|r| (r.source as usize) < MAX_TRACKS && (r.track as usize) <= MASTER_BUS && r.source != r.track)
             .map(|&r| KeyLine::new(r, self.block)).collect();
         self.pending = Some(Box::new(TimelineSwap { revision: self.timeline_revision, timeline: t, keys }));
         self.maintain();
@@ -706,6 +751,7 @@ impl Control {
 
     /// Non-real-time housekeeping: push pending swaps, drop retired objects.
     pub fn maintain(&mut self) {
+        while let Ok(old)=self.monitor_retired.pop(){drop(old);}
         while let Ok(old)=self.overlay_retired.pop(){drop(old);}
         while let Ok(old) = self.retired.pop() {
             drop(old);
@@ -771,6 +817,11 @@ impl RtState {
             // an empty first installation, and provides a reclamation receipt.
             let _ = self.chain_retire.push(command);
         }
+        while !self.monitor_retire.is_full(){
+            let Ok(mut next)=self.monitor_in.pop()else{break;};
+            if next.retain{if let Some(current)=self.monitor.as_mut(){if current.revision==next.revision{next.source=current.source.take();}}}
+            if let Some(old)=self.monitor.replace(next){let _=self.monitor_retire.push(old);}
+        }
         let len = self.current.as_ref().map(|t| t.length).unwrap_or(0);
         shared.timeline_len.store(len, Ordering::Relaxed);
         // 2. Transport control.
@@ -793,6 +844,10 @@ impl RtState {
         stopped || seek != NO_SEEK
     }
 
+    pub(crate) fn has_monitor_source(&self)->bool{
+        self.monitor.as_ref().is_some_and(|monitor|monitor.source.is_some())
+    }
+
     pub(crate) fn explicitly_paused(&self) -> bool {
         matches!(self.transport_intent & INTENT_MASK, INTENT_PAUSED | INTENT_STOPPED)
     }
@@ -807,13 +862,43 @@ impl RtState {
     /// callback. This does not consume another asynchronous transport command.
     pub(crate) fn process_prepared(&mut self,out:&mut[f32],channels:usize){
         let started=std::time::Instant::now();let channels=channels.max(1);let frames=out.len()/channels;out.fill(0.);
+        self.monitor_offset=0;
+        if frames<=self.monitor_l.len(){
+            self.monitor_l[..frames].fill(0.);self.monitor_r[..frames].fill(0.);
+            let mut count=0;
+            let revision=self.monitor.as_ref().map_or(0,|m|m.revision);
+            // Snapshot the publication boundary so a concurrent transaction
+            // is either entirely present or deferred to the next callback.
+            let available=self.monitor_events.slots().min(1024);
+            for _ in 0..available{
+                let Ok(&(event_revision,_,_))=self.monitor_events.peek()else{break;};
+                if event_revision>revision{break;}
+                let Ok((event_revision,id,value))=self.monitor_events.pop()else{break;};
+                if event_revision==revision{self.parameter_events[count]=(id,0,value);count+=1;}
+            }
+            // A reset for a newly queued source must survive until that source
+            // is installed at the next callback boundary. CAS preserves any
+            // newer request published after this load.
+            let reset=self.shared.monitor_reset.load(Ordering::Acquire);
+            let reset_current=reset!=0&&reset<=revision
+                &&self.shared.monitor_reset.compare_exchange(reset,0,Ordering::AcqRel,Ordering::Acquire).is_ok()
+                &&reset==revision;
+            if let Some(source)=self.monitor.as_mut().and_then(|m|m.source.as_mut()){
+                if reset_current{source.reset();count=0;}
+                if !source.process_automated(&mut self.monitor_l[..frames],&mut self.monitor_r[..frames],&self.parameter_events[..count]){
+                    source.reset();self.monitor_l[..frames].fill(0.);self.monitor_r[..frames].fill(0.);
+                }
+            }
+        }
         if frames>self.mix_l.len(){self.shared.underruns.fetch_add(1,Ordering::Relaxed);}
         else if self.playing{
             let mut written=0;
             while written<frames&&self.playing{
                 if let Some(overlay)=self.overlay.as_ref().filter(|o|o.block_transport&&self.overlay_position<o.samples.len()){
                     let count=(frames-written).min(overlay.samples.len()-self.overlay_position);
-                    for(i,frame)in out[written*channels..(written+count)*channels].chunks_exact_mut(channels).enumerate(){let value=overlay.samples[self.overlay_position+i];frame[0]=value;if channels>1{frame[1]=value;}}
+                    let start=self.overlay_position;
+                    let _=self.render_span(&mut out[written*channels..(written+count)*channels],channels,false);
+                    if let Some(overlay)=self.overlay.as_ref(){for(i,frame)in out[written*channels..(written+count)*channels].chunks_exact_mut(channels).enumerate(){let value=overlay.samples[start+i];frame[0]+=value;if channels>1{frame[1]+=value;}}}
                     self.overlay_position+=count;written+=count;continue;
                 }
                 let length=self.current.as_ref().map_or(0,|t|t.length);
@@ -822,11 +907,15 @@ impl RtState {
                 let boundary=loop_range.map_or(length,|(_,end)|end);
                 if self.pos>=boundary{self.finish_material();break;}
                 let count=(frames-written).min((boundary-self.pos)as usize);
-                if !self.render_span(&mut out[written*channels..(written+count)*channels],channels){self.playing=false;break;}
+                if !self.render_span(&mut out[written*channels..(written+count)*channels],channels,true){self.playing=false;break;}
                 self.pos+=count as u64;written+=count;
                 if let Some((start,end))=loop_range{if self.pos==end{self.pos=start;}}
                 else if self.pos>=length{self.pos=length;self.finish_material();}
             }
+        }
+        if frames<=self.mix_l.len() && self.monitor.as_ref().is_some_and(|m|m.source.is_some()) && self.monitor_offset<frames{
+            let start=self.monitor_offset;
+            let _=self.render_span(&mut out[start*channels..],channels,false);
         }
         if let Some(overlay)=self.overlay.as_ref().filter(|o|!o.block_transport){
             let count=frames.min(overlay.samples.len().saturating_sub(self.overlay_position));for(i,frame)in out.chunks_exact_mut(channels).take(count).enumerate(){let value=overlay.samples[self.overlay_position+i];frame[0]=soft_clip(frame[0]+value);if channels>1{frame[1]=soft_clip(frame[1]+value);}}self.overlay_position+=count;
@@ -843,18 +932,23 @@ impl RtState {
         if self.shared.seek.load(Ordering::Acquire)==NO_SEEK&&!self.shared.stop.load(Ordering::Acquire){let _=self.shared.transport_intent.compare_exchange(self.transport_intent,ended,Ordering::AcqRel,Ordering::Acquire);}
         self.playing=false;
     }
-    fn render_span(&mut self,out:&mut[f32],channels:usize)->bool{
+    fn render_span(&mut self,out:&mut[f32],channels:usize,include_material:bool)->bool{
         let frames=out.len()/channels;let pos=self.pos;
         let(ml,mr)=(&mut self.mix_l[..frames],&mut self.mix_r[..frames]);ml.fill(0.);mr.fill(0.);
-        let fading=self.fading.as_ref().filter(|(_,remaining)|*remaining>0);
-        let used=self.current.as_ref().map_or(0,|t|t.used_tracks()).max(fading.map_or(0,|(old,_)|old.used_tracks())).min(MAX_TRACKS);
+        let fading=self.fading.as_ref().filter(|(_,remaining)|include_material&&*remaining>0);
+        let monitor_track=self.monitor.as_ref().filter(|m|m.source.is_some()).map(|m|m.track);
+        let used=if include_material{self.current.as_ref().map_or(0,|t|t.used_tracks()).max(fading.map_or(0,|(old,_)|old.used_tracks()))}else{0};
+        let used=used.max(monitor_track.map_or(0,|t|t+1)).min(MAX_TRACKS);
         let any_solo=self.shared.channels.iter().any(|c|c.solo.load(Ordering::Relaxed));
         // Pass 1: every track's source material, so sidechain keys can read
         // any track's pre-insert signal regardless of track order.
         let mut material=[false;MAX_TRACKS];
         for ti in 0..used{
             let(bl,br)=(&mut self.bus_l[ti][..frames],&mut self.bus_r[ti][..frames]);bl.fill(0.);br.fill(0.);
-            material[ti]=self.current.as_ref().is_some_and(|t|t.mix_stereo(ti as u16,pos,bl,br));
+            material[ti]=include_material&&self.current.as_ref().is_some_and(|t|t.mix_stereo(ti as u16,pos,bl,br));
+            if monitor_track==Some(ti){
+                for i in 0..frames {bl[i]+=self.monitor_l[self.monitor_offset+i];br[i]+=self.monitor_r[self.monitor_offset+i];}material[ti]=true;
+            }
             if let Some((old,remaining))=fading{let n=(*remaining as usize).min(frames);let(pl,pr)=(&mut self.fade_tmp[..n],&mut self.fade_tmp_r[..n]);pl.fill(0.);pr.fill(0.);material[ti]|=old.mix_stereo(ti as u16,pos,pl,pr);for i in 0..n{let old_gain=(*remaining as usize-i)as f32/CROSSFADE_FRAMES as f32;bl[i]=bl[i]*(1.-old_gain)+pl[i]*old_gain;br[i]=br[i]*(1.-old_gain)+pr[i]*old_gain;}}
         }
         if let Some(current)=self.current.as_mut(){
@@ -880,10 +974,12 @@ impl RtState {
             }else{let(gl,gr)=if audible{crate::automation_clock::balance_gains(gain,pan)}else{(0.,0.)};for i in 0..frames{bl[i]*=gl;br[i]*=gr;ml[i]+=bl[i];mr[i]+=br[i];}}
             ctl.peak_l.fetch_max(peak(bl).to_bits(),Ordering::Relaxed);ctl.peak_r.fetch_max(peak(br).to_bits(),Ordering::Relaxed);
         }
-        if let Some(clicks)=self.current.as_ref().and_then(|t|t.metronome.as_ref()){clicks.mix(pos,ml,mr);}
+        if include_material{if let Some(clicks)=self.current.as_ref().and_then(|t|t.metronome.as_ref()){clicks.mix(pos,ml,mr);}}
         if let Some(chain)=&mut self.chains[MASTER_BUS]{
             let schedules=self.current.as_ref().map(|t|t.master_native_automation.as_slice()).unwrap_or(&[]);
-            if !process_chain(&mut chain.chain,schedules,pos,ml,mr,&mut self.parameter_events,&|_|None){self.shared.automation_fault.store(true,Ordering::Release);return false;}
+            let keys=self.current.as_ref().map(|t|t.keys.as_slice()).unwrap_or(&[]);
+            let key=|processor:usize|keys.iter().find(|k|k.route.track as usize==MASTER_BUS&&k.route.processor as usize==processor).map(|k|(&k.out_l[..frames],&k.out_r[..frames]));
+            if !process_chain(&mut chain.chain,schedules,pos,ml,mr,&mut self.parameter_events,&key){self.shared.automation_fault.store(true,Ordering::Release);return false;}
         }
         let master_muted=self.shared.master.mute.load(Ordering::Relaxed);
         let gain=f32::from_bits(self.shared.master.gain.load(Ordering::Relaxed));let pan=f32::from_bits(self.shared.master.pan.load(Ordering::Relaxed));
@@ -892,7 +988,7 @@ impl RtState {
         else{let(gl,gr)=crate::automation_clock::balance_gains(gain,pan);for i in 0..frames{ml[i]=soft_clip(ml[i]*gl);mr[i]=soft_clip(mr[i]*gr);}}
         self.shared.master.peak_l.fetch_max(peak(ml).to_bits(),Ordering::Relaxed);self.shared.master.peak_r.fetch_max(peak(mr).to_bits(),Ordering::Relaxed);
         for(i,frame)in out.chunks_exact_mut(channels).enumerate(){if channels==1{frame[0]=0.5*(ml[i]+mr[i]);}else{frame[0]=ml[i];frame[1]=mr[i];}}
-        if let Some((_,remaining))=&mut self.fading{*remaining-=(*remaining as usize).min(frames)as u32;}true
+        if let Some((_,remaining))=&mut self.fading{*remaining-=(*remaining as usize).min(frames)as u32;}self.monitor_offset+=frames;true
     }
 
 }
@@ -1160,4 +1256,86 @@ mod tests {
             assert_eq!(seen.len(), 32);
         }
     }
+}
+
+#[cfg(test)]
+mod monitor_tests {
+ use super::*;
+ struct NoteSource {value:f32,retired:Arc<AtomicBool>}
+ impl Drop for NoteSource {fn drop(&mut self){self.retired.store(true,Ordering::SeqCst);}}
+ impl Processor for NoteSource {
+  fn name(&self)->&str{"live test"}
+  fn reset(&mut self){self.value=0.;}
+  fn process(&mut self,l:&mut[f32],r:&mut[f32]){l.fill(self.value);r.fill(self.value);}
+  fn process_automated(&mut self,l:&mut[f32],r:&mut[f32],events:&[(u32,u32,f64)])->bool{for &(_,_,v)in events{self.value=v as f32;}self.process(l,r);true}
+ }
+ #[test]fn monitor_plays_while_stopped_through_track_and_master_and_retires_off_callback(){
+  let(mut ctl,mut rt)=channel(48000,256);let retired=Arc::new(AtomicBool::new(false));
+  assert!(ctl.set_chain(0,vec![Box::new(GainProcessor(2.))]));
+  ctl.set_channel(0,ChannelSettings{gain:0.5,pan:0.,mute:false,solo:false});
+  ctl.set_master(ChannelSettings{gain:0.5,pan:0.,mute:false,solo:false});
+  assert!(ctl.set_monitor(0,Some(Box::new(NoteSource{value:0.,retired:retired.clone()}))));
+  assert!(ctl.monitor_event(1,0.2));let mut out=[0.;512];rt.process(&mut out,2);
+  assert!(out.iter().all(|s|(*s-0.1).abs()<1e-6));assert_eq!(ctl.position(),0);
+  ctl.reset_monitor();rt.process(&mut out,2);assert!(out.iter().all(|s|*s==0.));
+  assert!(ctl.set_monitor(0,None));rt.process(&mut out,2);assert!(!retired.load(Ordering::SeqCst));ctl.maintain();assert!(retired.load(Ordering::SeqCst));
+ }
+ #[test]fn monitor_transactions_are_atomic_and_old_instance_events_cannot_reach_replacement(){
+  let(mut ctl,mut rt)=channel(48000,256);let retired=Arc::new(AtomicBool::new(false));
+  ctl.set_monitor(0,Some(Box::new(NoteSource{value:0.,retired:retired.clone()})));
+  assert!(ctl.monitor_events(&[(1,0.2),(1,0.4)]));
+  assert!(!ctl.monitor_events(&[(1,0.7),(1,f64::NAN)]));
+  let mut out=[0.;512];rt.process(&mut out,2);assert!(out.iter().all(|v|(*v-0.4).abs()<1e-6));
+  ctl.monitor_event(1,0.8);ctl.set_monitor(1,Some(Box::new(NoteSource{value:0.,retired})));
+  rt.process(&mut out,2);assert!(out.iter().all(|v|*v==0.));
+  ctl.monitor_event(1,0.3);ctl.set_channel(0,ChannelSettings{gain:0.,pan:0.,mute:true,solo:false});
+  assert!(ctl.move_monitor(0));rt.process(&mut out,2);assert!(out.iter().all(|v|*v==0.));
+  assert!(ctl.move_monitor(1));rt.process(&mut out,2);assert!(out.iter().all(|v|(*v-0.3).abs()<1e-6));
+ }
+ #[test]fn a_retired_monitor_reset_cannot_discard_a_new_instruments_first_note(){
+  let(mut ctl,mut rt)=channel(48000,256);let retired=Arc::new(AtomicBool::new(false));
+  ctl.set_monitor(0,Some(Box::new(NoteSource{value:0.2,retired:retired.clone()})));
+  let mut out=[0.;512];rt.process(&mut out,2);
+  ctl.reset_monitor();ctl.set_monitor(1,Some(Box::new(NoteSource{value:0.,retired})));
+  ctl.monitor_event(1,0.4);rt.process(&mut out,2);
+  assert!(out.iter().all(|v|(*v-0.4).abs()<1e-6));
+ }
+ #[test]fn a_future_monitor_overflow_is_retained_until_its_source_is_installed(){
+  let(mut ctl,mut rt)=channel(48000,256);let retired=Arc::new(AtomicBool::new(false));
+  ctl.set_monitor(0,Some(Box::new(NoteSource{value:0.2,retired:retired.clone()})));
+  rt.prepare_callback();
+  // The GUI publishes after this callback's swap boundary but before rendering.
+  ctl.set_monitor(1,Some(Box::new(NoteSource{value:0.5,retired})));
+  for _ in 0..1024{assert!(ctl.monitor_event(1,0.8));}
+  assert!(!ctl.monitor_event(1,0.));
+  let mut out=[0.;512];rt.process_prepared(&mut out,2);
+  assert!(out.iter().all(|v|(*v-0.2).abs()<1e-6),"future reset leaves the active source intact");
+  rt.process(&mut out,2);
+  assert!(out.iter().all(|v|*v==0.),"overflow releases the new source at its own callback boundary");
+ }
+ #[test]fn overflow_releases_voices_instead_of_leaving_a_stuck_note(){
+  let(mut ctl,mut rt)=channel(48000,256);ctl.set_monitor(0,Some(Box::new(NoteSource{value:0.2,retired:Arc::new(AtomicBool::new(false))})));
+  for _ in 0..1024{assert!(ctl.monitor_event(1,0.2));}assert!(!ctl.monitor_event(1,0.));
+  let mut out=[0.;512];rt.process(&mut out,2);assert!(out.iter().all(|s|*s==0.));
+ }
+}
+
+#[cfg(test)]
+mod master_key_tests {
+ use super::*;
+ struct KeyProbe;
+ impl Processor for KeyProbe{
+  fn name(&self)->&str{"master key test"}
+  fn process(&mut self,l:&mut[f32],r:&mut[f32]){l.fill(0.);r.fill(0.);}
+  fn process_keyed(&mut self,l:&mut[f32],r:&mut[f32],key:(&[f32],&[f32]),_:&[(u32,u32,f64)])->bool{l.copy_from_slice(key.0);r.copy_from_slice(key.1);true}
+ }
+ #[test]fn master_sidechain_reads_muted_track_pre_insert_with_exact_alignment(){
+  let(mut control,mut rt)=channel(48000,256);
+  let mut timeline=Timeline::new(48000,vec![Clip{start:0,samples:vec![0.2;256].into(),gain:1.,track:0}]);
+  timeline.sidechains=vec![SidechainRoute{source:0,track:MASTER_BUS as u16,processor:0,delay:3}];
+  control.set_channel(0,ChannelSettings{gain:0.,pan:0.,mute:true,solo:false});
+  control.set_master_chain(vec![Box::new(KeyProbe)]);
+  control.set_timeline(timeline);control.play();let mut out=[0.;512];rt.process(&mut out,2);
+  assert_eq!(&out[..6],&[0.;6]);assert!(out[6..].iter().all(|s|(*s-0.2).abs()<1e-7));
+ }
 }

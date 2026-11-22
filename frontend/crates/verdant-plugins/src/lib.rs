@@ -32,8 +32,10 @@ pub mod insert;
 pub mod plugin;
 pub mod project;
 pub mod proto;
+pub mod preset_interop;
 pub mod scan;
 pub mod shm;
+pub mod telemetry;
 
 #[cfg(feature = "client")]
 pub use bridge::{DelayPad, RemoteInsert, RemoteState};
