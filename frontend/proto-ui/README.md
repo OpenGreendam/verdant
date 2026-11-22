@@ -25,6 +25,8 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 
 ## 再生成与两类检查
 
+当前主线把 GUI binary 命名为 `verdant-gui`，`verdant` 是 CLI；下面的 app 测试命令使用 GUI target。#79 的实际结果仍绑定其原始 checkout 与包格式，后续主线集成的检查另见 PR Checks。
+
 使用 Node 24.x、pnpm 10.32.1，将 Proto-UI 检出到 pin 的完整 commit。以下命令从仓库根执行：
 
 ```sh
@@ -80,11 +82,11 @@ PROTO_UI_UPSTREAM="$PWD/../Proto-UI" corepack pnpm@10.32.1 --dir frontend/proto-
 node frontend/proto-ui/tools/check-cargo-gpui.mjs --offline
 
 (cd frontend && cargo test --locked -p verdant-ui-protocol -p verdant-session)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant host_pointer::tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant proto_knob::tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant devices::native_tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant roll::native_tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant pointer_boundary_tests)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui host_pointer::tests)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui proto_knob::tests)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui devices::native_tests)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui roll::native_tests)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui pointer_boundary_tests)
 ```
 
 离线 Cargo graph 检查前，需要在 `frontend/` 中执行过 `cargo fetch --locked`。Rust 测试进入该目录执行，使 rustup 采用其中的固定工具链。
