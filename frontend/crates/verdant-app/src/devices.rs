@@ -223,7 +223,9 @@ impl Editor {
     /// Window notifications cannot cancel a capture acquired by another editor
     /// window. Project changes still use the unconditional cancellation path.
     pub(crate) fn cancel_device_drag_in(&mut self, window: gpui::AnyWindowHandle, cx: &mut Context<Self>) {
-        if self.device_drag.as_ref().and_then(|drag| drag.capture.as_ref()).is_some_and(|capture| capture.window() == window) {
+        if self.device_drag.as_ref().is_some_and(|drag|
+            drag.source.as_ref().is_some_and(|source| source.window() == window)
+                || drag.capture.as_ref().is_some_and(|capture| capture.window() == window)) {
             self.cancel_device_drag(cx);
         }
     }
@@ -1916,6 +1918,39 @@ mod native_tests {
     }
 
     #[gpui::test]
+    fn graph_lost_or_replaced_capture_cannot_commit_or_release_its_successor(cx: &mut TestAppContext) {
+        for replacement in [false, true] {
+            for terminal_only in [false, true] {
+                let window = open(cx, false);
+                window.update(cx, |host, window, cx| {
+                    down(host, window, cx);
+                    let hitbox = window.captured_hitbox().unwrap();
+                    let successor = if replacement {
+                        Some(crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx))
+                    } else {
+                        window.release_pointer(); None
+                    };
+                    if !terminal_only {
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: start(host) + point(px(20.), px(-12.)),
+                            pressed_button: Some(MouseButton::Left), ..Default::default()
+                        }), cx);
+                        assert!(host.editor.read(cx).device_drag.is_none());
+                        if let Some(successor) = successor.as_ref() {
+                            assert!(successor.is_current(window, cx), "old cancellation preserves the newer capture");
+                        }
+                    }
+                    up(window, cx);
+                    assert!(host.editor.read(cx).device_drag.is_none());
+                    assert_eq!(host.editor.read(cx).revision().get(), 0);
+                    assert_eq!(gain(host, cx), host.desc.value);
+                    if let Some(successor) = successor { successor.release(window, cx); }
+                }).unwrap();
+            }
+        }
+    }
+
+    #[gpui::test]
     fn graph_stale_track_slot_and_value_cannot_reach_the_store(cx: &mut TestAppContext) {
         for change in ["track", "slot", "value", "generation"] {
             let window = open(cx, false);
@@ -2024,14 +2059,51 @@ mod native_tests {
             assert!(!host.editor.read(cx).has_proto_pointer_contact());
 
             down(host, window, cx);
+            let graph_contact = host.editor.read(cx).proto_pointer_contact.as_ref()
+                .and_then(std::rc::Weak::upgrade).expect("the compiled graph owns its contact");
             touch(gpui::TouchPhase::Started, touch_start, window, cx);
-            assert!(!host.editor.read(cx).has_proto_pointer_contact());
+            let current_contact = host.editor.read(cx).proto_pointer_contact.as_ref()
+                .and_then(std::rc::Weak::upgrade).expect("the graph contact remains live");
+            assert!(Rc::ptr_eq(&graph_contact, &current_contact), "the knob cannot replace the graph contact");
+            assert!(current_contact.is_active());
             assert!(host.editor.read(cx).device_drag.is_some());
             touch(gpui::TouchPhase::Cancelled, touch_start, window, cx);
             up(window, cx);
             assert_eq!(gain(host, cx), host.desc.max);
             assert_eq!(host.editor.read(cx).revision().get(), 1);
         }).unwrap();
+    }
+
+    #[gpui::test]
+    fn production_graph_touch_has_no_mouse_capture_and_obeys_its_window_retirement(cx: &mut TestAppContext) {
+        for cancel in [false, true] {
+            let window = open(cx, false);
+            window.update(cx, |host, window, cx| {
+                let origin = start(host);
+                let touch = |phase, position, window: &mut Window, cx: &mut App| {
+                    window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+                        id: gpui::TouchId(91), phase, position, ..Default::default()
+                    }), cx);
+                };
+                touch(gpui::TouchPhase::Started, origin, window, cx);
+                assert!(host.editor.read(cx).device_drag.is_some(), "production graph accepts touch");
+                assert!(window.captured_hitbox().is_none(), "touch uses its own gesture arena");
+                up(window, cx);
+                assert!(host.editor.read(cx).device_drag.is_some(), "mouse release cannot terminate touch");
+                touch(gpui::TouchPhase::Moved, origin + point(px(0.), px(-12.)), window, cx);
+                if cancel {
+                    host.editor.update(cx, |ed, cx| ed.cancel_device_drag_in(window.window_handle(), cx));
+                    assert!(host.editor.read(cx).device_drag.is_none());
+                }
+                touch(gpui::TouchPhase::Ended, origin + point(px(0.), px(-20.)), window, cx);
+                assert!(host.editor.read(cx).device_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+                assert_eq!(host.editor.read(cx).revision().get(), if cancel { 0 } else { 1 });
+                if cancel { assert_eq!(gain(host, cx), host.desc.value); }
+                else { assert!(gain(host, cx) > host.desc.value); }
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+        }
     }
 
     #[gpui::test]

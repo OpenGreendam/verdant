@@ -99,6 +99,9 @@ fn drain(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window,cx:&mut
                 let _=target.editor.update(cx,|ed,cx|{
                     if !target.current(ed,cx){return;}
                     if let Some(mut drag)=ed.device_drag.take(){if let Some(capture)=drag.capture.take(){capture.release(window,cx);}}
+                    // Every accepted source proposal addresses this band,
+                    // including keyboard and assistive edits without a press.
+                    if let Control::Band(index)=target.point.control{select_band(ed,target.target.key,index);}
                     write_if_current(ed,&target.target,values,cx);cx.notify();
                 });
             },
@@ -115,7 +118,10 @@ fn drain(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window,cx:&mut
                 let axis=if payload.get("axis").and_then(Value::as_str)==Some("x"){&target.point.x}else{&target.point.y};
                 if let Some((id,_))=axis {
                     if let Some(editor)=target.editor.upgrade(){
-                        if target.current(editor.read(cx),cx){if let Some(desc)=target.basis.as_ref().and_then(|basis|param(&basis.params,id)).cloned(){open_parameter_value(&editor,target.target.track.clone(),target.target.slot,target.target.key,desc,cx);}}
+                        if target.current(editor.read(cx),cx){if let Some(desc)=target.basis.as_ref().and_then(|basis|param(&basis.params,id)).cloned(){
+                            if let Control::Band(index)=target.point.control{editor.update(cx,|ed,cx|{select_band(ed,target.target.key,index);cx.notify();});}
+                            open_parameter_value(&editor,target.target.track.clone(),target.target.slot,target.target.key,desc,cx);
+                        }}
                     }
                 }
             },_=>{},
@@ -132,6 +138,7 @@ fn cancel_source(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window
 #[derive(Clone)]
 pub(super) struct Retirement {handle:GraphPointHandle,contact:Rc<crate::proto_knob::Contact>,window:gpui::AnyWindowHandle}
 impl Retirement {
+    pub(super) fn window(&self)->gpui::AnyWindowHandle { self.window }
     pub(super) fn cancel(&self,cx:&mut App){
         let expected=self.contact.generation.get();self.contact.input.set(None);
         let this=self.clone();cx.defer(move |cx|{
@@ -147,6 +154,14 @@ impl Retirement {
 struct Binding {handle:GraphPointHandle,target:Rc<RefCell<PointTarget>>,double:Rc<Cell<bool>>,
     contact:Rc<crate::proto_knob::Contact>,window:gpui::AnyWindowHandle,app:gpui::AsyncApp}
 impl Binding {
+    fn acquisition_current(&self,target:&PointTarget,input:MoveGestureInput,window:&Window,cx:&App)->bool{
+        target.editor.upgrade().is_some_and(|entity|{
+            let ed=entity.read(cx);
+            target.current(ed,cx)&&ed.device_drag.as_ref().is_some_and(|drag|
+                target.owns(drag)&&(input!=MoveGestureInput::Mouse
+                    ||drag.capture.as_ref().is_some_and(|capture|capture.is_current(window,cx))))
+        })
+    }
     fn inside(&self,sample:&MoveGestureSample,window:&Window)->bool{
         self.handle.owner.borrow().native_hitbox.as_ref().is_some_and(|hitbox|crate::host_pointer::contains_window_point(window,
             (f64::from(hitbox.bounds.origin.x)+sample.position.x,f64::from(hitbox.bounds.origin.y)+sample.position.y)))
@@ -178,19 +193,23 @@ impl MoveGestureBinding for Binding {
         let x=state(&self.handle,"x").and_then(|v|v.as_f64()).unwrap_or(0.);
         let y=state(&self.handle,"y").and_then(|v|v.as_f64()).unwrap_or(0.);
         let initial=target.values(x,y).unwrap_or_default();
-        let capture=crate::host_pointer::OwnedPointerCapture::acquire(hitbox,window,cx);
+        // Touch owns the native gesture arena. Only a mouse acquisition may
+        // claim GPUI's mouse capture; an unrelated mouse release must not end
+        // or replace a touch edit.
+        let capture=(sample.input==MoveGestureInput::Mouse)
+            .then(||crate::host_pointer::OwnedPointerCapture::acquire(hitbox,window,cx));
         let retirement=Retirement{handle:self.handle.clone(),contact:self.contact.clone(),window:self.window};
         let _=target.editor.update(cx,|ed,cx|{
             if !target.current(ed,cx){return;}
             ed.device_drag=Some(DeviceDrag{track:target.target.track.clone(),slot:target.target.slot,key:target.target.key,
-                control:target.point.control.clone(),phase:GesturePhase::Armed,capture:Some(capture),surface:target.surface.clone(),basis,
+                control:target.point.control.clone(),phase:GesturePhase::Armed,capture,surface:target.surface.clone(),basis,
                 scope:target.scope,preview:initial,source:Some(retirement)});cx.notify();
         });
     }
     fn on_move(&self,sample:&MoveGestureSample,window:&mut Window,cx:&mut App){
         if self.contact.input.get()!=Some(sample.input){return;}
         let target=self.target.borrow().clone();
-        if !self.inside(sample,window)||!target.editor.upgrade().is_some_and(|e|target.current(e.read(cx),cx)){
+        if !self.inside(sample,window)||!self.acquisition_current(&target,sample.input,window,cx){
             self.contact.input.set(None);cancel_source(&self.handle,&target,window,cx);return;
         }
         self.call("sample",self.arguments(sample),window,cx);preview(&self.handle,&target,cx);
@@ -198,7 +217,7 @@ impl MoveGestureBinding for Binding {
     fn on_end(&self,sample:&MoveGestureSample,window:&mut Window,cx:&mut App){
         if self.contact.input.replace(None)!=Some(sample.input){return;}
         let target=self.target.borrow().clone();
-        if !self.inside(sample,window)||!target.editor.upgrade().is_some_and(|e|target.current(e.read(cx),cx)){cancel_source(&self.handle,&target,window,cx);return;}
+        if !self.inside(sample,window)||!self.acquisition_current(&target,sample.input,window,cx){cancel_source(&self.handle,&target,window,cx);return;}
         self.call("finish",self.arguments(sample),window,cx);clear_preview(&target,window,cx);
     }
     fn on_cancel(&self,_:MoveGestureCancelReason,context:Option<MoveGestureCancelContext<'_>>){
