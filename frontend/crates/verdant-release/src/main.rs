@@ -1,6 +1,7 @@
 //! Native, offline release assembly and bounded recursive release auditing.
 mod archive;
 mod files;
+mod entrypoints;
 mod package;
 mod policy;
 mod source;

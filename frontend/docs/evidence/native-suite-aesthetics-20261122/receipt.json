@@ -1,0 +1,216 @@
+{
+  "date": "2026-11-22",
+  "fixture": "spec/examples/native-suite-advanced.verp",
+  "surface": "actual GPUI native windows; isolated Xvfb root 1600x1100",
+  "theme": "Adwaita neutral light and dark",
+  "host_profile": "release optimized native plughost; software audio clock",
+  "playback": {
+    "single_play_observation_seconds": 35.0,
+    "observed_original_fixture_end_seconds": 7.896,
+    "native_queue_faults": 0,
+    "capture_pass_faults": 0,
+    "note": "23.98s from the separate offline export includes bounded tails; it is not this GUI playhead endpoint. Old debug-host saturation screenshots remain outside this final evidence folder."
+  },
+  "font": {
+    "selected_family": "Noto Sans CJK SC",
+    "actual_shaped_run_family": "Noto Sans CJK SC",
+    "glyph_sample_count": 27,
+    "probe": "same plugin font helpers and actual GPUI CosmicTextSystem; font-resolution.txt"
+  },
+  "coverage": {
+    "light_families": 14,
+    "dark": "EQ and analysis windows",
+    "narrow": "640x520 EQ with reachable scrolling controls; 640x480 preset save form"
+  },
+  "preset_checks": {
+    "factory_per_device": 20,
+    "factory_total": 280,
+    "keyboard_search_and_enter": "passed",
+    "restored_original_parameters": {
+      "b1_freq": 120.0,
+      "b1_slope_continuous": 1.0,
+      "phase": 2.0,
+      "b3_dynamic": 1.0
+    },
+    "user_saved_parameter_count": 601,
+    "user_saved_metadata": {
+      "name": "Verdant QA EQ",
+      "category": "Vocal",
+      "author": "Verdant",
+      "origin_factory_id": "verdant.factory.eq.intimate-lead.v1"
+    },
+    "factory_favorites_saved": [
+      "verdant.factory.eq.bass-definition.v1"
+    ],
+    "one_gui_saved_parameter_count": 248,
+    "one_hidden_parameter_retained": 1.0,
+    "selection_after_async_save": "saved user row remains selected; search clears",
+    "ime": "focused-field composition guard retained; physical IME not exercised"
+  },
+  "analysis_gui": {
+    "match": {
+      "range_hz": [
+        100,
+        10000
+      ],
+      "amount_percent": 50,
+      "maximum_bands": 12,
+      "smoothing_octaves": 0.3333333333333333,
+      "submitted_bands": 12,
+      "rms_error_db_displayed": 0.43,
+      "max_error_db_displayed": 1.01,
+      "removed_offset_db_displayed": -18.8
+    },
+    "sketch": {
+      "drawn_by_mouse": true,
+      "submitted_bands": 11,
+      "rms_error_db_displayed": 0.04,
+      "max_error_db_displayed": 0.12,
+      "fitted_curve_overlay": true
+    },
+    "ir": {
+      "file_picker_import": "passed",
+      "input": {
+        "filename": "ui-ir-analysis-noisy-1p2s.wav",
+        "sample_rate": 48000,
+        "channels": 1,
+        "bits": 16,
+        "known_decay_seconds": 1.2,
+        "leading_silence_ms": 20,
+        "sha256": "b34d1bf9e919b42f16ae9fdae8096e7cc0b6d84bc6bf176d19f463227425dbb9"
+      },
+      "displayed_decay_seconds": 1.2,
+      "displayed_r_squared": 1.0,
+      "displayed_frequency_bands": 8,
+      "displayed_model_rms_percent": 0.4,
+      "saved_parameters": {
+        "decay": 1.2779825497494266,
+        "predelay": 20.0,
+        "diffusion": 100.0,
+        "damping": 20000.0,
+        "decay1_on": 1.0,
+        "decay1_rate": 91.9093829472202,
+        "post1_on": 1.0
+      }
+    }
+  },
+  "quality_regressions": {
+    "new_tests_passed": 7,
+    "eq_fit_rms_db": 0.06098,
+    "eq_fit_max_db": 0.20041,
+    "heldout_pcm_max_error_db": 0.11704737545770255,
+    "noisy_ir_rt60_seconds": 1.2027,
+    "rendered_fdn_target_seconds": 0.85,
+    "rendered_fdn_measured_seconds": 0.8581541362439472
+  },
+  "artifacts": {
+    "analysis-contact.jpg": {
+      "bytes": 300040,
+      "sha256": "b4e88b7d7f56c180cf8caa35ac177040006ea449f7d508d642541e47ca2f3704"
+    },
+    "analysis-fit-quality-tests.log": {
+      "bytes": 3017,
+      "sha256": "8c84f2ba79fcb33cc13de3fb03fa1c68fa947037f4b61ca0b4ba0aab67216f30"
+    },
+    "compressor-light.png": {
+      "bytes": 174022,
+      "sha256": "8db0507e0407d425994f65eb2fd9d3ec47d86e7f14c3d9faa7224925c6b74b31"
+    },
+    "contact.jpg": {
+      "bytes": 579273,
+      "sha256": "11b46167d42c1be1010ef46a0bc12c19dace2b010ff9480c50f41cb3650983f0"
+    },
+    "deesser-light.png": {
+      "bytes": 140548,
+      "sha256": "9a63408dc810db85d230f55de79fff4a339cebf81b90e4205bbc82d98c816597"
+    },
+    "delay-light.png": {
+      "bytes": 160204,
+      "sha256": "f28cc43d7c6a47c63f90e446084acc1972f3391b20d7b111346c2c007e6258d3"
+    },
+    "eq-dark.png": {
+      "bytes": 208086,
+      "sha256": "5cb91f4113a8740014f952fcfe1380ed381414a3cf661a890bc56750f1b61b64"
+    },
+    "eq-light.png": {
+      "bytes": 203873,
+      "sha256": "f2ce53579f53fb22cfe0bf1b96bc090af8f7e2676eb121b18c78e8e490eac730"
+    },
+    "eq-match-applied.png": {
+      "bytes": 171256,
+      "sha256": "7604bbcfe486dc47b33c4ad376c43e8f9c23329b4acd88c0184156d57b5ec48c"
+    },
+    "eq-narrow-640-controls.png": {
+      "bytes": 214734,
+      "sha256": "f11b918bd5a77e5c8d4ab7b76777a4dcb211ef2ec80fdaa64cc0bc829c5fbda3"
+    },
+    "eq-narrow-640-top.png": {
+      "bytes": 199684,
+      "sha256": "da74c80ba8de427106ce014abdad684e97b48e189847df3781da09639c0d4a20"
+    },
+    "eq-sketch-applied.png": {
+      "bytes": 136609,
+      "sha256": "97effb170c1be9349cef2eed365c45528b026a658ae647e84529ba534715d47a"
+    },
+    "filter-light.png": {
+      "bytes": 152383,
+      "sha256": "11bdcac915f5185f9ddbdc07c57b3e5ea99679ec4acf12c739234a9ea4b62d6c"
+    },
+    "font-resolution.txt": {
+      "bytes": 245,
+      "sha256": "8cead795b9158126e5dcbbc08f6d80b5d0b78883c155cb90d418db7a56ff6a33"
+    },
+    "gate-light.png": {
+      "bytes": 152898,
+      "sha256": "4dab7efe280d556fc778fa433a7c18bbf2fc4c4a594113b885e684039a195d72"
+    },
+    "limiter-light.png": {
+      "bytes": 164197,
+      "sha256": "ab739e4a7da11be7950cf66ccdae794233459bb677eb574062beb2226a6cb87a"
+    },
+    "micro-light.png": {
+      "bytes": 173156,
+      "sha256": "30105da8600c2b78dd64b12846de3eac9c7544679c38facda5ebb6d7d5123eba"
+    },
+    "multiband-light.png": {
+      "bytes": 165330,
+      "sha256": "750fe04b02c698a0e8de90285cd6e593b4ce0c53fc075d5b62b84d44d4659733"
+    },
+    "one-light.png": {
+      "bytes": 157322,
+      "sha256": "12d1c92bb924c354f9708a2a550a515df73318340a8cf5c6395ed6890aabe995"
+    },
+    "playback-complete.png": {
+      "bytes": 143761,
+      "sha256": "e92e647698ebd8e40e85c9c4a529e6e0e40679289d6b6c4a4543a948179a28a0"
+    },
+    "preset-browser-saved.png": {
+      "bytes": 166726,
+      "sha256": "1e7fbea2b2af1f4c4bc7bfbe5889ca2aabab2ddeb59af849c897e444ac34bb55"
+    },
+    "preset-save-640.png": {
+      "bytes": 199164,
+      "sha256": "61529227cc6751b09ab78e98575de894617d61245192e3b548f85a23bb200e4f"
+    },
+    "reverb-ir-applied.png": {
+      "bytes": 166944,
+      "sha256": "f8f12f088005248ed0ac4db0b311c35a5e37c7182e331e754a7e99200511bbb7"
+    },
+    "reverb-light.png": {
+      "bytes": 154102,
+      "sha256": "bfa5ece025ca0b5cfaac38f2db70866384b11170a2524fc9b40aca122a59c786"
+    },
+    "saturation-light.png": {
+      "bytes": 143397,
+      "sha256": "2b5d73bd9788a062fef58d745540755d36cbbf93174b82b2667cf627506fb2c1"
+    },
+    "simplon-light.png": {
+      "bytes": 147268,
+      "sha256": "efa14ff81a153dcc81f9df56c49facc75edd3d385f91921a865b7a1b4a02574b"
+    },
+    "synth-light.png": {
+      "bytes": 144000,
+      "sha256": "13abb0feb550db52a77d6037c3cf45c3d3d82f26300944d1a881ceee359db205"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "op": "voice.remove",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "reference": {
+        "type": "string"
+      },
+      "registry": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "reference"
+    ],
+    "type": "object"
+  }
+}

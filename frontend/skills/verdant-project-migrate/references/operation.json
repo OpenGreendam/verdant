@@ -1,0 +1,44 @@
+{
+  "op": "project.migrate",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "loss_policy": {
+        "enum": [
+          "strict",
+          "allow"
+        ]
+      },
+      "output": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "output",
+      "expect_revision"
+    ],
+    "type": "object"
+  }
+}

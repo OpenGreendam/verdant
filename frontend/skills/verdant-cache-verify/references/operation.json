@@ -1,0 +1,16 @@
+{
+  "op": "cache.verify",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "digest": {
+        "type": "string"
+      },
+      "workspace": {
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "op": "media.import",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "label": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "source": {
+        "type": "string"
+      },
+      "start_tick": {
+        "type": "integer"
+      },
+      "track": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "track",
+      "source"
+    ],
+    "type": "object"
+  }
+}

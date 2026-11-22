@@ -247,15 +247,15 @@ fn anchored_prefix_dyn_matches_export_and_playback_across_phrase_splits() {
 }
 
 fn callback_timeline(project:&Project,timeline:Timeline,rate:u32,channels:usize,frames:usize,block:usize)->Vec<f32>{
-    let(mut control,rt)=verdant_audio::engine::channel(RATE,1024);
+    let engine_rate=timeline.sample_rate;let(mut control,rt)=verdant_audio::engine::channel(engine_rate,1024);
     let any_solo=project.tracks.iter().any(|track|track.solo);
     for(index,track)in project.tracks.iter().enumerate(){control.set_channel(index,project_audio::channel_settings(&track.header(),any_solo));}
-    control.set_timeline(timeline);control.play();let mut renderer=CallbackRenderer::new(rt,RATE);renderer.set_device_rate(rate).unwrap();
+    control.set_timeline(timeline);control.play();let mut renderer=CallbackRenderer::new(rt,engine_rate);renderer.set_device_rate(rate).unwrap();
     let mut pcm=vec![0.0;frames*channels];for chunk in pcm.chunks_mut(block*channels){renderer.process_f32(chunk,channels).unwrap();}pcm
 }
 
 #[test]
-fn imported_stereo_automation_and_range_export_use_the_playback_clock(){
+fn imported_stereo_automation_and_range_export_use_selected_processing_clock(){
     use verdant_domain::automation::{AutomationDocument,AutomationLane,AutomationPoint,AutomationTarget,Interpolation,AUTOMATION_KEY};
     let scratch=Scratch::new();let input=scratch.0.join("owned-stereo-source.wav");
     let source_options=ExportOptions{sample_rate:24_000,..Default::default()};let source_frames=14_400;
@@ -274,7 +274,9 @@ fn imported_stereo_automation_and_range_export_use_the_playback_clock(){
     let path=scratch.0.join("selected-mono24.wav");let frames=render_outputs(&path,&project,Vec::new(),None,&render_settings,true,&||false).unwrap().frames as usize;let decoded=verdant_media::decode_bytes(&std::fs::read(path).unwrap(),Some("wav"),Default::default()).unwrap();
     assert_eq!((decoded.sample_rate,decoded.channels),(44_100,1));assert_eq!(decoded.frames()as usize,frames);
     let tempo=TempoMap::new(&project.tempo_map,project.ppq).unwrap();assert_eq!(frames,((tempo.seconds_at(1200.)-tempo.seconds_at(480.))*44_100.).round()as usize);
-    let skip=(tempo.seconds_at(480.)*44_100.).round()as usize;let callback=callback_timeline(&project,prepared.timeline,44_100,1,skip+frames,BLOCK);
+    // The requested export clock now drives preparation and automation directly.
+    let at_rate=project_audio::prepare_timeline(&project,&[],render_settings.media_policy.clone(),44_100,Default::default(),None).unwrap();
+    let skip=(tempo.seconds_at(480.)*44_100.).round()as usize;let callback=callback_timeline(&project,at_rate.timeline,44_100,1,skip+frames,BLOCK);
     for(actual,expected)in decoded.samples.iter().zip(&callback[skip..]){let quantized=((*expected as f64*8_388_608.).round().clamp(-8_388_608.,8_388_607.)/8_388_608.)as f32;assert!((*actual-quantized).abs()<=1e-7,"range history, mono conversion and PCM24 encoding changed the audible result");}
 }
 
@@ -321,5 +323,28 @@ fn stems_report_the_same_generated_paths_that_are_published() {
         let audio = verdant_media::decode_bytes(&std::fs::read(path).unwrap(), Some("wav"), Default::default()).unwrap();
         assert!(audio.frames() > 0);
         assert_eq!(audio.sample_rate, RATE);
+    }
+}
+
+#[test]
+fn bypassed_native_instrument_exports_silence_and_reenables_without_state_loss(){
+    let dir=Scratch::new();
+    for id in [verdant_plugins::builtin_dsp::SYNTH_ID,verdant_plugins::builtin_dsp::ONE_SYNTH_ID]{
+        let mut project=Project::new_empty();let track=&mut project.tracks[0];
+        track.notes.push(Note::new(0,480,60));track.refresh_index();
+        track.unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),serde_json::json!({
+            "format":"builtin","id":id,"params":{"gain":-12.,"release":25.},"bypass":false
+        }));
+        let options=settings(&project);let on=dir.0.join(format!("{}-on.wav",id));
+        let active=render_outputs(&on,&project,vec![],None,&options,false,&||false).unwrap();
+        let sounding=stereo_pcm(&on);assert!(sounding.iter().any(|v|v.abs()>1e-4));
+        project.tracks[0].unknown.get_mut(verdant_domain::model::INSTRUMENT_KEY).unwrap()["bypass"]=true.into();
+        let off=dir.0.join(format!("{}-off.wav",id));
+        let silent=render_outputs(&off,&project,vec![],None,&options,false,&||false).unwrap();
+        assert_eq!(active.frames,silent.frames);assert!(stereo_pcm(&off).iter().all(|v|*v==0.));
+        project.tracks[0].unknown.get_mut(verdant_domain::model::INSTRUMENT_KEY).unwrap()["bypass"]=false.into();
+        let restored=dir.0.join(format!("{}-restored.wav",id));
+        render_outputs(&restored,&project,vec![],None,&options,false,&||false).unwrap();
+        assert_eq!(stereo_pcm(&restored),sounding);
     }
 }

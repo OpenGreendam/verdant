@@ -1,0 +1,870 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "clip.edit",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "asset_paths": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "asset_roots": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "edit": {
+        "description": "Tagged operation. Nested batches use the same union and commit atomically.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "split"
+              },
+              "tick": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "end_tick": {
+                "type": "number"
+              },
+              "operation": {
+                "const": "split_range"
+              },
+              "start_tick": {
+                "type": "number"
+              },
+              "tracks": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "operation",
+              "tracks",
+              "start_tick",
+              "end_tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clip": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "track": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "track",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "duration_frames": {
+                "type": "integer"
+              },
+              "operation": {
+                "const": "trim"
+              },
+              "source_offset_frames": {
+                "type": "integer"
+              },
+              "start_tick": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "operation",
+              "clip",
+              "source_offset_frames",
+              "duration_frames"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "end_tick": {
+                "type": "number"
+              },
+              "operation": {
+                "const": "trim_to_range"
+              },
+              "start_tick": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "start_tick",
+              "end_tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "delta_frames": {
+                "type": "integer"
+              },
+              "operation": {
+                "const": "slip"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "delta_frames"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "delta_ticks": {
+                "type": "number"
+              },
+              "operation": {
+                "const": "move"
+              },
+              "track_offset": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "delta_ticks"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "at_tick": {
+                "type": "number"
+              },
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "duplicate"
+              },
+              "target_track": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "at_tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "delete"
+              },
+              "ripple": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "operation",
+              "clips"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "end_tick": {
+                "type": "number"
+              },
+              "operation": {
+                "const": "delete_range"
+              },
+              "ripple": {
+                "type": "boolean"
+              },
+              "start_tick": {
+                "type": "number"
+              },
+              "tracks": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "operation",
+              "tracks",
+              "start_tick",
+              "end_tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "copy"
+              }
+            },
+            "required": [
+              "operation",
+              "clips"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "end_tick": {
+                "type": "number"
+              },
+              "operation": {
+                "const": "copy_range"
+              },
+              "start_tick": {
+                "type": "number"
+              },
+              "tracks": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "operation",
+              "tracks",
+              "start_tick",
+              "end_tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "at_tick": {
+                "type": "number"
+              },
+              "clipboard": {
+                "additionalProperties": false,
+                "description": "Use the clipboard returned by clip.copy or clip.copy-range. Source frames, fades and fingerprints must be retained.",
+                "properties": {
+                  "clips": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "clip": {
+                          "description": "Copy the full source clip record returned by clip.copy or clip.copy-range without dropping unknown metadata.",
+                          "type": "object"
+                        },
+                        "offset_seconds": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "track_offset": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "clip",
+                        "track_offset",
+                        "offset_seconds"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "schema": {
+                    "const": "verdant-audio-clipboard/1"
+                  }
+                },
+                "required": [
+                  "schema",
+                  "clips"
+                ],
+                "type": "object"
+              },
+              "operation": {
+                "const": "paste"
+              },
+              "target_track": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "clipboard",
+              "at_tick",
+              "target_track"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "set_properties"
+              },
+              "properties": {
+                "additionalProperties": false,
+                "properties": {
+                  "fade_in_ms": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "fade_out_ms": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "fade_shape": {
+                    "enum": [
+                      "linear",
+                      "equal_power"
+                    ]
+                  },
+                  "gain_db": {
+                    "maximum": 36,
+                    "minimum": -120,
+                    "type": "number"
+                  },
+                  "muted": {
+                    "type": "boolean"
+                  },
+                  "name": {
+                    "maxLength": 512,
+                    "type": "string"
+                  },
+                  "pan": {
+                    "maximum": 1,
+                    "minimum": -1,
+                    "type": "number"
+                  },
+                  "playback_rate": {
+                    "maximum": 16,
+                    "minimum": 0.0625,
+                    "type": "number"
+                  },
+                  "preserve_pitch": {
+                    "type": "boolean"
+                  },
+                  "reversed": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "properties"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "join"
+              }
+            },
+            "required": [
+              "operation",
+              "clips"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "left": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "track": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "track",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "operation": {
+                "const": "crossfade"
+              },
+              "right": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "track": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "track",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "shape": {
+                "enum": [
+                  "linear",
+                  "equal_power"
+                ]
+              }
+            },
+            "required": [
+              "operation",
+              "left",
+              "right"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "min_silence_ms": {
+                "type": "number"
+              },
+              "operation": {
+                "const": "split_silence"
+              },
+              "threshold_db": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "threshold_db",
+              "min_silence_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clip": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "track": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "track",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "operation": {
+                "const": "split_zero_crossing"
+              },
+              "tick": {
+                "type": "number"
+              },
+              "window_ms": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "operation",
+              "clip",
+              "tick",
+              "window_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "independent": {
+                "type": "boolean"
+              },
+              "operation": {
+                "const": "normalize"
+              },
+              "target_db": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "target_db"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clips": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "track": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "bounce"
+              },
+              "path": {
+                "type": "string"
+              },
+              "replace": {
+                "type": "boolean"
+              },
+              "sample_rate": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "operation",
+              "clips",
+              "path",
+              "sample_rate"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "edits": {
+                "items": {
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "batch"
+              }
+            },
+            "required": [
+              "operation",
+              "edits"
+            ],
+            "type": "object"
+          }
+        ],
+        "type": "object"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "edit"
+    ],
+    "type": "object"
+  }
+}

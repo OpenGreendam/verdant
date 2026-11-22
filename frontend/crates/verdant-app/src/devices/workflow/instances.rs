@@ -85,7 +85,7 @@ impl Render for Instances {
                     })));
         }
         div().size_full().bg(th.surface).text_color(th.text).p(px(18.)).flex().flex_col().gap(px(12.))
-            .font_family(crate::theme::system_ui_font(&cx.text_system().all_font_names()))
+            .font(crate::theme::plugin_ui_font(ed.ui_font.clone()))
             .child(div().flex().items_center().gap(px(8.)).child(div().flex_1().text_lg().font_weight(FontWeight::BOLD).child("工程插件实例"))
                 .child(crate::ui_controls::selectable_button("instance-close", "关闭", false, th).on_click(|_, w, _| w.remove_window())))
             .child(self.search.clone())

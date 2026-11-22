@@ -1,0 +1,65 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "analysis.eq-match",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "amount": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "duration_seconds": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "max_bands": {
+        "maximum": 24,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_frequency": {
+        "maximum": 20000,
+        "minimum": 20,
+        "type": "number"
+      },
+      "max_windows": {
+        "maximum": 256,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "min_frequency": {
+        "maximum": 20000,
+        "minimum": 20,
+        "type": "number"
+      },
+      "reference": {
+        "type": "string"
+      },
+      "remove_level_offset": {
+        "type": "boolean"
+      },
+      "sample_rate": {
+        "type": "integer"
+      },
+      "smoothing_octaves": {
+        "maximum": 2,
+        "minimum": 0,
+        "type": "number"
+      },
+      "source": {
+        "type": "string"
+      },
+      "start_seconds": {
+        "minimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "source",
+      "reference"
+    ],
+    "type": "object"
+  }
+}

@@ -120,7 +120,7 @@ pub struct PluginClientOpts {
     /// Mixer/insert rate. Must be 48_000; devices resample at the output edge.
     pub sample_rate: f64,
     /// Device callback bound, at most `shm::MAX_BLOCK_FRAMES` (8192). Native DSP
-    /// uses `shm::DSP_QUANTUM_FRAMES`; RT transport adds 9472 frames of latency.
+    /// uses `shm::DSP_QUANTUM_FRAMES`; RT transport uses the negotiated callback budget (up to 9472 frames).
     pub max_frames: usize,
 }
 
@@ -318,18 +318,18 @@ impl PluginClient {
     /// registry and cannot yield an RT processor. State/parameter changes in
     /// this instance cannot affect playback. Drop it on the export thread.
     pub fn offline_insert(&self, spec: InsertSpec) -> Result<InsertHandle> {
-        let key = InsertKey(self.next_key.fetch_add(1, Ordering::Relaxed));
-        let desc = self.resolve_desc(&spec)?;
-        let mut handle = InsertHandle::spawn(
-            key,
-            spec,
-            desc,
-            &self.plughost,
-            crate::SAMPLE_RATE,
-            self.events_tx.clone(),
-        )?;
-        handle.make_offline()?;
-        Ok(handle)
+        self.offline_insert_at_rate(spec, self.opts.sample_rate)
+    }
+
+    /// A fresh export-only host runs its DSP at the requested render rate.
+    /// It cannot provide a live processor or enter the playback registry.
+    pub fn offline_insert_at_rate(&self,spec:InsertSpec,rate:f64)->Result<InsertHandle>{
+        if !crate::supported_sample_rate(rate){
+            return Err(PluginError::Host("unsupported offline sample rate".into()));
+        }
+        let key=InsertKey(self.next_key.fetch_add(1,Ordering::Relaxed));
+        let desc=self.resolve_desc(&spec)?;
+        InsertHandle::spawn_offline(key,spec,desc,&self.plughost,rate,self.events_tx.clone())
     }
 
     /// Restore a saved insert: finds the plugin by (`format`, `id`) — `path`

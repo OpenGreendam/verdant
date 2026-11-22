@@ -36,6 +36,8 @@ pub(crate) struct NativePluginWindow {
     binding: Binding,
     focus: FocusHandle,
     generic: bool,
+    tools_open: bool,
+    keyboard_open: bool,
     held_notes: std::collections::BTreeSet<u8>,
     pending_notes: std::collections::BTreeSet<u8>,
     preview_started: bool,
@@ -198,7 +200,7 @@ impl Editor {
                             });
                         });
                     }).detach();
-                    let view = NativePluginWindow { editor: observed.downgrade(), project, generation, target, binding, focus, generic: false, held_notes: Default::default(), pending_notes: Default::default(), preview_started: false };
+                    let view = NativePluginWindow { editor: observed.downgrade(), project, generation, target, binding, focus, generic: false, tools_open: false, keyboard_open: true, held_notes: Default::default(), pending_notes: Default::default(), preview_started: false };
                     view.spawn_signal_poll(cx);
                     view
                 })
@@ -231,6 +233,10 @@ impl Render for NativePluginWindow {
         let target = &self.target;
         let focus = self.focus.clone();
         let generic = self.generic;
+        let tools_open = self.tools_open;
+        let keyboard_open = self.keyboard_open;
+        let toggle_tools = cx.listener(|view: &mut Self, _: &gpui::ClickEvent, _, cx| { view.tools_open = !view.tools_open; cx.notify(); });
+        let toggle_keyboard = cx.listener(|view: &mut Self, _: &gpui::ClickEvent, _, cx| { view.keyboard_open = !view.keyboard_open; cx.notify(); });
         let toggle_generic = cx.listener(|view: &mut Self, _: &gpui::ClickEvent, _, cx| { view.generic = !view.generic; cx.notify(); });
         editor.update(cx, |ed, cx| {
             if &ed.project().project_id != project || ed.document_generation != generation {
@@ -279,10 +285,8 @@ impl Render for NativePluginWindow {
                     let key = crate::instrument::instrument_key_for_generation(track, id, generation);
                     let mut descs = crate::instrument::synth_descs_for(id, &params);
                     crate::devices::preview_and_animate(ed, key, &mut descs, window);
-                    let body = div().flex().flex_col().gap(gpui::rems(10./16.))
-                        .child(performance_keyboard(&native_entity, &self.held_notes, th))
-                        .child(crate::instrument::preset_button(ed, track, id, key, cx))
-                        .child(crate::devices::synth_editor(ed, &editor_entity, track, key, &descs, cx)).into_any_element();
+                    let body = if generic { crate::devices::generic_editor(ed, &editor_entity, target, crate::instrument::INSTRUMENT_SLOT, key, &descs) }
+                        else { crate::devices::synth_editor(ed, &editor_entity, track, key, &descs, cx) };
                     (crate::instrument::INSTRUMENT_SLOT, verdant_plugins::builtin_dsp::instrument_name(id).unwrap_or("Verdant Synth").into(), false, false, body)
                 }
             };
@@ -301,11 +305,11 @@ impl Render for NativePluginWindow {
             };
             let button = |id: &'static str, label: &'static str| div().id(id).role(Role::Button)
                 .aria_label(label).cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
-                .bg(th.control).hover(move |s| s.bg(th.hover)).text_size(px(14.)).child(label);
+                .bg(gpui::transparent_black()).hover(move |s| s.bg(th.hover)).text_size(px(13.)).child(label);
             let key_editor = editor_entity.clone();
             let mut root = div().id("builtin-native-editor").role(Role::Group)
                 .aria_label(format!("{name} 原生编辑器")).size_full().relative()
-                .bg(th.view).text_color(th.text).font_family(ed.ui_font.clone())
+                .bg(th.view).text_color(th.text).font(crate::theme::plugin_ui_font(ed.ui_font.clone()))
                 .flex().flex_col().track_focus(&focus)
                 .on_key_up(move |event: &gpui::KeyUpEvent, _, cx| {
                     if instrument_window { if let Some(note) = typing_note(&event.keystroke.key) {
@@ -351,10 +355,10 @@ impl Render for NativePluginWindow {
                         cx.stop_propagation();
                     }
                 })
-                .child(div().flex_none().min_h(px(56.)).py(px(6.)).px(px(16.)).flex().flex_wrap().items_center().gap(px(10.))
+                .child(div().flex_none().min_h(px(48.)).py(px(6.)).px(px(16.)).flex().flex_wrap().items_center().gap(px(10.))
                     .bg(th.headerbar).border_b_1().border_color(th.shade)
-                    .child(div().flex_1().min_w_0().flex().flex_col()
-                        .child(div().truncate().text_size(px(20.)).font_weight(FontWeight::BOLD).child(name.clone()))
+                    .child(div().flex_1().min_w_0().flex().items_baseline().gap(px(12.))
+                        .child(div().truncate().text_size(px(17.)).font_weight(FontWeight::BOLD).child(name.clone()))
                         .child(div().truncate().text_size(px(12.)).text_color(th.text_secondary).child(bus)))
                     .when(is_insert, |header| header
                         .child(button("native-bypass", if bypassed { "启用" } else { "旁通" })
@@ -362,14 +366,16 @@ impl Render for NativePluginWindow {
                                 if !busy && ed.document_generation == generation && expected_key.is_some_and(|key| ed.device_target_matches(&bypass_target, slot, key)) {
                                     ed.toggle_device_bypass(bypass_target.clone(), slot, cx);
                                 }
-                            })))
-                        .child(button("native-generic", if generic { "图形界面" } else { "参数列表" }).on_click(toggle_generic)))
+                            }))))
+                    .child(button("native-generic", if generic { "图形界面" } else { "参数列表" }).on_click(toggle_generic))
+                    .when(instrument_window, |header| header.child(button("native-keyboard", if keyboard_open { "收起键盘" } else { "演奏键盘" }).aria_selected(keyboard_open).on_click(toggle_keyboard)))
+                    .child(button("native-tools", "工具").aria_selected(tools_open).on_click(toggle_tools))
                     .child(button("native-close", "关闭").on_click(cx.listener(|ed, _, window, cx| {
                         ed.cancel_device_drag_in(window.window_handle(), cx);
                         ed.close_menu(window, cx);
                         window.remove_window();
                     }))))
-                .child(div().flex_none().px(px(16.)).py(px(6.)).flex().flex_wrap().items_center().gap(px(8.))
+                .when(tools_open, |root| root.child(div().flex_none().px(px(16.)).py(px(4.)).flex().flex_wrap().items_center().gap(px(6.))
                     .child(button("native-midi-input", "MIDI 输入").on_click(cx.listener(move |ed, _, window, cx| {
                         ed.open_device_midi_input(midi_target.clone(), window, cx);
                     })))
@@ -397,10 +403,12 @@ impl Render for NativePluginWindow {
                     .child(button("native-zoom-reset", "100%").on_click(cx.listener(|ed, _, _, cx| {
                         ed.prefs.extra.insert("plugin_ui_zoom".into(), 1.0.into()); ed.prefs_dirty = true; cx.notify();
                     })))
-                    .child(button("native-fullscreen", "全屏").on_click(|_, window, _| window.toggle_fullscreen())))
+                    .child(button("native-fullscreen", "全屏").on_click(|_, window, _| window.toggle_fullscreen()))))
                 .child(crate::devices::modulation_source_bar(ed, target, slot, if generic { None } else { modulation_key }))
                 .child(div().id("native-plugin-scroll").flex_1().min_h_0().overflow_y_scroll().overflow_x_scroll()
-                    .p(gpui::rems(16./16.)).child(body))
+                    .p(gpui::rems(12./16.)).child(body))
+                .when(instrument_window && keyboard_open, |root| root.child(div().flex_none().px(gpui::rems(12./16.)).pt(gpui::rems(8./16.)).border_t_1().border_color(th.shade)
+                    .child(performance_keyboard(&native_entity, &self.held_notes, th))))
                 .child(div().flex_none().px(px(16.)).py(px(6.)).text_size(px(12.)).text_color(th.text_secondary)
                     .child(if busy { "正在提交参数…" } else if bypassed { "效果器已旁通" } else { "拖动调节 · Shift 微调 · 点击数值精确输入 · Alt 点击复位" }));
             if let Some(notice) = ed.notices.back() {
@@ -425,7 +433,7 @@ fn typing_note(key: &str) -> Option<u8> {
     ["a", "w", "s", "e", "d", "f", "t", "g", "y", "h", "u", "j", "k"].iter().position(|&s| s == key).map(|i| 60 + i as u8)
 }
 fn performance_keyboard(view: &gpui::Entity<NativePluginWindow>, held: &std::collections::BTreeSet<u8>, th: crate::theme::Theme) -> gpui::AnyElement {
-    let mut keyboard = div().relative().h(gpui::rems(76./16.)).w_full();
+    let mut keyboard = div().relative().h(gpui::rems(60./16.)).w_full();
     for black_pass in [false, true] {
         let mut white = 0usize;
         for key in 48u8..72 {
@@ -437,8 +445,8 @@ fn performance_keyboard(view: &gpui::Entity<NativePluginWindow>, held: &std::col
                 keyboard = keyboard.child(div().id(format!("play-note-{key}")).role(Role::Button).aria_label(format!("{label}{}", key / 12 - 1))
                     .absolute().top(gpui::rems(0.)).left(gpui::relative((white as f32 - if black { 0.32 } else { 0. }) / 14.))
                     .w(gpui::relative(if black { 0.64 / 14. } else { 1. / 14. }))
-                    .h(gpui::rems(if black { 48./16. } else { 76./16. })).rounded(gpui::rems(4./16.))
-                    .border_1().border_color(th.shade).bg(if pressed { th.accent } else if black { th.control_pressed } else { th.card })
+                    .h(gpui::rems(if black { 38./16. } else { 60./16. })).rounded(gpui::rems(4./16.))
+                    .border_1().border_color(th.shade).bg(if pressed { th.accent } else if black { th.key_black } else { th.key_white })
                     .text_color(if black { th.text_secondary } else { th.text }).cursor_pointer().flex().items_end().justify_center().pb(gpui::rems(4./16.)).text_xs()
                     .child(if black { String::new() } else { format!("{label}{}", key / 12 - 1) })
                     .on_mouse_down(gpui::MouseButton::Left, move |_, _, cx| { down.update(cx, |view, cx| { view.note(key, true, cx); cx.notify(); }); })

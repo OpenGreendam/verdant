@@ -1,0 +1,98 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "clip.paste",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "asset_paths": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "asset_roots": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "at_tick": {
+        "type": "number"
+      },
+      "clipboard": {
+        "additionalProperties": false,
+        "description": "Use the clipboard returned by clip.copy or clip.copy-range. Source frames, fades and fingerprints must be retained.",
+        "properties": {
+          "clips": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "clip": {
+                  "description": "Copy the full source clip record returned by clip.copy or clip.copy-range without dropping unknown metadata.",
+                  "type": "object"
+                },
+                "offset_seconds": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "track_offset": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "clip",
+                "track_offset",
+                "offset_seconds"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "schema": {
+            "const": "verdant-audio-clipboard/1"
+          }
+        },
+        "required": [
+          "schema",
+          "clips"
+        ],
+        "type": "object"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "target_track": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "clipboard",
+      "at_tick",
+      "target_track"
+    ],
+    "type": "object"
+  }
+}

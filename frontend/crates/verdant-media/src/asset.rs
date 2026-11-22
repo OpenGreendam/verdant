@@ -193,11 +193,12 @@ impl MediaImporter {
                 }
                 let audio = &decoded[&key];
                 on_clip(&clip, audio);
-                let frames = (clip.duration_frames as f64 * f64::from(engine_rate) / f64::from(audio.sample_rate)).round() as u64;
+                let frames = ((clip.end_seconds(tempo) * f64::from(engine_rate)).round() - (clip.start_seconds(tempo) * f64::from(engine_rate)).round()) as u64;
                 let channels = if audio.channels == 1 && clip.pan != 0.0 { 2 } else { audio.channels };
                 let shared_full_source = engine_rate == audio.sample_rate && clip.source_offset_frames == 0
                     && clip.duration_frames == audio.frames() && clip.pan == 0.0
-                    && clip.fade_in_frames == 0 && clip.fade_out_frames == 0;
+                    && clip.fade_in_frames == 0 && clip.fade_out_frames == 0 && clip.fade_window.is_none()
+                    && clip.playback_rate == 1.0 && !clip.reversed;
                 let estimate = if shared_full_source { 0 } else {
                     self.limits.pcm_len(frames, channels)?.checked_mul(4)
                         .ok_or(MediaError::Limit("project PCM address space"))?

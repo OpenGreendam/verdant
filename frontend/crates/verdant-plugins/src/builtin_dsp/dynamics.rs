@@ -86,7 +86,7 @@ pub static COMP_SPECS: &[Spec] = &[
     Spec::new("ratio", "压缩比", 1.0, 20.0, 3.0, ":1").log(),
     Spec::new("attack", "启动", 0.1, 200.0, 10.0, "ms").log(),
     Spec::new("release", "释放", 5.0, 2000.0, 120.0, "ms").log(),
-    Spec::new("knee", "拐点", 0.0, 24.0, 6.0, "dB"),
+    Spec::new("knee", "拐点", 0.0, 72.0, 6.0, "dB"),
     Spec::new("makeup", "补偿增益", 0.0, 24.0, 0.0, "dB"),
     Spec::new("mix", "干湿比", 0.0, 100.0, 100.0, "%"),
     Spec::new("style", "风格", 0.0, 13.0, 0.0, "").steps(13),
@@ -104,7 +104,7 @@ pub static COMP_SPECS: &[Spec] = &[
     Spec::new("input", "输入", -24.0, 24.0, 0.0, "dB"),
     Spec::new("output", "输出", -24.0, 24.0, 0.0, "dB"),
     Spec::new("character", "染色", 0.0, 3.0, 0.0, "").steps(3),
-    Spec::new("character_drive", "染色驱动", 0.0, 24.0, 0.0, "dB"),
+    Spec::new("character_drive", "染色驱动", -24.0, 24.0, 0.0, "dB"),
     Spec::new("character_pre", "压缩前染色", 0.0, 1.0, 0.0, "").steps(1),
     Spec::new("auto_threshold", "自动阈值", 0.0, 1.0, 0.0, "").steps(1),
     Spec::new("auto_target", "目标压缩量", 0.0, 24.0, 6.0, "dB"),
@@ -917,6 +917,63 @@ mod tests {
         assert_eq!((p.core.clock, p.core.env, p.core.window, p.target_gain_db), retained);
         p.set_sample_rate(96_000.0);
         assert_eq!(p.meter_control(), (false, 4));
+    }
+
+
+    #[test]
+    fn compressor_signed_character_drive_preserves_index_and_processes_finite_pcm() {
+        assert_eq!(COMP_SPECS[22].id,"character_drive");
+        assert_eq!((COMP_SPECS[22].min,COMP_SPECS[22].max),(-24.0,24.0));
+        let input=sine(997.0,0.85,4096);
+        for mode in 1..=3 {
+            for pre in [0.0,1.0] {
+                let mut previous:Option<Vec<f32>>=None;
+                for drive in [-24.0,-12.0,0.0,12.0,24.0] {
+                    let mut p=CompProcessor::new(FS);
+                    for (id,v) in [("ratio",1.0),("threshold",0.0),("character",mode as f64),
+                        ("character_pre",pre),("character_drive",drive)] {p.set(id,v).unwrap();}
+                    let output=run(&mut p,&input,None);
+                    assert!(output.iter().all(|sample|sample.is_finite()&&sample.abs()<2.0));
+                    assert!(rms_db(&output)>-40.0);
+                    if let Some(prior)=previous {
+                        let change:f64=output.iter().zip(prior).map(|(a,b)|(a-b).abs() as f64).sum();
+                        assert!(change/output.len() as f64>0.001,"mode={mode} pre={pre} drive={drive}");
+                    }
+                    previous=Some(output);
+                }
+            }
+        }
+        let mut p=CompProcessor::new(FS);
+        assert!(p.set("character_drive",-24.01).is_err());
+        assert!(p.set("character_drive",24.01).is_err());
+    }
+
+
+    #[test]
+    fn compressor_wide_knee_is_continuous_monotone_and_changes_real_pcm() {
+        assert_eq!(COMP_SPECS[4].id,"knee");
+        assert_eq!(COMP_SPECS[4].max,72.0);
+        for knee in [24.0,48.0,72.0] {
+            let mut last=compressor_curve_db(-18.0,4.0,knee,-120.0);
+            for i in 1..=1320 {
+                let level=-120.0+f64::from(i)*0.1;
+                let value=compressor_curve_db(-18.0,4.0,knee,level);
+                assert!(value.is_finite()&&value>=last-1e-10&&value-last<=0.1+1e-10);
+                last=value;
+            }
+        }
+        assert!((compressor_curve_db(-18.0,4.0,72.0,-18.0)+24.75).abs()<1e-10);
+        let input=sine(997.0,0.1,12000);
+        let render=|knee| {
+            let mut p=CompProcessor::new(FS);
+            for (id,v) in [("threshold",-18.0),("ratio",4.0),("knee",knee)] {p.set(id,v).unwrap();}
+            run(&mut p,&input,None)
+        };
+        let tight=render(24.0);
+        let wide=render(72.0);
+        assert!(wide.iter().all(|value|value.is_finite()));
+        assert!(rms_db(&tight[6000..])-rms_db(&wide[6000..])>1.0);
+        assert!(CompProcessor::new(FS).set("knee",72.01).is_err());
     }
 
     #[test]

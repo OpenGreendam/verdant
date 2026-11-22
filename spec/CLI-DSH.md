@@ -1,12 +1,12 @@
-# verdant-cli(1) 与 DSH
+# verdant(1)／verdant-cli(1) 与 DSH
 
 ## 用法
 
-`verdant-cli COMMAND [ARGUMENTS] [--json | --events]`
+`verdant COMMAND [ARGUMENTS] [--json | --events]`（`verdant-cli` 保留为兼容别名）
 
 `verdant-cli request --json < REQUEST.json`
 
-`verdant-cli serve --stdio`
+`verdant worker --stdio`（`verdant-cli serve --stdio` 保留为兼容别名）
 
 ## 说明
 
@@ -36,7 +36,7 @@ Verdant CLI 在无显示、声卡和 MIDI 设备的环境中编辑、检查和�
 
 路径既可为命令参数，也可随 JSON 提供。`--params FILE` 读取参数对象。`--json` 输出一个结构化结果；`--events` 输出逐行 JSON，末行是终态。音频保存到指定文件。
 
-`request` 从 stdin 读取一个 UTF-8 JSON 对象，读取到 EOF 后执行。`serve --stdio` 逐行读取并顺序执行。公开请求最大 2 MiB。
+`request` 从 stdin 读取一个 UTF-8 JSON 对象，读取到 EOF 后执行。`worker --stdio`／`serve --stdio` 逐行读取并顺序执行，每次最多一个活动请求。独立 `verdant-worker` 继续使用声库合成协议。公开请求最大 2 MiB。
 
 ```json
 {"protocol":"verdant-cli/1","request_id":"inspect-1","op":"project.inspect","params":{"path":"song.verp"}}

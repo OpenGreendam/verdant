@@ -1,0 +1,21 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "preset.inspect-ffp",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "device": {
+        "type": "string"
+      },
+      "source": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "source",
+      "device"
+    ],
+    "type": "object"
+  }
+}

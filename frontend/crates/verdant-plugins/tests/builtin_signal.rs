@@ -249,3 +249,33 @@ fn limiter_meter_pause_and_reset_control_the_displayed_integrated_history(){
     assert_eq!(after_rpc.frames_total,before_rpc.frames_total);
     assert_eq!(after_rpc.captured_at,before_rpc.captured_at,"RPC reset does not refresh the PCM timestamp");
 }
+
+#[test]
+#[ignore = "requires a freshly built verdant-plughost in VERDANT_PLUGIN_HOST"]
+fn export_hosts_process_at_each_admitted_rate_without_entering_the_live_graph(){
+    let client=client();
+    assert!(client.offline_insert_at_rate(PluginClient::builtin_gain_spec(),12345.).is_err());
+    for rate in verdant_plugins::OFFLINE_SAMPLE_RATES {
+        let fs=f64::from(rate);
+        let mut host=client.offline_insert_at_rate(InsertSpec::new("builtin",dsp::DELAY_ID,"Delay",""),fs).unwrap();
+        assert_eq!(host.sample_rate(),fs);
+        assert!(host.processor().is_none());
+        assert_eq!(host.transport_latency_samples(),0);
+        let mut expected=dsp::DelayProcessor::new(fs);
+        for(id,value)in [("time",7.25),("mix",100.),("feedback",0.),("low_cut",20.),("high_cut",19000.)]{
+            host.set_param(id,value).unwrap();expected.set(id,value).unwrap();
+        }
+        let n=rate as usize/10;
+        let input=(0..n).map(|i|((TAU*1300.*i as f64/fs).sin()*0.1)as f32).collect::<Vec<_>>();
+        let(mut l,mut r)=(input.clone(),input.clone());let(mut el,mut er)=(vec![0.;n],vec![0.;n]);
+        expected.process(&input,&input,None,&mut el,&mut er);
+        host.process_offline(&mut l,&mut r).unwrap();
+        assert_eq!(l,el,"actual child DSP must use {rate} Hz");assert_eq!(r,er);
+        let frame=host.refresh_telemetry().unwrap();
+        assert_eq!(frame.sample_rate,fs);
+        assert_eq!(frame.frames_total,n as u64);
+        assert!(l.iter().any(|v|v.abs()>0.01));
+        assert!(host.reconfigure(fs,256).is_ok());
+        assert!(host.reconfigure(if rate==48000{96000.}else{48000.},256).is_err(),"a live instance cannot change its clock behind the graph");
+    }
+}

@@ -192,6 +192,7 @@ pub struct AuPlugin {
     unit: AudioUnit,
     initialized: bool,
     max_frames: usize,
+    sample_rate: f64,
     input: Box<UnsafeCell<RenderInput>>,
     sample_time: u64,
     editor: Option<crate::window::EditorWindow>,
@@ -205,7 +206,7 @@ pub struct AuPlugin {
 impl AuPlugin {
     fn configure(&mut self) -> Result<(), String> {
         let format = StreamFormat {
-            rate: verdant_plugins::SAMPLE_RATE, format: u32::from_be_bytes(*b"lpcm"),
+            rate: self.sample_rate, format: u32::from_be_bytes(*b"lpcm"),
             flags: 1 | 8 | 32, bytes_per_packet: 4, frames_per_packet: 1,
             bytes_per_frame: 4, channels: 2, bits: 32, reserved: 0,
         };
@@ -334,7 +335,7 @@ impl HostedPlugin for AuPlugin {
         let mut size = 8;
         if unsafe { AudioUnitGetProperty(self.unit, LATENCY, GLOBAL, 0,
             (&mut seconds as *mut f64).cast(), &mut size) } == 0 && seconds.is_finite() && seconds >= 0.0 {
-            (seconds * verdant_plugins::SAMPLE_RATE).round() as u64
+            (seconds * self.sample_rate).round() as u64
         } else { 0 }
     }
     fn params(&mut self) -> Result<Vec<ParamDesc>, String> {
@@ -428,7 +429,7 @@ impl HostedPlugin for AuPlugin {
     }
     fn editor_open(&self) -> bool { self.editor.is_some() }
     fn reconfigure(&mut self, rate: f64, max: u32) -> Result<(), String> {
-        if rate != verdant_plugins::SAMPLE_RATE || max as usize != self.max_frames { return Err("AU processing contract is fixed".into()); }
+        if rate != self.sample_rate || max as usize != self.max_frames { return Err("AU processing contract is fixed".into()); }
         if self.initialized {
             status(unsafe { AudioUnitUninitialize(self.unit) }, "AudioUnitUninitialize")?;
             self.initialized = false;
@@ -488,7 +489,7 @@ impl Drop for AuPlugin {
 
 pub fn instantiate(_path: &str, id: &str, rate: f64, max: u32, events: EventTx)
     -> Result<(Box<dyn HostedPlugin>, InstDesc), PluginError> {
-    if rate != verdant_plugins::SAMPLE_RATE || max == 0 { return Err(PluginError::Host("AU requires 48 kHz".into())); }
+    if !verdant_plugins::supported_sample_rate(rate) || max == 0 { return Err(PluginError::Host("AU requires an admitted sample rate".into())); }
     let parts: Vec<_> = id.split(':').collect();
     if parts.len() != 3 { return Err(PluginError::Host("AU id must be type:subtype:manufacturer".into())); }
     let desc = ComponentDesc {
@@ -503,7 +504,7 @@ pub fn instantiate(_path: &str, id: &str, rate: f64, max: u32, events: EventTx)
     status(unsafe { AudioComponentInstanceNew(component, &mut unit) }, "AudioComponentInstanceNew").map_err(PluginError::Host)?;
     if unit.is_null() { return Err(PluginError::Host("AU returned no instance".into())); }
     let mut plugin = AuPlugin {
-        unit, initialized: false, max_frames: max as usize,
+        unit, initialized: false, max_frames: max as usize, sample_rate: rate,
         input: Box::new(UnsafeCell::new(RenderInput { l: vec![0.0; max as usize], r: vec![0.0; max as usize], frames: 0 })),
         sample_time: 0, editor: None, view: None, factory: None, bundle: None,
         param_values: BTreeMap::new(),

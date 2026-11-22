@@ -1,0 +1,17 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "plugin.describe",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "device": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "device"
+    ],
+    "type": "object"
+  }
+}

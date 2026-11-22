@@ -5,12 +5,13 @@ Verdant 是歌声编辑器。用钢琴卷帘编写音符、歌词和表达曲线
 ## 用法
 
 ```text
-verdant [工程.verp | --import 乐谱文件] [选项]
-verdant --help
-verdant --runtime-features
+verdant                         # 帮助后退出
+verdant gui [工程.verp | --import 乐谱文件] [选项]
+verdant capabilities --json
+verdant skill list --json
 ```
 
-不指定文件时，打开本账户的未命名工作副本，或建立示例工程。`--import` 创建新的工作副本；在文件菜单查看损失报告，再保存为 `.verp`。
+`verdant` 无参数只显示帮助，不打开或等待 GUI。`verdant gui` 启动桌面；未指定文件时打开本账户的未命名工作副本，或建立示例工程。`verdant gui --import` 创建新的工作副本；在文件菜单查看损失报告，再保存为 `.verp`。
 
 ## 安装与启动
 
@@ -18,9 +19,9 @@ verdant --runtime-features
 
 | 平台 | 入口 |
 | --- | --- |
-| Linux | `bin/verdant [工程.verp]` |
-| Windows x64 | `bin\verdant.exe [工程.verp]` |
-| macOS Apple Silicon | 打开 `Verdant.app` |
+| Linux | 包根目录 `verdant-launcher [工程.verp]`；CLI 用 `bin/verdant` |
+| Windows x64 | 双击包根目录 `verdant-launcher.exe`；CLI 用 `bin\verdant.exe` |
+| macOS Apple Silicon | 打开 `Verdant.app` 或包根目录 `verdant-launcher` |
 
 软件、worker 和桌面声库共用版本 `0.1.0`。本地声库安装需要原始来源和兼容模型包；安装器检查版本与文件身份，再更新本账户注册表。构建、测试、打包、安装和推理无需 Python。[声库安装与回滚](docs/verdant-voice.md)
 
@@ -35,12 +36,14 @@ verdant --runtime-features
 ## 命令行与机器人
 
 ```sh
-verdant-cli capabilities --json
-verdant-cli project inspect song.verp --json
-verdant-cli render song.verp --output song.wav --events
+verdant capabilities --json
+verdant project inspect song.verp --json
+verdant render song.verp --output song.wav --events
+verdant worker --stdio
+verdant skill install --all --agent generic --scope project
 ```
 
-CLI 与桌面共用工程和音频服务。DeepSeek Harness 插件调用 `verdant-cli/1`，在受管会话中交付试听和工程。[命令与协议](spec/CLI-DSH.md) · [插件源码](plugins/dsh/)
+CLI 与桌面共用工程和音频服务；插件、混音、预设、音频片段和分析均使用可发现的原子操作。`verdant-cli` 保留为兼容别名，`verdant worker --stdio` 是顺序执行的工作流 worker，与独立声库进程 `verdant-worker` 区分。离线技能随包提供，安装和更新保护用户修改。[入口、工作流与技能安装](frontend/docs/AGENT-AUTOMATION.md)。DeepSeek Harness 插件调用 `verdant-cli/1`，在受管会话中交付试听和工程。[命令与协议](spec/CLI-DSH.md) · [插件源码](plugins/dsh/)
 
 已有专用工具分别见 [UST／USTX 导入](frontend/crates/verdant-import/README.md)、[乐谱交换](frontend/crates/verdant-exchange/README.md)和 [worker 协议](backend/README.md)。DeepSeek Harness 插件与音频效果宿主 `verdant-plughost` 分别维护。
 
@@ -54,7 +57,7 @@ CLI 与桌面共用工程和音频服务。DeepSeek Harness 插件调用 `verdan
 在 OpenGreendam/verdant 仓库里工作（没有就 git clone 一份）。先读 README.md、SPEC.md、
 docs/README.md 和 RELEASE.md，确认这次改动涉及的模块、手册和构建命令。然后直接实现目标：
 <在这里写你想改的东西>。
-改完本地验证：cargo check、相关测试各跑一次，再从真实入口（bin/verdant 或 verdant-cli）
+改完本地验证：cargo check、相关测试各跑一次，再从真实入口（verdant gui、verdant 或 verdant-cli）
 跑一个实际工程确认行为。最后提交到新分支，写清动机、执行的命令和结果，开一个 Pull Request。
 ```
 

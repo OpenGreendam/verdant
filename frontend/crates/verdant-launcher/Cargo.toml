@@ -1,0 +1,11 @@
+[package]
+name = "verdant-launcher"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+description = "Small native launcher for Verdant's explicit graphical interface."
+
+[dev-dependencies]
+tempfile = "3"

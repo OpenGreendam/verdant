@@ -1,0 +1,355 @@
+{
+  "schema": "verdant-final-skills-forward/1",
+  "created_at_utc": "2026-11-22T10:42:49.424719+00:00",
+  "status": "passed_with_nonblocking_documentation_notes",
+  "blocking_findings": [],
+  "test_root": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b",
+  "new_project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/final-scope/new.verp",
+  "device_id": "ec69e76d-71fb-4bc8-8671-c089fd87096f",
+  "scope": {
+    "read_implementation_source": false,
+    "edited_implementation_source": false,
+    "cargo_or_build_run": false,
+    "gui_launched": false,
+    "reran_old_pcm_reverse_tests": false,
+    "reran_old_atomicity_suite": false,
+    "reran_two_sample_rate_render_suite": false,
+    "input_materials": "Existing synthetic stereo test WAV and a newly generated known exponential-decay white-noise IR."
+  },
+  "runtime": {
+    "cli": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+    "cli_sha256_at_receipt": "97d57b9e171c978f6c5f109d7c40f5078294a76a8ae7c3578f715ee50b20b35a",
+    "plugin_host": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-plughost"
+  },
+  "installation": {
+    "command": [
+      "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+      "skill",
+      "install",
+      "--all",
+      "--dest",
+      "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/installed-skills-final",
+      "--json"
+    ],
+    "destination": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/installed-skills-final",
+    "skill_count": 128,
+    "bundle_sha256": "56d6862d650fcc3fc0567d270a21cdb823b30b5b749d8f8a1353026b2b0eaac6",
+    "bundle_version": "1.0.0",
+    "ok": true
+  },
+  "installed_skills_read": [
+    {
+      "name": "verdant-edit-add-track",
+      "skill_sha256": "0bf499d350b6bb3ba93dccce6ecd44683a2e82a6738c9e9a5b49625a3a10ca66",
+      "reference_sha256": "a7f01a7258781622d3ce83a77a53044ec8c6eef25628f727a0675730ef00c614"
+    },
+    {
+      "name": "verdant-edit-set-tempo-event",
+      "skill_sha256": "570547e774902db4598bd3fe292e8a171d441ef6241f68a662abcd016ecb1ee8",
+      "reference_sha256": "7036fd6a411f7b74054d8e07cb7bdcb23ccd5991cf17f0ad83da8a90a80aa512"
+    },
+    {
+      "name": "verdant-export-audio",
+      "skill_sha256": "4d6b4d7baeb63b8f185ff71562aae50233b6f78fd09dbf368e7ada868f128c92",
+      "reference_sha256": "646d158f04ce45f0a333f2b31504f02baa97a79a65c4545f766ad9c9c7eac0e2"
+    },
+    {
+      "name": "verdant-render-plan",
+      "skill_sha256": "8686c5d38440287dfded4ea16689416c4c6241d0ff92300c29af8bb9a792f35b",
+      "reference_sha256": "91f13cb4283c913055d79ca181d53cb9d6ddf792f8ec42963f7718d99310f3fc"
+    },
+    {
+      "name": "verdant-analysis-eq-fit",
+      "skill_sha256": "39ba786ef51a5b9a586adc9518241d67db91435ce3c77cde0f4ae60f443dfa98",
+      "reference_sha256": "7008228bcce010a948d0eb3326aeb10dc1fe170de91001f575d18fde627451af"
+    },
+    {
+      "name": "verdant-analysis-eq-match",
+      "skill_sha256": "2f2759c1a4e99740827c1d291cea4393c167a12c71b833887b63f778dfe9055f",
+      "reference_sha256": "07f26cb952284af31d52091e3e8da4425f5d539b491c9bfba00352cbd4adfbd2"
+    },
+    {
+      "name": "verdant-analysis-reverb-ir",
+      "skill_sha256": "1ccdfd4633a78f61d13dc0b9332f423d99922050ca98160facce06c67a27b9fa",
+      "reference_sha256": "0ff514d940e4752ce434f2b6c46e7ae61d01781c840a12ca143335d2548c79cb"
+    },
+    {
+      "name": "verdant-plugin-set",
+      "skill_sha256": "82f2e43609b843676cafd76981875476e3d0007056897a8b82b8ac264d14192c",
+      "reference_sha256": "abc0b70b2cda3a49765bc04365f00ffcc90134fc4a6642100bb2ad1eb3913e60"
+    },
+    {
+      "name": "verdant-project-new",
+      "skill_sha256": "708c953d18fa4ed0192e8a2d5f4d75ff9b605ee2f06691f34ebab88064457918",
+      "reference_sha256": "67615b8ac80166df6391a759e6072b702a6b1c665f038774845650ea864e29ba"
+    },
+    {
+      "name": "verdant-mixer-set",
+      "skill_sha256": "1a4675c07c0ba7fae3a87344383ef2ad88d910beea4c9c7edd89b92ffaa6819d",
+      "reference_sha256": "fd62cffad9c2cc648921fc4dc5ccf2e8d443e76684892090c58f68ba7f1a442f"
+    },
+    {
+      "name": "verdant-plugin-add",
+      "skill_sha256": "7254bf09cdd08a841e6cd11fd0b4b66a9e1ee97b460bf60d0d4fc4cc64f80fdc",
+      "reference_sha256": "b4ebd754bcb158019e39291038c191f087c24c7fb44b2cab22e1269c4347de86"
+    },
+    {
+      "name": "verdant-plugin-describe",
+      "skill_sha256": "cf95b0f584ce928a2f86cdd3fb1d94971e5ac18a89e0d275b93a9c7ed823095d",
+      "reference_sha256": "e7bd702cda268a2d711865b503796095a7e7c0fa930801f424cef0403d600d11"
+    }
+  ],
+  "new_track_and_tempo": {
+    "request_record": "final-03-add-track-and-tempo.json",
+    "request": {
+      "protocol": "verdant-cli/1",
+      "request_id": "final-03-add-track-and-tempo",
+      "op": "project.apply",
+      "params": {
+        "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/final-scope/new.verp",
+        "expect_revision": 0,
+        "expect_project_id": "ba10fc6c-4831-4afe-a292-e06f12070212",
+        "operations": [
+          {
+            "index": 1,
+            "op": "add_track",
+            "track": {
+              "color": "teal",
+              "id": "b4f1fc50-4c02-4a10-b9c8-bd4bc6aef509",
+              "monophonic": false,
+              "name": "Forward Final EQ",
+              "notes": []
+            }
+          },
+          {
+            "micro_bpm": 123000000,
+            "op": "set_tempo_event",
+            "tick": 0
+          }
+        ]
+      }
+    },
+    "new_track_id": "b4f1fc50-4c02-4a10-b9c8-bd4bc6aef509",
+    "final_track_count": 2,
+    "final_tempo_bpm": 123.0,
+    "track_shape_was_copied_from_installed_reference_example": true,
+    "tempo_multiplier_was_explicitly_documented": true,
+    "undocumented_shape_or_unit_guesses": []
+  },
+  "dry_run": {
+    "base_revision": 1,
+    "preview_revision": 2,
+    "persisted_revision_after_preview": 1,
+    "sha256_before": "e8c33dc2c026b0f7a70f47f4a4949fffa8ef379456993793ba4eef64064f7e2c",
+    "sha256_after_preview": "e8c33dc2c026b0f7a70f47f4a4949fffa8ef379456993793ba4eef64064f7e2c",
+    "preview_wrote_project": false,
+    "actual_request_expect_revision": 1,
+    "actual_revision": 2,
+    "actual_gain_millidecibels": -3000,
+    "pass": true
+  },
+  "analysis_results": {
+    "project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/final-scope/new.verp",
+    "track_id": "b4f1fc50-4c02-4a10-b9c8-bd4bc6aef509",
+    "instance_id": "8a8b9176-a3a5-473e-a4ea-378bfb976548",
+    "applications": [
+      {
+        "label": "final-15-apply-eq-match",
+        "instance_id": "8a8b9176-a3a5-473e-a4ea-378bfb976548",
+        "value_count": 123,
+        "all_returned_values_applied_exactly": true,
+        "mismatches": {},
+        "revision_after": 4
+      },
+      {
+        "label": "final-17-apply-eq-fit",
+        "instance_id": "8a8b9176-a3a5-473e-a4ea-378bfb976548",
+        "value_count": 153,
+        "all_returned_values_applied_exactly": true,
+        "mismatches": {},
+        "revision_after": 5
+      }
+    ],
+    "all_analysis_numeric_values_finite": true,
+    "eq_match_self": {
+      "bands_used": 0,
+      "rms_error_db": 0.0,
+      "max_error_db": 0.0,
+      "level_offset_db": 0.0
+    },
+    "eq_fit": {
+      "bands_used": 6,
+      "rms_error_db": 0.07468509399895135,
+      "max_error_db": 0.3185907625167391
+    },
+    "reverb_ir": {
+      "designed_rt60_seconds": 0.9,
+      "reported_decay_seconds": 0.8978520166783521,
+      "absolute_decay_error_seconds": 0.002147983321647895,
+      "decay_r_squared": 0.9999875585861981,
+      "decay_model_rms_percent": 0.17805547855692525,
+      "returned_values_count": 83
+    },
+    "final_tempo_bpm": 123.0,
+    "final_track_count": 2
+  },
+  "analysis_read_only_checks": {
+    "scope": "Recursive file SHA-256 inventory and directory inventory of the entire test root, including old/new projects and installed skills; exclude only the harness-created capture file for the current request.",
+    "results": [
+      {
+        "label": "final-09-eq-match",
+        "pass": true,
+        "changed_or_added": [],
+        "directories_unchanged": true
+      },
+      {
+        "label": "final-10-eq-fit",
+        "pass": true,
+        "changed_or_added": [],
+        "directories_unchanged": true
+      },
+      {
+        "label": "final-11-reverb-ir",
+        "pass": true,
+        "changed_or_added": [],
+        "directories_unchanged": true
+      }
+    ]
+  },
+  "analysis_skill_independence": [
+    {
+      "skill": "verdant-analysis-eq-match",
+      "status": "pass",
+      "input_guidance_sufficient": true,
+      "downstream_skills": [
+        "verdant-plugin-describe",
+        "verdant-plugin-add",
+        "verdant-plugin-set",
+        "verdant-project-inspect"
+      ],
+      "evidence": [
+        "final-09-eq-match.json",
+        "final-15-apply-eq-match.json",
+        "final-16-inspect-eq-match.json"
+      ],
+      "details": "Explicit source/reference paths, native sample rate and bounded spectrum options were enough. Returned device and values passed directly to the documented native EQ flow; 123 values read back exactly."
+    },
+    {
+      "skill": "verdant-analysis-eq-fit",
+      "status": "pass",
+      "input_guidance_sufficient": true,
+      "downstream_skills": [
+        "verdant-plugin-describe",
+        "verdant-plugin-add",
+        "verdant-plugin-set",
+        "verdant-project-inspect"
+      ],
+      "evidence": [
+        "final-10-eq-fit.json",
+        "final-17-apply-eq-fit.json",
+        "final-18-inspect-eq-fit.json"
+      ],
+      "details": "Frequency-Hz/gain-dB point-pair format and max_bands/sample_rate guidance were sufficient. Six-band fit returned finite errors, then all 153 returned values read back exactly."
+    },
+    {
+      "skill": "verdant-analysis-reverb-ir",
+      "status": "pass",
+      "input_guidance_sufficient": true,
+      "evidence": [
+        "final-11-reverb-ir.json",
+        "final-analysis-readonly-validation.json"
+      ],
+      "details": "Source/channel and fit-confidence guidance were sufficient. The task explicitly authorized a synthetic known-decay IR for this controlled check; it is not a claim about measured-room fidelity. Report and 83 suggested values are finite; no test-tree writes occurred."
+    }
+  ],
+  "synthetic_ir": {
+    "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/final-scope/synthetic-exponential-ir-2s.wav",
+    "sha256": "7638169fddbe3f71622561fa4e26417587c709cc46f855278892cea70ea353b9",
+    "sample_rate": 48000,
+    "channels": 1,
+    "frames": 96000,
+    "duration_seconds": 2,
+    "designed_rt60_seconds": 0.9,
+    "rng_seed": 1729,
+    "generation": "PCM16 round(32767*0.5*uniform(-1,1)*exp(-ln(1000)*(i/48000)/0.9)), 96000 samples, Python random.Random(1729)."
+  },
+  "old_followups": [
+    {
+      "prior_id": "F1",
+      "area": "preflight media authorization",
+      "status": "previous_runtime_regression_passed_and_new_docs_clear",
+      "evidence": "Previous receipt contains missing/authorized-root regression. New render-plan/export-audio text explicitly requires asset_roots for absolute imports and says project_root is not authorization. No repeated render tests in this narrow phase."
+    },
+    {
+      "prior_id": "F2",
+      "area": "range duration and preroll",
+      "status": "previous_runtime_regression_passed_and_new_docs_clear",
+      "evidence": "New render-plan text defines duration_seconds as output range, processing_timeline_seconds as processing from project zero, and explicit range tail exclusion."
+    },
+    {
+      "prior_id": "F3",
+      "area": "asset_roots/project_root/workspace",
+      "status": "critical_gap_resolved_nonblocking_workspace_note_remains",
+      "evidence": "asset_roots and project_root roles are now explicit and actionable. workspace is still a string field without a description of its jobs/cache role."
+    },
+    {
+      "prior_id": "F4",
+      "area": "track structure and tempo units",
+      "status": "requested_workflow_resolved_by_executed_examples",
+      "evidence": "Copied the installed add_track reference example, substituted only unique ID/name/index, and executed successfully. Used documented micro_bpm=BPM*1000000 for 123 BPM. Generic project.new.project remains an untyped object and its default track/native extension are not separately explained; these no longer block this documented new+add workflow."
+    },
+    {
+      "prior_id": "F5",
+      "area": "dry-run revision and IDs",
+      "status": "resolved_and_executed",
+      "evidence": "Installed skills explicitly say preview revision/commit/IDs are not persisted. Real dry-run returned preview revision 2, inspected revision stayed 1 and bytes stayed equal; submitting the actual gain change with expect_revision=1 succeeded."
+    },
+    {
+      "prior_id": "F6",
+      "area": "export audio.range=Full versus explicit range_ticks",
+      "status": "not_reverified_in_this_narrow_scope",
+      "evidence": "The requested final phase deliberately did not repeat export renders. New skill text does not directly explain the prior audio.range versus range_ticks report-field combination. Earlier report evidence remains available; this receipt makes no new runtime claim about that field."
+    }
+  ],
+  "nonblocking_documentation_notes": [
+    "workspace job/cache-directory semantics remain unspecified in the selected render/export skills.",
+    "Generic project.new.project still lacks a full typed structure/default-project description, although the new add-track and tempo examples now complete the requested workflow without guessing.",
+    "The common dry-run paragraph is also emitted in read-only analysis/plugin.describe/export skills whose parameter schemas do not admit dry_run; this is harmless boilerplate but could be scoped to mutation skills.",
+    "Prior audio.range report-field wording was outside the narrowly authorized rerender scope and is not declared fixed by this receipt."
+  ],
+  "pass_criteria": {
+    "bundle_128_installed": true,
+    "added_track_from_installed_example": true,
+    "tempo_123_with_documented_units": true,
+    "dry_run_original_revision_commit": true,
+    "eq_match_self_zero_error": true,
+    "eq_match_and_eq_fit_values_applied": true,
+    "all_three_analysis_reports_finite": true,
+    "ir_known_decay_sensible": true,
+    "analysis_no_test_tree_file_or_directory_mutation": true
+  },
+  "evidence_files": [
+    "final-01-new.json",
+    "final-02-inspect-new.json",
+    "final-03-add-track-and-tempo.json",
+    "final-04-inspect-123.json",
+    "final-05-dry-run-gain.json",
+    "final-06-inspect-dry-run.json",
+    "final-07-apply-gain-base-revision.json",
+    "final-08-inspect-committed.json",
+    "final-09-eq-match.json",
+    "final-10-eq-fit.json",
+    "final-11-reverb-ir.json",
+    "final-12-describe-eq.json",
+    "final-13-add-eq.json",
+    "final-14-inspect-eq.json",
+    "final-15-apply-eq-match.json",
+    "final-16-inspect-eq-match.json",
+    "final-17-apply-eq-fit.json",
+    "final-18-inspect-eq-fit.json",
+    "final-analysis-application-validation.json",
+    "final-analysis-readonly-validation.json",
+    "final-dry-run-validation.json"
+  ],
+  "conclusion": "The narrow forward workflow passes from the installed 128-skill bundle alone. New-track structure, tempo units and dry-run commit semantics are now actionable; all three analysis skills complete independently with documented downstream operations. No functional blocker was encountered. Test expansion stopped as requested."
+}

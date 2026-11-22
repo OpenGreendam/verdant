@@ -1,0 +1,66 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "plugin.inspect",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "instance_id": {
+        "type": "string"
+      },
+      "owner": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "master"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "track",
+                  "instrument"
+                ]
+              },
+              "track_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "track_id"
+            ],
+            "type": "object"
+          }
+        ],
+        "type": "object"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "owner"
+    ],
+    "type": "object"
+  }
+}

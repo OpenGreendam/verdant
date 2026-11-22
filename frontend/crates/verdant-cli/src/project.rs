@@ -227,16 +227,16 @@ fn commit_json(commit: &Option<verdant_domain::Commit>) -> Value {
     }
 }
 
-struct EditParams {
-    path: PathBuf,
+pub(crate) struct EditParams {
+    pub(crate) path: PathBuf,
     choices: Choices,
     expected: Revision,
     project_id: Option<std::string::String>,
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 impl EditParams {
-    fn take(params: &mut Params) -> Result<Self, CliError> {
+    pub(crate) fn take(params: &mut Params) -> Result<Self, CliError> {
         Ok(Self {
             path: params.required("path")?,
             choices: Choices::take(params)?,
@@ -261,13 +261,13 @@ impl EditParams {
         Ok(())
     }
 
-    fn read(&self) -> Result<(ProjectStore, RecoveryReport), CliError> {
+    pub(crate) fn read(&self) -> Result<(ProjectStore, RecoveryReport), CliError> {
         let (store, report) = read_store(&self.path, &self.choices, true)?;
         self.check(&store, &report)?;
         Ok((store, report))
     }
 
-    fn open(&self) -> Result<(ProjectPersistence, RecoveryReport), CliError> {
+    pub(crate) fn open(&self) -> Result<(ProjectPersistence, RecoveryReport), CliError> {
         let mut rejected = None;
         let opened = ProjectPersistence::open_admitted(&self.path, &mut |store, report| {
             let decision = self.check(store, report).and_then(|()| store.validate_document()
@@ -330,8 +330,43 @@ const OPERATIONS: &[OperationSpec] = &[
 ];
 
 pub fn operation_catalog() -> Value {
-    json!({"schema":"verdant-project-operations/1", "discriminator":"op", "operations":OPERATIONS.iter().map(|spec|
-        json!({"op":spec.op,"fields":spec.fields})).collect::<Vec<_>>()})
+    json!({"schema":"verdant-project-operations/1", "discriminator":"op",
+        "units":{"tick":"Project ticks; read project.ppq. One quarter note is ppq ticks.",
+            "micro_bpm":"BPM multiplied by 1000000; 120 BPM is 120000000. null removes a nonzero tempo event.",
+            "gain_millidecibels":"dB multiplied by 1000; -6 dB is -6000.",
+            "pan_permille":"-1000 left through 0 center to 1000 right.",
+            "detune_millicents":"Cents multiplied by 1000; 100 cents is 100000.",
+            "curve_tick":"Note-relative ticks; preserve the source note's duration and other fields."},
+        "operations":OPERATIONS.iter().map(|spec|{
+            let mut item=json!({"op":spec.op,"fields":spec.fields,
+                "identity":"Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records."});
+            if let Some(example)=operation_example(spec.op){item["example"]=example;}
+            item
+        }).collect::<Vec<_>>()})
+}
+fn operation_example(op:&str)->Option<Value>{
+    let track="INSPECTED_TRACK_ID";let note="INSPECTED_NOTE_ID";
+    Some(match op{
+        "add_track"=>json!({"op":op,"index":1,"track":{"id":"NEW_UNIQUE_TRACK_ID","name":"Audio","monophonic":false,"color":"teal","notes":[]}}),
+        "insert_notes"=>json!({"op":op,"track":track,"notes":[{"id":"NEW_UNIQUE_NOTE_ID","start_tick":0,"duration_tick":960,"midi_note":60,"lyric":"la"}]}),
+        "set_tempo_event"=>json!({"op":op,"tick":0,"micro_bpm":120000000}),
+        "set_time_signature_event"=>json!({"op":op,"tick":0,"numerator":4,"denominator":4}),
+        "move_notes"=>json!({"op":op,"track":track,"note_ids":[note],"delta_tick":120,"delta_semitones":0}),
+        "resize_notes"=>json!({"op":op,"track":track,"note_ids":[note],"edge":"end","delta_tick":120}),
+        "duplicate_notes"=>json!({"op":op,"track":track,"source_ids":[note],"new_ids":["NEW_UNIQUE_NOTE_ID"],"delta_tick":960,"delta_semitones":0}),
+        "delete_notes"=>json!({"op":op,"track":track,"note_ids":[note]}),
+        "set_lyric"=>json!({"op":op,"track":track,"note_id":note,"text":"la"}),
+        "set_pitch"=>json!({"op":op,"track":track,"note_id":note,"midi_note":60,"detune_millicents":0}),
+        "set_timing"=>json!({"op":op,"track":track,"note_id":note,"start_tick":0,"duration_tick":960}),
+        "move_track"=>json!({"op":op,"track":track,"index":0}),
+        "remove_track"=>json!({"op":op,"track":track}),
+        "set_track_header"=>json!({"op":op,"track":track,"header":{"name":"Audio","voice_ref":null,"monophonic":false,"color":"teal","gain_millidecibels":-6000,"pan_permille":0,"muted":false,"solo":false,"render_route":null}}),
+        "set_pitch_curve"=>json!({"op":op,"track":track,"note_id":note,"points":[{"id":"NEW_UNIQUE_POINT_ID","tick":0,"millicents":0}]}),
+        "set_gain_curve"=>json!({"op":op,"track":track,"note_id":note,"points":[{"id":"NEW_UNIQUE_POINT_ID","tick":0,"millidecibels":0}]}),
+        "set_portamento"=>json!({"op":op,"track":track,"note_ids":[note],"portamento_ms":80}),
+        "set_route"=>json!({"op":op,"route":"verdant-voice"}),
+        _=>return None,
+    })
 }
 
 fn batch(label: String, operations: Vec<Value>) -> Result<CommandBatch, CliError> {

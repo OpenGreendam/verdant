@@ -1,0 +1,26 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "mixer.inspect",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  }
+}

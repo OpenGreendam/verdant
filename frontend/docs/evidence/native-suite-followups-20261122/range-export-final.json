@@ -1,0 +1,160 @@
+{
+  "schema": "verdant-range-followup-validation/1",
+  "status": "passed",
+  "source_capture": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/23-export-authorized-44100.json",
+  "output_directory": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/range-final-ec33821dd7",
+  "exports": [
+    {
+      "sample_rate": 88200,
+      "channels": 2,
+      "frames": 88200,
+      "range": "Selection",
+      "range_ticks": [
+        960,
+        1920
+      ],
+      "output_sha256": "db066d2c399e28aa442654ab5b47a669f726b4ce0bb042971d0149286c8d0dc2",
+      "report": {
+        "schema": "verdant-render/1",
+        "job_id": "3a3a2eee-09bf-4efe-a43d-6c88480f0c92",
+        "project_id": "62994c84-2d6e-4a97-9a3d-caffd2d5213e",
+        "revision": 6,
+        "project_sha256": "d40a5053022a2e1a64e383d4c42b5c2b2b7fa85901330b3947b721281c670c52",
+        "input_sha256": "a7c2caecae61b59994bd7fa64a38b27c526a10e66a247aae5f9b8b3e35f88082",
+        "frames": 88200,
+        "fingerprint": "a7c2caecae61b59994bd7fa64a38b27c526a10e66a247aae5f9b8b3e35f88082",
+        "request_digest": "0553deb097df6f935b1dc1a82b1f2f7b020c92119a847ae7198b9195693b901f",
+        "sample_rate": 88200,
+        "processing_sample_rate": 88200,
+        "audio": {
+          "sample_rate": 88200,
+          "channels": 2,
+          "encoding": "Float32",
+          "scope": "Mix",
+          "range": "Selection",
+          "effects": true
+        },
+        "range_ticks": [
+          960,
+          1920
+        ],
+        "seed": 1,
+        "worker_sha256": "0b54418ad2762e7960eaa1a3097a024655f4c0d6fe70de453947b9b86081ee4e",
+        "voices": {
+          "version": 1,
+          "default_voice": null,
+          "voices": {}
+        },
+        "media": [
+          {
+            "sha256": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+            "bytes": 384044,
+            "frames": 96000,
+            "sample_rate": 48000
+          }
+        ],
+        "effects": [
+          {
+            "instance_id": "8831042f-6953-4ff6-8af0-8ee00ee9a17a",
+            "format": "builtin",
+            "id": "verdant.builtin.compressor",
+            "version": "",
+            "binary": null
+          },
+          {
+            "instance_id": "26abce5b-3265-42d4-88af-cadeb1490be6",
+            "format": "builtin",
+            "id": "verdant.builtin.reverb",
+            "version": "",
+            "binary": null
+          }
+        ],
+        "phrases": [],
+        "artifacts": [
+          {
+            "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/range-final-ec33821dd7/mix-88200.wav",
+            "role": "audio",
+            "bytes": 705656,
+            "sha256": "db066d2c399e28aa442654ab5b47a669f726b4ce0bb042971d0149286c8d0dc2"
+          }
+        ]
+      }
+    },
+    {
+      "sample_rate": 192000,
+      "channels": 2,
+      "frames": 192000,
+      "range": "Selection",
+      "range_ticks": [
+        960,
+        1920
+      ],
+      "output_sha256": "1aef24add96dde800f3daa6aebe1049ac9d355a46b1295c3cbb3fffe6d4972c4",
+      "report": {
+        "schema": "verdant-render/1",
+        "job_id": "24059aeb-fc16-4f34-9be6-bab2532ec868",
+        "project_id": "62994c84-2d6e-4a97-9a3d-caffd2d5213e",
+        "revision": 6,
+        "project_sha256": "d40a5053022a2e1a64e383d4c42b5c2b2b7fa85901330b3947b721281c670c52",
+        "input_sha256": "04b4e151d525a72224477bbf22b275d2c9c1d3316ea82cac07f64ad69725b84b",
+        "frames": 192000,
+        "fingerprint": "04b4e151d525a72224477bbf22b275d2c9c1d3316ea82cac07f64ad69725b84b",
+        "request_digest": "5a8aa83d1a06aa4ca26581e8baeb866f7650c481dde41456dd1c0ddd4db1a06a",
+        "sample_rate": 192000,
+        "processing_sample_rate": 192000,
+        "audio": {
+          "sample_rate": 192000,
+          "channels": 2,
+          "encoding": "Float32",
+          "scope": "Mix",
+          "range": "Selection",
+          "effects": true
+        },
+        "range_ticks": [
+          960,
+          1920
+        ],
+        "seed": 1,
+        "worker_sha256": "0b54418ad2762e7960eaa1a3097a024655f4c0d6fe70de453947b9b86081ee4e",
+        "voices": {
+          "version": 1,
+          "default_voice": null,
+          "voices": {}
+        },
+        "media": [
+          {
+            "sha256": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+            "bytes": 384044,
+            "frames": 96000,
+            "sample_rate": 48000
+          }
+        ],
+        "effects": [
+          {
+            "instance_id": "8831042f-6953-4ff6-8af0-8ee00ee9a17a",
+            "format": "builtin",
+            "id": "verdant.builtin.compressor",
+            "version": "",
+            "binary": null
+          },
+          {
+            "instance_id": "26abce5b-3265-42d4-88af-cadeb1490be6",
+            "format": "builtin",
+            "id": "verdant.builtin.reverb",
+            "version": "",
+            "binary": null
+          }
+        ],
+        "phrases": [],
+        "artifacts": [
+          {
+            "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/range-final-ec33821dd7/mix-192000.wav",
+            "role": "audio",
+            "bytes": 1536056,
+            "sha256": "1aef24add96dde800f3daa6aebe1049ac9d355a46b1295c3cbb3fffe6d4972c4"
+          }
+        ]
+      }
+    }
+  ]
+}

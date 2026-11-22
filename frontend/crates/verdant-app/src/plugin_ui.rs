@@ -316,6 +316,7 @@ fn encoded(specs: &[InsertSpec]) -> Vec<serde_json::Value> {
 
 #[derive(Default)]
 pub(crate) struct InsertRuntime {
+    pub(super) callback_budget:u64,
     tracks: Vec<AppliedTrack>,
     master: AppliedMaster,
     pending: Option<PreparedInserts>,
@@ -344,6 +345,7 @@ struct AppliedMaster {
 }
 
 struct PreparedInserts {
+    callback_budget:u64,
     tracks: Vec<AppliedTrack>,
     master: AppliedMaster,
     slots: HashMap<TrackId, Vec<InsertSlot>>,
@@ -441,13 +443,14 @@ fn copied_slot(slot: &InsertSlot, spec: &InsertSpec) -> InsertSlot {
     }
 }
 
-fn restore_slot(client: Option<&Arc<PluginClient>>, spec: InsertSpec)
+fn restore_slot(client: Option<&Arc<PluginClient>>, spec: InsertSpec, callback_budget:u64)
     -> (InsertSlot, std::option::Option<std::string::String>, Option<Box<dyn verdant_audio::Processor>>)
 {
     let restored = client.map(|client| client.restore(&spec)).unwrap_or_else(||
         InsertSlot::Missing { spec: spec.clone(), reason: "插件宿主不可用".into() });
     let InsertSlot::Live(handle) = restored else { return (restored, None, None) };
-    let result = handle.get_state_b64().map_err(|error| format!("无法读取插件初始状态：{error}"))
+    let result = handle.configure_callback_source_frames(callback_budget as u32)
+        .and_then(|()|handle.get_state_b64()).map_err(|error| format!("无法准备插件音频状态：{error}"))
         .and_then(|state| handle.processor().map(|processor| (state, processor)).ok_or_else(|| "无法获取插件音频处理器".to_string()));
     match result {
         Ok((state, processor)) => (InsertSlot::Live(handle), (state != spec.state_b64).then_some(state), Some(processor)),
@@ -572,13 +575,31 @@ impl Editor {
         }).detach();
     }
 
+    /// The device worker already stopped rendering the old budget before
+    /// publishing this token. Retained hosts keep their process and DSP state;
+    /// only the transport warmup, padding and native schedule are rebuilt.
+    fn sync_callback_budget(&mut self,cx:&mut Context<Self>){
+        let budget=self.audio.callback_budget();
+        if budget==0||budget==self.insert_runtime.callback_budget{return;}
+        self.hold_insert_transport(cx);
+        self.insert_gen+=1;
+        let error=self.inserts.values().flatten().chain(&self.master_inserts).find_map(|slot|{
+            let InsertSlot::Live(handle)=slot else{return None;};
+            handle.configure_callback_source_frames(budget as u32).err()
+        });
+        if let Some(error)=error{self.notice(format!("音频设备回调预算无法应用：{error}"));return;}
+        self.insert_runtime.callback_budget=budget;
+        self.insert_specs_applied.clear();
+    }
+
     pub fn restore_inserts(&mut self, cx: &mut Context<Self>) {
+        self.sync_callback_budget(cx);
         self.reclaim_inserts(cx);
         let desired: Vec<_> = self.project().tracks.iter()
             .map(|t| (t.id.clone(), verdant_plugins::project::read_inserts(&t.unknown))).collect();
         let desired_master = self.master_insert_specs();
         if let Some(prepared) = self.insert_runtime.pending.take() {
-            if prepared.master.specs == desired_master && prepared.tracks.iter().map(|t| (&t.id, &t.specs)).eq(desired.iter().map(|(id, specs)| (id, specs))) {
+            if prepared.callback_budget==self.insert_runtime.callback_budget && prepared.master.specs == desired_master && prepared.tracks.iter().map(|t| (&t.id, &t.specs)).eq(desired.iter().map(|(id, specs)| (id, specs))) {
                 self.install_inserts(prepared, cx);
                 return;
             }
@@ -605,7 +626,7 @@ impl Editor {
         if unchanged && padding_unchanged && !retry_needed {
             self.insert_runtime.retry_missing = false;
             self.mark_inserts_applied();
-            if self.insert_runtime.needs_timeline_receipt() {
+            if self.insert_runtime.needs_timeline_receipt() && self.integrations.timeline_preparation.needs_receipt_prepare(self.timeline_gen) {
                 // The matching receipt was dropped while a stale build was
                 // still loading; republish a timeline for the held transport.
                 self.rebuild_timeline(cx);
@@ -704,6 +725,7 @@ impl Editor {
         self.inserts_loading = true;
         self.insert_specs_applied.clear();
         let generation = self.insert_gen;
+        let callback_budget=self.insert_runtime.callback_budget;
         let client = self.plugins.clone();
         let old_padding: Vec<_> = self.insert_runtime.tracks.iter().map(|t| (t.id.clone(), t.padding,
             t.processors.iter().flatten().count())).collect();
@@ -713,7 +735,7 @@ impl Editor {
                 let mut fresh = Vec::new();
                 let mut new_processors = HashMap::new();
                 for (track, slot, spec) in restores {
-                    let (restored, state, processor) = restore_slot(build_client.as_ref(), spec);
+                    let (restored, state, processor) = restore_slot(build_client.as_ref(), spec, callback_budget);
                     if let InsertSlot::Live(handle) = &restored { fresh.push(handle.clone()); }
                     if let Some(processor) = processor { new_processors.insert((track, slot), processor); }
                     if track == MASTER_BUS {
@@ -764,13 +786,13 @@ impl Editor {
                         } else { layout[track].push(ChainInput::New(Box::new(verdant_plugins::DelayPad::new(applied.padding)))); }
                     }
                 }
-                PreparedInserts { tracks, master, slots, master_slots, layout, master_layout, fresh }
+                PreparedInserts { callback_budget, tracks, master, slots, master_slots, layout, master_layout, fresh }
             }).await;
             let mut prepared = Some(prepared);
             let _ = this.update(cx, |ed, cx| {
                 ed.inserts_loading = false;
                 let current = ed.project().tracks.iter().map(|t| (&t.id, verdant_plugins::project::read_inserts(&t.unknown))).collect::<Vec<_>>();
-                if ed.insert_gen == generation && ed.master_insert_specs() == desired_master && current.iter().map(|(id, specs)| (*id, specs))
+                if ed.insert_gen == generation && ed.audio.callback_budget()==callback_budget && ed.master_insert_specs() == desired_master && current.iter().map(|(id, specs)| (*id, specs))
                     .eq(desired.iter().map(|(id, specs)| (id, specs))) {
                     ed.install_inserts(prepared.take().expect("prepared install"), cx);
                 } else {
@@ -892,7 +914,7 @@ impl Editor {
         if let Some(client) = self.plugins.clone() {
             if !handles.is_empty() { cx.background_spawn(async move { retire(&client, handles); }).detach(); }
         }
-        let ready = !self.inserts_loading && self.insert_runtime.hold.as_ref().is_some_and(|hold|
+        let ready = !self.inserts_loading && self.audio.callback_budget()==self.insert_runtime.callback_budget && self.insert_runtime.hold.as_ref().is_some_and(|hold|
             hold.ready(revision, self.audio.applied_timeline_revision(), self.timeline_gen, self.revision())
                 && self.insert_runtime.matches_project(self.project()));
         if ready {
@@ -928,6 +950,7 @@ impl Editor {
     }
 
     pub(super) fn insert_transport_ready(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.audio.callback_budget()!=self.insert_runtime.callback_budget{self.restore_inserts(cx);}
         self.reclaim_inserts(cx);
         if self.inserts_loading || self.insert_runtime.hold.is_some() {
             self.notice("音频链正在重新对齐，请稍后播放"); cx.notify(); return false;

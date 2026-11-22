@@ -80,7 +80,7 @@ pub fn render_outputs(
 ) -> Result<RenderedAudio, String> {
     check_cancelled(cancelled)?;
     if ![44_100,48_000,88_200,96_000,192_000].contains(&settings.options.sample_rate)||!matches!(settings.options.channels,1|2){return Err("不支持的 WAV 采样率或声道数".into());}
-    let prepared=project_audio::prepare_timeline(project,&sources,settings.media_policy.clone(),RATE,Default::default(),None)?;
+    let prepared=project_audio::prepare_timeline(project,&sources,settings.media_policy.clone(),settings.options.sample_rate,Default::default(),None)?;
     check_cancelled(cancelled)?;
     if prepared.timeline.length==0{return Err("当前工程没有可导出的已校验音频".into());}
     let targets=match settings.options.scope{AudioScope::Mix=>vec![None],AudioScope::ActiveTrack=>vec![Some(settings.active_track.clone())],AudioScope::Stems=>project.tracks.iter().map(|t|Some(t.id.clone())).collect()};
@@ -115,8 +115,9 @@ fn check_cancelled(cancelled:&dyn Fn()->bool)->Result<(),String>{
 
 fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,plugins:Option<&PluginClient>,settings:&RenderSettings,target:Option<&TrackId>,cancelled:&dyn Fn()->bool)->Result<(AtomicWav,u64),String>{
     use verdant_audio::engine::ChainInput;
+    let engine_rate=timeline.sample_rate;
     let document=verdant_domain::automation::AutomationDocument::from_project(project).map_err(|e|e.to_string())?;
-    let transport_tempo=project_audio::transport_tempo_curve(project,RATE)?;
+    let transport_tempo=project_audio::transport_tempo_curve(project,engine_rate)?;
     let errors=Arc::new(Mutex::new(None));let mut chains=Vec::with_capacity(project.tracks.len());let mut schedules=Vec::with_capacity(project.tracks.len());let mut latencies=Vec::with_capacity(project.tracks.len());let mut ends=Vec::with_capacity(project.tracks.len());
     let target_slot=target.map(|id|project.tracks.iter().position(|t|&t.id==id).ok_or("导出轨道不存在")).transpose()?;
     // A stem keeps its sidechain sources' material: they are muted below but
@@ -134,7 +135,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
             for spec in verdant_plugins::project::read_inserts(&track.unknown){
                 if spec.bypass{matched.insert(spec.instance_id.clone());continue;}
                 let client=plugins.ok_or_else(||format!("轨道 {} 需要插件 {}，但宿主不可用",track.name,spec.name))?;
-                let handle=client.offline_insert(spec.clone()).map_err(|e|format!("插件 {}：{e}",spec.name))?;
+                let handle=client.offline_insert_at_rate(spec.clone(),f64::from(engine_rate)).map_err(|e|format!("插件 {}：{e}",spec.name))?;
                 let schedule=project_audio::plugin_schedule(&timeline.automation.tracks[index],&document,&verdant_domain::automation::AutomationOwner::Track{track_id:track.id.clone()},&spec.instance_id,&handle,&transport_tempo,latency,None)?;
                 sidechains.extend(project_audio::sidechain_route(project,index,&spec,chain.len(),latency));
                 matched.insert(spec.instance_id.clone());let own=handle.plugin_latency_samples();latency=latency.checked_add(own).ok_or("插件延迟超出范围")?;
@@ -142,7 +143,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
             }
             if timeline.automation.tracks[index].plugins.iter().any(|lane|!matched.contains(&lane.instance_id)){return Err(format!("轨道 {} 的参数自动化缺少已安装插件",track.name));}
         }
-        let tail=if end>0&&!chain.is_empty(){u64::from(RATE)*u64::from(INSERT_TAIL_SECONDS)}else{0};
+        let tail=if end>0&&!chain.is_empty(){u64::from(engine_rate)*u64::from(INSERT_TAIL_SECONDS)}else{0};
         ends.push(end.checked_add(tail).ok_or("尾音范围溢出")?);latencies.push(latency);chains.push(chain);schedules.push(native);
     }
     let maximum=latencies.iter().copied().max().unwrap_or(0);
@@ -151,7 +152,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
         for spec in project_audio::master_insert_specs(project){
             if spec.bypass{matched.insert(spec.instance_id.clone());continue;}
             let client=plugins.ok_or_else(||format!("主总线需要插件 {}，但宿主不可用",spec.name))?;
-            let handle=client.offline_insert(spec.clone()).map_err(|error|format!("主总线插件 {}：{error}",spec.name))?;
+            let handle=client.offline_insert_at_rate(spec.clone(),f64::from(engine_rate)).map_err(|error|format!("主总线插件 {}：{error}",spec.name))?;
             let input_latency=maximum.checked_add(master_latency).ok_or("主总线插件节拍延迟超出范围")?;
             let schedule=project_audio::plugin_schedule(&timeline.automation.master,&document,&verdant_domain::automation::AutomationOwner::Master,&spec.instance_id,&handle,&transport_tempo,input_latency,None)?;
             sidechains.extend(project_audio::sidechain_route(project,verdant_audio::engine::MASTER_BUS,&spec,master_chain.len(),input_latency));
@@ -161,7 +162,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
         if timeline.automation.master.plugins.iter().any(|lane|!matched.contains(&lane.instance_id)){return Err("主总线的参数自动化缺少已安装插件".into());}
     }
     let source_length=ends.iter().copied().max().unwrap_or(0);if source_length==0{return Err("所选轨道没有可导出的音频".into());}
-    let master_tail=if master_chain.is_empty(){0}else{u64::from(RATE)*u64::from(INSERT_TAIL_SECONDS)};
+    let master_tail=if master_chain.is_empty(){0}else{u64::from(engine_rate)*u64::from(INSERT_TAIL_SECONDS)};
     let length=source_length.checked_add(master_tail).ok_or("主总线尾音范围溢出")?;
     let latency=maximum.checked_add(master_latency).ok_or("总插件延迟超出范围")?;
     for(index,chain)in chains.iter_mut().enumerate(){
@@ -172,17 +173,17 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
     if !master_chain.is_empty(){master_chain.push(Box::new(TailGate{position:0,end:processed_end}));master_native.push(None);}
     timeline.length=processed_end;timeline.native_automation=schedules;timeline.master_native_automation=master_native;timeline.loop_range=None;timeline.metronome=None;timeline.sidechains=sidechains;
     let tempo=TempoMap::new(&project.tempo_map,project.ppq).map_err(|e|e.to_string())?;
-    let(start,end)=if let Some((a,z))=settings.range_ticks{let start=tempo.sample_at(a,RATE).max(0)as u64;let end=tempo.sample_at(z,RATE).max(0)as u64;if end<=start{return Err("导出时间范围为空".into());}(start,end)}else{(0,length)};
+    let(start,end)=if let Some((a,z))=settings.range_ticks{let start=tempo.sample_at(a,engine_rate).max(0)as u64;let end=tempo.sample_at(z,engine_rate).max(0)as u64;if end<=start{return Err("导出时间范围为空".into());}(start,end)}else{(0,length)};
     // An explicit range may include silence after the last source. Effects
     // still stop at each track's and the master's documented tail boundary.
     timeline.length=timeline.length.max(end.checked_add(u64::from(latency)).ok_or("导出时间范围溢出")?);
-    let rate=settings.options.sample_rate;let output_frames=((end-start)as f64*rate as f64/RATE as f64).round()as u64;
-    let skip=(start.checked_add(u64::from(latency)).ok_or("导出起点溢出")?as f64*rate as f64/RATE as f64).round()as u64;
-    let(mut control,rt)=verdant_audio::engine::channel(RATE,BLOCK);let any_solo=target.is_none()&&project.tracks.iter().any(|t|t.solo);
+    let rate=settings.options.sample_rate;let output_frames=end-start;
+    let skip=start.checked_add(u64::from(latency)).ok_or("导出起点溢出")?;
+    let(mut control,rt)=verdant_audio::engine::channel(engine_rate,BLOCK);let any_solo=target.is_none()&&project.tracks.iter().any(|t|t.solo);
     for(index,track)in project.tracks.iter().enumerate(){let mut channel=project_audio::channel_settings(&track.header(),any_solo);if let Some(slot)=target_slot{channel.solo=false;if slot!=index{channel.mute=true;}}control.set_channel(index,channel);}
     if target_slot.is_none() { control.set_master(project_audio::MasterBusSettings::from_project(project).channel_settings()); }
     control.remap_chains(chains).map_err(|_|"无法提交离线插件链")?;if !control.set_master_chain(master_chain){return Err("无法提交离线主总线插件链".into());}control.set_timeline(timeline);control.play();
-    let mut renderer=verdant_audio::CallbackRenderer::new(rt,RATE);renderer.set_device_rate(rate).map_err(|e|e.to_string())?;
+    let mut renderer=verdant_audio::CallbackRenderer::new(rt,engine_rate);renderer.set_device_rate(rate).map_err(|e|e.to_string())?;
     let mut wav=AtomicWav::new(path,output_frames,&settings.options)?;let channels=settings.options.channels as usize;let mut samples=vec![0f32;BLOCK*channels];let mut encoded=vec![0u8;BLOCK*channels*4];
     let mut position=0;let total=skip.checked_add(output_frames).ok_or("导出时长溢出")?;
     while position<total{

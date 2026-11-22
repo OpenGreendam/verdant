@@ -20,6 +20,7 @@ pub(super) fn inspect(path: &Path, device: &str, params: &[ParamDesc]) -> Result
         let preset = if report.values.is_empty() { None } else {
             let preset = PresetFile { format: "verdant-device-preset".into(), version: 1, device: device.into(),
                 name: name.clone(), tags: vec!["FabFilter".into(), "Imported".into()], favorite: false,
+                category: "Imported".into(), author: String::new(), description: String::new(), origin_factory_id: None,
                 parameters: report.values.iter().cloned().collect() };
             preset.validate(device, params)?;
             Some(preset)

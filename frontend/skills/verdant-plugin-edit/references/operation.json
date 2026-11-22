@@ -1,0 +1,840 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "plugin.edit",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "edit": {
+        "description": "Tagged operation. Nested batches use the same union and commit atomically.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "device": {
+                "type": "string"
+              },
+              "index": {
+                "type": "integer"
+              },
+              "operation": {
+                "const": "add"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              },
+              "preset_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "device"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "instance_id": {
+                "type": "string"
+              },
+              "operation": {
+                "const": "remove"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "instance_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "operation": {
+                "const": "reorder"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_ids"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "instance_id": {
+                "type": "string"
+              },
+              "operation": {
+                "const": "set"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              },
+              "values": {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_id",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "instance_id": {
+                "type": "string"
+              },
+              "operation": {
+                "const": "reset"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bypass": {
+                "type": "boolean"
+              },
+              "instance_id": {
+                "type": "string"
+              },
+              "operation": {
+                "const": "bypass"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_id",
+              "bypass"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "instance_id": {
+                "type": "string"
+              },
+              "operation": {
+                "const": "sidechain"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              },
+              "source_track": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "operation": {
+                "const": "mixer"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              },
+              "settings": {
+                "additionalProperties": false,
+                "properties": {
+                  "gain_db": {
+                    "maximum": 6,
+                    "minimum": -96,
+                    "type": "number"
+                  },
+                  "muted": {
+                    "type": "boolean"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "pan": {
+                    "maximum": 1,
+                    "minimum": -1,
+                    "type": "number"
+                  },
+                  "solo": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "settings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "lane": {
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "points": {
+                    "items": {
+                      "properties": {
+                        "interpolation": {
+                          "enum": [
+                            "step",
+                            "linear"
+                          ]
+                        },
+                        "tick": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "tick",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "target": {
+                    "description": "Gain automation uses millidecibels; pan uses permille. Plugin values use the native descriptor units. Instrument parameters are edited through plugin.set; insert automation targets track/master effects.",
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "track_gain",
+                              "track_pan"
+                            ]
+                          },
+                          "track_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "track_id"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "master_gain",
+                              "master_pan"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "instance_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "plugin_parameter"
+                          },
+                          "owner": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "master"
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "track_id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "track_id"
+                                ],
+                                "type": "object"
+                              }
+                            ],
+                            "type": "object"
+                          },
+                          "parameter_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "owner",
+                          "instance_id",
+                          "parameter_id"
+                        ],
+                        "type": "object"
+                      }
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "target",
+                  "points"
+                ],
+                "type": "object"
+              },
+              "operation": {
+                "const": "automation"
+              }
+            },
+            "required": [
+              "operation",
+              "lane"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "operation": {
+                "const": "remove_automation"
+              },
+              "target": {
+                "description": "Gain automation uses millidecibels; pan uses permille. Plugin values use the native descriptor units. Instrument parameters are edited through plugin.set; insert automation targets track/master effects.",
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track_gain",
+                          "track_pan"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "master_gain",
+                          "master_pan"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "instance_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "plugin_parameter"
+                      },
+                      "owner": {
+                        "oneOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "const": "master"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "const": "track"
+                              },
+                              "track_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "track_id"
+                            ],
+                            "type": "object"
+                          }
+                        ],
+                        "type": "object"
+                      },
+                      "parameter_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "owner",
+                      "instance_id",
+                      "parameter_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "operation",
+              "target"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "instance_id": {
+                "type": "string"
+              },
+              "operation": {
+                "const": "preset"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "master"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "track",
+                          "instrument"
+                        ]
+                      },
+                      "track_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "track_id"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "type": "object"
+              },
+              "preset_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "owner",
+              "instance_id",
+              "preset_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "edits": {
+                "items": {
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "operation": {
+                "const": "batch"
+              }
+            },
+            "required": [
+              "operation",
+              "edits"
+            ],
+            "type": "object"
+          }
+        ],
+        "type": "object"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "edit"
+    ],
+    "type": "object"
+  }
+}

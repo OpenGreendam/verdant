@@ -18,7 +18,7 @@
 //! Protocol — `in_seq`/`out_seq` count completed blocks (0 at init):
 //! - RT writer: fill `in_slot[n % RING_SLOTS]`, publish `in_seq`, wake host.
 //! - Host: drain complete input quanta in order, publish corresponding output.
-//! - RT reader consumes output 37 quanta later. The delay covers an entire
+//! - RT reader consumes output after a negotiated number of quanta (at most 37). The delay covers an entire
 //!   8192-frame device callback at >=44.1 kHz, source prefetch, and partial DSP
 //!   alignment at the fixed 48 kHz processing rate. A callback never
 //!   depends on DSP for audio it submitted during that same callback.

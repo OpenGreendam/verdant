@@ -1,0 +1,44 @@
+{
+  "op": "project.new",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "label": {
+        "type": "string"
+      },
+      "operations": {
+        "items": {
+          "properties": {
+            "op": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "output": {
+        "type": "string"
+      },
+      "ppq": {
+        "type": "integer"
+      },
+      "project": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "output"
+    ],
+    "type": "object"
+  }
+}

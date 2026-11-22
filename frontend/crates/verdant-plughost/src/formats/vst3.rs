@@ -17,6 +17,7 @@ pub struct Vst3Plugin {
     id: String,
     bufs: BusAudioBuffers,
     max_frames: usize,
+    sample_rate: f64,
     offline: bool,
     editor: Option<crate::window::EditorWindow>,
     editor_title: Option<String>,
@@ -174,7 +175,7 @@ impl HostedPlugin for Vst3Plugin {
     }
     fn editor_open(&self) -> bool { self.editor.is_some() && self.plugin.is_editor_open() }
     fn reconfigure(&mut self, rate: f64, max: u32) -> Result<(), String> {
-        if rate != verdant_plugins::SAMPLE_RATE || max as usize != self.max_frames {
+        if rate != self.sample_rate || max as usize != self.max_frames {
             return Err("VST3 insert processing contract is fixed".into());
         }
         self.plugin.stop_processing().map_err(|e| e.to_string())?;
@@ -233,7 +234,7 @@ pub fn instantiate(path: &str, id: &str, rate: f64, max: u32, events: EventTx)
     let bufs = make_buffers(&plugin, max as usize).map_err(PluginError::Host)?;
     Ok((Box::new(Vst3Plugin {
         plugin, host, path: path.into(), id: info.uid.clone(), bufs,
-        max_frames: max as usize, offline: false, editor: None, editor_title: None,
+        max_frames: max as usize, sample_rate: rate, offline: false, editor: None, editor_title: None,
         editor_size: (0, 0), events,
     }), InstDesc { id: info.uid, name: info.name }))
 }

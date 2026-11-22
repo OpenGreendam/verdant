@@ -820,57 +820,8 @@ impl HalfBand {
     }
 }
 
-/// Fit a sketched log-frequency response using a bounded set of bell bands.
-/// The result is one atomic parameter edit, with no audio-thread file access.
-pub fn eq_fit_curve(points:&[(f64,f64)],max_bands:usize)->Result<Vec<(String,f64)>,String> {
-    if points.len()<2 || points.len()>65536 {return Err("EQ curve needs 2..65536 points".into());}
-    if points.iter().any(|&(f,g)|!f.is_finite()||!g.is_finite()||!(FREQ_MIN..=FREQ_MAX).contains(&f)||!(-96.0..=96.0).contains(&g)) {
-        return Err("EQ curve contains an invalid frequency or gain".into());
-    }
-    let mut points=points.to_vec();points.sort_by(|a,b|a.0.total_cmp(&b.0));points.dedup_by(|a,b|a.0==b.0);
-    if points.len()<2 {return Err("EQ curve needs distinct frequencies".into());}
-    let probes:Vec<f64>=(0..192).map(|i|FREQ_MIN*(FREQ_MAX/FREQ_MIN).powf(i as f64/191.0)).collect();
-    let interpolate=|f:f64| {
-        let at=points.partition_point(|p|p.0<f);
-        if at==0 {points[0].1} else if at==points.len(){points[at-1].1}
-        else {let (a,b)=(points[at-1],points[at]);let t=(f/a.0).ln()/(b.0/a.0).ln();a.1+t*(b.1-a.1)}
-    };
-    let mut residual:Vec<f64>=probes.iter().map(|&f|interpolate(f).clamp(-24.0,24.0)).collect();
-    let mut changes=Vec::new();
-    for i in 0..EQ_BANDS {changes.push((eq_param_id(i,"on"),0.0));changes.push((eq_param_id(i,"slope_continuous"),0.0));}
-    for band_index in 0..max_bands.clamp(1,EQ_BANDS) {
-        let peak=(0..residual.len()).max_by(|&a,&b|residual[a].abs().total_cmp(&residual[b].abs())).unwrap();
-        let gain=residual[peak].clamp(-24.0,24.0);
-        if gain.abs()<0.35 {break;}
-        let mut left=peak;let mut right=peak;
-        while left>0 && residual[left-1]*gain>gain*gain*0.5 {left-=1;}
-        while right+1<residual.len() && residual[right+1]*gain>gain*gain*0.5 {right+=1;}
-        let center=probes[peak];let bandwidth=(probes[right]-probes[left]).max(center*0.05);
-        let q=(center/bandwidth).clamp(0.15,18.0);
-        let band=Band{kind:BandKind::Bell,on:true,freq:center,gain_db:gain,q,slope:0,place:Placement::Stereo};
-        for (f,r) in probes.iter().zip(&mut residual){*r-=band_response_db(&band,*f,48000.0);}
-        for (field,v) in [("on",1.0),("shape",0.0),("freq",center),("gain",gain),("q",q),("place",0.0),("dynamic",0.0),("spectral",0.0),("brickwall",0.0)] {
-            changes.push((eq_param_id(band_index,field),v));
-        }
-    }
-    // Remove duplicate enable updates so callers can validate a strict map.
-    let mut unique=std::collections::BTreeMap::new();for (id,value) in changes {unique.insert(id,value);}
-    Ok(unique.into_iter().collect())
-}
-
-/// Spectra are (Hz,dB) samples of actual source/reference audio. A global
-/// level offset is removed before fitting the tonal difference.
-pub fn eq_match_spectra(source:&[(f64,f64)],target:&[(f64,f64)],max_bands:usize)->Result<Vec<(String,f64)>,String> {
-    let validate=|s:&[(f64,f64)]|s.len()>=2&&s.len()<=65536&&s.iter().all(|&(f,g)|f.is_finite()&&g.is_finite()&&(FREQ_MIN..=FREQ_MAX).contains(&f));
-    if !validate(source)||!validate(target){return Err("Match requires finite source and reference spectra".into());}
-    let mut source=source.to_vec();let mut target=target.to_vec();
-    source.sort_by(|a,b|a.0.total_cmp(&b.0));target.sort_by(|a,b|a.0.total_cmp(&b.0));
-    let sample=|s:&[(f64,f64)],f:f64|{let i=s.partition_point(|p|p.0<f);if i==0{s[0].1}else if i==s.len(){s[i-1].1}else{let(a,b)=(s[i-1],s[i]);let t=(f/a.0).ln()/(b.0/a.0).ln().max(1e-12);a.1+t*(b.1-a.1)}};
-    let mut curve:Vec<_>=(0..192).map(|i|{let f=FREQ_MIN*(FREQ_MAX/FREQ_MIN).powf(i as f64/191.0);(f,(sample(&target,f)-sample(&source,f)).clamp(-48.0,48.0))}).collect();
-    let offset=curve.iter().map(|p|p.1).sum::<f64>()/curve.len() as f64;
-    for p in &mut curve{p.1=(p.1-offset).clamp(-24.0,24.0);}
-    eq_fit_curve(&curve,max_bands)
-}
+mod fit;
+pub use fit::{EqFitReport, EqMatchOptions, eq_fit_curve, eq_fit_curve_report, eq_match_spectra, eq_match_spectra_with_options};
 
 #[cfg(test)]
 mod tests {

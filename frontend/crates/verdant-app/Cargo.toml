@@ -7,7 +7,7 @@ publish.workspace = true
 description = "Verdant 翠绿 — GPUI singing-voice editor."
 
 [[bin]]
-name = "verdant"
+name = "verdant-gui"
 path = "src/main.rs"
 
 [dependencies]

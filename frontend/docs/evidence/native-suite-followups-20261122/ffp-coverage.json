@@ -1,0 +1,686 @@
+{
+  "schema": "verdant-ffp-followup-proof/1",
+  "captured_utc": "2026-11-22",
+  "repository_base_commit": "5c89d69d810b8b214b366c6623a9e049370a0159",
+  "source_state": "implementation worktree before integration commit; exact importer, DSP and probe hashes below",
+  "source_files_sha256": {
+    "frontend/crates/verdant-plugins/src/preset_interop.rs": "7d0caf341a525ff1e8074fdc1b09cf0bf4c5cc40ea0736fe8d72ee58873c4dbe",
+    "frontend/crates/verdant-plugins/src/builtin_dsp/dynamics.rs": "1f93714ad413c4203f9139fc2fcf8c1e7db4be8fe9527c3b9440311c1f759377",
+    "frontend/scripts/verify-ffp-corpus.py": "d52e1994a264081e6521a101fbde3e842a4d7044ede2806208ceff276fc7abbf"
+  },
+  "evidence_sources": [
+    {
+      "url": "https://www.fabfilter.com/help/pro-c/using/styleandcharacter",
+      "used_for": "Character names, internal drive level, pre/post semantics"
+    },
+    {
+      "url": "https://www.fabfilter.com/help/pro-c/using/dynamicscontrols",
+      "used_for": "Explicit 0..72 dB knee range"
+    },
+    {
+      "url": "https://www.fabfilter.com/help/pro-r/using/maincontrols",
+      "used_for": "Stereo width percentage, cross-feed caveat, input-triggered ducking range"
+    },
+    {
+      "url": "https://www.fabfilter.com/download",
+      "used_for": "Existing local official factory FFP corpus; files remain outside repository"
+    }
+  ],
+  "descriptor_changes": [
+    {
+      "device": "verdant.builtin.compressor",
+      "id": "character_drive",
+      "index": 22,
+      "old_range": [
+        0,
+        24
+      ],
+      "new_range": [
+        -24,
+        24
+      ],
+      "unit": "dB",
+      "default": 0
+    },
+    {
+      "device": "verdant.builtin.compressor",
+      "id": "knee",
+      "index": 4,
+      "old_range": [
+        0,
+        24
+      ],
+      "new_range": [
+        0,
+        72
+      ],
+      "unit": "dB",
+      "default": 6
+    }
+  ],
+  "translation_changes": [
+    {
+      "product": "Pro-C 3",
+      "source": "Character",
+      "native": "character",
+      "mapping": "0 Off, 1 Tube, 2 Diode, 3 Bright; other or fractional values remain unsupported"
+    },
+    {
+      "product": "Pro-C 3",
+      "source": "Character Drive",
+      "native": "character_drive",
+      "mapping": "physical dB, validated -24..24; values outside range are reported, never clamped"
+    },
+    {
+      "product": "Pro-C 3",
+      "source": "Character Routing",
+      "native": "character_pre",
+      "mapping": "0 Pre -> true, 1 Post -> false; unknown or fractional values remain unsupported"
+    },
+    {
+      "product": "Pro-C 3",
+      "source": "Knee",
+      "native": "knee",
+      "mapping": "existing physical dB mapping now accepts 0..72"
+    },
+    {
+      "product": "Pro-R 2",
+      "source": "Ducking",
+      "native": "ducking",
+      "mapping": "physical dB, validated native 0..48 range"
+    },
+    {
+      "product": "Pro-R 2",
+      "source": "Stereo Width",
+      "native": "width",
+      "mapping": "ratio times 100 to percent, validated 0..150; warning retains algorithm/cross-feed difference"
+    }
+  ],
+  "aggregate_before": {
+    "recognized": 1769,
+    "complete": 23,
+    "partial": 437,
+    "identified_only": 1309,
+    "unsupported_diagnostics": 5201
+  },
+  "aggregate_after": {
+    "recognized": 1769,
+    "complete": 23,
+    "partial": 437,
+    "identified_only": 1309,
+    "unsupported_diagnostics": 4829
+  },
+  "deltas": {
+    "FC3p": {
+      "unsupported_before": 1295,
+      "unsupported_after": 1111,
+      "resolved_occurrences": 184,
+      "resolved_by_field": {
+        "Knee": 30,
+        "Character": 59,
+        "Character Drive": 66,
+        "Character Routing": 29
+      }
+    },
+    "FR2p": {
+      "unsupported_before": 1171,
+      "unsupported_after": 983,
+      "resolved_occurrences": 188,
+      "resolved_by_field": {
+        "Stereo Width": 112,
+        "Ducking": 76
+      }
+    }
+  },
+  "resolved_unsupported_field_occurrences": 372,
+  "validation": {
+    "preset_interop_unit_tests": {
+      "passed": 10,
+      "ignored_external_probe_in_default_run": 1
+    },
+    "compressor_targeted_tests": {
+      "passed": 6,
+      "includes": [
+        "negative drive finite PCM across all 3 character modes and both routes",
+        "wide knee monotonicity, continuity and PCM effect"
+      ]
+    },
+    "external_corpus_test": {
+      "passed": true,
+      "files": 1769
+    },
+    "real_cli_worker_roundtrip": {
+      "passed": true,
+      "requests": 1769,
+      "protocol": "verdant-cli/1",
+      "max_active_requests": 1
+    },
+    "cli_build": {
+      "passed": true,
+      "command": "cargo build --offline -p verdant-cli"
+    }
+  },
+  "limitations": [
+    "Complete/partial/identified-only classifications remain 23/437/1309; improved field translation does not imply full preset or audio equivalence.",
+    "Native result values include defaults and are not a count of measured or translated fields.",
+    "Opaque C3 ratio/attack/release/stereo-link laws, Q4 dynamic thresholds/times, R2 room/tone laws and MB remaining positional fields are not guessed.",
+    "Verdant uses independent DSP; original saturation response, reverb cross-feed and sonic matching are not proven.",
+    "No commercial factory preset bytes or per-preset assets are distributed with this evidence."
+  ],
+  "before": {
+    "schema": "verdant-ffp-corpus-proof/1",
+    "binary_sha256": "2905bb995c32944156003170f1d1d4b9caaa18f589d53915022b3a7db8da1e8c",
+    "input_set_sha256": "cfddd3235b651f192a57641d451aff8cddcff3ccdedb07ffae601a5e759f0029",
+    "inputs": 1769,
+    "families": {
+      "FMic": {
+        "recognized": 16,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 16,
+        "unsupported_diagnostics": 16,
+        "unsupported_by_field": {
+          "已识别 Micro 二进制预设，格式版本 1；此产品的参数布局/归一化尚未验证，没有应用任何参数": 16
+        },
+        "native_result_values": 0
+      },
+      "FFPr": {
+        "recognized": 109,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 109,
+        "unsupported_diagnostics": 109,
+        "unsupported_by_field": {
+          "已识别 One 二进制预设，格式版本 0；此产品的参数布局/归一化尚未验证，没有应用任何参数": 25,
+          "已识别 One 二进制预设，格式版本 1；此产品的参数布局/归一化尚未验证，没有应用任何参数": 84
+        },
+        "native_result_values": 0
+      },
+      "FC3p": {
+        "recognized": 122,
+        "complete": 0,
+        "partial": 122,
+        "identified_only": 0,
+        "unsupported_diagnostics": 1295,
+        "unsupported_by_field": {
+          "Ratio": 122,
+          "Attack": 122,
+          "Release": 122,
+          "Stereo Link": 122,
+          "Wet Gain": 88,
+          "Side Chain EQ Band * Slope": 39,
+          "Knee": 30,
+          "Hold": 64,
+          "Character": 59,
+          "Character Drive": 66,
+          "Character Routing": 29,
+          "Side Chain EQ Band * Shape": 34,
+          "Lookahead": 54,
+          "Side Chain Level": 49,
+          "Dry Gain": 38,
+          "Lookahead Enabled": 6,
+          "Side Chain Expert Mode": 6,
+          "Mix": 31,
+          "Output Level": 27,
+          "Stereo Link Mode": 24,
+          "Side Chain EQ Band * gain": 6,
+          "Oversampling": 24,
+          "Wet Pan": 12,
+          "Dry Pan": 7,
+          "Side Chain EQ Band * ": 25,
+          "Side Chain EQ Band * Speakers": 25,
+          "Side Chain EQ Band * q": 12,
+          "Side Chain EQ Band * freq": 6,
+          "Input Level": 3,
+          "Host Trigger Offset": 8,
+          "Side Chain Input": 23,
+          "Stereo Link Surrounds": 6,
+          "Stereo Link Tops": 6
+        },
+        "native_result_values": 7808
+      },
+      "FPSr": {
+        "recognized": 9,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 9,
+        "unsupported_diagnostics": 9,
+        "unsupported_by_field": {
+          "已识别 Pro-DS 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 9
+        },
+        "native_result_values": 0
+      },
+      "FPGr": {
+        "recognized": 57,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 57,
+        "unsupported_diagnostics": 57,
+        "unsupported_by_field": {
+          "已识别 Pro-G 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 57
+        },
+        "native_result_values": 0
+      },
+      "FL2p": {
+        "recognized": 58,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 58,
+        "unsupported_diagnostics": 58,
+        "unsupported_by_field": {
+          "已识别 Pro-L 2 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 58
+        },
+        "native_result_values": 0
+      },
+      "FPMb": {
+        "recognized": 55,
+        "complete": 0,
+        "partial": 55,
+        "identified_only": 0,
+        "unsupported_diagnostics": 407,
+        "unsupported_by_field": {
+          "Band * high": 33,
+          "Band * Attack/Release": 142,
+          "Band * 斜率/路由等剩余字段": 142,
+          "Pro-MB 其余全局设置": 55,
+          "Band * knee": 27,
+          "Input Level": 6,
+          "Band * Ratio": 2
+        },
+        "native_result_values": 7590
+      },
+      "FQ4p": {
+        "recognized": 171,
+        "complete": 23,
+        "partial": 148,
+        "identified_only": 0,
+        "unsupported_diagnostics": 1019,
+        "unsupported_by_field": {
+          "Output Level": 68,
+          "Band * Dynamics": 528,
+          "Band * Side Chain Filtering": 57,
+          "Character": 26,
+          "Band * freq": 15,
+          "Band * Slope": 134,
+          "Band * q": 18,
+          "Band * Spectral Tilt": 58,
+          "Band * Spectral Enabled": 76,
+          "Band * Dynamic Range": 3,
+          "Output Pan": 5,
+          "Output Pan Mode": 9,
+          "Band * Speakers": 22
+        },
+        "native_result_values": 74727
+      },
+      "FR2p": {
+        "recognized": 112,
+        "complete": 0,
+        "partial": 112,
+        "identified_only": 0,
+        "unsupported_diagnostics": 1171,
+        "unsupported_by_field": {
+          "Space": 112,
+          "Brightness": 112,
+          "Character": 112,
+          "Stereo Width": 112,
+          "Predelay": 107,
+          "Decay EQ Band * freq": 29,
+          "Predelay Offset": 41,
+          "Predelay Sync": 5,
+          "Ducking": 76,
+          "Decay EQ Band * Shape": 56,
+          "Post EQ Band * Slope": 63,
+          "Output Level": 53,
+          "Post EQ Band * ": 133,
+          "Post EQ Band * freq": 19,
+          "Post EQ Band * gain": 13,
+          "Decay EQ Band * q": 44,
+          "Input Level": 48,
+          "Post EQ Band * q": 25,
+          "Decay EQ Band * rate": 10,
+          "Output Pan": 1
+        },
+        "native_result_values": 12880
+      },
+      "FPRr": {
+        "recognized": 162,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 162,
+        "unsupported_diagnostics": 162,
+        "unsupported_by_field": {
+          "已识别 Pro-R 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 162
+        },
+        "native_result_values": 0
+      },
+      "FS2a": {
+        "recognized": 71,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 71,
+        "unsupported_diagnostics": 71,
+        "unsupported_by_field": {
+          "已识别 Saturn 2 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 36,
+          "已识别 Saturn 2 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 21,
+          "已识别 Saturn 2 二进制预设，格式版本 3；此产品的参数布局/归一化尚未验证，没有应用任何参数": 14
+        },
+        "native_result_values": 0
+      },
+      "FSat": {
+        "recognized": 6,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 6,
+        "unsupported_diagnostics": 6,
+        "unsupported_by_field": {
+          "已识别 Saturn 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 6
+        },
+        "native_result_values": 0
+      },
+      "FSim": {
+        "recognized": 22,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 22,
+        "unsupported_diagnostics": 22,
+        "unsupported_by_field": {
+          "已识别 Simplon 二进制预设，格式版本 1；此产品的参数布局/归一化尚未验证，没有应用任何参数": 22
+        },
+        "native_result_values": 0
+      },
+      "F3Ts": {
+        "recognized": 118,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 118,
+        "unsupported_diagnostics": 118,
+        "unsupported_by_field": {
+          "已识别 Timeless 3 二进制预设，格式版本 10；此产品的参数布局/归一化尚未验证，没有应用任何参数": 116,
+          "已识别 Timeless 3 二进制预设，格式版本 9；此产品的参数布局/归一化尚未验证，没有应用任何参数": 2
+        },
+        "native_result_values": 0
+      },
+      "FT3i": {
+        "recognized": 573,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 573,
+        "unsupported_diagnostics": 573,
+        "unsupported_by_field": {
+          "已识别 Twin 3 二进制预设，格式版本 18；此产品的参数布局/归一化尚未验证，没有应用任何参数": 568,
+          "已识别 Twin 3 二进制预设，格式版本 17；此产品的参数布局/归一化尚未验证，没有应用任何参数": 1,
+          "已识别 Twin 3 二进制预设，格式版本 15；此产品的参数布局/归一化尚未验证，没有应用任何参数": 4
+        },
+        "native_result_values": 0
+      },
+      "FV3l": {
+        "recognized": 108,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 108,
+        "unsupported_diagnostics": 108,
+        "unsupported_by_field": {
+          "已识别 Volcano 3 二进制预设，格式版本 5；此产品的参数布局/归一化尚未验证，没有应用任何参数": 95,
+          "已识别 Volcano 3 二进制预设，格式版本 3；此产品的参数布局/归一化尚未验证，没有应用任何参数": 10,
+          "已识别 Volcano 3 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 3
+        },
+        "native_result_values": 0
+      }
+    }
+  },
+  "after": {
+    "schema": "verdant-ffp-corpus-proof/1",
+    "binary_sha256": "6e91b68bff21abf0f3b3b2b26b4a028d49a588ba3aad98b3bb90a9d2c167668f",
+    "input_set_sha256": "cfddd3235b651f192a57641d451aff8cddcff3ccdedb07ffae601a5e759f0029",
+    "inputs": 1769,
+    "families": {
+      "FMic": {
+        "recognized": 16,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 16,
+        "unsupported_diagnostics": 16,
+        "unsupported_by_field": {
+          "已识别 Micro 二进制预设，格式版本 1；此产品的参数布局/归一化尚未验证，没有应用任何参数": 16
+        },
+        "native_result_values": 0
+      },
+      "FFPr": {
+        "recognized": 109,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 109,
+        "unsupported_diagnostics": 109,
+        "unsupported_by_field": {
+          "已识别 One 二进制预设，格式版本 0；此产品的参数布局/归一化尚未验证，没有应用任何参数": 25,
+          "已识别 One 二进制预设，格式版本 1；此产品的参数布局/归一化尚未验证，没有应用任何参数": 84
+        },
+        "native_result_values": 0
+      },
+      "FC3p": {
+        "recognized": 122,
+        "complete": 0,
+        "partial": 122,
+        "identified_only": 0,
+        "unsupported_diagnostics": 1111,
+        "unsupported_by_field": {
+          "Ratio": 122,
+          "Attack": 122,
+          "Release": 122,
+          "Stereo Link": 122,
+          "Wet Gain": 88,
+          "Side Chain EQ Band * Slope": 39,
+          "Hold": 64,
+          "Side Chain EQ Band * Shape": 34,
+          "Lookahead": 54,
+          "Side Chain Level": 49,
+          "Dry Gain": 38,
+          "Lookahead Enabled": 6,
+          "Side Chain Expert Mode": 6,
+          "Mix": 31,
+          "Output Level": 27,
+          "Stereo Link Mode": 24,
+          "Side Chain EQ Band * gain": 6,
+          "Oversampling": 24,
+          "Wet Pan": 12,
+          "Dry Pan": 7,
+          "Side Chain EQ Band * ": 25,
+          "Side Chain EQ Band * Speakers": 25,
+          "Side Chain EQ Band * q": 12,
+          "Side Chain EQ Band * freq": 6,
+          "Input Level": 3,
+          "Host Trigger Offset": 8,
+          "Side Chain Input": 23,
+          "Stereo Link Surrounds": 6,
+          "Stereo Link Tops": 6
+        },
+        "native_result_values": 7808
+      },
+      "FPSr": {
+        "recognized": 9,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 9,
+        "unsupported_diagnostics": 9,
+        "unsupported_by_field": {
+          "已识别 Pro-DS 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 9
+        },
+        "native_result_values": 0
+      },
+      "FPGr": {
+        "recognized": 57,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 57,
+        "unsupported_diagnostics": 57,
+        "unsupported_by_field": {
+          "已识别 Pro-G 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 57
+        },
+        "native_result_values": 0
+      },
+      "FL2p": {
+        "recognized": 58,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 58,
+        "unsupported_diagnostics": 58,
+        "unsupported_by_field": {
+          "已识别 Pro-L 2 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 58
+        },
+        "native_result_values": 0
+      },
+      "FPMb": {
+        "recognized": 55,
+        "complete": 0,
+        "partial": 55,
+        "identified_only": 0,
+        "unsupported_diagnostics": 407,
+        "unsupported_by_field": {
+          "Band * high": 33,
+          "Band * Attack/Release": 142,
+          "Band * 斜率/路由等剩余字段": 142,
+          "Pro-MB 其余全局设置": 55,
+          "Band * knee": 27,
+          "Input Level": 6,
+          "Band * Ratio": 2
+        },
+        "native_result_values": 7590
+      },
+      "FQ4p": {
+        "recognized": 171,
+        "complete": 23,
+        "partial": 148,
+        "identified_only": 0,
+        "unsupported_diagnostics": 1019,
+        "unsupported_by_field": {
+          "Output Level": 68,
+          "Band * Dynamics": 528,
+          "Band * Side Chain Filtering": 57,
+          "Character": 26,
+          "Band * freq": 15,
+          "Band * Slope": 134,
+          "Band * q": 18,
+          "Band * Spectral Tilt": 58,
+          "Band * Spectral Enabled": 76,
+          "Band * Dynamic Range": 3,
+          "Output Pan": 5,
+          "Output Pan Mode": 9,
+          "Band * Speakers": 22
+        },
+        "native_result_values": 74727
+      },
+      "FR2p": {
+        "recognized": 112,
+        "complete": 0,
+        "partial": 112,
+        "identified_only": 0,
+        "unsupported_diagnostics": 983,
+        "unsupported_by_field": {
+          "Space": 112,
+          "Brightness": 112,
+          "Character": 112,
+          "Predelay": 107,
+          "Decay EQ Band * freq": 29,
+          "Predelay Offset": 41,
+          "Predelay Sync": 5,
+          "Decay EQ Band * Shape": 56,
+          "Post EQ Band * Slope": 63,
+          "Output Level": 53,
+          "Post EQ Band * ": 133,
+          "Post EQ Band * freq": 19,
+          "Post EQ Band * gain": 13,
+          "Decay EQ Band * q": 44,
+          "Input Level": 48,
+          "Post EQ Band * q": 25,
+          "Decay EQ Band * rate": 10,
+          "Output Pan": 1
+        },
+        "native_result_values": 12880
+      },
+      "FPRr": {
+        "recognized": 162,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 162,
+        "unsupported_diagnostics": 162,
+        "unsupported_by_field": {
+          "已识别 Pro-R 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 162
+        },
+        "native_result_values": 0
+      },
+      "FS2a": {
+        "recognized": 71,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 71,
+        "unsupported_diagnostics": 71,
+        "unsupported_by_field": {
+          "已识别 Saturn 2 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 36,
+          "已识别 Saturn 2 二进制预设，格式版本 2；此产品的参数布局/归一化尚未验证，没有应用任何参数": 21,
+          "已识别 Saturn 2 二进制预设，格式版本 3；此产品的参数布局/归一化尚未验证，没有应用任何参数": 14
+        },
+        "native_result_values": 0
+      },
+      "FSat": {
+        "recognized": 6,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 6,
+        "unsupported_diagnostics": 6,
+        "unsupported_by_field": {
+          "已识别 Saturn 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 6
+        },
+        "native_result_values": 0
+      },
+      "FSim": {
+        "recognized": 22,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 22,
+        "unsupported_diagnostics": 22,
+        "unsupported_by_field": {
+          "已识别 Simplon 二进制预设，格式版本 1；此产品的参数布局/归一化尚未验证，没有应用任何参数": 22
+        },
+        "native_result_values": 0
+      },
+      "F3Ts": {
+        "recognized": 118,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 118,
+        "unsupported_diagnostics": 118,
+        "unsupported_by_field": {
+          "已识别 Timeless 3 二进制预设，格式版本 10；此产品的参数布局/归一化尚未验证，没有应用任何参数": 116,
+          "已识别 Timeless 3 二进制预设，格式版本 9；此产品的参数布局/归一化尚未验证，没有应用任何参数": 2
+        },
+        "native_result_values": 0
+      },
+      "FT3i": {
+        "recognized": 573,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 573,
+        "unsupported_diagnostics": 573,
+        "unsupported_by_field": {
+          "已识别 Twin 3 二进制预设，格式版本 18；此产品的参数布局/归一化尚未验证，没有应用任何参数": 568,
+          "已识别 Twin 3 二进制预设，格式版本 17；此产品的参数布局/归一化尚未验证，没有应用任何参数": 1,
+          "已识别 Twin 3 二进制预设，格式版本 15；此产品的参数布局/归一化尚未验证，没有应用任何参数": 4
+        },
+        "native_result_values": 0
+      },
+      "FV3l": {
+        "recognized": 108,
+        "complete": 0,
+        "partial": 0,
+        "identified_only": 108,
+        "unsupported_diagnostics": 108,
+        "unsupported_by_field": {
+          "已识别 Volcano 3 二进制预设，格式版本 5；此产品的参数布局/归一化尚未验证，没有应用任何参数": 95,
+          "已识别 Volcano 3 二进制预设，格式版本 3；此产品的参数布局/归一化尚未验证，没有应用任何参数": 10,
+          "已识别 Volcano 3 二进制预设，格式版本 4；此产品的参数布局/归一化尚未验证，没有应用任何参数": 3
+        },
+        "native_result_values": 0
+      }
+    }
+  }
+}
