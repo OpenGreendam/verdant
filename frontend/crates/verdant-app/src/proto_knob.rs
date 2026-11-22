@@ -218,10 +218,21 @@ fn call(handle: &NormalizedKnobHandle, method: &str, arguments: Vec<Value>,
 pub(crate) struct Contact {
     generation: Cell<u64>,
     input: Cell<Option<MoveGestureInput>>,
+    window: Cell<Option<gpui::AnyWindowHandle>>,
+    lease: RefCell<Option<std::rc::Weak<MoveGestureLease>>>,
 }
 
 impl Contact {
     pub(crate) fn is_active(&self) -> bool { self.input.get().is_some() }
+
+    pub(crate) fn cancel_in_window(&self, window: &mut Window, cx: &mut App) {
+        if self.window.get() != Some(window.window_handle()) || !self.is_active() { return; }
+        // Look up the live lease at activation time. The Contact does not own
+        // it, and cancellation runs now rather than queuing a stale generation
+        // that could retire a replacement interaction after the command.
+        let lease = self.lease.borrow().as_ref().and_then(std::rc::Weak::upgrade);
+        if let Some(lease) = lease { lease.cancel(MoveGestureCancelReason::HostCancel, window, cx); }
+    }
     fn begin(&self, input: MoveGestureInput) -> u64 {
         let next = self.generation.get().checked_add(1).expect("knob contact generation exhausted");
         self.generation.set(next);
@@ -492,6 +503,8 @@ impl RenderOnce for Knob {
                 handle, target: target.clone(), double_click, contact: contact.clone(),
                 window: window.window_handle(), app: cx.to_async(),
             })).unwrap_or_else(|error| panic!("compiled knob pointer binding failed: {error}")));
+            contact.window.set(Some(window.window_handle()));
+            *contact.lease.borrow_mut() = Some(Rc::downgrade(&lease));
             let window_handle = window.window_handle();
             let changes = cx.observe(&root, move |mount: &mut Mount, _, cx| {
                 let handle = mount.root.read(cx).handle();
