@@ -165,10 +165,9 @@ pub fn selectable_button(
     label: impl Into<SharedString>,
     active: bool,
     th: Theme,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
-    div()
-        .id(id.into())
+    crate::proto_controls::action(id.into(), label.clone())
         .role(Role::Button)
         .aria_label(label.clone())
         .aria_selected(active)
@@ -195,11 +194,10 @@ pub fn icon_selectable_button(
     label: impl Into<SharedString>,
     active: bool,
     th: Theme,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
     let fg = th.text;
-    div()
-        .id(id.into())
+    crate::proto_controls::action(id.into(), label.clone())
         .role(Role::Button)
         .aria_label(label.clone())
         .aria_selected(active)
@@ -228,11 +226,10 @@ pub fn select_button(
     label: impl Into<SharedString>,
     aria_name: impl Into<SharedString>,
     th: Theme,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
-    div()
-        .id(id.into())
-        .role(Role::Button)
+    crate::proto_controls::action(id.into(), label.clone())
+        .role(Role::ComboBox)
         .aria_label(aria_name.into())
         .h(px(PANEL_BTN_H))
         .px(px(12.0))
@@ -262,9 +259,10 @@ pub fn selectable_command_button(
     key: impl Into<gpui::ElementId>,
     active: bool,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
+    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
     controls::command_button(
         cmd,
         arg,
@@ -275,6 +273,7 @@ pub fn selectable_command_button(
         if active { th.checked.into() } else { th.control_pressed.into() },
         cx,
     )
+    .authority(authority)
     .role(Role::Button)
     .aria_label(label)
     .aria_selected(active)
@@ -298,10 +297,11 @@ pub fn flat_command_button(
     key: impl Into<gpui::ElementId>,
     active: bool,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
     let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
+    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
     controls::command_button(
         cmd,
         arg,
@@ -312,6 +312,7 @@ pub fn flat_command_button(
         if active { th.checked.into() } else { th.hover.into() },
         cx,
     )
+    .authority(authority)
     .role(Role::Button)
     .aria_label(label)
     .aria_selected(active)
@@ -329,7 +330,7 @@ pub fn icon_command_button(
     key: impl Into<gpui::ElementId>,
     active: bool,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
     let fg = th.text;
@@ -349,7 +350,7 @@ pub fn flat_icon_command_button(
     key: impl Into<gpui::ElementId>,
     active: bool,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
     let fg = th.text;
@@ -369,10 +370,11 @@ pub fn generated_select_button(
     arg: Arg,
     key: impl Into<gpui::ElementId>,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let th = ed.theme;
     let current = ed.current_select_option(id, &arg);
     let spec = controls::select(id);
+    let authority = format!("{}:{id:?}:{arg:?}:{current}", crate::proto_controls::editor_authority(ed));
     controls::select_control(
         id,
         arg,
@@ -383,7 +385,8 @@ pub fn generated_select_button(
         th.control_pressed.into(),
         cx,
     )
-    .role(Role::Button)
+    .authority(authority)
+    .role(Role::ComboBox)
     .aria_label(spec.label)
     .h(px(PANEL_BTN_H))
     .py(px(0.0))
@@ -514,284 +517,102 @@ pub fn format_numeric_value(ed: &Editor, id: Num, value: f64) -> String {
     }
 }
 
+// Host bookkeeping records the target of the live audio/draft preview. Gesture
+// phase, threshold, values, cancellation and stepping live in ContinuousControl.
 #[derive(Default)]
-struct NumericScrubState {
-    active: Option<ActiveScrub>,
-}
+struct NumericScrubState { active: Option<(gpui::EntityId, SharedString)> }
 impl Global for NumericScrubState {}
-
 pub(crate) fn has_numeric_scrub(editor: gpui::EntityId, cx: &App) -> bool {
-    cx.try_global::<NumericScrubState>()
-        .and_then(|s| s.active.as_ref())
-        .is_some_and(|s| s.editor == editor)
-}
-
-pub(crate) fn cancel_numeric_scrub(editor: gpui::EntityId, cx: &mut App) {
-    if has_numeric_scrub(editor, cx) {
-        cx.global_mut::<NumericScrubState>().active = None;
-    }
-}
-
-fn owns_numeric_scrub(editor: &Entity<Editor>, key: &SharedString, cx: &App) -> bool {
     cx.try_global::<NumericScrubState>().and_then(|state| state.active.as_ref())
-        .is_some_and(|active| active.editor == editor.entity_id() && &active.key == key)
+        .is_some_and(|(owner, _)| *owner == editor)
+}
+pub(crate) fn cancel_numeric_scrub(editor: gpui::EntityId, cx: &mut App) {
+    if has_numeric_scrub(editor, cx) { cx.global_mut::<NumericScrubState>().active = None; }
 }
 
-fn discard_numeric_scrub(editor: &Entity<Editor>, key: &SharedString, window: &mut Window, cx: &mut App) {
-    if !owns_numeric_scrub(editor, key, cx) { return; }
-    let active = cx.global_mut::<NumericScrubState>().active.take().unwrap();
-    window.release_pointer();
-    editor.update(cx, |ed, cx| {
-        if ed.numeric_preview.as_ref().is_some_and(|(id, arg, _)| *id == active.id && *arg == active.arg) {
-            ed.numeric_preview = None;
-            ed.sync_mixer();
-        }
-        cx.notify();
-    });
-}
-
-fn sample_numeric_scrub(editor: &Entity<Editor>, key: &SharedString, position: gpui::Point<Pixels>,
-    modifiers: gpui::Modifiers, cx: &mut App) {
-    if !owns_numeric_scrub(editor, key, cx) { return; }
-    let active = cx.global::<NumericScrubState>().active.as_ref().unwrap();
-    let dx = f64::from(position.x) - active.start_x;
-    let dy = active.start_y - f64::from(position.y);
-    let delta_px = if dx.abs() > dy.abs() { dx } else { dy };
-    if !active.moved && delta_px.abs() < 3.0 { return; }
-    let spec = controls::numeric(active.id);
-    let step = if modifiers.shift { spec.fine_step } else { spec.step };
-    let next = (active.initial_value + (delta_px / 4.0).round() * step).clamp(spec.min, spec.max);
-    let (id, arg) = (active.id, active.arg.clone());
-    let active = cx.global_mut::<NumericScrubState>().active.as_mut().unwrap();
-    active.moved = true;
-    active.current_value = next;
-    editor.update(cx, |ed, cx| {
-        ed.set_numeric(id, arg, next, NumericPhase::Preview, cx);
-        cx.notify();
-    });
-}
-
-#[derive(Clone)]
-struct ActiveScrub {
-    editor: gpui::EntityId,
-    key: SharedString,
-    id: Num,
-    arg: Arg,
-    start_x: f64,
-    start_y: f64,
-    initial_value: f64,
-    current_value: f64,
-    moved: bool,
-}
-
-/// Scrubbable, preset-clickable, localized DAW numeric pill backed by `NumericTarget`.
-pub fn numeric_pill(
-    ed: &Editor,
-    id: Num,
-    arg: Arg,
-    key: impl Into<SharedString>,
-    compact: bool,
-    cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+/// An authored SpinButton with native Adwaita content and project-unit callbacks.
+pub fn numeric_pill(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>,
+    compact: bool, cx: &mut Context<Editor>) -> Stateful<Div> {
+    use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
     let key: SharedString = key.into();
     let spec = controls::numeric(id);
     assert_eq!(spec.arg, arg.kind(), "numeric argument kind mismatch");
     let value = ed.numeric_value(id, arg.clone());
     let th = ed.theme;
-    let zh_label = numeric_label_zh(id);
-    let formatted = format_numeric_value(ed, id, value);
-    let display_text = if compact {
-        format!("{zh_label} {formatted}")
-    } else {
-        formatted.clone()
-    };
-
-    let scrubbing = cx.try_global::<NumericScrubState>()
-        .and_then(|s| s.active.as_ref())
-        .is_some_and(|s| s.key == key);
-
-    let (dec_arg, inc_arg, a11y_inc, a11y_dec) = (arg.clone(), arg.clone(), arg.clone(), arg.clone());
-    let dec_id = SharedString::from(format!("{key}-minus"));
-    let inc_id = SharedString::from(format!("{key}-plus"));
-    let scrub_key = key.clone();
-    let scrub_arg = arg.clone();
+    let label = numeric_label_zh(id);
     let entity = cx.entity();
-
-    let stepper = |btn_id: SharedString, direction: f64, symbol: &'static str, step_arg: Arg| {
-        div()
-            .id(btn_id)
-            .w(px(if compact { 24.0 } else { 30.0 }))
-            .h_full()
-            .flex_none()
-            .flex()
-            .items_center()
-            .justify_center()
-            .border_l_1()
-            .border_color(th.shade)
-            .text_color(th.text)
-            .hover(move |s| s.bg(th.control_pressed))
-            .child(svg().path(icon(symbol)).size(px(13.0)).text_color(th.text))
-            .on_click(cx.listener(move |target, ev: &ClickEvent, _, cx| {
-                let cur = target.numeric_value(id, step_arg.clone());
-                if let Some(next) = spec.stepped(cur, direction, ev.modifiers().shift) {
-                    target.set_numeric(id, step_arg.clone(), next, NumericPhase::Preview, cx);
-                    target.set_numeric(id, step_arg.clone(), next, NumericPhase::Commit, cx);
-                }
-                cx.stop_propagation();
-            }))
-    };
-
-    let center = canvas(
-        |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-        move |bounds, hitbox, window, cx| {
-            if cx.try_global::<NumericScrubState>().is_none() {
-                cx.set_global(NumericScrubState::default());
-            }
-            let is_grid = matches!(id, Num::SnapGridTicks | Num::DefaultNoteTicks);
-            if hitbox.is_hovered(window) {
-                window.set_cursor_style(
-                    if is_grid { CursorStyle::Arrow } else { CursorStyle::ResizeUpDown },
-                    &hitbox,
-                );
-            }
-            let (e_down, h_down, k_down, a_down) = (entity.clone(), hitbox.clone(), scrub_key.clone(), scrub_arg.clone());
-            window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left || !h_down.is_hovered(window) {
-                    return;
-                }
-                if ev.click_count >= 2 {
-                    cx.global_mut::<NumericScrubState>().active = None;
-                    e_down.update(cx, |ed, cx| {
-                        let current = ed.numeric_value(id, a_down.clone());
-                        ed.prompt_numeric_value(id, a_down.clone(), current, window, cx);
-                    });
-                    cx.stop_propagation();
-                    return;
-                }
-                let start_val = e_down.read(cx).numeric_value(id, a_down.clone());
-                cx.global_mut::<NumericScrubState>().active = Some(ActiveScrub {
-                    editor: e_down.entity_id(),
-                    key: k_down.clone(),
-                    id,
-                    arg: a_down.clone(),
-                    start_x: ev.position.x.as_f32() as f64,
-                    start_y: ev.position.y.as_f32() as f64,
-                    initial_value: start_val,
-                    current_value: start_val,
-                    moved: false,
-                });
-                window.capture_pointer(h_down.id);
-                cx.stop_propagation();
-            });
-
-            let (e_move, k_move) = (entity.clone(), scrub_key.clone());
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-                if phase != DispatchPhase::Capture || !owns_numeric_scrub(&e_move, &k_move, cx) { return; }
-                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-                    discard_numeric_scrub(&e_move, &k_move, window, cx);
-                    return;
-                }
-                sample_numeric_scrub(&e_move, &k_move, ev.position, ev.modifiers, cx);
-            });
-
-            let (e_up, k_up) = (entity.clone(), scrub_key.clone());
-            window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Capture || ev.button != MouseButton::Left {
-                    return;
-                }
-                let matches = cx.try_global::<NumericScrubState>()
-                    .and_then(|s| s.active.as_ref())
-                    .is_some_and(|s| s.editor == e_up.entity_id() && s.key == k_up);
-                if !matches {
-                    return;
-                }
-                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-                    discard_numeric_scrub(&e_up, &k_up, window, cx);
-                    return;
-                }
-                sample_numeric_scrub(&e_up, &k_up, ev.position, ev.modifiers, cx);
-                let finished = cx.global_mut::<NumericScrubState>().active.take();
-                window.release_pointer();
-                if let Some(scrub) = finished {
-                    e_up.update(cx, |ed, cx| {
-                        if scrub.moved {
-                            ed.set_numeric(scrub.id, scrub.arg, scrub.current_value, NumericPhase::Commit, cx);
-                        } else if matches!(scrub.id, Num::SnapGridTicks | Num::DefaultNoteTicks) {
-                            show_grid_preset_menu(ed, scrub.id, bounds.bottom_left(), window, cx);
-                        }
-                        cx.notify();
-                    });
-                }
-            });
+    let display_editor = entity.clone();
+    let event_key = key.clone();
+    let event_arg = arg.clone();
+    let valid_arg = arg.clone();
+    let mut config = Spec::slider(value, spec.min, spec.max, label);
+    config.step = spec.step;
+    config.fine_step = spec.fine_step;
+    config.default_value = spec.default;
+    config.role = "spinbutton";
+    config.drag_mode = "steps";
+    config.double_action = "edit";
+    config.tap_action = if matches!(id, Num::SnapGridTicks | Num::DefaultNoteTicks) { "activate" } else { "none" };
+    config.preview_echo = true;
+    let scalar = scalar(entity, key.clone(), config,
+        |sample, _, _| {
+            let dx = sample.total_delta.x;
+            let dy = -sample.total_delta.y;
+            let steps = if dx.abs() > dy.abs() { dx } else { dy } / 4.0;
+            Sample { value: steps, fine: steps, jump: false }
         },
-    )
-    .size_full();
-
-    let pill = div()
-        .id(key.clone())
-        .role(Role::SpinButton)
-        .aria_label(zh_label)
-        .aria_numeric_value(value)
-        .aria_numeric_value_step(spec.step)
-        .aria_min_numeric_value(spec.min)
-        .aria_max_numeric_value(spec.max)
-        .aria_value(formatted)
-        .on_a11y_action(
-            AccessibleAction::Increment,
-            crate::view::a11y_listener(cx, move |ed, _, _, cx| {
-                if let Some(v) = spec.stepped(ed.numeric_value(id, a11y_inc.clone()), 1.0, false) {
-                    ed.set_numeric(id, a11y_inc.clone(), v, NumericPhase::Preview, cx);
-                    ed.set_numeric(id, a11y_inc.clone(), v, NumericPhase::Commit, cx);
+        move |display, actions, _, cx| {
+            let formatted = format_numeric_value(display_editor.read(cx), id, display.value);
+            let text = if compact { format!("{label} {formatted}") } else { formatted };
+            let stepper = |direction: f64, symbol: &'static str| {
+                let actions = actions.clone();
+                div().id(symbol).w(px(if compact { 24.0 } else { 30.0 })).h_full().flex_none()
+                    .flex().items_center().justify_center().border_l_1().border_color(th.shade)
+                    .text_color(th.text).hover(move |s| s.bg(th.control_pressed))
+                    .child(svg().path(icon(symbol)).size(px(13.0)).text_color(th.text))
+                    .on_click(move |event: &ClickEvent, window, cx| {
+                        actions.invoke("adjust", vec![direction.into(), event.modifiers().shift.into()], window, cx);
+                        cx.stop_propagation();
+                    })
+            };
+            div().h(px(if compact { BAR_BTN_H } else { PANEL_BTN_H })).w_full().flex().items_center()
+                .rounded(px(6.0)).bg(th.control).border_1()
+                .border_color(if display.active || display.focus_visible { th.accent } else { th.control })
+                .overflow_hidden()
+                .child(div().h_full().px(px(if compact { 8.0 } else { 10.0 }))
+                    .min_w(px(if compact { 76.0 } else { 64.0 })).flex_1().flex().items_center()
+                    .when(compact, |d| d.justify_center()).text_sm().text_color(th.text).child(text))
+                .child(stepper(-1.0, "minus")).child(stepper(1.0, "plus")).into_any_element()
+        },
+        move |ed, event, window, cx| {
+            if cx.try_global::<NumericScrubState>().is_none() { cx.set_global(NumericScrubState::default()); }
+            match event.kind {
+                EventKind::Start => cx.global_mut::<NumericScrubState>().active = Some((cx.entity_id(), event_key.clone())),
+                EventKind::Preview => ed.set_numeric(id, event_arg.clone(), event.value, NumericPhase::Preview, cx),
+                EventKind::Commit => {
+                    cancel_numeric_scrub(cx.entity_id(), cx);
+                    ed.set_numeric(id, event_arg.clone(), event.value, NumericPhase::Commit, cx);
                 }
-            }),
-        )
-        .on_a11y_action(
-            AccessibleAction::Decrement,
-            crate::view::a11y_listener(cx, move |ed, _, _, cx| {
-                if let Some(v) = spec.stepped(ed.numeric_value(id, a11y_dec.clone()), -1.0, false) {
-                    ed.set_numeric(id, a11y_dec.clone(), v, NumericPhase::Preview, cx);
-                    ed.set_numeric(id, a11y_dec.clone(), v, NumericPhase::Commit, cx);
+                EventKind::Cancel | EventKind::Activate | EventKind::Edit => {
+                    cancel_numeric_scrub(cx.entity_id(), cx);
+                    if ed.numeric_preview.as_ref().is_some_and(|(active_id, active_arg, _)| *active_id == id && *active_arg == event_arg) {
+                        ed.numeric_preview = None; ed.sync_mixer();
+                    }
+                    if event.kind == EventKind::Activate { show_grid_preset_menu(ed, id, window.mouse_position(), window, cx); }
+                    if event.kind == EventKind::Edit { ed.prompt_numeric_value(id, event_arg.clone(), event.value, window, cx); }
                 }
-            }),
-        );
-
-    let inner_box = div()
-        .h(px(if compact { BAR_BTN_H } else { PANEL_BTN_H }))
-        .flex()
-        .items_center()
-        .rounded(px(6.0))
-        .bg(th.control)
-        .border_1()
-        .border_color(if scrubbing { th.accent } else { th.control })
-        .overflow_hidden()
-        // GtkSpinButton: the value (drag to scrub) then − and + on the right.
-        .child(
-            div()
-                .relative()
-                .h_full()
-                .px(px(if compact { 8.0 } else { 10.0 }))
-                .min_w(px(if compact { 76.0 } else { 64.0 }))
-                .flex_1()
-                .flex()
-                .items_center()
-                .when(compact, |d| d.justify_center())
-                .text_sm()
-                .text_color(th.text)
-                .child(display_text)
-                .child(div().absolute().inset_0().child(center)),
-        )
-        .child(stepper(dec_id, -1.0, "minus", dec_arg))
-        .child(stepper(inc_id, 1.0, "plus", inc_arg));
-
-    if compact {
-        pill.flex().items_center().child(inner_box)
-    } else {
-        pill.flex()
-            .items_center()
-            .gap(px(12.0))
-            .child(div().flex_1().min_w(px(56.0)).text_sm().text_color(th.text).child(zh_label))
-            .child(div().flex_shrink_0().w(px(150.0)).child(inner_box))
-    }
+            }
+            cx.notify();
+        }).valid_when(move |ed| match &valid_arg {
+            Arg::Track(track) => ed.project().track(track).is_some(),
+            Arg::Note(note) | Arg::NotePhone(note, _) => ed.index.contains(note),
+            _ => true,
+        });
+    let pill = div().id(key).h(px(if compact { BAR_BTN_H } else { PANEL_BTN_H }));
+    if compact { pill.child(scalar) }
+    else { pill.flex().items_center().gap(px(12.0))
+        .child(div().flex_1().min_w(px(56.0)).text_sm().text_color(th.text).child(label))
+        .child(div().flex_shrink_0().w(px(150.0)).h_full().child(scalar)) }
 }
 
 pub fn show_grid_preset_menu(
@@ -850,167 +671,114 @@ pub enum SplitterKind {
     LaneHeight,
 }
 
-#[derive(Default)]
-struct SplitterState {
-    drag: Option<ActiveSplitter>,
-}
-impl Global for SplitterState {}
+#[derive(IntoElement)]
+struct Splitter { editor: Entity<Editor>, kind: SplitterKind, theme: Theme }
 
-struct ActiveSplitter {
-    editor: gpui::EntityId,
-    kind: SplitterKind,
-    start_pos: f32,
-    initial_size: f32,
-}
-
-/// Interactive draggable splitter bar between workspace panes.
+/// Layout policy (size constraints/persistence) remains in the host; input,
+/// focus, accessibility and rollback use the same authored scalar as the mixer.
 pub fn splitter_bar(editor: Entity<Editor>, kind: SplitterKind, th: Theme) -> impl IntoElement {
-    let vertical = matches!(kind, SplitterKind::InspectorWidth | SplitterKind::RightDockWidth);
-    let id = match kind {
-        SplitterKind::InspectorWidth => "splitter-inspector",
-        SplitterKind::RightDockWidth => "splitter-right-dock",
-        SplitterKind::ArrangeHeight => "splitter-arrange",
-        SplitterKind::LaneHeight => "splitter-lane",
-    };
-    div()
-        .id(id)
-        .flex_none()
-        .when(vertical, |d| d.w(px(5.0)).h_full())
-        .when(!vertical, |d| d.h(px(5.0)).w_full())
-        .bg(th.surface)
-        .child(
-            canvas(
-                |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-                move |bounds, hitbox, window, cx| {
-                    if cx.try_global::<SplitterState>().is_none() {
-                        cx.set_global(SplitterState::default());
-                    }
-                    let dragging = cx.global::<SplitterState>()
-                        .drag
-                        .as_ref()
-                        .is_some_and(|d| d.editor == editor.entity_id() && d.kind == kind);
+    Splitter { editor, kind, theme: th }
+}
+impl gpui::RenderOnce for Splitter {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
+        let kind = self.kind;
+        let th = self.theme;
+        let ed = self.editor.read(cx);
+        let defaults = LayoutPrefs::default();
+        let (id, label, value, default, min, max, vertical, sign) = match kind {
+            SplitterKind::InspectorWidth => ("splitter-inspector", "左侧面板宽度", ed.layout.inspector_width, defaults.inspector_width, 260.0, 440.0, true, 1.0),
+            SplitterKind::RightDockWidth => ("splitter-right-dock", "右侧面板宽度", ed.layout.right_dock_width, defaults.right_dock_width, 280.0, 480.0, true, -1.0),
+            SplitterKind::ArrangeHeight => ("splitter-arrange", "编曲区高度", ed.layout.arrange_height, defaults.arrange_height, 92.0, 460.0, false, 1.0),
+            SplitterKind::LaneHeight => ("splitter-lane", "参数轨高度", ed.layout.lane_height, defaults.lane_height, 112.0, 420.0, false, -1.0),
+        };
+        let mut spec = Spec::slider(value as f64, min, max, label);
+        spec.role = "separator";
+        spec.step = 8.0; spec.fine_step = 1.0; spec.default_value = default as f64;
+        spec.preview_echo = true;
+        let control = scalar(self.editor, id, spec,
+            move |sample, _, initial| {
+                let delta = if vertical { sample.total_delta.x } else { sample.total_delta.y } * sign;
+                Sample { value: initial + delta, fine: initial + delta * 0.1, jump: false }
+            },
+            move |display, _, _, _| canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+                move |bounds, hitbox, window, _| {
                     let hovered = hitbox.is_hovered(window);
-                    if hovered || dragging {
-                        window.set_cursor_style(
-                            if vertical { CursorStyle::ResizeLeftRight } else { CursorStyle::ResizeUpDown },
-                            &hitbox,
-                        );
+                    if hovered || display.active { window.set_cursor_style(
+                        if vertical { CursorStyle::ResizeLeftRight } else { CursorStyle::ResizeUpDown }, &hitbox); }
+                    let (w, h) = (f64::from(bounds.size.width), f64::from(bounds.size.height));
+                    let color = if display.active || display.focus_visible { th.accent }
+                        else if hovered { with_alpha(th.accent, 0.7) } else { th.shade };
+                    let width = if display.active || display.focus_visible { 2.0 } else { 1.0 };
+                    window.paint_quad(fill(if vertical { b((w-width)/2.0, 0.0, width, h, bounds.origin) }
+                        else { b(0.0, (h-width)/2.0, w, width, bounds.origin) }, color));
+                }).size_full().into_any_element(),
+            move |ed, event, _, cx| {
+                if matches!(event.kind, EventKind::Preview | EventKind::Commit | EventKind::Cancel) {
+                    let value = event.value as f32;
+                    match kind {
+                        SplitterKind::InspectorWidth => ed.layout.inspector_width = value,
+                        SplitterKind::RightDockWidth => ed.layout.right_dock_width = value,
+                        SplitterKind::ArrangeHeight => ed.layout.arrange_height = value,
+                        SplitterKind::LaneHeight => ed.layout.lane_height = value,
                     }
-                    let o = bounds.origin;
-                    let (w, h) = (bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
-                    let line_color = if dragging {
-                        th.accent
-                    } else if hovered {
-                        with_alpha(th.accent, 0.7)
-                    } else {
-                        th.shade
-                    };
-                    if vertical {
-                        window.paint_quad(fill(b((w - 1.0) / 2.0, 0.0, if dragging { 2.0 } else { 1.0 }, h, o), line_color));
-                    } else {
-                        window.paint_quad(fill(b(0.0, (h - 1.0) / 2.0, w, if dragging { 2.0 } else { 1.0 }, o), line_color));
-                    }
-
-                    let (e_down, h_down) = (editor.clone(), hitbox.clone());
-                    window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                        if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left || !h_down.is_hovered(window) {
-                            return;
-                        }
-                        if ev.click_count >= 2 {
-                            e_down.update(cx, |ed, cx| {
-                                let def = LayoutPrefs::default();
-                                match kind {
-                                    SplitterKind::InspectorWidth => ed.layout.inspector_width = def.inspector_width,
-                                    SplitterKind::RightDockWidth => ed.layout.right_dock_width = def.right_dock_width,
-                                    SplitterKind::ArrangeHeight => ed.layout.arrange_height = def.arrange_height,
-                                    SplitterKind::LaneHeight => ed.layout.lane_height = def.lane_height,
-                                }
-                                ed.layout.store(&mut ed.prefs);
-                                ed.prefs_dirty = true;
-                                cx.notify();
-                            });
-                            cx.stop_propagation();
-                            return;
-                        }
-                        let initial_size = {
-                            let ed = e_down.read(cx);
-                            match kind {
-                                SplitterKind::InspectorWidth => ed.layout.inspector_width,
-                                SplitterKind::RightDockWidth => ed.layout.right_dock_width,
-                                SplitterKind::ArrangeHeight => ed.layout.arrange_height,
-                                SplitterKind::LaneHeight => ed.layout.lane_height,
-                            }
-                        };
-                        cx.global_mut::<SplitterState>().drag = Some(ActiveSplitter {
-                            editor: e_down.entity_id(),
-                            kind,
-                            start_pos: if vertical { ev.position.x.as_f32() } else { ev.position.y.as_f32() },
-                            initial_size,
-                        });
-                        window.capture_pointer(h_down.id);
-                        cx.stop_propagation();
-                    });
-
-                    let e_move = editor.clone();
-                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                        if phase != DispatchPhase::Bubble {
-                            return;
-                        }
-                        let next = {
-                            let Some(drag) = cx.try_global::<SplitterState>().and_then(|s| s.drag.as_ref()) else { return };
-                            if drag.editor != e_move.entity_id() || drag.kind != kind {
-                                return;
-                            }
-                            let cur = if vertical { ev.position.x.as_f32() } else { ev.position.y.as_f32() };
-                            let delta = cur - drag.start_pos;
-                            match kind {
-                                SplitterKind::InspectorWidth => drag.initial_size + delta,
-                                SplitterKind::RightDockWidth => drag.initial_size - delta,
-                                SplitterKind::ArrangeHeight => drag.initial_size + delta,
-                                SplitterKind::LaneHeight => drag.initial_size - delta,
-                            }
-                        };
-                        e_move.update(cx, |ed, cx| {
-                            match kind {
-                                SplitterKind::InspectorWidth => ed.layout.inspector_width = next,
-                                SplitterKind::RightDockWidth => ed.layout.right_dock_width = next,
-                                SplitterKind::ArrangeHeight => ed.layout.arrange_height = next,
-                                SplitterKind::LaneHeight => ed.layout.lane_height = next,
-                            }
-                            ed.layout = ed.layout.clamped();
-                            cx.notify();
-                        });
-                    });
-
-                    let e_up = editor.clone();
-                    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                        if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left {
-                            return;
-                        }
-                        let matched = cx.try_global::<SplitterState>()
-                            .and_then(|s| s.drag.as_ref())
-                            .is_some_and(|d| d.editor == e_up.entity_id() && d.kind == kind);
-                        if matched {
-                            cx.global_mut::<SplitterState>().drag = None;
-                            window.release_pointer();
-                            e_up.update(cx, |ed, cx| {
-                                ed.layout.store(&mut ed.prefs);
-                                ed.prefs_dirty = true;
-                                cx.notify();
-                            });
-                        }
-                    });
-                },
-            )
-            .size_full(),
-        )
+                    ed.layout = ed.layout.clamped();
+                    if event.kind == EventKind::Commit { ed.layout.store(&mut ed.prefs); ed.prefs_dirty = true; }
+                    cx.notify();
+                }
+            });
+        div().id(id).flex_none().when(vertical, |d| d.w(px(5.0)).h_full())
+            .when(!vertical, |d| d.h(px(5.0)).w_full()).bg(th.surface).child(control)
+    }
 }
 
-#[derive(Default)]
-struct ScrollThumbState {
-    drag: Option<(gpui::EntityId, bool, f64, f64)>,
+#[derive(IntoElement)]
+struct TimelineScrollbar { editor: Entity<Editor>, arrange: bool, theme: Theme }
+impl gpui::RenderOnce for TimelineScrollbar {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
+        let ed = self.editor.read(cx);
+        let arrange = self.arrange;
+        let vp = if arrange { ed.arrange } else { ed.session.viewport };
+        let visible = (vp.width / vp.px_per_tick.max(1e-6)).max(1.0);
+        let max_end = ed.arrange_cache.end_tick().max(ed.project().ppq.saturating_mul(16)) as f64;
+        let total = (max_end + visible * 0.5).max(vp.start_tick + visible).max(1.0);
+        let max_scroll = (total - visible).max(1.0);
+        let ratio = (visible / total).clamp(0.04, 1.0);
+        let th = self.theme;
+        let mut spec = Spec::slider(vp.start_tick.max(0.0), 0.0, max_scroll, if arrange { "编曲区水平滚动" } else { "钢琴卷帘水平滚动" });
+        spec.role = "scrollbar"; spec.step = visible / 10.0; spec.fine_step = visible / 100.0;
+        spec.default_value = 0.0; spec.preview_echo = true;
+        scalar(self.editor, if arrange { "arrange-timeline-scroll" } else { "roll-timeline-scroll" }, spec,
+            move |sample, bounds, initial| {
+                let w = f64::from(bounds.size.width);
+                let thumb_w = (w * ratio).max(24.0).min(w);
+                let travel = (w - thumb_w).max(1.0);
+                let initial_x = initial / max_scroll * travel;
+                let pointer_start = sample.position.x - sample.total_delta.x;
+                let on_thumb = (initial_x..=initial_x + thumb_w).contains(&pointer_start);
+                let start = if on_thumb { initial } else { ((pointer_start-thumb_w*0.5)/travel).clamp(0.0, 1.0)*max_scroll };
+                let delta = sample.total_delta.x / travel * max_scroll;
+                Sample { value: start + delta, fine: start + delta * 0.1, jump: !on_thumb }
+            },
+            move |display, _, _, _| canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+                move |bounds, hitbox, window, _| {
+                    let (w, h) = (f64::from(bounds.size.width), f64::from(bounds.size.height));
+                    let thumb_w = (w * ratio).max(24.0).min(w);
+                    let x = (display.value / max_scroll).clamp(0.0, 1.0) * (w - thumb_w).max(0.0);
+                    window.paint_quad(fill(bounds, th.lcd));
+                    window.paint_quad(gpui::quad(b(x, 2.0, thumb_w, (h-4.0).max(4.0), bounds.origin), px(4.0),
+                        if display.active || hitbox.is_hovered(window) { th.control_pressed } else { th.control }, px(1.0),
+                        if display.active || display.focus_visible { th.accent } else { th.separator }, gpui::BorderStyle::Solid));
+                }).size_full().into_any_element(),
+            move |ed, event, _, cx| {
+                if matches!(event.kind, EventKind::Preview | EventKind::Commit | EventKind::Cancel) {
+                    if arrange { ed.arrange.start_tick = event.value; } else { ed.session.viewport.start_tick = event.value; }
+                    ed.notify_viewport(if arrange { crate::clock::Space::Arrange } else { crate::clock::Space::Editor }, cx);
+                }
+            })
+    }
 }
-impl Global for ScrollThumbState {}
 
 /// Horizontal timeline scrollbar + zoom buttons for Arrangement or Piano Roll.
 pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: Theme, cx: &mut Context<Editor>) -> impl IntoElement {
@@ -1028,106 +796,9 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
         .bg(th.surface)
         .border_t_1()
         .border_color(th.shade)
+        .child(div().flex_1().h_full().child(TimelineScrollbar { editor, arrange: is_arrange, theme: th }))
         .child(
-            div()
-                .flex_1()
-                .h_full()
-                .child(
-                    canvas(
-                        |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-                        move |bounds, hitbox, window, cx| {
-                            if cx.try_global::<ScrollThumbState>().is_none() {
-                                cx.set_global(ScrollThumbState::default());
-                            }
-                            let (start_tick, visible_ticks, total_ticks) = {
-                                let ed = editor.read(cx);
-                                let vp = if is_arrange { ed.arrange } else { ed.session.viewport };
-                                let vis = (vp.width / vp.px_per_tick.max(1e-6)).max(1.0);
-                                let max_end = ed.arrange_cache.end_tick().max(ed.project().ppq.saturating_mul(16)) as f64;
-                                let total = (max_end + vis * 0.5).max(vp.start_tick + vis).max(1.0);
-                                (vp.start_tick.max(0.0), vis, total)
-                            };
-                            let o = bounds.origin;
-                            let (w, h) = (bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
-                            window.paint_quad(fill(bounds, th.lcd));
-                            let ratio = (visible_ticks / total_ticks).clamp(0.04, 1.0);
-                            let thumb_w = (w * ratio).max(24.0).min(w);
-                            let travel = (w - thumb_w).max(0.0);
-                            let max_scroll = (total_ticks - visible_ticks).max(1.0);
-                            let thumb_x = if travel > 0.0 { (start_tick / max_scroll).clamp(0.0, 1.0) * travel } else { 0.0 };
-                            let dragging = cx.global::<ScrollThumbState>()
-                                .drag
-                                .is_some_and(|(eid, arr, _, _)| eid == editor.entity_id() && arr == is_arrange);
-                            window.paint_quad(
-                                gpui::quad(
-                                    b(thumb_x, 2.0, thumb_w, (h - 4.0).max(4.0), o),
-                                    px(4.0),
-                                    if dragging || hitbox.is_hovered(window) { th.control_pressed } else { th.control },
-                                    px(1.0),
-                                    if dragging { th.accent } else { th.separator },
-                                    gpui::BorderStyle::Solid,
-                                ),
-                            );
-
-                            let (e_down, h_down) = (editor.clone(), hitbox.clone());
-                            window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left || !h_down.is_hovered(window) {
-                                    return;
-                                }
-                                let local_x = (ev.position.x - bounds.origin.x).as_f32() as f64;
-                                let start = if (thumb_x..=thumb_x + thumb_w).contains(&local_x) {
-                                    start_tick
-                                } else {
-                                    let target_frac = ((local_x - thumb_w * 0.5) / travel.max(1.0)).clamp(0.0, 1.0);
-                                    let jump_tick = target_frac * max_scroll;
-                                    e_down.update(cx, |ed, cx| {
-                                        if is_arrange { ed.arrange.start_tick = jump_tick; } else { ed.session.viewport.start_tick = jump_tick; }
-                                        ed.notify_viewport(space, cx);
-                                    });
-                                    jump_tick
-                                };
-                                cx.global_mut::<ScrollThumbState>().drag =
-                                    Some((e_down.entity_id(), is_arrange, ev.position.x.as_f32() as f64, start));
-                                window.capture_pointer(h_down.id);
-                                cx.stop_propagation();
-                            });
-
-                            let e_move = editor.clone();
-                            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                                if phase != DispatchPhase::Bubble {
-                                    return;
-                                }
-                                let Some((eid, arr, ox, start)) = cx.try_global::<ScrollThumbState>().and_then(|s| s.drag) else { return };
-                                if eid != e_move.entity_id() || arr != is_arrange || travel <= 0.0 {
-                                    return;
-                                }
-                                let dx = ev.position.x.as_f32() as f64 - ox;
-                                let next_tick = (start + dx / travel * max_scroll).max(0.0);
-                                e_move.update(cx, |ed, cx| {
-                                    if is_arrange { ed.arrange.start_tick = next_tick; } else { ed.session.viewport.start_tick = next_tick; }
-                                    ed.notify_viewport(space, cx);
-                                });
-                            });
-
-                            let e_up = editor.clone();
-                            window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                                if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left {
-                                    if cx.try_global::<ScrollThumbState>().and_then(|s| s.drag).is_some_and(|(eid, arr, _, _)| eid == e_up.entity_id() && arr == is_arrange) {
-                                        cx.global_mut::<ScrollThumbState>().drag = None;
-                                        window.release_pointer();
-                                    }
-                                }
-                            });
-                        },
-                    )
-                    .size_full(),
-                ),
-        )
-        .child(
-            div()
-                .id(SharedString::from(format!("{id_prefix}-zoom-out")))
-                .role(Role::Button)
-                .aria_label("水平缩小")
+            crate::proto_controls::action(SharedString::from(format!("{id_prefix}-zoom-out")), "水平缩小")
                 .w(px(20.0))
                 .h_full()
                 .flex()
@@ -1152,10 +823,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 })),
         )
         .child(
-            div()
-                .id(SharedString::from(format!("{id_prefix}-zoom-in")))
-                .role(Role::Button)
-                .aria_label("水平放大")
+            crate::proto_controls::action(SharedString::from(format!("{id_prefix}-zoom-in")), "水平放大")
                 .w(px(20.0))
                 .h_full()
                 .flex()

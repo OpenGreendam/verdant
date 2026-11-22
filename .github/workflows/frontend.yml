@@ -351,13 +351,12 @@ jobs:
           host="$PWD/target/release/verdant-plughost"
           if [ "$RUNNER_OS" = Windows ]; then host="$host.exe"; fi
           VERDANT_PLUGIN_HOST="$host" cargo test --offline --locked --release -p verdant-plugins --test builtin_signal export_hosts_process_at_each_admitted_rate -- --ignored
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui theme::tests
           cargo test --offline --locked --release -p verdant-ui-protocol -p verdant-session
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui host_pointer::tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui proto_knob::tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui devices::native_tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui roll::native_tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui pointer_boundary_tests
+          # The compiler migration spans text, collections, overlays and editing
+          # surfaces as well as knobs. Exercise the complete application suite
+          # on every native runner, including the generated SDK regressions.
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui -- --test-threads=1
+          cargo test --offline --locked --release -p proto-ui-gpui-native --features test-support,gpui/test-support --lib -- --test-threads=1
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
           if [ "$RUNNER_OS" = Windows ]; then
             cargo test --offline --locked --release -p verdant-cli windows_path_tests

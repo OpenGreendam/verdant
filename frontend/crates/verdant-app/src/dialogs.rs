@@ -76,136 +76,50 @@ pub enum ModalDialog {
     },
 }
 
-#[derive(Default)]
-struct DialogSliderDrag {
-    active: Option<(gpui::EntityId, SharedString)>,
-}
-impl Global for DialogSliderDrag {}
-
-/// Horizontal interactive slider for dialogs, plugin rows, and clip inspector.
-pub fn horizontal_slider(
-    editor: Entity<Editor>,
-    id: impl Into<SharedString>,
-    value: f64,
-    min: f64,
-    max: f64,
-    default_val: Option<f64>,
-    th: Theme,
-    on_change: impl Fn(&mut Editor, f64, bool, &mut Context<Editor>) + Clone + 'static,
-) -> impl IntoElement {
+/// Horizontal slider with a compiled source transaction and an Adwaita slot.
+/// Draft dialogs echo preview values; project/plugin owners may accept only the
+/// commit. Both use the same keyboard, assistive and cancellation path.
+pub fn horizontal_slider(editor: Entity<Editor>, id: impl Into<SharedString>,
+    value: f64, min: f64, max: f64, default_val: Option<f64>, th: Theme,
+    on_change: impl Fn(&mut Editor, f64, bool, &mut Context<Editor>) + Clone + 'static) -> impl IntoElement {
+    use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
     let id: SharedString = id.into();
-    let drag_id = id.clone();
-    let fraction = if (max - min).abs() < 1e-12 {
-        0.0
-    } else {
-        ((value - min) / (max - min)).clamp(0.0, 1.0)
-    };
-    div()
-        .id(id)
-        .h(px(20.0))
-        .w_full()
-        .child(
-            canvas(
-                |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-                move |bounds, hitbox, window, cx| {
-                    if cx.try_global::<DialogSliderDrag>().is_none() {
-                        cx.set_global(DialogSliderDrag::default());
-                    }
-                    let dragging = cx.global::<DialogSliderDrag>()
-                        .active
-                        .as_ref()
-                        .is_some_and(|(eid, k)| *eid == editor.entity_id() && k == &drag_id);
-                    let o = bounds.origin;
-                    let (w, h) = (bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
-                    let pad = 6.0;
-                    let track_w = (w - pad * 2.0).max(1.0);
-                    let thumb_x = pad + fraction * track_w;
-
-                    window.paint_quad(gpui::quad(
-                        b(pad, h * 0.5 - 2.5, track_w, 5.0, o),
-                        px(2.5),
-                        th.lcd,
-                        px(1.0),
-                        th.separator,
-                        gpui::BorderStyle::Solid,
-                    ));
-                    if min < 0.0 && max > 0.0 {
-                        let zero_x = pad + ((0.0 - min) / (max - min)).clamp(0.0, 1.0) * track_w;
-                        let (a, z) = if thumb_x < zero_x { (thumb_x, zero_x) } else { (zero_x, thumb_x) };
-                        window.paint_quad(fill(b(a, h * 0.5 - 2.0, (z - a).max(1.0), 4.0, o), th.accent));
-                        window.paint_quad(fill(b(zero_x - 0.5, h * 0.5 - 5.0, 1.0, 10.0, o), th.text_tertiary));
-                    } else {
-                        window.paint_quad(fill(b(pad, h * 0.5 - 2.0, (thumb_x - pad).max(0.0), 4.0, o), th.accent));
-                    }
-                    window.paint_quad(gpui::quad(
-                        b(thumb_x - 5.5, h * 0.5 - 5.5, 11.0, 11.0, o),
-                        px(5.5),
-                        if dragging { th.accent } else { th.text },
-                        px(1.0),
-                        th.accent,
-                        gpui::BorderStyle::Solid,
-                    ));
-
-                    let map_x = move |px_x: f32| -> f64 {
-                        let local = (px_x - o.x.as_f32()) as f64;
-                        let frac = ((local - pad) / track_w).clamp(0.0, 1.0);
-                        min + frac * (max - min)
-                    };
-
-                    let (e_down, h_down, k_down, cb_down) =
-                        (editor.clone(), hitbox.clone(), drag_id.clone(), on_change.clone());
-                    window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                        if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left || !h_down.is_hovered(window) {
-                            return;
-                        }
-                        if ev.click_count >= 2 {
-                            if let Some(def) = default_val {
-                                e_down.update(cx, |ed, cx| cb_down(ed, def, true, cx));
-                                cx.stop_propagation();
-                                return;
-                            }
-                        }
-                        let v = map_x(ev.position.x.as_f32());
-                        cx.global_mut::<DialogSliderDrag>().active = Some((e_down.entity_id(), k_down.clone()));
-                        window.capture_pointer(h_down.id);
-                        e_down.update(cx, |ed, cx| cb_down(ed, v, false, cx));
-                        cx.stop_propagation();
-                    });
-
-                    let (e_move, k_move, cb_move) = (editor.clone(), drag_id.clone(), on_change.clone());
-                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                        if phase != DispatchPhase::Bubble {
-                            return;
-                        }
-                        let active = cx.try_global::<DialogSliderDrag>()
-                            .and_then(|s| s.active.as_ref())
-                            .is_some_and(|(eid, k)| *eid == e_move.entity_id() && k == &k_move);
-                        if !active {
-                            return;
-                        }
-                        let v = map_x(ev.position.x.as_f32());
-                        e_move.update(cx, |ed, cx| cb_move(ed, v, false, cx));
-                    });
-
-                    let (e_up, k_up, cb_up) = (editor.clone(), drag_id.clone(), on_change);
-                    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                        if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left {
-                            return;
-                        }
-                        let active = cx.try_global::<DialogSliderDrag>()
-                            .and_then(|s| s.active.as_ref())
-                            .is_some_and(|(eid, k)| *eid == e_up.entity_id() && k == &k_up);
-                        if active {
-                            cx.global_mut::<DialogSliderDrag>().active = None;
-                            window.release_pointer();
-                            let v = map_x(ev.position.x.as_f32());
-                            e_up.update(cx, |ed, cx| cb_up(ed, v, true, cx));
-                        }
-                    });
-                },
-            )
-            .size_full(),
-        )
+    let label = if id.contains("gain") { "增益" } else if id.contains("pan") { "声像" }
+        else if id.contains("time-scale") { "时间缩放" } else if id.contains("offset") { "偏移" }
+        else if id.contains("scale") { "数值缩放" } else { "参数值" };
+    let mut spec = Spec::slider(value, min, max, label);
+    spec.default_value = default_val.unwrap_or(value);
+    spec.double_action = if default_val.is_some() { "reset" } else { "none" };
+    spec.preview_echo = true;
+    let control = scalar(editor, id.clone(), spec,
+        move |sample, bounds, initial| {
+            let width = (f64::from(bounds.size.width) - 12.0).max(1.0);
+            let candidate = min + (sample.position.x - 6.0) / width * (max-min);
+            Sample { value: candidate, fine: initial + (candidate-initial)*0.1, jump: true }
+        },
+        move |display, _, _, _| canvas(|_, _, _| {}, move |bounds, _, window, _| {
+            let (w, h) = (f64::from(bounds.size.width), f64::from(bounds.size.height));
+            let pad = 6.0;
+            let track_w = (w - 2.0*pad).max(1.0);
+            let fraction = if max > min { ((display.value-min)/(max-min)).clamp(0.0, 1.0) } else { 0.0 };
+            let thumb_x = pad + fraction*track_w;
+            let o = bounds.origin;
+            window.paint_quad(gpui::quad(b(pad, h*0.5-2.5, track_w, 5.0, o), px(2.5), th.lcd, px(1.0), th.separator, gpui::BorderStyle::Solid));
+            if min < 0.0 && max > 0.0 {
+                let zero = pad + ((-min)/(max-min)).clamp(0.0, 1.0)*track_w;
+                let (a, z) = if thumb_x < zero { (thumb_x, zero) } else { (zero, thumb_x) };
+                window.paint_quad(fill(b(a, h*0.5-2.0, (z-a).max(1.0), 4.0, o), th.accent));
+                window.paint_quad(fill(b(zero-0.5, h*0.5-5.0, 1.0, 10.0, o), th.text_tertiary));
+            } else { window.paint_quad(fill(b(pad, h*0.5-2.0, (thumb_x-pad).max(0.0), 4.0, o), th.accent)); }
+            window.paint_quad(gpui::quad(b(thumb_x-5.5, h*0.5-5.5, 11.0, 11.0, o), px(5.5),
+                if display.active { th.accent } else { th.text }, px(if display.focus_visible { 2.0 } else { 1.0 }), th.accent, gpui::BorderStyle::Solid));
+        }).size_full().into_any_element(),
+        move |ed, event, _, cx| match event.kind {
+            EventKind::Preview | EventKind::Cancel => on_change(ed, event.value, false, cx),
+            EventKind::Commit => on_change(ed, event.value, true, cx),
+            _ => {},
+        });
+    div().id(id).h(px(20.0)).w_full().child(control)
 }
 
 impl Editor {
@@ -216,7 +130,6 @@ impl Editor {
             root: self.integrations.scale_root,
             intervals: self.integrations.scale_intervals.clone(),
         });
-        window.focus(&self.focus_dialog, cx);
         cx.notify();
     }
 
@@ -248,7 +161,6 @@ impl Editor {
             selected_id,
             base: self.revision(),
         });
-        window.focus(&self.focus_dialog, cx);
         cx.notify();
         Ok(())
     }
@@ -273,7 +185,6 @@ impl Editor {
             portamento_curve: first.portamento_curve_percent() as f64,
             base: self.revision(),
         });
-        window.focus(&self.focus_dialog, cx);
         cx.notify();
     }
 
@@ -293,7 +204,6 @@ impl Editor {
             value_scale_percent: 100.0,
             base: self.revision(),
         });
-        window.focus(&self.focus_dialog, cx);
         cx.notify();
     }
 
@@ -317,7 +227,6 @@ impl Editor {
             muted: clip.muted,
             base: self.revision(),
         });
-        window.focus(&self.focus_dialog, cx);
         cx.notify();
         Ok(())
     }
@@ -362,18 +271,12 @@ impl Editor {
 
     pub fn close_modal_dialog(&mut self, confirm: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(dialog) = self.modal_dialog.take() else { return };
-        if !confirm {
-            window.focus(&self.focus_roll, cx);
-            cx.notify();
-            return;
-        }
+        if !confirm { cx.notify(); return; }
         let result = self.apply_modal_dialog(&dialog, cx);
         if let Err(err) = result {
             self.notice(err);
             self.modal_dialog = Some(dialog);
             window.focus(&self.focus_dialog, cx);
-        } else {
-            window.focus(&self.focus_roll, cx);
         }
         cx.notify();
     }
@@ -648,7 +551,46 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
     )
 }
 
-pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
+fn modal_revision(ed: &Editor) -> String {
+    format!("{}:{}:{:?}", ed.document_generation, ed.revision().get(), ed.modal_dialog)
+}
+
+pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, _cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
+    let dialog = ed.modal_dialog.as_ref()?;
+    let label = match dialog {
+        ModalDialog::Scale { .. } => "音阶与调式高亮设置",
+        ModalDialog::Segment { editing_key, .. } => if editing_key.is_some() { "编辑多语言读音器分段" } else { "新建多语言读音器分段" },
+        ModalDialog::VibratoShape { .. } => "颤音包络与滑音曲率",
+        ModalDialog::TransformPoints { .. } => "参数控制点批量变换",
+        ModalDialog::AudioClipEdit { .. } => "音频片段精确位置与裁剪",
+    };
+    let revision = modal_revision(ed);
+    let props = serde_json::json!({"label":label, "role":"dialog", "open":true, "revision":revision,
+        "choices":2, "defaultChoice":1, "cancelChoice":0});
+    let draw_editor = entity.clone(); let basis = revision.clone();
+    let draw = std::rc::Rc::new(move |handle: &verdant_overlay_control::OverlayControlHandle, focus: &gpui::FocusHandle, window: &mut Window, cx: &mut gpui::App| {
+        let viewport = window.use_keyed_state("modal-form-viewport", cx, |_,_| gpui::ScrollHandle::new());
+        let entity = draw_editor.clone(); let handle = handle.clone(); let focus = focus.clone(); let basis = basis.clone();
+        let content: crate::proto_scroll::Draw = std::rc::Rc::new(move |_,_,engine,_,cx| {
+            entity.update(cx, |ed,cx| {
+                ed.focus_dialog = focus.clone();
+                native_modal_dialog_layer(ed, &cx.entity(), handle.clone(), basis.clone(), engine.expect("modal viewport binding"), cx).unwrap_or_else(||div().into_any_element())
+            })
+        });
+        crate::proto_scroll::region("compiled-modal-scroll", serde_json::json!({"label":"对话框设置", "role":"group", "scope":false}), content)
+            .scroll_engine(crate::proto_scroll::Engine::Native(viewport)).into_any_element()
+    });
+    let editor = entity.downgrade();
+    let response = std::rc::Rc::new(move |index: usize, window: &mut Window, cx: &mut gpui::App| {
+        let _ = editor.update(cx, |ed, cx| {
+            if modal_revision(ed) == revision { ed.close_modal_dialog(index == 1, window, cx); }
+        });
+    });
+    Some(crate::proto_overlay::overlay("compiled-modal-dialog", props, draw, response).into_any_element())
+}
+
+fn native_modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, handle: verdant_overlay_control::OverlayControlHandle,
+    revision: String, engine: crate::proto_scroll::EngineBinding, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
     let dialog = ed.modal_dialog.clone()?;
     let th = ed.theme;
     let (title, body): (&str, Div) = match dialog {
@@ -673,6 +615,8 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context
         ),
     };
 
+    let keyboard = handle.clone(); let close = handle.clone(); let cancel = handle.clone();
+    let close_revision = revision.clone(); let cancel_revision = revision.clone();
     Some(
         div()
             .id("modal-dialog-backdrop")
@@ -686,13 +630,11 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context
             .child(
                 div()
                     .id("modal-dialog")
-                    .role(Role::Dialog)
-                    .aria_label(title)
                     .key_context("ModalDialog")
-                    .track_focus(&ed.focus_dialog)
                     .w(px(560.0))
                     .max_h(px(680.0))
-                    .overflow_y_scroll()
+                    .overflow_y_scroll().track_scroll(&engine.handle(cx))
+                    .on_scroll_wheel(move |_,window,cx| engine.notify_input(window,cx))
                     .p(px(18.0))
                     .rounded(px(12.0))
                     .bg(th.popover)
@@ -702,21 +644,7 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context
                     .flex()
                     .flex_col()
                     .gap(px(14.0))
-                    .on_key_down(cx.listener(|ed, ev: &KeyDownEvent, window, cx| {
-                        match ev.keystroke.key.as_str() {
-                            "escape" => {
-                                window.prevent_default();
-                                cx.stop_propagation();
-                                ed.close_modal_dialog(false, window, cx);
-                            }
-                            "enter" => {
-                                window.prevent_default();
-                                cx.stop_propagation();
-                                ed.close_modal_dialog(true, window, cx);
-                            }
-                            _ => {}
-                        }
-                    }))
+                    .on_key_down(move |event, window, cx| crate::proto_overlay::key(&keyboard, event, window, cx))
                     .child(
                         div()
                             .flex()
@@ -728,7 +656,7 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context
                             .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(title))
                             .child(
                                 selectable_button("modal-close-x", "✕", false, th)
-                                    .on_click(cx.listener(|ed, _, w, cx| ed.close_modal_dialog(false, w, cx))),
+                                    .on_click(move |_, w, cx| crate::proto_overlay::choose(&close, 0, &close_revision, w, cx)),
                             ),
                     )
                     .child(body)
@@ -742,11 +670,11 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context
                             .pt(px(10.0))
                             .child(
                                 selectable_button("modal-cancel", "取消 (Esc)", false, th)
-                                    .on_click(cx.listener(|ed, _, w, cx| ed.close_modal_dialog(false, w, cx))),
+                                    .on_click(move |_, w, cx| crate::proto_overlay::choose(&cancel, 0, &cancel_revision, w, cx)),
                             )
                             .child(
                                 selectable_button("modal-confirm", "应用 (Enter)", true, th)
-                                    .on_click(cx.listener(|ed, _, w, cx| ed.close_modal_dialog(true, w, cx))),
+                                    .on_click(move |_, w, cx| crate::proto_overlay::choose(&handle, 1, &revision, w, cx)),
                             ),
                     ),
             )

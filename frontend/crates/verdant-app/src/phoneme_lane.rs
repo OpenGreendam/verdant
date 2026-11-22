@@ -54,7 +54,16 @@ pub fn short_phoneme_label(raw: &str) -> &str {
     raw.split(" → ").next().unwrap_or(raw).trim()
 }
 
-pub fn timeline_phoneme_lane(editor: Entity<Editor>) -> impl IntoElement {
+pub fn timeline_phoneme_lane(editor:Entity<Editor>)->impl IntoElement {
+    let draw=editor.clone();let cancel=editor.clone();
+    crate::proto_editor_surface::surface(editor,"timeline-phonemes","时间线音素边界",0.0,
+        move |input|native_timeline_phonemes(draw.clone(),input).into_any_element(),
+        move |_,window,cx| {
+            let owned=cx.try_global::<TimelinePhonemeDragState>().and_then(|s|s.drag.as_ref()).is_some_and(|d|d.editor==cancel.entity_id());
+            if owned { cx.global_mut::<TimelinePhonemeDragState>().drag=None;cancel.update(cx,|_,cx|cx.notify()); }
+        })
+}
+fn native_timeline_phonemes(editor:Entity<Editor>,input:crate::proto_editor_surface::Input)->impl IntoElement {
     canvas(
         |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
         move |bounds, hitbox, window, cx| {
@@ -67,7 +76,7 @@ pub fn timeline_phoneme_lane(editor: Entity<Editor>) -> impl IntoElement {
                 .is_some_and(|d| d.editor == editor.entity_id() && !d.matches(&editor, editor.read(cx)));
             if stale {
                 cx.global_mut::<TimelinePhonemeDragState>().drag = None;
-                window.release_pointer();
+                input.cancel(window, cx);
             }
 
             let mut texts = Texts::new();
@@ -292,36 +301,26 @@ pub fn timeline_phoneme_lane(editor: Entity<Editor>) -> impl IntoElement {
             if hovered_boundary || dragging {
                 window.set_cursor_style(CursorStyle::ResizeLeftRight, &hitbox);
             }
-            install_timeline_phoneme_input(&editor, bounds, &hitbox, window);
-            crate::roll::install_roll_scroll(&editor, bounds, &hitbox, crate::roll::ScrollSurface::Timeline, window);
+            install_timeline_phoneme_input(&editor,bounds,&hitbox,&input,window);
+            crate::roll::install_roll_scroll(&editor, bounds, &hitbox, crate::roll::ScrollSurface::Timeline,&input,window);
         },
     )
     .size_full()
 }
 
-fn install_timeline_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox, window: &mut Window) {
-    let (e_down, h_down) = (editor.clone(), hitbox.clone());
-    window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || !h_down.is_hovered(window) {
-            return;
-        }
-        if ev.button == MouseButton::Right {
-            if cx.global_mut::<TimelinePhonemeDragState>().drag.take().is_some() {
-                window.release_pointer();
-                e_down.update(cx, |_, cx| cx.notify());
-            }
-            cx.stop_propagation();
-            return;
-        }
-        if ev.button != MouseButton::Left {
-            return;
-        }
-        let local_x = (ev.position.x - bounds.origin.x).as_f32() as f64;
+fn install_timeline_phoneme_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,
+    input:&crate::proto_editor_surface::Input,window:&mut Window) {
+    let editor=editor.clone();
+    crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
+        use crate::proto_editor_surface::PointerPhase;
+        let local_x=event.x;
+        match event.phase {
+            PointerPhase::Begin => {
         let hit = {
-            let ed = e_down.read(cx);
+            let ed = editor.read(cx);
             let vp = ed.session.viewport;
             let tempo = ed.tempo();
-            let Some(track) = ed.active_track() else { return };
+            let Some(track) = ed.active_track() else { return false };
             let click_tick = vp.x_to_tick(local_x);
             let mut boundary_hit = None;
             if ed.scheduler.capabilities.is_some() {
@@ -343,11 +342,11 @@ fn install_timeline_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels
                             let min_pm = budget.minimum_permille();
                             boundary_hit = Some((
                                 TimelinePhonemeDrag {
-                                    editor: e_down.entity_id(),
+                                    editor: editor.entity_id(),
                                     track: ed.session.track.clone(),
                                     note: note.id.clone(),
                                     revision: ed.revision(),
-                                    pointer: PointerId::Mouse,
+                                    pointer:event.pointer,
                                     boundary: idx + 1,
                                     note_start_seconds: note_s0,
                                     total_seconds: budget.total_seconds,
@@ -373,33 +372,26 @@ fn install_timeline_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels
         };
 
         if let Some((maybe_drag, maybe_note)) = hit {
-            e_down.update(cx, |ed, cx| {
+            editor.update(cx, |ed, cx| {
                 if let Some(nid) = maybe_note {
                     ed.session.selection = [nid].into();
                 }
-                window.focus(&ed.focus_roll, cx);
                 cx.notify();
             });
             if let Some(drag) = maybe_drag {
                 cx.global_mut::<TimelinePhonemeDragState>().drag = Some(drag);
-                window.capture_pointer(h_down.id);
+                return true;
             }
-            cx.stop_propagation();
         }
-    });
-
-    let e_move = editor.clone();
-    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-        if phase != DispatchPhase::Bubble {
-            return;
-        }
+                false
+            }
+            PointerPhase::Sample => {
         let next_pos = {
-            let Some(drag) = cx.try_global::<TimelinePhonemeDragState>().and_then(|s| s.drag.as_ref()) else { return };
-            let ed = e_move.read(cx);
-            if !drag.matches(&e_move, ed) {
-                return;
+            let Some(drag) = cx.try_global::<TimelinePhonemeDragState>().and_then(|s| s.drag.as_ref()) else { return false };
+            let ed = editor.read(cx);
+            if !drag.matches(&editor, ed) {
+                return false;
             }
-            let local_x = (ev.position.x - bounds.origin.x).as_f32() as f64;
             let tick = ed.session.viewport.x_to_tick(local_x).max(0.0);
             let abs_s = ed.tempo().seconds_at(tick);
             Some(abs_s - drag.note_start_seconds)
@@ -408,25 +400,21 @@ fn install_timeline_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels
             if let Some(drag) = cx.global_mut::<TimelinePhonemeDragState>().drag.as_mut() {
                 drag.position_seconds = pos_s;
             }
-            e_move.update(cx, |_, cx| cx.notify());
+            editor.update(cx, |_, cx| cx.notify());
         }
-    });
-
-    let e_up = editor.clone();
-    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left {
-            return;
-        }
+                true
+            }
+            PointerPhase::Finish => {
         let matched = cx.try_global::<TimelinePhonemeDragState>()
             .and_then(|s| s.drag.as_ref())
-            .is_some_and(|d| d.editor == e_up.entity_id() && d.pointer == PointerId::Mouse);
+            .is_some_and(|d| d.editor == editor.entity_id() && d.pointer == event.pointer);
         if !matched {
-            return;
+            return false;
         }
-        let Some(drag) = cx.global_mut::<TimelinePhonemeDragState>().drag.take() else { return };
-        window.release_pointer();
-        e_up.update(cx, |ed, cx| {
-            if !drag.matches(&e_up, ed) {
+        let Some(drag) = cx.global_mut::<TimelinePhonemeDragState>().drag.take() else { return false };
+        
+        editor.update(cx, |ed, cx| {
+            if !drag.matches(&editor, ed) {
                 ed.notice("工程或选区已变化，取消本次音素边界调整");
                 cx.notify();
                 return;
@@ -442,6 +430,10 @@ fn install_timeline_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels
                 Err(err) => { ed.notice(err); cx.notify(); }
             }
         });
+                true
+            }
+            PointerPhase::Context => false,
+        }
     });
 }
 

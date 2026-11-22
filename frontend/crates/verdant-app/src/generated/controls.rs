@@ -3,7 +3,7 @@
 // This checked-in Rust module is the source for the application controls.
 
 #![allow(dead_code)]
-use gpui::{prelude::*, div, px, ClickEvent, Context, Div, ElementId, Hsla, SharedString, Stateful, Window};
+use gpui::{prelude::*, div, px, ClickEvent, Context, ElementId, Hsla, SharedString, Window};
 use verdant_domain::{NoteId, TrackId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -241,10 +241,11 @@ pub fn dispatch<T: CommandTarget>(target: &mut T, cmd: CommandId, arg: CommandAr
     target.run_command(cmd, arg, window, cx);
 }
 pub fn command_button<T: CommandTarget>(cmd: CommandId, arg: CommandArg, label: impl Into<SharedString>,
-    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> Stateful<Div> {
+    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> crate::proto_controls::Action {
     assert_eq!(command(cmd).arg, arg.kind(), "generated command argument mismatch");
     let label: SharedString = label.into();
-    div().id(key).flex().items_center().justify_center().px(px(6.0)).py(px(3.0))
+    crate::proto_controls::action(key, label.clone()).authority(format!("{cmd:?}:{arg:?}"))
+        .flex().items_center().justify_center().px(px(6.0)).py(px(3.0))
         .rounded(px(3.0)).text_xs().text_color(fg).bg(bg).hover(move |s| s.bg(hover))
         .child(label)
         .on_click(cx.listener(move |target, _: &ClickEvent, window, cx| dispatch(target, cmd, arg.clone(), window, cx)))
@@ -342,33 +343,6 @@ impl NumericSpec {
         (next != value).then_some(next)
     }
 }
-/// Ordinary numeric shell: minus/plus steppers commit once per click; Shift
-/// uses the source fine step. The render owner supplies its current value;
-/// this avoids reading an entity already borrowed for rendering. Continuous
-/// canvas/fader drags remain named host primitives using the same target.
-pub fn numeric_control<T: NumericTarget>(id: NumericId, arg: CommandArg, value: f64,
-    key: impl Into<SharedString>, fg: Hsla, cx: &mut Context<T>) -> Stateful<Div> {
-    let key: SharedString = key.into();
-    let spec = numeric(id);
-    assert_eq!(spec.arg, arg.kind(), "generated numeric argument mismatch");
-    let label = format!("{} {:.*} {}", spec.label, spec.decimals, value, spec.unit);
-    let button = |suffix: &str, direction: f64, text: &'static str| {
-        let arg = arg.clone();
-        div().id(SharedString::from(format!("{key}-{suffix}"))).px(px(5.0)).py(px(2.0))
-            .child(text).on_click(cx.listener(move |target, event: &ClickEvent, _, cx| {
-                let value = target.numeric_value(id, arg.clone());
-                if let Some(next) = spec.stepped(value, direction, event.modifiers().shift) {
-                    target.set_numeric(id, arg.clone(), next, NumericPhase::Preview, cx);
-                    target.set_numeric(id, arg.clone(), next, NumericPhase::Commit, cx);
-                }
-            }))
-    };
-    let minus = button("minus", -1.0, "−");
-    let plus = button("plus", 1.0, "+");
-    div().id(key).flex().items_center().text_xs().text_color(fg)
-        .child(minus).child(label).child(plus)
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SelectId {
     AppearanceMode,
@@ -424,11 +398,12 @@ pub fn dispatch_select<T: SelectTarget>(target: &mut T, id: SelectId, arg: Comma
     target.set_select(id, arg, validated.id, window, cx);
 }
 pub fn select_control<T: SelectTarget>(id: SelectId, arg: CommandArg, current_option: &str,
-    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> Stateful<Div> {
+    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> crate::proto_controls::Action {
     let spec = select(id);
     assert_eq!(spec.arg, arg.kind(), "generated select argument mismatch");
     let resolved = spec.option_or_default(current_option);
-    div().id(key).flex().items_center().px(px(8.0)).py(px(4.0))
+    crate::proto_controls::action(key, spec.label).authority(format!("{id:?}:{arg:?}:{current_option}"))
+        .role(gpui::Role::ComboBox).flex().items_center().px(px(8.0)).py(px(4.0))
         .rounded(px(5.0)).text_xs().text_color(fg).bg(bg).hover(move |s| s.bg(hover))
         .child(div().flex_1().min_w_0().truncate().child(resolved.label))
         .on_click(cx.listener(move |target, ev: &ClickEvent, window, cx| {

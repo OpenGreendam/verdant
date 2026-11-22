@@ -47,7 +47,7 @@ struct Preview { library: WeakEntity<Library>, items: Vec<Imported>, th: Theme }
 impl Render for Preview {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.th;
-        let mut rows = div().id("preset-import-report").flex_1().min_h_0().overflow_y_scroll()
+        let mut rows = crate::proto_scroll::viewport("preset-import-report", "预设参数映射报告", "vertical").flex_1().min_h_0()
             .flex().flex_col().gap(px(12.));
         for (index, item) in self.items.iter().enumerate() {
             let mut card = div().id(SharedString::from(format!("import-report-{index}"))).p(px(12.)).rounded(px(10.)).bg(th.card).flex().flex_col().gap(px(8.))

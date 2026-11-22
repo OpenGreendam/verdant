@@ -39,7 +39,7 @@ pub(crate) fn open(editor: Entity<Editor>, cx: &mut App) {
     }, move |window, cx| {
         window.set_window_title("工程插件实例 — Verdant");
         cx.new(|cx| {
-            let search = TextField::new("按轨道、总线或插件名称搜索实例", "", th, cx);
+            let search = TextField::new("按轨道、总线或插件名称搜索实例", "", th, window, cx);
             let focus = search.read(cx).focus.clone(); window.focus(&focus, cx);
             cx.observe(&search, |_, _, cx| cx.notify()).detach();
             cx.observe(&observed, |_, _, cx| cx.notify()).detach();
@@ -54,8 +54,8 @@ impl Render for Instances {
         let ed = editor.read(cx);
         if ed.document_generation != self.generation { window.remove_window(); return div().into_any_element() }
         let th = self.th;
-        let query = self.search.read(cx).text.text.to_lowercase();
-        let mut rows = div().id("instance-list").role(Role::List).flex_1().min_h_0().overflow_y_scroll().flex().flex_col().gap(px(8.));
+        let query = self.search.read(cx).value().to_lowercase();
+        let mut rows = crate::proto_scroll::viewport("instance-list", "工程插件实例", "vertical").role(Role::List).flex_1().min_h_0().flex().flex_col().gap(px(8.));
         let mut count = 0;
         for item in instances(ed).into_iter().filter(|i| {
             let haystack = format!("{} {} {} {}", i.name, i.bus, i.id, i.status).to_lowercase();

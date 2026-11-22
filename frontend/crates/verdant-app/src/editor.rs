@@ -30,7 +30,7 @@ mod plugin_ui;
 #[path = "phonemes.rs"]
 mod phonemes;
 #[path = "curves.rs"]
-mod curves;
+pub(crate) mod curves;
 #[path = "project_audio.rs"]
 pub(crate) mod project_audio;
 #[path = "integrations.rs"]
@@ -463,10 +463,6 @@ impl Editor {
         let focus_lyric = cx.focus_handle();
         let focus_table = cx.focus_handle();
         let focus_devices = cx.focus_handle();
-        cx.on_blur(&focus_lyric, window, |this: &mut Self, window, cx| {
-            this.end_lyric(true, None, window, cx);
-        })
-        .detach();
         cx.on_blur(&focus_roll, window, |this: &mut Self, window, cx| {
             if this.session.pointer_owner().is_some() || this.note_creation.is_some()
                 || this.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll)
@@ -1728,7 +1724,6 @@ impl Editor {
             self.table_anchor = Some(note.id.clone());
         }
         self.table_cursor = index;
-        self.table_scroll.scroll_to_item(index, gpui::ScrollStrategy::Nearest);
         self.session.viewport.reveal(note);
         cx.notify();
     }
@@ -1744,7 +1739,6 @@ impl Editor {
         }
         let n = self.active_track().map(|t| t.notes.len()).unwrap_or(0);
         self.table_cursor = self.table_cursor.min(n.saturating_sub(1));
-        self.table_scroll.scroll_to_item(self.table_cursor, gpui::ScrollStrategy::Nearest);
     }
 
     /// Explicit vowel-proxy pronunciation for the selection (one transaction).
@@ -1787,8 +1781,6 @@ impl Editor {
         self.mixer_drag = None;
         self.table_cursor = 0;
         self.table_anchor = None;
-        self.table_scroll.scroll_to_item(0, gpui::ScrollStrategy::Nearest);
-        self.point_scroll.scroll_to_item(0, gpui::ScrollStrategy::Nearest);
         self.needs_fit = true;
     }
 
@@ -2184,9 +2176,9 @@ impl Editor {
     }
 
     /// Turn a lyric field text into one transaction (lyric + explicit pinyin).
-    pub fn commit_lyric_text(&mut self, id: &NoteId, text: &str, cx: &mut Context<Self>) {
+    pub fn commit_lyric_text(&mut self, id: &NoteId, text: &str, cx: &mut Context<Self>) -> bool {
         let track = self.session.track.clone();
-        self.commit_lyric_on_track(&track, id, text, cx);
+        self.commit_lyric_on_track(&track, id, text, cx)
     }
 
     fn commit_lyric_on_track(&mut self, track: &TrackId, id: &NoteId, text: &str, cx: &mut Context<Self>) -> bool {

@@ -26,7 +26,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "5712266648fdbce2f6662636cb83f01eb849adb1"
+    "revision": "5dc02bc36cafe334a4fbd37976a6dfbf3f6aa2f3"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -64,7 +64,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774"
+    "contentSha256": "76614277b5d439ac492670388c71beae980fc96e83525c58d06b13db894b745b"
   },
   "artifacts": [
     {
@@ -95,7 +95,7 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-a11y.rs",
       "kind": "source",
-      "sha256": "64c5a3ec99881a4fff33dc85ffdc4bfdd40404ce977d24953c6381ce216de468"
+      "sha256": "1b029d9bd23c03d9db6c4523842088781b9897d4e39bb2a93c53596120636801"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-host.rs",
@@ -115,7 +115,7 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "adc07e4bc02e4ecf65c215c37f72faff4dbf7f100bb678f652bc28ee847c1507"
+      "sha256": "32a3acaed13b0d1b178b17ff186256e1186b7422e978e272594cafbb00e85170"
     },
     {
       "path": ".proto-ui/gpui-native/src/lib.rs",
@@ -135,7 +135,7 @@
     {
       "path": ".proto-ui/gpui-native/src/style/mapping.rs",
       "kind": "source",
-      "sha256": "0816f23c6d280b12d5b4cb551e74829de748b1a8c204a666a8c27c2717ac60ad"
+      "sha256": "f0e46712db27ed6aec1417f5bbc451cd2c9a3842caef5257790985fa05fca6ab"
     },
     {
       "path": ".proto-ui/gpui-native/src/style/mod.rs",
@@ -150,22 +150,22 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "fdf915ea665c60ab618cb20c5b50828e43fee37e5748f56247312a0389b6ce11"
+      "sha256": "aa46a7a9808d1c054f619f196dedac49a91359818b9ecc493a2eba95b8a19ece"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "06459ce82a8f6f8444b9dc42f5e0be6c5467cbf7f07c0bd33175dfad3f6f09d2"
+      "sha256": "6c13ffa6a920ddc0f6c6c6c9a0fb86657ad8c0a1207d08cbdc40022086875bdc"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "84bf4ea2071c882d1e38b965b35df388a9ecc806fbccf3fa5d40b0605b693192"
+      "sha256": "e3501189d671cabf0ede6b5118b0222a2339be1a95ace73f1d203bee3a2e4bbf"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "d3301b28ac76fabba667183894bdf5be2869787275d4519da7274e2375a6d9a3"
+      "sha256": "7dfd58a4743498f9510d9ffe77ed068d1c82946c8e7bb6f00e0f5c620b22ad3d"
     }
   ]
 }

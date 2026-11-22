@@ -1,0 +1,125 @@
+{
+  "source": {
+    "file": "frontend/proto-ui/src/text-field.proto.ts",
+    "exportName": "default",
+    "sha256": "10e0fdc1ccd1b73d186fcd9fca2c468eda735c0d633021efbe68e82625cfa5fe"
+  },
+  "irVersion": 7,
+  "backend": "gpui-source-v1",
+  "nativeSdk": {
+    "schemaVersion": 1,
+    "name": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "dependencyMode": "workspace",
+    "contentSha256": "76614277b5d439ac492670388c71beae980fc96e83525c58d06b13db894b745b",
+    "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
+    "bundled": false
+  },
+  "observableSemantics": {
+    "version": "proto-ui-observables-v1",
+    "props": {
+      "input": "full-raw-snapshot",
+      "update": "explicit",
+      "initialNotification": "silent"
+    },
+    "state": {
+      "write": "synchronous",
+      "notifications": "fifo-recorded-snapshot-v1",
+      "update": "explicit"
+    },
+    "context": {
+      "update": "explicit",
+      "identity": "nominal"
+    },
+    "lifecycle": {
+      "update": "coalescible-intent",
+      "completion": "host-commit-before-updated",
+      "detach": "preserve-owner",
+      "disposal": "invalidate-retained-handles"
+    },
+    "composition": {
+      "nativeChildren": "ordinary-host-slots",
+      "sharedIdentity": "explicit-artifact-link"
+    }
+  },
+  "sourceResolution": {
+    "version": 1,
+    "imports": {},
+    "packages": []
+  },
+  "profile": "gpui-source-v1",
+  "dependencies": [
+    {
+      "name": "gpui",
+      "version": "workspace",
+      "role": "target"
+    },
+    {
+      "name": "serde",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "role": "host-bridge"
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "=1.13.3",
+      "role": "target"
+    },
+    {
+      "name": "data-url",
+      "version": "=0.3.2",
+      "role": "target"
+    },
+    {
+      "name": "image",
+      "version": "=0.25.10",
+      "role": "target"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "frontend/proto-ui/src/text-field.proto.ts",
+      "sha256": "1be1d1c0e09389ddf0bac70f0bc35ebad5593384dd67a984ba1d8d8d1bbd0c07"
+    },
+    {
+      "file": "frontend/proto-ui/src/upstream-input/root.proto.ts",
+      "sha256": "ee03ad2918c034b6b1fb67e3cc439ff2b6ef0c45d6e745aeaf0d4607082021b5"
+    },
+    {
+      "file": "frontend/proto-ui/src/upstream-input/types.ts",
+      "sha256": "81a4006cddf6df21ebc060a403025dbe2eb83bb0b1e8f91eb635f4999791d325"
+    }
+  ],
+  "generatedSha256": "96c00af2534293dc20a428ec652d4607f97c4fa288f88c5d1412f9907ecd4eb4",
+  "artifacts": [
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "96c00af2534293dc20a428ec652d4607f97c4fa288f88c5d1412f9907ecd4eb4"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "901af5666aed3afa1c3b13f401cac6031c6046278f3e72cf75d2be105dd4c812"
+    },
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "299e5ddf75488f073623c1d1665d1b1ebdc6ed5f7862103ab5fd96b387db62b2"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "c7ea73e9b85a4b41bdf642f9db79a3aa9dac134337f4f81aad3ccf5455b9b08d"
+    }
+  ]
+}

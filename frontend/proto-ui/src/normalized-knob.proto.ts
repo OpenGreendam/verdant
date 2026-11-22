@@ -65,6 +65,7 @@ export default definePrototype<Props>({
     def.expose.state('focusVisible', focus.focusVisible);
     def.expose.event('valueCommit', { payload: 'json' });
     def.expose.event('interactionCancel', { payload: 'json' });
+    def.expose.event('exactValueRequested', { payload: 'json' });
 
     let run: RunHandle<Props> | null = null;
     let attached = false;
@@ -150,6 +151,16 @@ export default definePrototype<Props>({
       }), value.get(), ticket);
     });
     def.expose.method('cancel', cancel);
+    const requestExactValue = (): boolean => {
+      const current = run;
+      if (!current || syncing || !attached || disposed || disabled.get()) return false;
+      const ticket = epoch + 1;
+      cancel();
+      if (!isCurrent(ticket) || !attached || disabled.get()) return false;
+      current.expose.emit('exactValueRequested', { revision });
+      return true;
+    };
+    def.expose.method('requestExactValue', requestExactValue);
     const adjust = (key: string, fine: boolean): boolean => {
       const current = run;
       if (!current || syncing || !attached || disposed || disabled.get()) return false;
@@ -163,7 +174,8 @@ export default definePrototype<Props>({
       const rawStep = current.props.get().step ?? 0.01;
       const step = rawStep > 0 && rawStep <= 1 ? rawStep : 0.01;
       const amount = step * (fine ? 0.1 : 1);
-      if (key === 'Home') next = 0;
+      if (key === 'Backspace') next = current.props.get().defaultValue ?? 0;
+      else if (key === 'Home') next = 0;
       else if (key === 'End') next = 1;
       else if (key === 'ArrowUp' || key === 'ArrowRight') next += amount;
       else if (key === 'ArrowDown' || key === 'ArrowLeft') next -= amount;
@@ -197,7 +209,12 @@ export default definePrototype<Props>({
         return;
       }
       if (!run || !attached || disposed || disabled.get() || event.altKey || event.ctrlKey || event.metaKey) return;
-      if (event.key !== 'Home' && event.key !== 'End'
+      if (event.key === 'Enter') {
+        event.control.requestDefaultActionPrevention();
+        requestExactValue();
+        return;
+      }
+      if (event.key !== 'Backspace' && event.key !== 'Home' && event.key !== 'End'
         && event.key !== 'ArrowUp' && event.key !== 'ArrowRight'
         && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft'
         && event.key !== 'PageUp' && event.key !== 'PageDown') return;
