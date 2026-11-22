@@ -84,8 +84,72 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
-  linux:
+  headless-session:
+    name: Session build without native UI libraries
     needs: [proto-retained, proto-fresh]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.32.1'
+      - name: Install the locked graph checker
+        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .ci/headless-cargo/registry
+            .ci/headless-cargo/git
+            .ci/headless-target
+          key: ${{ runner.os }}-verdant-headless-${{ hashFiles('frontend/Cargo.lock', 'frontend/Dockerfile') }}
+          restore-keys: ${{ runner.os }}-verdant-headless-
+      - name: Resolve the full workspace in the plain Rust image
+        run: |
+          mkdir -p .ci/headless-cargo .ci/headless-target
+          rust_image=$(sed -n 's/^ARG RUST_IMAGE=//p' frontend/Dockerfile)
+          test -n "$rust_image"
+          docker run --rm --memory=8g --cpus=2 \
+            --mount type=bind,src="$PWD",dst=/workspace \
+            --mount type=bind,src="$PWD/.ci/headless-cargo",dst=/cargo-cache \
+            --env CARGO_HOME=/cargo-cache --env CARGO_BUILD_JOBS=2 \
+            --workdir /workspace/frontend "$rust_image" sh -eu -c '
+              cargo fetch --locked
+              cargo metadata --locked --all-features --offline --format-version 1 > /workspace/.ci/headless-metadata.json
+            '
+      - name: Prove session dependencies exclude native components and support
+        run: |
+          node frontend/proto-ui/tools/check-cargo-gpui.mjs --metadata .ci/headless-metadata.json > .ci/headless-graph.json
+          cat .ci/headless-graph.json
+      - name: Compile and test the real session and typed planners without native UI libraries
+        run: |
+          rust_image=$(sed -n 's/^ARG RUST_IMAGE=//p' frontend/Dockerfile)
+          # Use the unmodified Rust base image, not verdant-dev; no GPUI apt
+          # packages or native build cache are installed or mounted here.
+          docker run --rm --memory=8g --cpus=2 \
+            --mount type=bind,src="$PWD",dst=/workspace \
+            --mount type=bind,src="$PWD/.ci/headless-cargo",dst=/cargo-cache \
+            --mount type=bind,src="$PWD/.ci/headless-target",dst=/build \
+            --env CARGO_HOME=/cargo-cache --env CARGO_TARGET_DIR=/build \
+            --env CARGO_BUILD_JOBS=2 --env CARGO_INCREMENTAL=0 \
+            --env CARGO_PROFILE_DEV_DEBUG=0 --env CARGO_PROFILE_TEST_DEBUG=0 \
+            --workdir /workspace/frontend "$rust_image" \
+            cargo test --locked --offline --all-features \
+              -p verdant-session -p verdant-ui-protocol \
+              -p verdant-note-gesture-data -p verdant-control-gesture-data
+      - name: Retain complete headless graph evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-ui-headless-session
+          path: |
+            .ci/headless-metadata.json
+            .ci/headless-graph.json
+          if-no-files-found: error
+
+  linux:
+    needs: [proto-retained, proto-fresh, headless-session]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -156,7 +220,7 @@ jobs:
           if-no-files-found: error
 
   native:
-    needs: [proto-retained, proto-fresh]
+    needs: [proto-retained, proto-fresh, headless-session]
     strategy:
       fail-fast: false
       matrix:
@@ -208,6 +272,8 @@ jobs:
           cargo test --offline --locked --release -p verdant-ui-protocol -p verdant-session
           cargo test --offline --locked --release -p verdant-app --bin verdant host_pointer::tests
           cargo test --offline --locked --release -p verdant-app --bin verdant proto_knob::tests
+          cargo test --offline --locked --release -p verdant-app --bin verdant devices::native_tests
+          cargo test --offline --locked --release -p verdant-app --bin verdant roll::native_tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
           if [ "$RUNNER_OS" = Windows ]; then
             cargo test --offline --locked --release -p verdant-cli windows_path_tests

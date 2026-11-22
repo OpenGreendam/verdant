@@ -1,5 +1,5 @@
 {
-  "schema": "verdant.proto-ui.receipt.v2",
+  "schema": "verdant.proto-ui.receipt.v3",
   "unit": "control-gesture-planner",
   "source": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
   "sourceInputs": [
@@ -26,7 +26,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "e56b2d1a3d6b688a1cbc6930dab1d6757304d733"
+    "revision": "2685caf7ce0bf8ed7cc5e0f2a9d119bbf616d0b5"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -41,57 +41,29 @@
     }
   },
   "target": {
-    "profile": "gpui-source-v1",
-    "gpuiDependency": "workspace",
-    "componentName": "ControlGesturePlanner",
-    "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
-  },
-  "gpu": {
-    "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
-    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
-    "workspace": {
-      "name": "gpui",
-      "git": "https://github.com/cyjin-yl/z3rm",
-      "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
-      "features": [],
-      "defaultFeatures": true
-    }
-  },
-  "sharedSdk": {
-    "owner": "pitch-gesture-surface",
-    "directory": ".proto-ui/gpui-native",
-    "package": "proto-ui-gpui-native",
-    "version": "0.2.0",
-    "features": [
-      "gpui-modern-element-api"
+    "profile": "rust-data-v1",
+    "crateName": "verdant-control-gesture-data",
+    "methods": [
+      "planControlGesture",
+      "dragNormalized"
     ],
-    "contentSha256": "379b97bad8d0082097c7944506323fb58936eb880856eb5707e52a7244d483ed"
+    "dependencies": []
   },
   "artifacts": [
     {
-      "path": ".proto-ui/fixtures/style-tokens.json",
-      "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
-    },
-    {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "ee07e080e6fd6e51d7bb546030cb0f31046d371adb27c5895f326e8e2a1501bc"
+      "sha256": "076a18ec8b6ada1ce351ac84e758effd6e7738ef732a774e3ea73c11dec9d775"
     },
     {
-      "path": "Component.rs",
+      "path": "lib.rs",
       "kind": "source",
-      "sha256": "172e0f756ea6e0e1f7bd120ef868c5bc9316e621b915006129556619fbee9843"
-    },
-    {
-      "path": "Component.rs.map",
-      "kind": "source-map",
-      "sha256": "12b3425ed6fb483d253671f809fd09e7114edf5dc218bee849415b87892356c5"
+      "sha256": "6deeb7570506d5f0fb5bac51662e444f44e71ebf446b1828e64418ea6f1fae2a"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "a547d883767f1931318658a88a44a3f64ce854d13be8e41a07c7a226349e0bf9"
+      "sha256": "26209dfbdc3bb96c330bbee79a9eb2f79c4025b8514bff1c7383ed2b330f7914"
     }
   ]
 }

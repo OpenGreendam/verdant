@@ -157,7 +157,8 @@ impl Editor {
     }
 
     pub fn begin_curve(&mut self, param: Param, pointer: PointerId, note: Option<NoteId>, point: Option<PointId>, roll: bool, tick: f64, value: f64, screen: (f64, f64), erase: bool) -> bool {
-        if self.session.pointer_owner().is_some() || self.lane_stroke.is_some() || self.mixer_drag.is_some() { return false; }
+        if self.session.pointer_owner().is_some() || self.lane_stroke.is_some() || self.mixer_drag.is_some()
+            || self.device_drag.is_some() || self.note_creation.is_some() || self.has_proto_pointer_contact() { return false; }
         self.lane_stroke = Some(LaneStroke {
             param, pointer, note, point, roll, base: self.revision(), tool: if roll { LaneTool::Pencil } else { self.lane_tool },
             origin_screen: screen, axis: None, samples: vec![(tick, value)], erase,

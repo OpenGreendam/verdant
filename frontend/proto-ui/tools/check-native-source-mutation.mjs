@@ -26,18 +26,12 @@ const consumerName = 'verdant-proto-source-mutation-consumer';
 const variantValues = { baseline: 0.55, variant: 0.6 };
 const consumerSource = `#[cfg(test)]
 mod tests {
-    use control_planner::ControlGesturePlannerHandle;
-    use serde_json::json;
+    use control_planner::drag_normalized;
 
     #[test]
     fn compiled_source_controls_fine_drag() {
-        let result = ControlGesturePlannerHandle::call_data_method(
-            "dragNormalized", vec![json!(0.5), json!(90.0), json!(180.0), json!(true)],
-        );
-        let value = match result {
-            Ok(result) => result.as_f64().expect("compiled numeric result"),
-            Err(_) => panic!("compiled source method failed"),
-        };
+        let value = drag_normalized(0.5, 90.0, 180.0, true)
+            .expect("compiled typed data function succeeds");
         println!("verdant-source-mutation-result={value}");
         let expected: f64 = std::env::var("VERDANT_MUTATION_EXPECTED")
             .expect("experiment expected value").parse().expect("finite expectation");
@@ -51,7 +45,7 @@ function makeConsumer(root) {
   const directory = path.join(root, 'frontend/crates/proto-source-mutation-consumer');
   mkdirSync(path.join(directory, 'src'), { recursive: true });
   const manifest = parseCargoManifest(readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Cargo.toml'), 'utf8'));
-  writeFileSync(path.join(directory, 'Cargo.toml'), `[package]\nname = "${consumerName}"\nversion = "0.0.0"\nedition = "2024"\npublish = false\n\n[dependencies]\ncontrol-planner = { package = "${manifest.package.name}", path = "../../proto-ui/generated/control-gesture-planner" }\nserde_json.workspace = true\n`, { flag: 'wx' });
+  writeFileSync(path.join(directory, 'Cargo.toml'), `[package]\nname = "${consumerName}"\nversion = "0.0.0"\nedition = "2024"\npublish = false\n\n[dependencies]\ncontrol-planner = { package = "${manifest.package.name}", path = "../../proto-ui/generated/control-gesture-planner" }\n`, { flag: 'wx' });
   writeFileSync(path.join(directory, 'src/lib.rs'), consumerSource, { flag: 'wx' });
 }
 
@@ -74,20 +68,24 @@ async function prepare(directory, upstream) {
       await runProducer(['--upstream', upstream], root);
     } else await runProducer(['--check', '--upstream', upstream], root);
     makeConsumer(root);
-    const generated = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Component.rs'));
+    const generated = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/lib.rs'));
     const pin = readJson(path.join(root, 'frontend/proto-ui/compiler.pin.json'));
-    results[name] = { expected, generatedSha256: hash(generated), upstream: pin.upstream, sharedSdk: pin.sharedSdk };
+    results[name] = { expected, generatedSha256: hash(generated), upstream: pin.upstream, target: pin.units.find((unit) => unit.name === 'control-gesture-planner').target };
   }
   assert.notEqual(results.baseline.generatedSha256, results.variant.generatedSha256);
-  assert.deepEqual(results.baseline.sharedSdk, results.variant.sharedSdk);
-  writeJson(path.join(directory, 'experiment.json'), { schema: 'verdant.proto-ui.native-source-mutation.v1', method: 'dragNormalized', arguments: [0.5, 90, 180, true], consumerSha256: hash(consumerSource), variants: results });
+  assert.deepEqual(results.baseline.target, results.variant.target);
+  writeJson(path.join(directory, 'experiment.json'), { schema: 'verdant.proto-ui.native-source-mutation.v2', profile: 'rust-data-v1', method: 'dragNormalized', arguments: [0.5, 90, 180, true], consumerSha256: hash(consumerSource), variants: results });
   console.log(JSON.stringify({ prepared: directory, nativeExecution: false, variants: results }, null, 2));
 }
 
-function cargo(root, args, { expected, failure = false } = {}) {
+function cargo(root, args, { expected, failure = false, targetDirectory } = {}) {
   const result = spawnSync(process.env.CARGO ?? 'cargo', args, {
     cwd: path.join(root, 'frontend'), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, ...(expected === undefined ? {} : { VERDANT_MUTATION_EXPECTED: String(expected) }) },
+    env: {
+      ...process.env,
+      ...(targetDirectory === undefined ? {} : { CARGO_TARGET_DIR: targetDirectory }),
+      ...(expected === undefined ? {} : { VERDANT_MUTATION_EXPECTED: String(expected) }),
+    },
   });
   if (result.error) throw result.error;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
@@ -98,36 +96,58 @@ function cargo(root, args, { expected, failure = false } = {}) {
 
 async function run(directory) {
   const plan = readJson(path.join(directory, 'experiment.json'));
-  assert.equal(plan.schema, 'verdant.proto-ui.native-source-mutation.v1');
+  assert.equal(plan.schema, 'verdant.proto-ui.native-source-mutation.v2');
+  assert.equal(plan.profile, 'rust-data-v1');
   assert.equal(plan.consumerSha256, hash(consumerSource));
   const observations = {};
+  const targetRoot = path.resolve(process.env.CARGO_TARGET_DIR ?? path.join(directory, 'target'));
   for (const [name, expected] of Object.entries(variantValues)) {
     const root = path.join(directory, name);
     assert.equal(plan.variants[name].expected, expected);
-    assert.equal(hash(readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Component.rs'))), plan.variants[name].generatedSha256);
+    assert.equal(hash(readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/lib.rs'))), plan.variants[name].generatedSha256);
     assert.equal(hash(readFileSync(path.join(root, 'frontend/crates/proto-source-mutation-consumer/src/lib.rs'))), hash(consumerSource));
     await runProducer(['--check-retained'], root);
+    // These two workspaces deliberately use the same stable Cargo package
+    // names. Archive extraction may also give their sources equal mtimes. A
+    // common target can then reuse the baseline's artifact for the variant,
+    // hiding the source change we intend to execute. Keep each source digest
+    // in its own target beneath the caller's cache; never delete that cache.
+    const targetDirectory = path.join(targetRoot, 'proto-ui-source-mutation', `${name}-${plan.variants[name].generatedSha256}`);
     // Add the disposable consumer/workspace package identities while retaining
     // the copied dependency lock. This unlocked operation is confined to the
     // experiment; the subsequent graph and executions must be --locked.
-    cargo(root, ['metadata', '--format-version', '1', '--all-features', '--offline']);
-    const metadata = JSON.parse(cargo(root, ['metadata', '--format-version', '1', '--all-features', '--locked', '--offline']).stdout);
+    cargo(root, ['metadata', '--format-version', '1', '--all-features', '--offline'], { targetDirectory });
+    const metadata = JSON.parse(cargo(root, ['metadata', '--format-version', '1', '--all-features', '--locked', '--offline'], { targetDirectory }).stdout);
     const identity = readWorkspaceGpuiIdentity(readFileSync(path.join(root, 'frontend/Cargo.toml'), 'utf8'));
     const violations = findCargoGpuiGraphViolations(metadata, identity);
     assert.deepEqual(violations, [], `${name} native consumer graph must contain the one pinned GPUI and SDK`);
-    recordJson(path.join(directory, `${name}-cargo-graph.json`), { gpui: metadata.packages.filter((pkg) => pkg.name === 'gpui').map(({ id, source }) => ({ id, source })), sharedSdk: metadata.packages.filter((pkg) => pkg.name === 'proto-ui-gpui-native').map(({ id, source }) => ({ id, source })) });
-    const execution = cargo(root, ['test', '--locked', '--offline', '-p', consumerName, '--', '--nocapture'], { expected });
+    // The encompassing application workspace still resolves its native UI.
+    // This consumer must reach exactly one std-only data crate and no native
+    // package, even with every feature and target represented in the graph.
+    const consumer = metadata.packages.find((pkg) => pkg.name === consumerName);
+    const planner = metadata.packages.find((pkg) => pkg.name === plan.variants[name].target.crateName);
+    assert.ok(consumer && planner, 'both real consumer and selected data package must resolve');
+    assert.equal(path.resolve(planner.manifest_path), path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Cargo.toml'));
+    const nodes = new Map(metadata.resolve.nodes.map((node) => [node.id, node]));
+    assert.deepEqual(nodes.get(consumer.id)?.dependencies, [planner.id], `${name} consumer has only its typed planner dependency`);
+    assert.deepEqual(nodes.get(planner.id)?.dependencies, [], `${name} compiled data artifact has no dependencies`);
+    recordJson(path.join(directory, `${name}-cargo-graph.json`), {
+      gpui: metadata.packages.filter((pkg) => pkg.name === 'gpui').map(({ id, source }) => ({ id, source })),
+      sharedSdk: metadata.packages.filter((pkg) => pkg.name === 'proto-ui-gpui-native').map(({ id, source }) => ({ id, source })),
+      headlessConsumerClosure: [consumer, planner].map(({ id, name, source, manifest_path }) => ({ id, name, source, manifestPath: manifest_path })),
+    });
+    const execution = cargo(root, ['test', '--locked', '--offline', '-p', consumerName, '--', '--nocapture'], { expected, targetDirectory });
     const match = /verdant-source-mutation-result=([0-9.]+)/.exec(execution.output);
     assert.ok(match, `${name} native consumer must report its actual result`);
     const observed = Number(match[1]);
     assert.ok(Math.abs(observed - expected) < 1e-12);
-    observations[name] = { observed, expected, exitCode: execution.status };
+    observations[name] = { observed, expected, exitCode: execution.status, targetDirectory };
     if (name === 'variant') {
-      const negative = cargo(root, ['test', '--locked', '--offline', '-p', consumerName, '--', '--nocapture'], { expected: variantValues.baseline, failure: true });
+      const negative = cargo(root, ['test', '--locked', '--offline', '-p', consumerName, '--', '--nocapture'], { expected: variantValues.baseline, failure: true, targetDirectory });
       observations.oldExpectationRejected = { expected: variantValues.baseline, exitCode: negative.status };
     }
   }
-  const result = { schema: 'verdant.proto-ui.native-source-mutation-result.v1', nativeExecution: true, observations, variants: plan.variants };
+  const result = { schema: 'verdant.proto-ui.native-source-mutation-result.v2', profile: 'rust-data-v1', nativeExecution: true, observations, variants: plan.variants };
   recordJson(path.join(directory, 'result.json'), result);
   console.log(JSON.stringify(result, null, 2));
 }

@@ -45,19 +45,19 @@ struct Target {
 
 impl Target {
     fn current_desc(&self, editor: &Editor) -> Option<ParamDesc> {
-        // The device page belongs to the selected track. Selection can change
-        // before GPUI paints and detaches this old subtree.
-        if editor.session.track != self.track { return None; }
-        let track = editor.project().track(&self.track)?;
-        if self.slot == crate::instrument::INSTRUMENT_SLOT {
-            if self.key != crate::instrument::instrument_key(&self.track) { return None; }
-            // Instrument descriptors are derived from the project, not the
-            // asynchronous effect-parameter cache, which has no instrument key.
-            let params = crate::instrument::synth_params(track)?;
-            return crate::instrument::synth_descs(&params).into_iter().find(|desc| desc.id == self.desc.id);
-        }
-        if editor.live_insert(&self.track, self.slot)?.key() != self.key { return None; }
-        editor.plugin_params.get(&self.key)?.iter().find(|desc| desc.id == self.desc.id).cloned()
+        editor.current_device_parameters(&self.track, self.slot, self.key)?
+            .into_iter().find(|desc| desc.id == self.desc.id)
+    }
+
+    fn host_allows_edit(&self, editor: &Editor) -> bool {
+        !editor.plugin_busy.contains(&self.key) && editor.device_drag.is_none()
+            && editor.menu.is_none() && editor.text_prompt.is_none() && editor.modal_dialog.is_none()
+            && editor.session.pointer_owner().is_none() && editor.note_creation.is_none()
+            && editor.lane_stroke.is_none() && editor.mixer_drag.is_none() && editor.master_drag.is_none()
+        // Do not reject this knob's native contact here. Keyboard and assistive
+        // actions intentionally cancel its authored preview before proposing,
+        // while native lease retirement may still be queued. Pointer finish
+        // clears Contact before entering this same commit boundary.
     }
 
     fn revision(&self, editor: &Editor, desc: &ParamDesc) -> String {
@@ -104,6 +104,11 @@ fn state<T: serde::de::DeserializeOwned>(handle: &NormalizedKnobHandle, name: &s
     serde_json::from_value(value).map_err(|error| format!("旋钮状态 {name} 不符合协议：{error}"))
 }
 
+fn phase(handle: &NormalizedKnobHandle) -> Result<GesturePhase, String> {
+    let value: String = state(handle, "phase")?;
+    GesturePhase::try_from(value.as_str()).map_err(|error| format!("旋钮状态 phase 不符合协议：{error}"))
+}
+
 fn report(target: &Target, message: impl Into<String>, cx: &mut App) {
     let message = message.into();
     let _ = target.editor.update(cx, |editor, cx| {
@@ -143,9 +148,16 @@ fn drain(handle: &NormalizedKnobHandle, target: &Target, cx: &mut App) -> Draine
             }
             Output::Commit(commit) => {
                 let accepted = target.editor.update(cx, |editor, cx| {
+                    // Host policy can change before the next frame publishes
+                    // disabled props. Every input route, including an assistive
+                    // action on the old native tree, must recheck live policy.
+                    if !target.host_allows_edit(editor) {
+                        editor.notice("当前操作暂不允许修改此参数；已取消这次旋钮修改");
+                        cx.notify();
+                        return false;
+                    }
                     let current = target.current_desc(editor);
-                    if current.as_ref().is_none_or(|desc| target.revision(editor, desc) != commit.revision)
-                        || editor.plugin_busy.contains(&target.key) {
+                    if current.as_ref().is_none_or(|desc| target.revision(editor, desc) != commit.revision) {
                         editor.notice("工程或参数已改变；已取消这次旋钮修改");
                         cx.notify();
                         return false;
@@ -177,12 +189,13 @@ fn call(handle: &NormalizedKnobHandle, method: &str, arguments: Vec<Value>,
 }
 
 #[derive(Default)]
-struct Contact {
+pub(crate) struct Contact {
     generation: Cell<u64>,
     input: Cell<Option<MoveGestureInput>>,
 }
 
 impl Contact {
+    pub(crate) fn is_active(&self) -> bool { self.input.get().is_some() }
     fn begin(&self, input: MoveGestureInput) -> u64 {
         let next = self.generation.get().checked_add(1).expect("knob contact generation exhausted");
         self.generation.set(next);
@@ -258,7 +271,7 @@ fn defer_lease_cancel(lease: Rc<MoveGestureLease>, handle: NormalizedKnobHandle,
                 lease.cancel(MoveGestureCancelReason::HostCancel, window, cx);
                 return;
             }
-            match state::<GesturePhase>(&handle, "phase") {
+            match phase(&handle) {
                 Ok(GesturePhase::Idle) => lease.cancel(MoveGestureCancelReason::HostCancel, window, cx),
                 Ok(_) => {}, // A new authored interaction already owns the phase.
                 Err(error) => {
@@ -276,11 +289,7 @@ impl MoveGestureBinding for Binding {
         let target = self.target.borrow();
         let available = target.editor.upgrade().is_some_and(|entity| {
             let editor = entity.read(cx);
-            editor.device_drag.is_none() && editor.session.pointer_owner().is_none()
-                && editor.lane_stroke.is_none() && editor.note_creation.is_none()
-                && editor.mixer_drag.is_none() && editor.menu.is_none()
-                && editor.text_prompt.is_none() && editor.modal_dialog.is_none()
-                && !editor.plugin_busy.contains(&target.key) && target.current_desc(editor).is_some()
+            target.host_allows_edit(editor) && target.current_desc(editor).is_some()
         });
         if !available { return false; }
         match state::<bool>(&self.handle, "disabled") {
@@ -292,10 +301,11 @@ impl MoveGestureBinding for Binding {
     fn on_start(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         let target = self.target.borrow().clone();
         self.contact.begin(sample.input);
+        let _ = target.editor.update(cx, |editor, _| editor.proto_pointer_contact = Some(Rc::downgrade(&self.contact)));
         // A no-context cancellation may still be queued when a replacement
         // native contact starts. Retire its old preview synchronously before
         // beginning this generation; the queued callback must then be stale.
-        match state::<GesturePhase>(&self.handle, "phase") {
+        match phase(&self.handle) {
             Ok(GesturePhase::Idle) => {},
             Ok(_) => cancel_source(&self.handle, &target, window, cx),
             Err(error) => {
@@ -308,7 +318,7 @@ impl MoveGestureBinding for Binding {
         let double = sample.input == MoveGestureInput::Mouse && self.double_click.replace(false);
         let consumed = self.invoke(&target, "begin",
             vec![sample.modifiers.alt.into(), double.into()], window, cx);
-        match state::<GesturePhase>(&self.handle, "phase") {
+        match phase(&self.handle) {
             Ok(phase) => if !consumed || phase == GesturePhase::Idle { self.contact.input.set(None); },
             Err(error) => {
                 self.contact.input.set(None);
@@ -401,10 +411,7 @@ impl RenderOnce for Knob {
         let mut target = Target { editor: self.editor.downgrade(), track: self.track,
             slot: self.slot, key: self.key, desc: self.desc.clone() };
         let current = target.current_desc(editor);
-        let disabled = current.is_none() || editor.plugin_busy.contains(&self.key) || editor.device_drag.is_some()
-            || editor.menu.is_some() || editor.text_prompt.is_some() || editor.modal_dialog.is_some()
-            || editor.session.pointer_owner().is_some() || editor.note_creation.is_some()
-            || editor.lane_stroke.is_some() || editor.mixer_drag.is_some();
+        let disabled = current.is_none() || !target.host_allows_edit(editor);
         let desc = current.unwrap_or(self.desc);
         let revision = target.revision(editor, &desc);
         target.desc = desc.clone();
@@ -464,7 +471,7 @@ impl RenderOnce for Knob {
                 }
                 if mount.lease.is_active() {
                     let handle = mount.root.read(cx).handle();
-                    match state::<GesturePhase>(&handle, "phase") {
+                    match phase(&handle) {
                         Ok(GesturePhase::Idle) => mount.lease.cancel(MoveGestureCancelReason::HostCancel, window, cx),
                         Ok(_) => {},
                         Err(error) => {
@@ -564,6 +571,7 @@ mod tests {
     use super::*;
     use gpui::{FocusHandle, Focusable, TestAppContext, WindowHandle, size};
     use verdant_normalized_knob::native::gpui_native_owner::resolved;
+    use verdant_domain::{Command, CommandBatch};
 
     #[test]
     fn event_batch_rejects_unknown_fields_and_nonportable_values_before_commit() {
@@ -744,7 +752,7 @@ mod tests {
             assert!(call(&handle, "finish", vec![36.0.into(), true.into(), false.into()], window, cx).unwrap());
             only_commit(&handle, 0.7, "r1");
             close_to(state::<f64>(&handle, "value").unwrap(), 0.5);
-            assert_eq!(state::<GesturePhase>(&handle, "phase").unwrap(), GesturePhase::Idle);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle);
             assert!(call(&handle, "begin", vec![false.into(), false.into()], window, cx).unwrap());
             call(&handle, "sample", vec![36.0.into(), true.into(), false.into()], window, cx).unwrap();
         }).unwrap();
@@ -759,7 +767,7 @@ mod tests {
         frames(window, cx);
         window.update(cx, |host, window, cx| {
             let handle = host.knob.read(cx).handle();
-            assert_eq!(state::<GesturePhase>(&handle, "phase").unwrap(), GesturePhase::Idle);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle);
             close_to(state::<f64>(&handle, "value").unwrap(), 0.5);
             assert!(matches!(decode_events(handle.take_events()).unwrap().as_slice(), [Output::Cancel(_)]));
             assert!(call(&handle, "begin", vec![false.into(), false.into()], window, cx).unwrap());
@@ -771,7 +779,7 @@ mod tests {
         window.update(cx, |host, window, cx| {
             let handle = host.knob.read(cx).handle();
             assert!(!handle.owner.borrow().mounted);
-            assert_eq!(state::<GesturePhase>(&handle, "phase").unwrap(), GesturePhase::Idle);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle);
             close_to(state::<f64>(&handle, "value").unwrap(), 0.5);
             assert!(matches!(decode_events(handle.take_events()).unwrap().as_slice(), [Output::Cancel(_)]));
             assert!(!call(&handle, "begin", vec![false.into(), false.into()], window, cx).unwrap());
@@ -798,7 +806,7 @@ mod tests {
                 position: moved, pressed_button: Some(MouseButton::Left), ..Default::default()
             }), cx);
             close_to(state::<f64>(&handle, "value").unwrap(), 0.6);
-            assert_eq!(state::<GesturePhase>(&handle, "phase").unwrap(), GesturePhase::Dragging);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Dragging);
             assert!(handle.take_events().is_empty(), "leaving the element is not a cancellation");
             window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
                 position: final_position, button: MouseButton::Left, ..Default::default()
@@ -815,7 +823,7 @@ mod tests {
             }), cx);
             window.dispatch_event(gpui::PlatformInput::MouseExited(gpui::MouseExitEvent::default()), cx);
             assert!(!host.lease.as_ref().unwrap().is_active());
-            assert_eq!(state::<GesturePhase>(&handle, "phase").unwrap(), GesturePhase::Idle);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle);
             close_to(state::<f64>(&handle, "value").unwrap(), 0.5);
             assert!(matches!(decode_events(handle.take_events()).unwrap().as_slice(), [Output::Cancel(_)]));
             window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
@@ -867,5 +875,316 @@ mod tests {
             assert!(!host.lease.as_ref().unwrap().is_active());
             assert!(!handle.take_events().iter().any(|(event, _)| event == "valueCommit"));
         }).unwrap();
+    }
+
+    struct ProductionHarness {
+        editor: Entity<Editor>,
+        target: Target,
+        show: bool,
+    }
+
+    impl Render for ProductionHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let target = self.target.clone();
+            let theme = self.editor.read(cx).theme;
+            div().size_full().flex().flex_col().items_start().when(self.show, |view| view.child(knob(
+                self.editor.clone(), target.track, target.slot, target.key, target.desc, "Gain", theme, 64.0)))
+        }
+    }
+
+    fn open_production(cx: &mut TestAppContext) -> WindowHandle<ProductionHarness> {
+        let window = cx.open_window(size(px(300.0), px(200.0)), |window, cx| {
+            let editor = cx.new(|cx| Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx));
+            let track = editor.read(cx).session.track.clone();
+            let key = crate::instrument::instrument_key(&track);
+            let desc = editor.read(cx).current_device_parameters(&track, crate::instrument::INSTRUMENT_SLOT, key)
+                .unwrap().into_iter().find(|desc| desc.id == "gain").unwrap();
+            let target = Target { editor: editor.downgrade(), track, slot: crate::instrument::INSTRUMENT_SLOT, key, desc };
+            ProductionHarness { editor, target, show: true }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window
+    }
+
+    fn instrument_gain(editor: &Editor, track: &TrackId) -> f64 {
+        let params = crate::instrument::synth_params(editor.project().track(track).unwrap()).unwrap();
+        crate::instrument::synth_descs(&params).into_iter().find(|desc| desc.id == "gain").unwrap().value
+    }
+
+    fn production_down(window: &mut Window, cx: &mut App) {
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: gpui::point(px(32.0), px(50.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+    }
+
+    fn production_up(window: &mut Window, cx: &mut App) {
+        window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+            position: gpui::point(px(132.0), px(14.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+    }
+
+    fn production_handle(window: &Window) -> NormalizedKnobHandle {
+        let mut owners: Vec<_> = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter()
+            .filter(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.declared_events.contains("valueCommit")
+            }).collect();
+        assert_eq!(owners.len(), 1, "the real rendered production knob is uniquely bound to this window");
+        NormalizedKnobHandle { owner: owners.pop().unwrap() }
+    }
+
+    #[gpui::test]
+    fn native_production_escape_cancels_preview_and_retires_contact(cx: &mut TestAppContext) {
+        let window = open_production(cx);
+        let (handle, accepted, revision) = window.update(cx, |host, window, cx| {
+            let handle = production_handle(window);
+            let accepted = state::<f64>(&handle, "value").unwrap();
+            let revision = host.editor.read(cx).revision();
+            production_down(window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+                position: gpui::point(px(132.0), px(14.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+            }), cx);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Dragging);
+            assert!(state::<f64>(&handle, "value").unwrap() > accepted);
+            (handle, accepted, revision)
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "escape");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle);
+            close_to(state::<f64>(&handle, "value").unwrap(), accepted);
+            assert!(!host.editor.read(cx).has_proto_pointer_contact());
+            assert!(window.captured_hitbox().is_none());
+            production_up(window, cx);
+            assert_eq!(host.editor.read(cx).revision(), revision);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_editor_keymap_escape_cancels_device_preview_before_late_release(cx: &mut TestAppContext) {
+        // Render the actual Editor shell and install the production keymap.
+        // A source-only harness misses actions resolved before raw key.down.
+        let window = cx.open_window(size(px(1300.0), px(900.0)), |window, cx| {
+            let bindings = crate::shortcuts::bindings(cx);
+            cx.bind_keys(bindings);
+            let mut editor = Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx);
+            editor.bottom = crate::editor::Bottom::Devices;
+            editor.needs_fit = false;
+            editor
+        });
+        cx.update_window(window.into(), |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        let (handle, accepted, start) = cx.update_window(window.into(), |_, window, cx| {
+            let owner = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.declared_events.contains("valueCommit")
+                    && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text() == "音量")
+            }).expect("actual device pane renders the instrument gain knob");
+            let handle = NormalizedKnobHandle { owner };
+            let accepted = state::<f64>(&handle, "value").unwrap();
+            let start = handle.owner.borrow().bounds.unwrap().center();
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                position: start, button: MouseButton::Left, ..Default::default()
+            }), cx);
+            window.dispatch_event(gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+                position: start + gpui::point(px(0.0), px(-54.0)),
+                pressed_button: Some(MouseButton::Left), ..Default::default()
+            }), cx);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Dragging);
+            assert!(state::<f64>(&handle, "value").unwrap() > accepted);
+            (handle, accepted, start)
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "escape");
+        crate::native_test_support::frames(window, cx);
+        cx.update_window(window.into(), |_, window, cx| {
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle,
+                "actual Editor key contexts: {:?}", window.context_stack());
+            close_to(state::<f64>(&handle, "value").unwrap(), accepted);
+            close_to(resolved(&handle.owner.borrow().accessible_states["valueNow"]).num(), accepted);
+            assert!(window.captured_hitbox().is_none());
+            window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                position: start + gpui::point(px(0.0), px(-54.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+        }).unwrap();
+        window.update(cx, |editor, _, _| {
+            assert!(!editor.has_proto_pointer_contact());
+            assert_eq!(editor.revision().get(), 0, "cancellation and late release cannot write the project");
+        }).unwrap();
+    }
+
+    /// Exercise the compiled author handler and real commit executor directly.
+    /// This is host policy coverage; AccessKit/AT-SPI action transport remains
+    /// a separate OS test and is not simulated by this helper.
+    fn dispatch_compiled_action(handle: &NormalizedKnobHandle, action: &str) -> f64 {
+        use verdant_normalized_knob::native::gpui_native_owner::{dispatch, event_fields};
+        let kind = format!("host:verdant-knob-{action}");
+        let mut fields = event_fields(&kind);
+        if action == "set-value" { fields.insert("value".into(), json!(0.63)); }
+        dispatch(&handle.owner, &kind, false, fields);
+        assert!(handle.take_failures().is_empty());
+        let outputs = decode_events(handle.owner.borrow().emitted.clone()).unwrap();
+        let [Output::Commit(commit)] = outputs.as_slice() else {
+            panic!("the compiled {action} handler must propose exactly one value before host policy decides");
+        };
+        commit.value
+    }
+
+    fn block_host_edit(editor: &mut Editor, target: &Target, policy: &str, window: &mut Window, cx: &mut Context<Editor>) {
+        match policy {
+            "menu" => editor.show_menu(gpui::point(px(0.0), px(0.0)), vec![], window, cx),
+            "modal" => editor.open_scale_dialog(window, cx),
+            "prompt" => editor.prompt_text("Go to bar", crate::editor::PromptPurpose::GoToBar, "1", window, cx),
+            "mixer" => editor.begin_mixer_drag(crate::editor::MixerControl::Fader, &target.track, 0.0, 0.5),
+            "master" => editor.begin_master_drag(crate::editor::MixerControl::Fader, 0.0, 0.5),
+            "session" => {
+                let project = editor.project().clone();
+                let effects = editor.session.handle_pointer(&project, editor.revision(), verdant_session::PointerId::Mouse,
+                    verdant_session::InputEvent::PointerDown {
+                        hit: verdant_session::Hit::Background,
+                        music: verdant_session::MusicPoint { tick: 0.0, pitch: 60.0 },
+                        screen: (0.0, 0.0), mods: Default::default(), click_count: 1,
+                    });
+                assert!(effects.contains(&verdant_session::Effect::CapturePointer));
+                assert!(editor.session.pointer_owner().is_some());
+            }
+            "pencil" => editor.note_creation = Some(crate::editor::workflow::NoteCreation {
+                pointer: verdant_session::PointerId::Mouse, base: editor.revision(), origin_tick: 0,
+                note: verdant_domain::Note::new(0, 0, 60),
+            }),
+            "lane" => editor.lane_stroke = Some(crate::editor::LaneStroke {
+                param: verdant_backend::params::Param::Pit, base: editor.revision(),
+                pointer: verdant_session::PointerId::Mouse, tool: crate::editor::LaneTool::Pencil,
+                note: None, point: None, roll: false, origin_screen: (0.0, 0.0), axis: None,
+                samples: vec![], erase: false,
+            }),
+            "busy" => { editor.plugin_busy.insert(target.key); }
+            _ => panic!("unknown host policy fixture"),
+        }
+    }
+
+    #[gpui::test]
+    fn production_compiled_assistive_proposals_recheck_live_policy_before_props_repaint(cx: &mut TestAppContext) {
+        for action in ["increment", "decrement", "set-value"] {
+            for policy in ["allowed", "menu", "modal", "prompt", "mixer", "master", "session", "pencil", "lane", "busy"] {
+                let window = open_production(cx);
+                window.update(cx, |host, window, cx| {
+                    let handle = production_handle(window);
+                    let target = host.target.clone();
+                    let before = host.editor.read(cx).revision();
+                    let basis = target.revision(host.editor.read(cx), &target.desc);
+                    if policy != "allowed" {
+                        host.editor.update(cx, |editor, cx| block_host_edit(editor, &target, policy, window, cx));
+                    }
+                    assert_eq!(target.revision(host.editor.read(cx), &target.desc), basis,
+                        "host policy changes without advancing document or parameter authority");
+                    assert!(!state::<bool>(&handle, "disabled").unwrap(), "the native tree still has pre-change props");
+                    // No draw occurs between the live policy transition and
+                    // delivering the old tree's valid compiled proposal.
+                    let proposal = dispatch_compiled_action(&handle, action);
+                    let output = drain(&handle, &target, cx);
+                    assert!(!output.failed);
+                    let editor = host.editor.read(cx);
+                    if policy == "allowed" {
+                        assert!(!output.cancel);
+                        assert_eq!(editor.revision().get(), before.get() + 1, "{action} must reach the real store once");
+                        close_to(instrument_gain(editor, &target.track), from_norm(&target.desc, proposal));
+                    } else {
+                        assert!(output.cancel, "{action} during {policy} must be rejected by the live host");
+                        assert_eq!(editor.revision(), before, "{action} during {policy} must not append a store edit");
+                        close_to(instrument_gain(editor, &target.track), target.desc.value);
+                    }
+                }).unwrap();
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn host_target_resolves_real_instrument_authority_and_refuses_stale_identity(cx: &mut TestAppContext) {
+        let window = open_production(cx);
+        window.update(cx, |host, _, cx| {
+            let target = host.target.clone();
+            host.editor.update(cx, |editor, _| {
+                assert!(editor.plugin_params.is_empty(), "instrument has no effect parameter cache");
+                assert_eq!(target.current_desc(editor), Some(target.desc.clone()));
+                let mut poisoned = target.desc.clone();
+                poisoned.value = poisoned.max;
+                editor.plugin_params.insert(target.key, vec![poisoned]);
+                assert_eq!(target.current_desc(editor), Some(target.desc.clone()), "instrument authority is the project");
+                let mut stale = target.clone();
+                stale.key = InsertKey(target.key.0 ^ 1);
+                assert!(stale.current_desc(editor).is_none());
+                stale = target.clone();
+                stale.slot = 0;
+                assert!(stale.current_desc(editor).is_none(), "cached data does not manufacture a live slot");
+                editor.session.track = editor.project().tracks[1].id.clone();
+                assert!(target.current_desc(editor).is_none(), "selection rejects the old subtree before repaint");
+                editor.session.track = target.track.clone();
+                editor.persistence.commit(editor.revision(), CommandBatch::single("Remove instrument", Command::SetTrackInstrument {
+                    track: target.track.clone(), instrument: None,
+                })).unwrap();
+                assert!(target.current_desc(editor).is_none());
+            });
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn production_binding_commits_one_store_edit_from_the_final_up_sample(cx: &mut TestAppContext) {
+        let window = open_production(cx);
+        window.update(cx, |host, window, cx| {
+            let before = host.editor.read(cx).revision();
+            production_down(window, cx);
+            assert!(host.editor.read(cx).has_proto_pointer_contact(), "the production Binding owns the contact");
+            production_up(window, cx);
+            let editor = host.editor.read(cx);
+            let expected = from_norm(&host.target.desc, (to_norm(&host.target.desc, host.target.desc.value) + 0.2).min(1.0));
+            close_to(instrument_gain(editor, &host.target.track), expected);
+            assert_eq!(editor.revision().get(), before.get() + 1);
+            assert!(!editor.has_proto_pointer_contact());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn production_binding_refuses_track_slot_and_value_changes_before_props_repaint(cx: &mut TestAppContext) {
+        for change in ["track", "slot", "value"] {
+            let window = open_production(cx);
+            window.update(cx, |host, window, cx| {
+                production_down(window, cx);
+                assert!(host.editor.read(cx).has_proto_pointer_contact());
+                let target = host.target.clone();
+                host.editor.update(cx, |editor, _| {
+                    match change {
+                        "track" => editor.session.track = editor.project().tracks[1].id.clone(),
+                        "slot" => {
+                            editor.persistence.commit(editor.revision(), CommandBatch::single("Remove instrument", Command::SetTrackInstrument {
+                                track: target.track.clone(), instrument: None,
+                            })).unwrap();
+                        }
+                        "value" => {
+                            let mut params = crate::instrument::synth_params(editor.project().track(&target.track).unwrap()).unwrap();
+                            params.set("gain", -18.0).unwrap();
+                            editor.persistence.commit(editor.revision(), CommandBatch::single("External parameter change", Command::SetTrackInstrument {
+                                track: target.track.clone(), instrument: Some(crate::instrument::synth_spec(&params, "test")),
+                            })).unwrap();
+                        }
+                        _ => unreachable!(),
+                    }
+                });
+                // No draw/props update occurs between host authority changing
+                // and the old tree delivering the terminal native sample.
+                let revision = host.editor.read(cx).revision();
+                production_up(window, cx);
+                let editor = host.editor.read(cx);
+                assert_eq!(editor.revision(), revision, "stale {change} proposal must not append a store edit");
+                assert!(!editor.has_proto_pointer_contact());
+                if change != "slot" {
+                    close_to(instrument_gain(editor, &target.track), if change == "value" { -18.0 } else { target.desc.value });
+                }
+            }).unwrap();
+        }
     }
 }

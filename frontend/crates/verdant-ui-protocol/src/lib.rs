@@ -1,19 +1,34 @@
 //! Stable, typed boundary to the compiler-owned interaction planners.
 //!
-//! Generated package fingerprints, owner handles, JSON and string operation
-//! names stop here. No transition rules are reimplemented in Rust. The pinned
-//! upstream target still links its GPUI support crate: this adapter isolates
-//! that dependency but does not claim a GPUI-free build or data-only backend.
+//! The pinned compiler emits direct Rust functions, typed records and arrays
+//! into two stable, std-only data crates. This boundary adds application enums
+//! and effect-capability validation without reimplementing transition rules.
+//! It has no GPUI, native owner, renderer or JSON dependency.
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::fmt;
-use verdant_control_gesture_planner::ControlGesturePlannerHandle;
-use verdant_note_gesture_planner::NoteGesturePlannerHandle;
+use verdant_control_gesture_data as control;
+use verdant_note_gesture_data as note;
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum GesturePhase { Idle, Armed, Dragging }
+// These are protocol names, not transition rules. Keep their conversion total:
+// an unknown generated operation must fail before any host effect is executed.
+macro_rules! protocol_enum {
+    ($name:ident { $($variant:ident => $wire:literal),+ $(,)? }) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum $name { $($variant),+ }
+
+        impl TryFrom<&str> for $name {
+            type Error = PlannerError;
+            fn try_from(value: &str) -> Result<Self, Self::Error> {
+                match value {
+                    $($wire => Ok(Self::$variant),)+
+                    _ => Err(PlannerError(format!("compiled planner returned unknown {} {value:?}", stringify!($name)))),
+                }
+            }
+        }
+    };
+}
+
+protocol_enum!(GesturePhase { Idle => "idle", Armed => "armed", Dragging => "dragging" });
 
 impl GesturePhase {
     fn as_str(self) -> &'static str {
@@ -30,7 +45,7 @@ impl GestureEvent {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NoteMachine { Move, Duplicate, Resize, Marquee }
 
 impl NoteMachine {
@@ -39,7 +54,7 @@ impl NoteMachine {
     }
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default)]
 pub struct NoteGuards {
     pub hit_background: bool,
     pub hit_selected_note: bool,
@@ -54,40 +69,37 @@ pub struct NoteGuards {
     pub base_revision_matches_and_delta_nonzero: bool,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-pub enum NoteEffect {
-    #[serde(rename = "Session.SelectOnlyHitNote")] SelectOnly,
-    #[serde(rename = "Session.ToggleHitNote")] Toggle,
-    #[serde(rename = "Session.ExtendSelectionToHit")] Extend,
-    #[serde(rename = "Session.SelectIfUnselectedHit")] SelectIfUnselected,
-    #[serde(rename = "Session.BeginMoveGesture")] BeginMove,
-    #[serde(rename = "Session.BeginDuplicateGesture")] BeginDuplicate,
-    #[serde(rename = "Session.BeginResizeGesture")] BeginResize,
-    #[serde(rename = "Session.BeginMarqueeGesture")] BeginMarquee,
-    #[serde(rename = "Session.UpdateMovePreview")] UpdateMove,
-    #[serde(rename = "Session.UpdateResizePreview")] UpdateResize,
-    #[serde(rename = "Session.UpdateMarqueePreview")] UpdateMarquee,
-    #[serde(rename = "Domain.CommitMoveNotes")] CommitMove,
-    #[serde(rename = "Domain.CommitDuplicateNotes")] CommitDuplicate,
-    #[serde(rename = "Domain.CommitResizeNotes")] CommitResize,
-    #[serde(rename = "Session.CommitMarqueeSelection")] CommitMarquee,
-    #[serde(rename = "Session.ClickReleaseSelection")] ClickSelection,
-    #[serde(rename = "Session.ReportConflictIfStale")] Conflict,
-    #[serde(rename = "Session.ClearGesturePreview")] Clear,
-    #[serde(rename = "Host.CapturePointer")] Capture,
-    #[serde(rename = "Host.ReleasePointer")] Release,
-}
+protocol_enum!(NoteEffect {
+    SelectOnly => "Session.SelectOnlyHitNote",
+    Toggle => "Session.ToggleHitNote",
+    Extend => "Session.ExtendSelectionToHit",
+    SelectIfUnselected => "Session.SelectIfUnselectedHit",
+    BeginMove => "Session.BeginMoveGesture",
+    BeginDuplicate => "Session.BeginDuplicateGesture",
+    BeginResize => "Session.BeginResizeGesture",
+    BeginMarquee => "Session.BeginMarqueeGesture",
+    UpdateMove => "Session.UpdateMovePreview",
+    UpdateResize => "Session.UpdateResizePreview",
+    UpdateMarquee => "Session.UpdateMarqueePreview",
+    CommitMove => "Domain.CommitMoveNotes",
+    CommitDuplicate => "Domain.CommitDuplicateNotes",
+    CommitResize => "Domain.CommitResizeNotes",
+    CommitMarquee => "Session.CommitMarqueeSelection",
+    ClickSelection => "Session.ClickReleaseSelection",
+    Conflict => "Session.ReportConflictIfStale",
+    Clear => "Session.ClearGesturePreview",
+    Capture => "Host.CapturePointer",
+    Release => "Host.ReleasePointer",
+});
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug)]
 pub struct NotePlan {
-    #[serde(rename = "nextPhase")]
     pub next_phase: GesturePhase,
     pub consumed: bool,
     pub effects: Vec<NoteEffect>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Serialize)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct ControlGuards {
     pub hit_control: bool,
     pub threshold_crossed: bool,
@@ -95,22 +107,19 @@ pub struct ControlGuards {
     pub double_click: bool,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-pub enum ControlEffect {
-    #[serde(rename = "Control.Select")] Select,
-    #[serde(rename = "Control.Reset")] Reset,
-    #[serde(rename = "Control.Begin")] Begin,
-    #[serde(rename = "Control.Preview")] Preview,
-    #[serde(rename = "Control.Commit")] Commit,
-    #[serde(rename = "Control.Discard")] Discard,
-    #[serde(rename = "Host.CapturePointer")] Capture,
-    #[serde(rename = "Host.ReleasePointer")] Release,
-}
+protocol_enum!(ControlEffect {
+    Select => "Control.Select",
+    Reset => "Control.Reset",
+    Begin => "Control.Begin",
+    Preview => "Control.Preview",
+    Commit => "Control.Commit",
+    Discard => "Control.Discard",
+    Capture => "Host.CapturePointer",
+    Release => "Host.ReleasePointer",
+});
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug)]
 pub struct ControlPlan {
-    #[serde(rename = "nextPhase")]
     pub next_phase: GesturePhase,
     pub consumed: bool,
     pub effects: Vec<ControlEffect>,
@@ -124,10 +133,6 @@ impl fmt::Display for PlannerError {
 }
 impl std::error::Error for PlannerError {}
 
-fn decode<T: serde::de::DeserializeOwned>(method: &str, value: Value) -> Result<T, PlannerError> {
-    serde_json::from_value(value).map_err(|error| PlannerError(format!("{method} returned an incompatible decision: {error}")))
-}
-
 fn validate_result(phase: GesturePhase, next: GesturePhase, consumed: bool, empty: bool) -> Result<(), PlannerError> {
     if (!consumed && (!empty || phase != next)) || (empty && phase != next) {
         return Err(PlannerError("compiled planner changed state without an accepted effect".into()));
@@ -135,25 +140,90 @@ fn validate_result(phase: GesturePhase, next: GesturePhase, consumed: bool, empt
     Ok(())
 }
 
+fn validate_ownership(phase: GesturePhase, next: GesturePhase, begin: bool, release: bool) -> Result<(), PlannerError> {
+    // A phase is a promise that its host gesture and capture exist. Validate
+    // resource acquisition/retirement, without deciding guards or transitions.
+    let acquired = phase == GesturePhase::Idle && next != GesturePhase::Idle;
+    let retired = phase != GesturePhase::Idle && next == GesturePhase::Idle;
+    if begin != acquired || release != retired {
+        return Err(PlannerError("compiled phase changed without matching gesture ownership effects".into()));
+    }
+    Ok(())
+}
+
 pub fn plan_note(machine: NoteMachine, phase: GesturePhase, event: GestureEvent, guards: &NoteGuards) -> Result<NotePlan, PlannerError> {
-    let value = NoteGesturePlannerHandle::call_data_method("planNoteGesture", vec![
+    let value = note::plan_note_gesture(
         machine.as_str().into(), phase.as_str().into(), event.as_str().into(),
-        serde_json::to_value(guards).expect("serializable note guards"),
-    ]).map_err(|error| PlannerError(format!("compiled note planner failed: {error:?}")))?;
-    let plan: NotePlan = decode("planNoteGesture", value)?;
+        note::PlanNoteGestureGuards::new(
+            guards.hit_background, guards.hit_selected_note, guards.hit_unselected_note,
+            guards.hit_note_body, guards.hit_resize_handle, guards.toggle_modifier,
+            guards.extend_modifier, guards.duplicate_modifier, guards.pointer_threshold_crossed,
+            guards.base_revision_matches, guards.base_revision_matches_and_delta_nonzero,
+        ),
+    ).map_err(|error| PlannerError(format!("compiled note planner failed: {error}")))?;
+    decode_note(machine, phase, event, &value)
+}
+
+fn decode_note(machine: NoteMachine, phase: GesturePhase, event: GestureEvent, value: &note::PlanNoteGestureResult) -> Result<NotePlan, PlannerError> {
+    let plan = NotePlan {
+        next_phase: value.next_phase.as_str().try_into()?,
+        consumed: value.consumed,
+        effects: value.effects.iter().map(|effect| NoteEffect::try_from(effect.as_str())).collect::<Result<_, _>>()?,
+    };
     validate_result(phase, plan.next_phase, plan.consumed, plan.effects.is_empty())?;
+    for (index, effect) in plan.effects.iter().enumerate() {
+        let valid = match effect {
+            NoteEffect::SelectOnly | NoteEffect::Toggle | NoteEffect::Extend | NoteEffect::SelectIfUnselected | NoteEffect::Capture => event == GestureEvent::Down,
+            NoteEffect::BeginMove => event == GestureEvent::Down && machine == NoteMachine::Move,
+            NoteEffect::BeginDuplicate => event == GestureEvent::Down && machine == NoteMachine::Duplicate,
+            NoteEffect::BeginResize => event == GestureEvent::Down && machine == NoteMachine::Resize,
+            NoteEffect::BeginMarquee => event == GestureEvent::Down && machine == NoteMachine::Marquee,
+            NoteEffect::UpdateMove => event == GestureEvent::Move && matches!(machine, NoteMachine::Move | NoteMachine::Duplicate),
+            NoteEffect::UpdateResize => event == GestureEvent::Move && machine == NoteMachine::Resize,
+            NoteEffect::UpdateMarquee => event == GestureEvent::Move && machine == NoteMachine::Marquee,
+            NoteEffect::CommitMove => event == GestureEvent::Up && machine == NoteMachine::Move,
+            NoteEffect::CommitDuplicate => event == GestureEvent::Up && machine == NoteMachine::Duplicate,
+            NoteEffect::CommitResize => event == GestureEvent::Up && machine == NoteMachine::Resize,
+            NoteEffect::CommitMarquee => event == GestureEvent::Up && machine == NoteMachine::Marquee,
+            NoteEffect::ClickSelection | NoteEffect::Conflict => event == GestureEvent::Up,
+            NoteEffect::Clear | NoteEffect::Release => matches!(event, GestureEvent::Up | GestureEvent::Cancel),
+        };
+        let needs_owner = matches!(effect, NoteEffect::UpdateMove | NoteEffect::UpdateResize | NoteEffect::UpdateMarquee
+            | NoteEffect::CommitMove | NoteEffect::CommitDuplicate | NoteEffect::CommitResize | NoteEffect::CommitMarquee
+            | NoteEffect::ClickSelection | NoteEffect::Conflict | NoteEffect::Clear | NoteEffect::Release);
+        if !valid || (needs_owner && phase == GesturePhase::Idle) || plan.effects[..index].contains(effect) {
+            return Err(PlannerError(format!("compiled note planner emitted invalid or repeated {effect:?} during {machine:?}/{event:?}")));
+        }
+    }
+    let begin = plan.effects.iter().position(|effect| matches!(effect, NoteEffect::BeginMove | NoteEffect::BeginDuplicate | NoteEffect::BeginResize | NoteEffect::BeginMarquee));
+    let capture = plan.effects.iter().position(|effect| *effect == NoteEffect::Capture);
+    if begin.is_some() != capture.is_some() || matches!((begin, capture), (Some(begin), Some(capture)) if begin >= capture) {
+        return Err(PlannerError("compiled note capture must follow its begin effect".into()));
+    }
+    validate_ownership(phase, plan.next_phase, begin.is_some(), plan.effects.contains(&NoteEffect::Release))?;
+    if phase != GesturePhase::Idle && matches!(event, GestureEvent::Up | GestureEvent::Cancel)
+        && (!plan.consumed || plan.next_phase != GesturePhase::Idle
+            || plan.effects.len() < 2 || plan.effects[plan.effects.len() - 2] != NoteEffect::Clear
+            || plan.effects.last() != Some(&NoteEffect::Release)) {
+        return Err(PlannerError("compiled terminal decision failed to retire the active note preview and its capture".into()));
+    }
     Ok(plan)
 }
 
 pub fn plan_control(phase: GesturePhase, event: GestureEvent, guards: ControlGuards) -> Result<ControlPlan, PlannerError> {
-    let value = ControlGesturePlannerHandle::call_data_method("planControlGesture", vec![
-        phase.as_str().into(), event.as_str().into(), serde_json::to_value(guards).expect("serializable control guards"),
-    ]).map_err(|error| PlannerError(format!("compiled control planner failed: {error:?}")))?;
-    decode_control(phase, event, value)
+    let value = control::plan_control_gesture(
+        phase.as_str().into(), event.as_str().into(),
+        control::PlanControlGestureGuards::new(guards.hit_control, guards.threshold_crossed, guards.reset_modifier, guards.double_click),
+    ).map_err(|error| PlannerError(format!("compiled control planner failed: {error}")))?;
+    decode_control(phase, event, &value)
 }
 
-fn decode_control(phase: GesturePhase, event: GestureEvent, value: Value) -> Result<ControlPlan, PlannerError> {
-    let plan: ControlPlan = decode("planControlGesture", value)?;
+fn decode_control(phase: GesturePhase, event: GestureEvent, value: &control::PlanControlGestureResult) -> Result<ControlPlan, PlannerError> {
+    let plan = ControlPlan {
+        next_phase: value.next_phase.as_str().try_into()?,
+        consumed: value.consumed,
+        effects: value.effects.iter().map(|effect| ControlEffect::try_from(effect.as_str())).collect::<Result<_, _>>()?,
+    };
     validate_result(phase, plan.next_phase, plan.consumed, plan.effects.is_empty())?;
     // Decode and validate the whole response before a host selects, previews,
     // captures or writes a parameter. This is an effect capability boundary,
@@ -165,7 +235,10 @@ fn decode_control(phase: GesturePhase, event: GestureEvent, value: Value) -> Res
             ControlEffect::Commit => event == GestureEvent::Up,
             ControlEffect::Discard | ControlEffect::Release => matches!(event, GestureEvent::Up | GestureEvent::Cancel),
         };
-        if !valid { return Err(PlannerError(format!("compiled control planner emitted {effect:?} during {event:?}"))); }
+        let needs_owner = matches!(effect, ControlEffect::Preview | ControlEffect::Commit | ControlEffect::Discard | ControlEffect::Release);
+        if !valid || (needs_owner && phase == GesturePhase::Idle) {
+            return Err(PlannerError(format!("compiled control planner emitted {effect:?} during {phase:?}/{event:?}")));
+        }
     }
     for (index, effect) in plan.effects.iter().enumerate() {
         if plan.effects[..index].contains(effect) {
@@ -177,8 +250,10 @@ fn decode_control(phase: GesturePhase, event: GestureEvent, value: Value) -> Res
     if begin.is_some() != capture.is_some() || matches!((begin, capture), (Some(begin), Some(capture)) if begin >= capture) {
         return Err(PlannerError("compiled control capture must follow its begin effect".into()));
     }
+    validate_ownership(phase, plan.next_phase, begin.is_some(), plan.effects.contains(&ControlEffect::Release))?;
     if phase != GesturePhase::Idle && matches!(event, GestureEvent::Up | GestureEvent::Cancel)
-        && (!plan.consumed || plan.next_phase != GesturePhase::Idle || plan.effects.last() != Some(&ControlEffect::Release)) {
+        && (!plan.consumed || plan.next_phase != GesturePhase::Idle || plan.effects.last() != Some(&ControlEffect::Release)
+            || plan.effects.contains(&ControlEffect::Commit) == plan.effects.contains(&ControlEffect::Discard)) {
         return Err(PlannerError("compiled terminal decision failed to retire the active control and its capture".into()));
     }
     Ok(plan)
@@ -188,25 +263,39 @@ pub fn drag_normalized(start: f64, delta: f64, travel: f64, fine: bool) -> Resul
     if !start.is_finite() || !delta.is_finite() || !travel.is_finite() {
         return Err(PlannerError("dragNormalized requires finite input coordinates".into()));
     }
-    let value = ControlGesturePlannerHandle::call_data_method("dragNormalized", vec![start.into(), delta.into(), travel.into(), fine.into()])
-        .map_err(|error| PlannerError(format!("compiled drag mapping failed: {error:?}")))?;
-    value.as_f64().filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
-        .ok_or_else(|| PlannerError("dragNormalized returned a non-finite or out-of-range value".into()))
+    let value = control::drag_normalized(start, delta, travel, fine)
+        .map_err(|error| PlannerError(format!("compiled drag mapping failed: {error}")))?;
+    if value.is_finite() && (0.0..=1.0).contains(&value) { Ok(value) }
+    else { Err(PlannerError("dragNormalized returned a non-finite or out-of-range value".into())) }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn control_result(phase: &str, consumed: bool, effects: &[&str]) -> std::rc::Rc<control::PlanControlGestureResult> {
+        control::PlanControlGestureResult::new(phase.into(), consumed, effects.iter().map(|value| (*value).into()).collect::<Vec<_>>().into())
+    }
+
+    fn note_result(phase: &str, effects: &[&str]) -> std::rc::Rc<note::PlanNoteGestureResult> {
+        note::PlanNoteGestureResult::new(phase.into(), true, effects.iter().map(|value| (*value).into()).collect::<Vec<_>>().into())
+    }
+
     #[test]
-    fn control_wire_protocol_rejects_unknown_or_partial_results() {
+    fn typed_decisions_reject_unknown_protocol_names_before_effects() {
+        // Missing/wrongly typed fields cannot cross the generated Rust API.
+        // Source strings are still checked before any effect is returned.
         for value in [
-            serde_json::json!({"nextPhase":"typo","consumed":true,"effects":[]}),
-            serde_json::json!({"nextPhase":"idle","effects":[]}),
-            serde_json::json!({"nextPhase":"idle","consumed":true,"effects":["Control.Commit","Control.Unknown"]}),
-            serde_json::json!({"nextPhase":"idle","consumed":true,"effects":[],"ignored":1}),
+            control_result("typo", true, &[]),
+            control_result("idle", true, &["Control.Commit", "Control.Unknown"]),
         ] {
-            assert!(decode::<ControlPlan>("test", value).is_err());
+            assert!(decode_control(GesturePhase::Dragging, GestureEvent::Up, &value).is_err());
+        }
+        for value in [
+            note_result("typo", &[]),
+            note_result("idle", &["Domain.CommitMoveNotes", "Session.Unknown"]),
+        ] {
+            assert!(decode_note(NoteMachine::Move, GesturePhase::Dragging, GestureEvent::Up, &value).is_err());
         }
     }
 
@@ -226,10 +315,25 @@ mod tests {
             vec!["Control.Reset", "Control.Reset"],
         ] {
             assert!(decode_control(GesturePhase::Idle, GestureEvent::Down,
-                serde_json::json!({"nextPhase":"armed","consumed":true,"effects":effects})).is_err());
+                &control_result("armed", true, &effects)).is_err());
         }
         assert!(decode_control(GesturePhase::Dragging, GestureEvent::Up,
-            serde_json::json!({"nextPhase":"idle","consumed":true,"effects":["Control.Commit"]})).is_err());
+            &control_result("idle", true, &["Control.Commit"])).is_err());
+    }
+
+    #[test]
+    fn note_effect_capabilities_reject_cross_machine_and_unretired_results() {
+        for effects in [
+            vec!["Domain.CommitResizeNotes", "Session.ClearGesturePreview", "Host.ReleasePointer"],
+            vec!["Domain.CommitMoveNotes"],
+            vec!["Host.ReleasePointer", "Session.ClearGesturePreview"],
+            vec!["Domain.CommitMoveNotes", "Domain.CommitMoveNotes", "Session.ClearGesturePreview", "Host.ReleasePointer"],
+        ] {
+            assert!(decode_note(NoteMachine::Move, GesturePhase::Dragging, GestureEvent::Up,
+                &note_result("idle", &effects)).is_err());
+        }
+        assert!(decode_note(NoteMachine::Move, GesturePhase::Idle, GestureEvent::Down,
+            &note_result("armed", &["Host.CapturePointer", "Session.BeginMoveGesture"])).is_err());
     }
 
     #[test]
@@ -244,5 +348,34 @@ mod tests {
         assert!(drag_normalized(0.5, f64::INFINITY, 100.0, false).is_err());
         assert_eq!(drag_normalized(0.5, 100.0, 100.0, false).unwrap(), 1.0);
         assert!((drag_normalized(0.5, 100.0, 100.0, true).unwrap() - 0.6).abs() < 1e-9);
+    }
+
+    #[test]
+    fn phase_promises_require_real_host_ownership_before_any_effects_are_returned() {
+        // These packets used to pass validation and could mutate selection
+        // before the session discovered that the promised gesture was absent.
+        for (phase, event, next, effects) in [
+            (GesturePhase::Idle, GestureEvent::Down, "armed", vec!["Session.SelectOnlyHitNote"]),
+            (GesturePhase::Idle, GestureEvent::Down, "idle", vec!["Session.BeginMoveGesture", "Host.CapturePointer"]),
+            (GesturePhase::Dragging, GestureEvent::Move, "idle", vec!["Session.UpdateMovePreview"]),
+            (GesturePhase::Idle, GestureEvent::Move, "idle", vec!["Session.UpdateMovePreview"]),
+            (GesturePhase::Dragging, GestureEvent::Up, "idle", vec!["Session.ClearGesturePreview", "Domain.CommitMoveNotes", "Host.ReleasePointer"]),
+        ] {
+            assert!(decode_note(NoteMachine::Move, phase, event, &note_result(next, &effects)).is_err(), "{phase:?}/{event:?}: {effects:?}");
+        }
+        for (phase, event, next, effects) in [
+            (GesturePhase::Idle, GestureEvent::Down, "armed", vec!["Control.Select"]),
+            (GesturePhase::Idle, GestureEvent::Down, "idle", vec!["Control.Begin", "Host.CapturePointer"]),
+            (GesturePhase::Dragging, GestureEvent::Move, "idle", vec!["Control.Preview"]),
+            (GesturePhase::Idle, GestureEvent::Move, "idle", vec!["Control.Preview"]),
+            (GesturePhase::Dragging, GestureEvent::Up, "idle", vec!["Host.ReleasePointer"]),
+            (GesturePhase::Dragging, GestureEvent::Up, "idle", vec!["Control.Commit", "Control.Discard", "Host.ReleasePointer"]),
+        ] {
+            assert!(decode_control(phase, event, &control_result(next, true, &effects)).is_err(), "{phase:?}/{event:?}: {effects:?}");
+        }
+        assert!(decode_note(NoteMachine::Move, GesturePhase::Idle, GestureEvent::Down,
+            &note_result("idle", &["Session.ToggleHitNote"])).is_ok());
+        assert!(decode_control(GesturePhase::Idle, GestureEvent::Down,
+            &control_result("idle", true, &["Control.Select", "Control.Reset"])).is_ok());
     }
 }

@@ -6,6 +6,15 @@
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
+  "nativeSdk": {
+    "schemaVersion": 1,
+    "name": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "dependencyMode": "workspace",
+    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774",
+    "path": ".proto-ui/gpui-native",
+    "bundled": true
+  },
   "observableSemantics": {
     "version": "proto-ui-observables-v1",
     "props": {
@@ -92,7 +101,7 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "ae0b39b5ee91cd228a095c4a1972a8cd5ee26370354c8e2750bd33b048199b5d"
+      "sha256": "fdf915ea665c60ab618cb20c5b50828e43fee37e5748f56247312a0389b6ce11"
     },
     {
       "path": ".proto-ui/gpui-native/LICENSE",
@@ -112,12 +121,12 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "897c79b483fd54febce187ed62db95b64e7349c40434d526f87e629a6a165a39"
+      "sha256": "adc07e4bc02e4ecf65c215c37f72faff4dbf7f100bb678f652bc28ee847c1507"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-a11y.rs",
       "kind": "source",
-      "sha256": "4fb144c5d45ba0cced2265d342078d8d71de7b2c027f6109fa97c5a9ba4c7320"
+      "sha256": "64c5a3ec99881a4fff33dc85ffdc4bfdd40404ce977d24953c6381ce216de468"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-host.rs",

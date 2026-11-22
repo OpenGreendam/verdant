@@ -83,6 +83,16 @@ async function fixture(t, initial = {}, mount = true) {
       target.dispatchEvent(event);
       return event;
     },
+    action(name) {
+      const event = new CustomEvent(`host:verdant-knob-${name}`, { cancelable: true });
+      target.dispatchEvent(event);
+      return event;
+    },
+    setValue(value) {
+      const event = Object.assign(new Event('host:verdant-knob-set-value'), { value });
+      target.dispatchEvent(event);
+      return event;
+    },
     semantics: () => session.caps.getPort('a11y').getSnapshot(),
   };
 }
@@ -188,6 +198,7 @@ runtimeTest('knob exposed state and a11y follow label, disabled, bounds, and aut
   assert.equal(f.semantics().role, 'slider');
   assert.deepEqual(f.semantics().name, { kind: 'text', value: 'Gain' });
   assert.deepEqual(f.semantics().states, { valueMin: 0, valueMax: 1, valueNow: 0.5, disabled: false });
+  assert.deepEqual(Object.keys(f.semantics().actions).sort(), ['decrement', 'increment', 'setValue']);
   f.call('begin', false, false);
   f.call('sample', 18, true, false);
   f.update({ label: 'Cutoff' });
@@ -201,6 +212,107 @@ runtimeTest('knob exposed state and a11y follow label, disabled, bounds, and aut
   assert.equal(f.semantics().states.valueNow, 1);
   f.key('Home');
   assert.equal(f.call('begin', true, false), false);
+  assert.deepEqual(f.commits(), []);
+});
+
+runtimeTest('knob assistive increment and decrement use authoritative value and one commit', async (t) => {
+  const f = await fixture(t, { step: 0.1 });
+  f.onEvent((name, payload) => { if (name === 'valueCommit') f.update({ value: payload.value, revision: `document:${f.commits().length + 1}` }); });
+  f.call('begin', false, false);
+  f.call('sample', 54, true, false);
+  assert.equal(f.x.value.get(), 0.8);
+  f.action('increment');
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.x.value.get(), 0.6);
+  assert.deepEqual(f.commits(), [{ value: 0.6, revision: 'document:1' }]);
+  assert.equal(f.cancels().length, 1);
+  f.action('decrement');
+  assert.equal(f.x.value.get(), 0.5);
+  assert.deepEqual(f.commits()[1], { value: 0.5, revision: 'document:2' });
+});
+
+runtimeTest('knob assistive actions cannot outlive disabled, detached or reentrant owners', async (t) => {
+  const f = await fixture(t);
+  f.update({ disabled: true });
+  f.action('increment');
+  assert.deepEqual(f.commits(), []);
+  f.update({ disabled: false });
+  f.call('begin', false, false);
+  f.onEvent((name) => { if (name === 'interactionCancel') f.update({ value: 0.9, revision: 'document:2' }); });
+  f.action('decrement');
+  assert.equal(f.x.value.get(), 0.9);
+  assert.deepEqual(f.commits(), []);
+  await f.session.unmount();
+  f.action('increment');
+  assert.deepEqual(f.commits(), []);
+});
+
+runtimeTest('knob assistive value setter cancels preview and commits one accepted proposal', async (t) => {
+  const f = await fixture(t);
+  f.onEvent((name, payload) => { if (name === 'valueCommit') f.update({ value: payload.value, revision: 'document:2' }); });
+  f.call('begin', false, false);
+  f.call('sample', 54, true, false);
+  f.setValue(0.63);
+  assert.deepEqual(f.commits(), [{ value: 0.63, revision: 'document:1' }]);
+  assert.deepEqual(f.cancels(), [{ revision: 'document:1' }]);
+  assert.equal(f.x.value.get(), 0.63);
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.call('finish', 72, true, false), false);
+  assert.equal(f.commits().length, 1);
+});
+
+runtimeTest('knob assistive value rejection leaves authority intact and malformed input has no effect', async (t) => {
+  const f = await fixture(t);
+  f.call('begin', false, false);
+  f.call('sample', 18, true, false);
+  for (const invalid of [undefined, null, '0.63', NaN, Infinity, -Infinity]) f.setValue(invalid);
+  assert.equal(f.x.phase.get(), 'dragging');
+  assert.equal(f.x.value.get(), 0.6);
+  assert.deepEqual(f.commits(), []);
+  assert.deepEqual(f.cancels(), []);
+  f.setValue(0.63);
+  assert.deepEqual(f.commits(), [{ value: 0.63, revision: 'document:1' }]);
+  assert.equal(f.x.value.get(), 0.5);
+  f.setValue(2);
+  assert.deepEqual(f.commits()[1], { value: 1, revision: 'document:1' });
+  assert.equal(f.x.value.get(), 0.5);
+});
+
+runtimeTest('knob assistive value cannot outlive disabled, detached or reentrant owners', async (t) => {
+  const f = await fixture(t);
+  f.update({ disabled: true });
+  f.setValue(0.63);
+  assert.deepEqual(f.commits(), []);
+  f.update({ disabled: false });
+  f.call('begin', false, false);
+  f.onEvent((name) => { if (name === 'interactionCancel') f.update({ value: 0.9, revision: 'document:2' }); });
+  f.setValue(0.63);
+  assert.equal(f.x.value.get(), 0.9);
+  assert.deepEqual(f.commits(), []);
+  await f.session.unmount();
+  f.setValue(0.63);
+  assert.deepEqual(f.commits(), []);
+});
+
+runtimeTest('knob observer cancellation cannot interrupt authoritative value and focus synchronization', async (t) => {
+  const f = await fixture(t);
+  const unsubscribe = f.x.disabled.subscribe((event) => {
+    if (event.type === 'next' && f.x.disabled.get()) {
+      f.call('cancel');
+      assert.equal(f.call('begin', false, false), false);
+      f.setValue(0.2);
+    }
+  });
+  t.after(unsubscribe);
+  f.update({ value: 0.9, revision: 'document:2', disabled: true });
+  assert.equal(f.x.value.get(), 0.9);
+  assert.equal(f.semantics().states.valueNow, 0.9);
+  assert.equal(f.semantics().states.disabled, true);
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.deepEqual(f.commits(), []);
+  f.update({ disabled: false });
+  assert.equal(f.call('begin', false, false), true);
+  assert.equal(f.call('finish', 0, false, false), true);
   assert.deepEqual(f.commits(), []);
 });
 
@@ -230,6 +342,21 @@ runtimeTest('knob disposal retires an active preview through unmount without ano
   assert.deepEqual(f.commits(), []);
   // Native before-dispose additionally forbids State.set and RunHandle
   // callbacks; the explicit GPUI handle.dispose test checks that target rule.
+});
+
+runtimeTest('knob observer cancellation during detach cannot retain a provisional display', async (t) => {
+  const f = await fixture(t);
+  f.call('begin', false, false);
+  f.call('sample', 54, true, false);
+  const unsubscribe = f.x.phase.subscribe((event) => {
+    if (event.type === 'next' && f.x.phase.get() === 'idle') f.call('cancel');
+  });
+  t.after(unsubscribe);
+  await f.session.unmount();
+  assert.equal(f.x.value.get(), 0.5);
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.deepEqual(f.cancels(), [{ revision: 'document:1' }]);
+  assert.deepEqual(f.commits(), []);
 });
 
 runtimeTest('knob shortcuts clamp, reset, reject modifiers and normalize invalid step', async (t) => {

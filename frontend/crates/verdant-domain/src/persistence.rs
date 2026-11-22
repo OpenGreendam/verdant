@@ -94,7 +94,7 @@ fn resolved_path(path: &Path) -> Result<PathBuf, PersistenceError> {
 
 #[derive(Debug)]
 struct ProjectLease {
-    _file: File,
+    file: File,
 }
 
 impl ProjectLease {
@@ -116,9 +116,22 @@ impl ProjectLease {
         }
         let file = options.open(&sidecar).map_err(|source| IoError::Io { path: sidecar.clone(), source })?;
         match file.try_lock() {
-            Ok(()) => Ok(Self { _file: file }),
+            Ok(()) => Ok(Self { file }),
             Err(std::fs::TryLockError::WouldBlock) => Err(PersistenceError::Busy(path.into())),
             Err(std::fs::TryLockError::Error(source)) => Err(IoError::Io { path: sidecar, source }.into()),
+        }
+    }
+}
+
+impl Drop for ProjectLease {
+    fn drop(&mut self) {
+        // A concurrent process spawn can inherit this open file description
+        // until exec closes its CLOEXEC descriptor. Closing only our handle
+        // would leave a Unix flock held during that window, so reopening a
+        // just-dropped document could spuriously return Busy. End the writer
+        // lease explicitly; an inherited handle is never a project writer.
+        if let Err(error) = self.file.unlock() {
+            eprintln!("Verdant: could not release project writer lease: {error}");
         }
     }
 }
@@ -616,6 +629,29 @@ mod snapshot_tests {
         assert!(matches!(ProjectPersistence::open(&path), Err(PersistenceError::Busy(_))));
         assert!(ProjectPersistence::read_saved(&path).is_ok());
         drop(document);
+        assert!(ProjectPersistence::open(&path).is_ok());
+    }
+
+    #[test]
+    fn dropping_writer_releases_lease_while_a_duplicated_descriptor_remains_open() {
+        let sandbox = Sandbox::new();
+        let path = sandbox.project();
+        let document = ProjectPersistence::create(&path, Project::new_empty()).unwrap();
+        // try_clone shares the OS open file description, just as a transient
+        // inherited descriptor does between fork and exec. Keep it alive to
+        // make the spawn/drop race deterministic without launching a process.
+        let inherited = document.lease.file.try_clone().unwrap();
+        assert!(matches!(ProjectPersistence::open(&path), Err(PersistenceError::Busy(_))));
+        drop(document);
+
+        let (replacement, report) = ProjectPersistence::open(&path).unwrap();
+        assert!(!report.recovered_anything());
+        assert!(matches!(ProjectPersistence::open(&path), Err(PersistenceError::Busy(_))));
+        // Closing the old inherited descriptor must not release the new,
+        // independently acquired writer lease.
+        drop(inherited);
+        assert!(matches!(ProjectPersistence::open(&path), Err(PersistenceError::Busy(_))));
+        drop(replacement);
         assert!(ProjectPersistence::open(&path).is_ok());
     }
 }

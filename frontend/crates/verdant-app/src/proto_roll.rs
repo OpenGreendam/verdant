@@ -97,18 +97,22 @@ fn sample_pointer(input: MoveGestureInput) -> Option<PointerId> {
 }
 
 impl RollMove {
-    fn sample(editor: &mut Editor, sample: &MoveGestureSample) {
+    fn sample(editor: &mut Editor, sample: &MoveGestureSample) -> bool {
         let x = f64::from(sample.position.x);
         let y = f64::from(sample.position.y);
         let viewport = editor.session.viewport;
-        let Some(pointer) = sample_pointer(sample.input) else { return };
+        let Some(pointer) = sample_pointer(sample.input) else { return false };
+        let tick = viewport.x_to_tick(x);
+        let pitch = viewport.y_to_pitch(y);
+        if !x.is_finite() || !y.is_finite() || !tick.is_finite() || !pitch.is_finite() { return false; }
         editor.roll_pitch_sample(
             pointer,
-            viewport.x_to_tick(x),
-            viewport.y_to_pitch(y),
+            tick,
+            pitch,
             (x, y),
             sample.modifiers.shift,
         );
+        true
     }
 
     fn cancel_preview(editor: &WeakEntity<Editor>, pointer: PointerId, cx: &mut App) {
@@ -123,11 +127,13 @@ impl RollMove {
 
 impl MoveGestureBinding for RollMove {
     fn should_start(&self, sample: &MoveGestureSample, _: &mut Window, cx: &mut App) -> bool {
-        sample_pointer(sample.input).is_some() && self.editor.upgrade().is_some_and(|entity| {
+        sample.position.x.is_finite() && sample.position.y.is_finite()
+            && sample_pointer(sample.input).is_some() && self.editor.upgrade().is_some_and(|entity| {
             let editor = entity.read(cx);
             editor.tool == Tool::Pitch && editor.lane_stroke.is_none()
                 && editor.session.pointer_owner().is_none() && editor.note_creation.is_none()
                 && editor.device_drag.is_none() && editor.mixer_drag.is_none() && editor.menu.is_none()
+                && !editor.has_proto_pointer_contact()
                 && editor.text_prompt.is_none() && editor.modal_dialog.is_none()
         })
     }
@@ -145,10 +151,14 @@ impl MoveGestureBinding for RollMove {
         self.started.set(started.then_some(pointer));
     }
 
-    fn on_move(&self, sample: &MoveGestureSample, _: &mut Window, cx: &mut App) {
+    fn on_move(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         if self.started.get().is_some() && self.started.get() == sample_pointer(sample.input) {
             let _ = self.editor.update(cx, |editor, cx| {
-                Self::sample(editor, sample);
+                if !Self::sample(editor, sample) {
+                    editor.lane_stroke = None;
+                    editor.compiled_pitch_move.cancel(window, cx);
+                    editor.notice("音高笔画坐标无效；已取消这次修改");
+                }
                 cx.notify();
             });
         }
@@ -160,8 +170,12 @@ impl MoveGestureBinding for RollMove {
             self.started.set(None);
             let _ = self.editor.update(cx, |editor, cx| {
                 if editor.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll && stroke.pointer == pointer) {
-                    Self::sample(editor, sample);
-                    editor.commit_roll_pitch(cx);
+                    if Self::sample(editor, sample) { editor.commit_roll_pitch(cx); }
+                    else {
+                        editor.lane_stroke = None;
+                        editor.notice("音高笔画终止坐标无效；未提交修改");
+                        cx.notify();
+                    }
                 }
             });
         }

@@ -1,4 +1,4 @@
-import { definePrototype, type RunHandle } from '@proto.ui/core';
+import { definePrototype, type A11ySetValueEventPayload, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable } from '@proto.ui/hooks';
 import { dragNormalized, planControlGesture, type ControlDecision } from './control-gesture-planner.proto';
 
@@ -53,6 +53,11 @@ export default definePrototype<Props>({
     accessible.state('valueMax', maximum);
     accessible.state('valueNow', value);
     accessible.state('disabled', disabled);
+    // Explicit host-extension names are admitted by both portable Runtime and
+    // native action dispatch; the default a11y:* names are not core events.
+    accessible.action('increment', { event: 'host:verdant-knob-increment' });
+    accessible.action('decrement', { event: 'host:verdant-knob-decrement' });
+    accessible.action('setValue', { event: 'host:verdant-knob-set-value' });
     def.expose.state('value', value);
     def.expose.state('phase', phase);
     def.expose.state('disabled', disabled);
@@ -65,10 +70,13 @@ export default definePrototype<Props>({
     let attached = false;
     let disposed = false;
     let epoch = 0;
+    let authorityEpoch = 0;
+    let syncing = false;
     let initial = 0;
     let accepted = 0;
     let revision = '';
     const isCurrent = (ticket: number): boolean => !disposed && run !== null && epoch === ticket;
+    const isAuthorityCurrent = (ticket: number): boolean => !disposed && run !== null && authorityEpoch === ticket;
     const publish = (next: number, ticket: number): boolean => {
       if (!isCurrent(ticket)) return false;
       value.set(clamp(next), 'reason: normalized knob display');
@@ -116,13 +124,13 @@ export default definePrototype<Props>({
       return decision.consumed;
     };
     const sampleAt = (delta: number, crossed: boolean, fine: boolean, ticket: number): boolean => {
-      if (!isCurrent(ticket) || !attached || disabled.get() || phase.get() === 'idle') return false;
+      if (!isCurrent(ticket) || syncing || !attached || disabled.get() || phase.get() === 'idle') return false;
       return apply(plan(phase.get(), 'PointerMove', {
         hit_control: true, threshold_crossed: crossed, reset_modifier: false, double_click: false,
       }), normalizeDrag(initial, delta, 180, fine), ticket);
     };
     def.expose.method('begin', (reset: boolean, double: boolean) => {
-      if (!run || !attached || disposed || disabled.get() || phase.get() !== 'idle') return false;
+      if (!run || syncing || !attached || disposed || disabled.get() || phase.get() !== 'idle') return false;
       const ticket = ++epoch;
       focus.focusSelf();
       if (!isCurrent(ticket) || !attached || disabled.get()) return false;
@@ -142,7 +150,47 @@ export default definePrototype<Props>({
       }), value.get(), ticket);
     });
     def.expose.method('cancel', cancel);
-    def.event.on('key.down', (current, event) => {
+    const adjust = (key: string, fine: boolean): boolean => {
+      const current = run;
+      if (!current || syncing || !attached || disposed || disabled.get()) return false;
+      const ticket = epoch + 1;
+      cancel();
+      // Keyboard and assistive actions start from accepted truth after cancel,
+      // never from an unaccepted pointer preview. A reentrant owner supersedes
+      // this request by advancing the epoch before any proposal can escape.
+      if (!isCurrent(ticket) || !attached || disabled.get()) return false;
+      let next = accepted;
+      const rawStep = current.props.get().step ?? 0.01;
+      const step = rawStep > 0 && rawStep <= 1 ? rawStep : 0.01;
+      const amount = step * (fine ? 0.1 : 1);
+      if (key === 'Home') next = 0;
+      else if (key === 'End') next = 1;
+      else if (key === 'ArrowUp' || key === 'ArrowRight') next += amount;
+      else if (key === 'ArrowDown' || key === 'ArrowLeft') next -= amount;
+      else if (key === 'PageUp') next += step * 10;
+      else if (key === 'PageDown') next -= step * 10;
+      else return false;
+      return propose(next, ticket);
+    };
+    def.event.on('host:verdant-knob-increment', () => {
+      adjust('ArrowUp', false);
+    });
+    def.event.on('host:verdant-knob-decrement', () => {
+      adjust('ArrowDown', false);
+    });
+    def.event.on('host:verdant-knob-set-value', (_current, opaque) => {
+      const event = opaque as A11ySetValueEventPayload;
+      const next = event.value;
+      if (typeof next !== 'number' || !Number.isFinite(next)) return;
+      if (!run || syncing || !attached || disposed || disabled.get()) return;
+      const ticket = epoch + 1;
+      cancel();
+      if (!isCurrent(ticket) || !attached || disabled.get()) return;
+      // Assistive writes use the same revision-checked proposal as a drag or
+      // key. They cannot adopt an unaccepted preview or bypass host policy.
+      propose(next, ticket);
+    });
+    def.event.on('key.down', (_current, event) => {
       if (event.key === 'Escape') {
         if (phase.get() !== 'idle') event.control.requestDefaultActionPrevention();
         cancel();
@@ -154,28 +202,13 @@ export default definePrototype<Props>({
         && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft'
         && event.key !== 'PageUp' && event.key !== 'PageDown') return;
       event.control.requestDefaultActionPrevention();
-      const ticket = epoch + 1;
-      cancel();
-      // Every RunHandle replacement advances epoch. Do not compare host handle
-      // identities: this pinned native target does not define Owner equality.
-      if (!isCurrent(ticket) || !attached || disabled.get()) return;
-      // A keyboard takeover starts from accepted truth after pointer cancel,
-      // never from a preview that the host has not accepted.
-      let next = accepted;
-      const rawStep = current.props.get().step ?? 0.01;
-      const step = rawStep > 0 && rawStep <= 1 ? rawStep : 0.01;
-      const amount = step * (event.shiftKey ? 0.1 : 1);
-      if (event.key === 'Home') next = 0;
-      else if (event.key === 'End') next = 1;
-      else if (event.key === 'ArrowUp' || event.key === 'ArrowRight') next += amount;
-      else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') next -= amount;
-      else if (event.key === 'PageUp') next += step * 10;
-      else if (event.key === 'PageDown') next -= step * 10;
-      propose(next, ticket);
+      adjust(event.key ?? '', event.shiftKey === true);
     });
     const sync = (current: RunHandle<Props>) => {
       if (disposed) return;
-      const ticket = ++epoch;
+      ++epoch;
+      const ticket = ++authorityEpoch;
+      syncing = true;
       run = current;
       const props = current.props.get();
       const next = clamp(props.value ?? 0);
@@ -187,27 +220,34 @@ export default definePrototype<Props>({
       revision = nextRevision;
       if (shouldCancel) {
         phase.set('idle', 'reason: normalized knob authority changed');
-        if (!isCurrent(ticket)) return;
+        if (!isAuthorityCurrent(ticket)) return;
       }
       label.set(props.label ?? '', 'reason: normalized knob label');
-      if (!isCurrent(ticket)) return;
+      if (!isAuthorityCurrent(ticket)) return;
       disabled.set(props.disabled ?? false, 'reason: normalized knob policy');
-      if (!isCurrent(ticket)) return;
+      if (!isAuthorityCurrent(ticket)) return;
       focus.setDisabled(disabled.get());
-      if (!isCurrent(ticket)) return;
+      if (!isAuthorityCurrent(ticket)) return;
       if (phase.get() === 'idle') {
-        if (!publish(accepted, ticket)) return;
-      } else {
-        current.update();
-        if (!isCurrent(ticket)) return;
+        value.set(accepted, 'reason: normalized knob authority display');
+        if (!isAuthorityCurrent(ticket)) return;
       }
+      // A public observer may cancel an idle interaction while these fields
+      // are being published. That retires input, not the new props: finish
+      // their value/focus projection. Only newer props or detach supersede it.
+      // Admit fresh input after all authority fields and cancellation settle.
       if (shouldCancel) current.expose.emit('interactionCancel', { revision: nextRevision });
+      if (!isAuthorityCurrent(ticket)) return;
+      syncing = false;
+      if (attached) current.update();
     };
     const retire = (permanent: boolean) => {
       const current = run;
       const wasActive = phase.get() !== 'idle';
       const basis = revision;
-      const ticket = ++epoch;
+      ++epoch;
+      const ticket = ++authorityEpoch;
+      syncing = false;
       attached = false;
       disposed = disposed || permanent;
       run = null;
@@ -216,9 +256,9 @@ export default definePrototype<Props>({
       // State.set nor RunHandle callbacks are available in that terminal phase.
       if (permanent) return;
       phase.set('idle', 'reason: normalized knob detached');
-      if (epoch !== ticket) return;
+      if (authorityEpoch !== ticket) return;
       value.set(accepted, 'reason: normalized knob detached display');
-      if (epoch !== ticket) return;
+      if (authorityEpoch !== ticket) return;
       if (wasActive && current) current.expose.emit('interactionCancel', { revision: basis });
     };
     def.lifecycle.onCreated(sync);

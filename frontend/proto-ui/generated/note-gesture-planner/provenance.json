@@ -5,75 +5,119 @@
     "sha256": "c338c05aa48559a1209eabf43f21fe2c0cc80a8016123756790073999356a48d"
   },
   "irVersion": 7,
-  "backend": "gpui-source-v1",
-  "observableSemantics": {
-    "version": "proto-ui-observables-v1",
-    "props": {
-      "input": "full-raw-snapshot",
-      "update": "explicit",
-      "initialNotification": "silent"
-    },
-    "state": {
-      "write": "synchronous",
-      "notifications": "fifo-recorded-snapshot-v1",
-      "update": "explicit"
-    },
-    "context": {
-      "update": "explicit",
-      "identity": "nominal"
-    },
-    "lifecycle": {
-      "update": "coalescible-intent",
-      "completion": "host-commit-before-updated",
-      "detach": "preserve-owner",
-      "disposal": "invalidate-retained-handles"
-    },
-    "composition": {
-      "nativeChildren": "ordinary-host-slots",
-      "sharedIdentity": "explicit-artifact-link"
-    }
-  },
+  "backend": "rust-data-v1",
   "sourceResolution": {
     "version": 1,
     "imports": {},
     "packages": []
   },
-  "profile": "gpui-source-v1",
-  "dependencies": [
+  "format": "proto-ui-rust-data",
+  "version": 1,
+  "profile": "rust-data-v1",
+  "dependencies": [],
+  "methods": [
     {
-      "name": "gpui",
-      "version": "workspace",
-      "role": "target"
-    },
-    {
-      "name": "serde",
-      "version": "1.0",
-      "role": "target"
-    },
-    {
-      "name": "serde_json",
-      "version": "1.0",
-      "role": "target"
-    },
-    {
-      "name": "proto-ui-gpui-native",
-      "version": "0.2.0",
-      "role": "host-bridge"
-    },
-    {
-      "name": "unicode-segmentation",
-      "version": "=1.13.3",
-      "role": "target"
-    },
-    {
-      "name": "data-url",
-      "version": "=0.3.2",
-      "role": "target"
-    },
-    {
-      "name": "image",
-      "version": "=0.25.10",
-      "role": "target"
+      "name": "planNoteGesture",
+      "rustName": "plan_note_gesture",
+      "parameters": [
+        {
+          "name": "machine",
+          "rustName": "argument_0",
+          "type": "string",
+          "optional": false,
+          "rustType": "String"
+        },
+        {
+          "name": "phase",
+          "rustName": "argument_1",
+          "type": "string",
+          "optional": false,
+          "rustType": "String"
+        },
+        {
+          "name": "event",
+          "rustName": "argument_2",
+          "type": "string",
+          "optional": false,
+          "rustType": "String"
+        },
+        {
+          "name": "guards",
+          "rustName": "argument_3",
+          "type": {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "hit_background",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_selected_note",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_unselected_note",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_note_body",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_resize_handle",
+                "type": "boolean"
+              },
+              {
+                "name": "toggle_modifier",
+                "type": "boolean"
+              },
+              {
+                "name": "extend_modifier",
+                "type": "boolean"
+              },
+              {
+                "name": "duplicate_modifier",
+                "type": "boolean"
+              },
+              {
+                "name": "pointer_threshold_crossed",
+                "type": "boolean"
+              },
+              {
+                "name": "base_revision_matches",
+                "type": "boolean"
+              },
+              {
+                "name": "base_revision_matches_and_delta_nonzero",
+                "type": "boolean"
+              }
+            ]
+          },
+          "optional": false,
+          "rustType": "Rc<PlanNoteGestureGuards>"
+        }
+      ],
+      "returnType": {
+        "kind": "record",
+        "fields": [
+          {
+            "name": "nextPhase",
+            "type": "string"
+          },
+          {
+            "name": "consumed",
+            "type": "boolean"
+          },
+          {
+            "name": "effects",
+            "type": {
+              "kind": "array",
+              "element": "string"
+            }
+          }
+        ]
+      },
+      "rustReturnType": "Rc<PlanNoteGestureResult>"
     }
   ],
   "sourceFiles": [
@@ -82,27 +126,17 @@
       "sha256": "949e8f82cf31a7269df583049caa5ee27573006901be1605c000292795596ede"
     }
   ],
-  "generatedSha256": "20317e55b1e02e2748fcb7df925bd56b68100a8b73211206cfb4d63d0365d404",
+  "generatedSha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2",
   "artifacts": [
     {
-      "path": "Component.rs",
+      "path": "lib.rs",
       "kind": "source",
-      "sha256": "20317e55b1e02e2748fcb7df925bd56b68100a8b73211206cfb4d63d0365d404"
+      "sha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "1ebf14e224d2a75b7926bd88c818f5f8fd16d0d405e67ee11d02bbe333a1222e"
-    },
-    {
-      "path": ".proto-ui/fixtures/style-tokens.json",
-      "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
-    },
-    {
-      "path": "Component.rs.map",
-      "kind": "source-map",
-      "sha256": "57311cc2648a4b22182244eef5eb04c4d81facf990408e772e90d0a807630d1c"
+      "sha256": "98be7d5b9364deebf49d00cfc00732c21a95a316644469545c115bc09578f25c"
     }
   ]
 }

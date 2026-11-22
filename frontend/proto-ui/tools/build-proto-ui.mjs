@@ -20,7 +20,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { findWorkspaceGpuiViolations, parseCargoManifest, readWorkspaceGpuiIdentity } from './lib/workspace-gpui.mjs';
+import { findRustDataViolations, findWorkspaceGpuiViolations, parseCargoManifest, readWorkspaceGpuiIdentity } from './lib/workspace-gpui.mjs';
 import { acquireProducerLock, assertOwnedInventory, insidePath, publishBatch, recoverPublication } from './lib/artifact-publication.mjs';
 
 export const EXIT = { ok: 0, revision: 2, sourceState: 3, pin: 4, toolchain: 5, compile: 6, drift: 7, admission: 8, replace: 9, upstreamAbsent: 10, artifactsAbsent: 11 };
@@ -36,6 +36,7 @@ const artifactText = (artifacts, filename) => artifacts.find((artifact) => artif
 const json = (filename) => JSON.parse(readFileSync(filename, 'utf8'));
 const artifactJson = (artifacts, filename) => JSON.parse(artifactText(artifacts, filename));
 const fail = (code, message) => { throw new ProducerError(code, message); };
+const isDataUnit = (unit) => unit.target.profile === 'rust-data-v1';
 function checked(code, work) {
   try { return work(); } catch (error) { if (error instanceof ProducerError) throw error; fail(code, error.message); }
 }
@@ -61,12 +62,12 @@ export function parseArguments(argv, root = defaultRoot) {
 
 export function loadPin(filename, root = defaultRoot) {
   const pin = checked(EXIT.pin, () => json(filename));
-  if (pin?.schema !== 'verdant.proto-ui.compiler-pin.v2') fail(EXIT.pin, `Unsupported pin schema: ${pin?.schema}`);
+  if (pin?.schema !== 'verdant.proto-ui.compiler-pin.v3') fail(EXIT.pin, `Unsupported pin schema: ${pin?.schema}`);
   for (const [label, value] of [['upstream.revision', pin.upstream?.revision], ['gpu.workspaceGpuiRevision', pin.gpu?.workspaceGpuiRevision], ['gpu.upstreamGpuiRevision', pin.gpu?.upstreamGpuiRevision]]) {
     if (!/^[0-9a-f]{40}$/.test(value ?? '')) fail(EXIT.pin, `Pin ${label} must be a full 40-hex revision.`);
   }
   if (typeof pin.upstream.repository !== 'string' || !pin.upstream.repository.startsWith('https://')) fail(EXIT.pin, 'Pin upstream.repository must be an HTTPS URL.');
-  if (pin.target?.profile !== 'gpui-source-v1' || pin.target.gpuiDependency !== 'workspace') fail(EXIT.pin, 'Only the workspace GPUI source profile is admitted.');
+  if (pin.target !== undefined) fail(EXIT.pin, 'Each compilation unit must declare its own target.');
   if (!pin.gpu.workspace || pin.gpu.workspace.name !== 'gpui' || pin.gpu.workspace.rev !== pin.gpu.workspaceGpuiRevision || typeof pin.gpu.workspace.git !== 'string' || !Array.isArray(pin.gpu.workspace.features) || typeof pin.gpu.workspace.defaultFeatures !== 'boolean') fail(EXIT.pin, 'Pin must describe the complete workspace GPUI identity.');
   if (!/^pnpm@\d+\.\d+\.\d+$/.test(pin.packageVersions?.packageManager ?? '') || pin.packageVersions.nodeEngine !== '24.x') fail(EXIT.pin, 'Pin requires Node 24.x and an exact pnpm version.');
   if (!/^[0-9a-f]{64}$/.test(pin.toolchain?.lockSha256 ?? '') || !pin.toolchain.packages?.typescript || !pin.toolchain.packages?.tsx) fail(EXIT.pin, 'Pin must bind the upstream lockfile and executed compiler package versions.');
@@ -74,10 +75,22 @@ export function loadPin(filename, root = defaultRoot) {
   const names = new Set();
   const outputs = [];
   const receipts = new Set();
+  const dataPackages = new Set();
   for (const unit of pin.units) {
     if (!/^[a-z][a-z0-9-]*$/.test(unit.name) || names.has(unit.name)) fail(EXIT.pin, `Invalid or duplicate unit: ${unit.name}`);
     names.add(unit.name);
-    if (!/^[A-Z][A-Za-z0-9]*$/.test(unit.componentName)) fail(EXIT.pin, `Invalid component name: ${unit.componentName}`);
+    if (unit.componentName !== undefined || unit.nativeSdkPath !== undefined) fail(EXIT.pin, `${unit.name} must bind all compilation options under target.`);
+    const target = unit.target;
+    if (target?.profile === 'gpui-source-v1') {
+      if (target.gpuiDependency !== 'workspace' || !/^[A-Z][A-Za-z0-9]*$/.test(target.componentName)) fail(EXIT.pin, `${unit.name} must name its workspace GPUI component target.`);
+      if (Object.keys(target).some((key) => !['profile', 'gpuiDependency', 'componentName', 'nativeSdkPath'].includes(key))) fail(EXIT.pin, `${unit.name} has unknown native target options.`);
+    } else if (target?.profile === 'rust-data-v1') {
+      if (!/^[a-z][a-z0-9-]{0,63}$/.test(target.crateName) || dataPackages.has(target.crateName)) fail(EXIT.pin, `${unit.name} needs a distinct stable data crate name.`);
+      dataPackages.add(target.crateName);
+      if (!Array.isArray(target.methods) || !target.methods.length || target.methods.some((name) => !/^[A-Za-z][A-Za-z0-9]*$/.test(name)) || new Set(target.methods).size !== target.methods.length) fail(EXIT.pin, `${unit.name} must select distinct pure source methods.`);
+      if (!same(target.dependencies, [])) fail(EXIT.pin, `${unit.name} must require a standard-library-only data artifact.`);
+      if (Object.keys(target).some((key) => !['profile', 'crateName', 'methods', 'dependencies'].includes(key))) fail(EXIT.pin, `${unit.name} has unknown data target options.`);
+    } else fail(EXIT.pin, `${unit.name} has an unsupported compilation target.`);
     checked(EXIT.pin, () => {
       insidePath(root, unit.source);
       insidePath(root, unit.output?.directory);
@@ -92,12 +105,14 @@ export function loadPin(filename, root = defaultRoot) {
   if (!sdk || !names.has(sdk.owner) || sdk.package !== 'proto-ui-gpui-native' || !/^\d+\.\d+\.\d+$/.test(sdk.version) || !Array.isArray(sdk.features) || !/^[0-9a-f]{64}$/.test(sdk.contentSha256)) fail(EXIT.pin, 'Pin must bind the shared native SDK owner, ABI and content.');
   checked(EXIT.pin, () => insidePath(root, sdk.directory));
   const owner = pin.units.find((unit) => unit.name === sdk.owner);
+  if (isDataUnit(owner)) fail(EXIT.pin, 'A Rust data unit cannot own a native SDK.');
   for (const unit of pin.units) {
+    if (isDataUnit(unit)) continue;
     if (unit === owner) {
-      if (unit.nativeSdkPath !== undefined) fail(EXIT.pin, 'The SDK owner must emit its SDK.');
+      if (unit.target.nativeSdkPath !== undefined) fail(EXIT.pin, 'The SDK owner must emit its SDK.');
     } else {
       const expected = slash(path.relative(path.resolve(root, unit.output.directory), path.resolve(root, owner.output.directory, sdk.directory)));
-      if (unit.nativeSdkPath !== expected) fail(EXIT.pin, `${unit.name} must reference its pinned shared SDK owner at ${expected}.`);
+      if (unit.target.nativeSdkPath !== expected) fail(EXIT.pin, `${unit.name} must reference its pinned shared SDK owner at ${expected}.`);
     }
   }
   return pin;
@@ -158,7 +173,10 @@ function verifyWorkspace(root, pin) {
 
 const records = (artifacts) => artifacts.map((artifact) => ({ path: artifact.path, kind: artifact.kind, sha256: sha256(artifact.contents) })).sort((a, b) => a.path.localeCompare(b.path));
 function sdkIdentity(pin, ownerArtifacts) {
-  const artifacts = records(ownerArtifacts).filter((artifact) => artifact.path.startsWith(`${pin.sharedSdk.directory}/`));
+  // Match the upstream SDK's own inventory identity: paths are SDK-relative,
+  // with deterministic code-point ordering rather than a machine locale.
+  const prefix = `${pin.sharedSdk.directory}/`;
+  const artifacts = records(ownerArtifacts).filter((artifact) => artifact.path.startsWith(prefix)).map((artifact) => ({ ...artifact, path: artifact.path.slice(prefix.length) })).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   const contentSha256 = sha256(JSON.stringify(artifacts));
   if (contentSha256 !== pin.sharedSdk.contentSha256) fail(EXIT.admission, 'Shared SDK content differs from its pinned identity.');
   const sdkManifest = artifactText(ownerArtifacts, `${pin.sharedSdk.directory}/Cargo.toml`);
@@ -169,12 +187,22 @@ function sdkIdentity(pin, ownerArtifacts) {
 }
 
 function verifyUnitAdmission(pin, unit, artifacts, ownerArtifacts, workspaceManifest, root) {
+  const provenance = artifactJson(artifacts, 'provenance.json');
+  if (isDataUnit(unit)) {
+    const violations = findRustDataViolations({ crateManifest: artifactText(artifacts, 'Cargo.toml'), provenance, expectedPackageName: unit.target.crateName, expectedMethods: unit.target.methods });
+    if (violations.length) fail(EXIT.admission, `${unit.name}:\n${violations.join('\n')}`);
+    if (!same(provenance.methods?.map((method) => method.name), unit.target.methods)) fail(EXIT.admission, `${unit.name} does not expose precisely its pinned pure methods.`);
+    if (artifacts.some((artifact) => artifact.path.startsWith('.proto-ui/') || artifact.path === 'Component.rs')) fail(EXIT.admission, `${unit.name} must not contain native component or SDK artifacts.`);
+    return;
+  }
   const sdkManifest = artifactText(ownerArtifacts, `${pin.sharedSdk.directory}/Cargo.toml`);
-  const violations = findWorkspaceGpuiViolations({ crateManifest: artifactText(artifacts, 'Cargo.toml'), sdkManifest, provenance: artifactJson(artifacts, 'provenance.json'), workspaceManifest });
+  const violations = findWorkspaceGpuiViolations({ crateManifest: artifactText(artifacts, 'Cargo.toml'), sdkManifest, provenance, workspaceManifest });
   if (violations.length) fail(EXIT.admission, `${unit.name}:\n${violations.join('\n')}`);
   const manifest = parseCargoManifest(artifactText(artifacts, 'Cargo.toml'));
   const dependency = manifest.dependencies?.[pin.sharedSdk.package];
   const owner = pin.units.find((entry) => entry.name === pin.sharedSdk.owner);
+  const expectedIdentity = { schemaVersion: 1, name: pin.sharedSdk.package, version: pin.sharedSdk.version, dependencyMode: 'workspace', contentSha256: pin.sharedSdk.contentSha256, path: unit.target.nativeSdkPath ?? pin.sharedSdk.directory, bundled: unit.name === owner.name };
+  if (!same(provenance.nativeSdk, expectedIdentity)) fail(EXIT.admission, `${unit.name} compiler SDK provenance differs from the shared identity.`);
   const actualSdk = path.resolve(root, unit.output.directory, dependency?.path ?? '');
   const expectedSdk = path.resolve(root, owner.output.directory, pin.sharedSdk.directory);
   if (actualSdk !== expectedSdk || dependency?.version !== `=${pin.sharedSdk.version}` || !same([...(dependency.features ?? [])].sort(), [...pin.sharedSdk.features].sort())) fail(EXIT.admission, `${unit.name} does not link the pinned shared SDK path/version/ABI features.`);
@@ -183,10 +211,10 @@ function verifyUnitAdmission(pin, unit, artifacts, ownerArtifacts, workspaceMani
 
 function receiptFor(pin, unit, artifacts, inputs, sharedSdk) {
   return {
-    schema: 'verdant.proto-ui.receipt.v2', unit: unit.name, source: unit.source,
+    schema: 'verdant.proto-ui.receipt.v3', unit: unit.name, source: unit.source,
     sourceInputs: inputs, upstream: pin.upstream, packageVersions: pin.packageVersions,
-    toolchainRequirements: pin.toolchain, target: { ...pin.target, componentName: unit.componentName, ...(unit.nativeSdkPath ? { nativeSdkPath: unit.nativeSdkPath } : {}) },
-    gpu: pin.gpu, sharedSdk, artifacts: records(artifacts),
+    toolchainRequirements: pin.toolchain, target: unit.target,
+    ...(isDataUnit(unit) ? {} : { gpu: pin.gpu, sharedSdk }), artifacts: records(artifacts),
   };
 }
 function readInput(root, input) {
@@ -209,12 +237,12 @@ function verifyRetained(root, pin, workspaceManifest) {
     if (!existsSync(outDirectory) || !existsSync(receiptPath)) fail(EXIT.artifactsAbsent, `Retained artifacts/receipt are absent for ${unit.name}.`);
     assertOwnedInventory(outDirectory, receiptPath, root);
     const receipt = json(receiptPath);
-    if (receipt.schema !== 'verdant.proto-ui.receipt.v2' || !Array.isArray(receipt.sourceInputs) || receipt.sourceInputs.length === 0) fail(EXIT.drift, `${unit.name} needs a v2 source-graph receipt.`);
+    if (receipt.schema !== 'verdant.proto-ui.receipt.v3' || !Array.isArray(receipt.sourceInputs) || receipt.sourceInputs.length === 0) fail(EXIT.drift, `${unit.name} needs a v3 per-target source-graph receipt.`);
     const inputs = receipt.sourceInputs;
     if (new Set(inputs.map((input) => input.path)).size !== inputs.length || !inputs.some((input) => input.path === unit.source && typeof input.sha256 === 'string')) fail(EXIT.drift, `${unit.name} source-input inventory is invalid.`);
     for (const input of inputs) if (input.sha256 !== readInput(root, input)) fail(EXIT.drift, `Retained source/resolution input changed: ${input.path}`);
     const artifacts = receipt.artifacts.map((artifact) => ({ path: artifact.path, kind: artifact.kind, contents: readFileSync(insidePath(outDirectory, artifact.path), 'utf8') }));
-    for (const required of ['Component.rs', 'Cargo.toml', 'provenance.json']) if (!artifacts.some((artifact) => artifact.path === required)) fail(EXIT.drift, `Required artifact missing: ${unit.name}/${required}`);
+    for (const required of [isDataUnit(unit) ? 'lib.rs' : 'Component.rs', 'Cargo.toml', 'provenance.json']) if (!artifacts.some((artifact) => artifact.path === required)) fail(EXIT.drift, `Required artifact missing: ${unit.name}/${required}`);
     const provenance = artifactJson(artifacts, 'provenance.json');
     for (const source of provenance.sourceFiles ?? []) {
       if (!inputs.some((input) => input.path === source.file && input.sha256 === source.sha256)) fail(EXIT.drift, `Compiler source is absent from receipt closure: ${source.file}`);
@@ -237,15 +265,18 @@ async function compilerModules(upstream, pin) {
   const load = (filename) => import(pathToFileURL(path.join(upstream, 'packages/compiler/src', filename)).href);
   const compiler = await load('compile.ts');
   const { TARGET_PROFILES } = await load('targets.ts');
-  const profile = TARGET_PROFILES[pin.target.profile];
+  const profile = TARGET_PROFILES['gpui-source-v1'];
   const gpui = profile?.dependencies?.find((dependency) => dependency.name === 'gpui');
   const sdk = profile?.dependencies?.find((dependency) => dependency.name === pin.sharedSdk.package);
   if (profile?.version !== `git:${pin.gpu.upstreamGpuiRevision}` || gpui?.version !== `git:${pin.gpu.upstreamGpuiRevision}` || sdk?.version !== pin.sharedSdk.version) fail(EXIT.admission, 'Compiler target GPUI/SDK profile pins differ from the recorded upstream identity.');
   const { FileSourceGraph } = await load('source-loader.ts');
-  return { compiler, FileSourceGraph };
+  const dataCompiler = await load('rust-data.ts');
+  const { gpuiNativeSdkIdentity } = await load('gpui-native-sdk.ts');
+  if (gpuiNativeSdkIdentity(true).contentSha256 !== pin.sharedSdk.contentSha256) fail(EXIT.admission, 'Compiler SDK content identity differs from the pinned shared SDK.');
+  return { compiler, dataCompiler, FileSourceGraph };
 }
 
-async function compileUnit(root, pin, unit, { compiler, FileSourceGraph }) {
+async function compileUnit(root, pin, unit, { compiler, dataCompiler, FileSourceGraph }) {
   const graph = new FileSourceGraph(root);
   const snapshot = await graph.load(await graph.entry(insidePath(root, unit.source)));
   if (snapshot.failures.length) fail(EXIT.compile, `${unit.name} source graph rejected: ${snapshot.failures.map((error) => error.message).join('\n')}`);
@@ -267,9 +298,12 @@ async function compileUnit(root, pin, unit, { compiler, FileSourceGraph }) {
   for (const [filename, source] of Object.entries(snapshot.files)) {
     if (!inputs.some((input) => input.path === filename && input.sha256 === sha256(source))) fail(EXIT.compile, `Source changed while capturing compilation inputs: ${filename}`);
   }
-  const result = await compiler.compileFile(unit.source, { root, sourceSnapshot: snapshot, ...pin.target, componentName: unit.componentName, ...(unit.nativeSdkPath ? { nativeSdkPath: unit.nativeSdkPath } : {}) });
+  const result = isDataUnit(unit)
+    ? await dataCompiler.compileRustDataFile(unit.source, { root, sourceSnapshot: snapshot, methods: unit.target.methods, crateName: unit.target.crateName })
+    : await compiler.compileFile(unit.source, { root, sourceSnapshot: snapshot, ...unit.target });
   if (!result.ok) fail(EXIT.compile, `Compiler rejected ${unit.source}:\n${JSON.stringify(result.diagnostics, null, 2)}`);
-  return { unit, compilation: result.value, artifacts: compiler.compilationArtifacts(result.value), inputs, sourceGraphIdentity: snapshot.identity, outDirectory: insidePath(root, unit.output.directory), receiptPath: insidePath(root, unit.output.receipt) };
+  const artifacts = isDataUnit(unit) ? dataCompiler.rustDataCompilationArtifacts(result.value) : compiler.compilationArtifacts(result.value);
+  return { unit, compilation: result.value, artifacts, inputs, sourceGraphIdentity: snapshot.identity, outDirectory: insidePath(root, unit.output.directory), receiptPath: insidePath(root, unit.output.receipt) };
 }
 
 export async function runProducer(argv, root = defaultRoot) {
@@ -306,13 +340,15 @@ export async function runProducer(argv, root = defaultRoot) {
     }
     if (options.mode === 'check') {
       for (const entry of compiled) {
-        const diff = await modules.compiler.diffCompilation(entry.compilation, entry.outDirectory);
+        const diff = isDataUnit(entry.unit)
+          ? await modules.dataCompiler.diffRustDataCompilation(entry.compilation, entry.outDirectory)
+          : await modules.compiler.diffCompilation(entry.compilation, entry.outDirectory);
         if (!diff.ok) fail(EXIT.drift, `${entry.unit.name} artifact diff rejected: ${JSON.stringify(diff.diagnostics)}`);
         const changes = diff.value.changes.filter((change) => change.status !== 'unchanged' || change.consumerModified);
         if (changes.length || !same(json(entry.receiptPath), entry.receipt)) fail(EXIT.drift, `${entry.unit.name} differs from fresh compilation: ${JSON.stringify(changes)}`);
       }
     } else checked(EXIT.replace, () => publishBatch(compiled, { root, lockDirectory }));
-    return { ok: true, mode: options.mode === 'check' ? 'fresh-compilation' : 'publish', freshCompilation: true, upstreamRevision: pin.upstream.revision, executedToolchain, sharedSdk, units: compiled.map((entry) => ({ name: entry.unit.name, componentName: entry.unit.componentName, packageName: parseCargoManifest(artifactText(entry.artifacts, 'Cargo.toml')).package.name, artifacts: entry.artifacts.length, sourceInputs: entry.inputs.length, outputDirectory: entry.unit.output.directory, receipt: entry.unit.output.receipt })) };
+    return { ok: true, mode: options.mode === 'check' ? 'fresh-compilation' : 'publish', freshCompilation: true, upstreamRevision: pin.upstream.revision, executedToolchain, sharedSdk, units: compiled.map((entry) => ({ name: entry.unit.name, target: entry.unit.target, packageName: parseCargoManifest(artifactText(entry.artifacts, 'Cargo.toml')).package.name, artifacts: entry.artifacts.length, sourceInputs: entry.inputs.length, outputDirectory: entry.unit.output.directory, receipt: entry.unit.output.receipt })) };
   } finally { release(); }
 }
 

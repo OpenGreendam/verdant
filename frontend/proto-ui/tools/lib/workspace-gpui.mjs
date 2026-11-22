@@ -150,6 +150,38 @@ export function findWorkspaceGpuiViolations({ crateManifest, sdkManifest, proven
   return violations;
 }
 
+/** The selected Rust data backend emits std-only crates, without any SDK. */
+export function findRustDataViolations({ crateManifest, provenance, expectedPackageName, expectedMethods }) {
+  const violations = [];
+  let manifest;
+  try { manifest = parseCargoManifest(crateManifest); }
+  catch { return ['the generated Rust data crate manifest is not valid TOML']; }
+  if (manifest.package?.name !== expectedPackageName) {
+    violations.push(`the generated Rust data package differs from ${expectedPackageName}: ${manifest.package?.name}`);
+  }
+  for (const dependency of parseDependencyEntries(manifest)) {
+    violations.push(`the std-only Rust data crate declares a dependency in ${dependency.table}.${dependency.name}`);
+  }
+  if (!record(provenance) || provenance.format !== 'proto-ui-rust-data'
+    || provenance.backend !== 'rust-data-v1' || provenance.profile !== 'rust-data-v1') {
+    violations.push('the compiler provenance does not identify the Rust data backend');
+  } else {
+    if (!Array.isArray(provenance.dependencies) || provenance.dependencies.length !== 0) {
+      violations.push('the std-only Rust data provenance must declare no dependencies');
+    }
+    if (provenance.nativeSdk !== undefined) {
+      violations.push('the Rust data provenance must not declare a native SDK');
+    }
+    if (expectedMethods !== undefined) {
+      const methods = Array.isArray(provenance.methods) ? provenance.methods.map((method) => method?.name) : [];
+      if (JSON.stringify(methods) !== JSON.stringify(expectedMethods)) {
+        violations.push('the Rust data methods differ from the pinned exposed-method order');
+      }
+    }
+  }
+  return violations;
+}
+
 const canonicalRepository = (value) => {
   const url = new URL(value);
   url.pathname = url.pathname.replace(/\.git\/?$/, '').replace(/\/$/, '');

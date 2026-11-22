@@ -63,10 +63,45 @@ test('shared consumers cannot redirect their SDK path or add another owner', (t)
   const root = fixture(t);
   const filename = path.join(root, 'frontend/proto-ui/compiler.pin.json');
   const pin = json(filename);
-  pin.units.find((unit) => unit.name === 'note-gesture-planner').nativeSdkPath = './.proto-ui/gpui-native';
+  pin.units.find((unit) => unit.name === 'normalized-knob').target.nativeSdkPath = './.proto-ui/gpui-native';
   writeFileSync(filename, JSON.stringify(pin));
   assert.throws(() => loadPin(filename, root), code(EXIT.pin));
 });
+
+test('each data unit pins selected pure methods, a stable package and an empty dependency closure', (t) => {
+  const root = fixture(t);
+  const pin = loadPin(path.join(root, 'frontend/proto-ui/compiler.pin.json'), root);
+  const data = pin.units.filter((unit) => unit.target.profile === 'rust-data-v1');
+  assert.deepEqual(data.map((unit) => unit.target.crateName), ['verdant-note-gesture-data', 'verdant-control-gesture-data']);
+  for (const unit of data) {
+    const receipt = json(path.join(root, unit.output.receipt));
+    const provenance = json(path.join(root, unit.output.directory, 'provenance.json'));
+    assert.deepEqual(receipt.target, unit.target);
+    assert.deepEqual(provenance.methods.map((method) => method.name), unit.target.methods);
+    assert.deepEqual(provenance.dependencies, []);
+    assert.equal(receipt.sharedSdk, undefined);
+    assert.equal(receipt.gpu, undefined);
+    assert.equal(existsSync(path.join(root, unit.output.directory, 'Component.rs')), false);
+    assert.equal(existsSync(path.join(root, unit.output.directory, 'lib.rs')), true);
+  }
+});
+
+for (const [label, mutate] of [
+  ['native SDK option', (unit) => { unit.target.nativeSdkPath = '../pitch-gesture-surface/.proto-ui/gpui-native'; }],
+  ['missing selectors', (unit) => { unit.target.methods = []; }],
+  ['duplicate selectors', (unit) => { unit.target.methods = ['planNoteGesture', 'planNoteGesture']; }],
+  ['language dependency', (unit) => { unit.target.dependencies = ['serde_json']; }],
+  ['implicit target', (unit) => { delete unit.target; }],
+]) {
+  test(`data targets reject ${label} instead of falling back to a GPUI component`, (t) => {
+    const root = fixture(t);
+    const filename = path.join(root, 'frontend/proto-ui/compiler.pin.json');
+    const pin = json(filename);
+    mutate(pin.units.find((unit) => unit.name === 'note-gesture-planner'));
+    writeFileSync(filename, JSON.stringify(pin));
+    assert.throws(() => loadPin(filename, root), code(EXIT.pin));
+  });
+}
 
 test('retained checks refuse unrecorded generated files instead of silently accepting them', async (t) => {
   const root = fixture(t);
@@ -76,11 +111,11 @@ test('retained checks refuse unrecorded generated files instead of silently acce
 });
 
 const upstream = process.env.PROTO_UI_UPSTREAM;
-test('fresh source-graph recompilation tracks imported helpers and changes emitted native code', { skip: !upstream }, async (t) => {
+test('fresh source-graph recompilation tracks imported helpers and changes emitted data code', { skip: !upstream }, async (t) => {
   const root = fixture(t);
   const source = path.join(root, 'frontend/proto-ui/src/control-gesture-planner.proto.ts');
   const helper = path.join(root, 'frontend/proto-ui/src/drag-rate.ts');
-  const before = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Component.rs'), 'utf8');
+  const before = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/lib.rs'), 'utf8');
   const original = readFileSync(source, 'utf8');
   assert.ok(original.includes('const rate = fine ? 0.1 : 1;'));
   writeFileSync(source, `import { dragRate } from './drag-rate';\n${original.replace('const rate = fine ? 0.1 : 1;', 'const rate = dragRate(fine);')}`);
@@ -89,7 +124,7 @@ test('fresh source-graph recompilation tracks imported helpers and changes emitt
   assert.equal(first.freshCompilation, true);
   const receipt = json(path.join(root, 'frontend/proto-ui/receipts/control-gesture-planner.json'));
   assert.ok(receipt.sourceInputs.some((input) => input.path === 'frontend/proto-ui/src/drag-rate.ts' && input.sha256));
-  const changed = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Component.rs'), 'utf8');
+  const changed = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/lib.rs'), 'utf8');
   assert.notEqual(changed, before);
   assert.match(changed, /0\.2/);
   await runProducer(['--check', '--upstream', upstream], root);
@@ -97,10 +132,19 @@ test('fresh source-graph recompilation tracks imported helpers and changes emitt
   writeFileSync(helper, 'export function dragRate(fine: boolean): number { return fine ? 0.3 : 1; }\n');
   await assert.rejects(runProducer(['--check-retained', ...absentUpstream(root)], root), code(EXIT.drift));
   await runProducer(['--upstream', upstream], root);
-  const second = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/Component.rs'), 'utf8');
+  const second = readFileSync(path.join(root, 'frontend/proto-ui/generated/control-gesture-planner/lib.rs'), 'utf8');
   assert.notEqual(second, changed);
   assert.match(second, /0\.3/);
   await runProducer(['--check', '--upstream', upstream], root);
+});
+
+test('fresh data compilation rejects an unavailable selected method without omitting it', { skip: !upstream }, async (t) => {
+  const root = fixture(t);
+  const filename = path.join(root, 'frontend/proto-ui/compiler.pin.json');
+  const pin = json(filename);
+  pin.units.find((unit) => unit.name === 'control-gesture-planner').target.methods.push('missingMethod');
+  writeFileSync(filename, JSON.stringify(pin));
+  await assert.rejects(runProducer(['--upstream', upstream], root), (error) => code(EXIT.compile)(error) && /PUI_RUST_DATA_PURITY/.test(error.message));
 });
 
 test('the actual upstream target GPUI pin is checked, not just recorded', { skip: !upstream }, async (t) => {

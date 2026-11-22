@@ -1,5 +1,5 @@
 {
-  "schema": "verdant.proto-ui.receipt.v2",
+  "schema": "verdant.proto-ui.receipt.v3",
   "unit": "pitch-gesture-surface",
   "source": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
   "sourceInputs": [
@@ -26,7 +26,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "e56b2d1a3d6b688a1cbc6930dab1d6757304d733"
+    "revision": "2685caf7ce0bf8ed7cc5e0f2a9d119bbf616d0b5"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -64,7 +64,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "379b97bad8d0082097c7944506323fb58936eb880856eb5707e52a7244d483ed"
+    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774"
   },
   "artifacts": [
     {
@@ -95,7 +95,7 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-a11y.rs",
       "kind": "source",
-      "sha256": "4fb144c5d45ba0cced2265d342078d8d71de7b2c027f6109fa97c5a9ba4c7320"
+      "sha256": "64c5a3ec99881a4fff33dc85ffdc4bfdd40404ce977d24953c6381ce216de468"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-host.rs",
@@ -115,7 +115,7 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "897c79b483fd54febce187ed62db95b64e7349c40434d526f87e629a6a165a39"
+      "sha256": "adc07e4bc02e4ecf65c215c37f72faff4dbf7f100bb678f652bc28ee847c1507"
     },
     {
       "path": ".proto-ui/gpui-native/src/lib.rs",
@@ -150,7 +150,7 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "ae0b39b5ee91cd228a095c4a1972a8cd5ee26370354c8e2750bd33b048199b5d"
+      "sha256": "fdf915ea665c60ab618cb20c5b50828e43fee37e5748f56247312a0389b6ce11"
     },
     {
       "path": "Component.rs",
@@ -165,7 +165,7 @@
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "c2a6ff4f33305f3c20914b75281765875f299ff6eee5052a27280aae8de5b90a"
+      "sha256": "f8fd31510beb0d7f3538baa23374199056dc03d49d9a376bc1ba2a7cb307d176"
     }
   ]
 }

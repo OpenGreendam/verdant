@@ -1,5 +1,5 @@
 {
-  "schema": "verdant.proto-ui.receipt.v2",
+  "schema": "verdant.proto-ui.receipt.v3",
   "unit": "normalized-knob",
   "source": "frontend/proto-ui/src/normalized-knob.proto.ts",
   "sourceInputs": [
@@ -45,7 +45,7 @@
     },
     {
       "path": "frontend/proto-ui/src/normalized-knob.proto.ts",
-      "sha256": "762f4bb6de7372b0a899cb806c8bb6fff23af441d042200c6b092e7b06d7b1a9"
+      "sha256": "f9f8dd91d051a1afad3d525ab40ac1d0773ae654e92b541a3511d988ad26416a"
     },
     {
       "path": "node_modules/@proto.ui/core/package.json",
@@ -58,7 +58,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "e56b2d1a3d6b688a1cbc6930dab1d6757304d733"
+    "revision": "2685caf7ce0bf8ed7cc5e0f2a9d119bbf616d0b5"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -97,7 +97,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "379b97bad8d0082097c7944506323fb58936eb880856eb5707e52a7244d483ed"
+    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774"
   },
   "artifacts": [
     {
@@ -108,22 +108,22 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "942740fcf93430852520bfb749ef54aaf9a4333fd1637f2e2ebd6b184e13db84"
+      "sha256": "fe4c519c09ecd5a7521fef95f570e3f15c3584e6a224560b055b1de60b897e3d"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "095a054c4dc33b03ad4d36a7bba417c7b62093e2b22877023679bb534873bd94"
+      "sha256": "33dea373c384a5b573dbf62febad443f857a72c80e4792f575c8044e9900c9d4"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "56c8b6821023db39308ef16c763e8242045fa5d86dfe37e013da55e763a09496"
+      "sha256": "e093bb013c132e24ab62e3752844256eb99ad45b1acc3af578d29d9e9de024a2"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "907cce88017fb07265db1bf53d4b5b94637862600ac85d3ab91db3d87c6f059b"
+      "sha256": "f5857a1f7323e1939f2a93fe738a4c8dc8ae9c5ed2e89c78b57ccf6c0de8ab06"
     }
   ]
 }

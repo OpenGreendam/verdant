@@ -6,8 +6,47 @@
 //! release its replacement. GPUI may independently clear capture on MouseUp;
 //! that is harmless and does not replace cancellation cleanup.
 
-use std::collections::HashMap;
-use gpui::{AnyWindowHandle, App, AppContext, AsyncApp, HitboxId, Window, WindowId};
+use std::{cell::Cell, collections::HashMap, rc::Rc};
+use gpui::{AnyWindowHandle, App, AppContext, AsyncApp, HitboxId, SharedString, Window, WindowId};
+
+/// Identity of one actually rendered native input subtree. It survives
+/// redraws, but a detach/remount always gets a different identity.
+#[derive(Clone)]
+pub(crate) struct SurfaceToken(Rc<Cell<bool>>);
+
+impl SurfaceToken {
+    pub(crate) fn is_live(&self) -> bool { self.0.get() }
+    pub(crate) fn same(&self, other: &Self) -> bool { Rc::ptr_eq(&self.0, &other.0) }
+    #[cfg(test)]
+    pub(crate) fn for_test() -> Self { Self(Rc::new(Cell::new(true))) }
+}
+
+struct SurfaceLifetime {
+    token: SurfaceToken,
+    app: AsyncApp,
+    detached: Option<Box<dyn FnOnce(SurfaceToken, &mut App)>>,
+}
+
+impl Drop for SurfaceLifetime {
+    fn drop(&mut self) {
+        self.token.0.set(false);
+        let token = self.token.clone();
+        if let Some(detached) = self.detached.take() {
+            self.app.spawn(async move |cx| { cx.update(|cx| detached(token, cx)); }).detach();
+        }
+    }
+}
+
+/// GPUI drops keyed state when a subtree is no longer rendered. Mark it dead
+/// synchronously; release editor ownership after draw, where entity mutation is
+/// legal. The callback matches this token before cancelling a replacement drag.
+pub(crate) fn track_surface(key: SharedString, window: &mut Window, cx: &mut App,
+    detached: impl FnOnce(SurfaceToken, &mut App) + 'static) -> SurfaceToken {
+    let state = window.use_keyed_state(key, cx, |_, cx| SurfaceLifetime {
+        token: SurfaceToken(Rc::new(Cell::new(true))), app: cx.to_async(), detached: Some(Box::new(detached)),
+    });
+    state.read(cx).token.clone()
+}
 
 #[derive(Default)]
 struct Captures {

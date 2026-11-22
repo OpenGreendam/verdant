@@ -2,10 +2,19 @@
   "source": {
     "file": "frontend/proto-ui/src/normalized-knob.proto.ts",
     "exportName": "default",
-    "sha256": "14312d32add12dadb3a42f3692587f06be139d1ecf8ca59ebb2631c72dc0d4d3"
+    "sha256": "960865aa7360a7a7c27073c2c09314e6adb67a3d05c41341269d437dfd8e94d5"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
+  "nativeSdk": {
+    "schemaVersion": 1,
+    "name": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "dependencyMode": "workspace",
+    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774",
+    "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
+    "bundled": false
+  },
   "observableSemantics": {
     "version": "proto-ui-observables-v1",
     "props": {
@@ -83,20 +92,20 @@
     },
     {
       "file": "frontend/proto-ui/src/normalized-knob.proto.ts",
-      "sha256": "762f4bb6de7372b0a899cb806c8bb6fff23af441d042200c6b092e7b06d7b1a9"
+      "sha256": "f9f8dd91d051a1afad3d525ab40ac1d0773ae654e92b541a3511d988ad26416a"
     }
   ],
-  "generatedSha256": "095a054c4dc33b03ad4d36a7bba417c7b62093e2b22877023679bb534873bd94",
+  "generatedSha256": "33dea373c384a5b573dbf62febad443f857a72c80e4792f575c8044e9900c9d4",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "095a054c4dc33b03ad4d36a7bba417c7b62093e2b22877023679bb534873bd94"
+      "sha256": "33dea373c384a5b573dbf62febad443f857a72c80e4792f575c8044e9900c9d4"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "942740fcf93430852520bfb749ef54aaf9a4333fd1637f2e2ebd6b184e13db84"
+      "sha256": "fe4c519c09ecd5a7521fef95f570e3f15c3584e6a224560b055b1de60b897e3d"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
@@ -106,7 +115,7 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "56c8b6821023db39308ef16c763e8242045fa5d86dfe37e013da55e763a09496"
+      "sha256": "e093bb013c132e24ab62e3752844256eb99ad45b1acc3af578d29d9e9de024a2"
     }
   ]
 }

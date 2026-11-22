@@ -2085,27 +2085,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-064ea77191cea03fb2e0f34678d5581a"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "proto-ui-gpui-native",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "generated-gpui-1d08ae6cfd66f22afc399345f5522b6f"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "proto-ui-gpui-native",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "generated-gpui-28e1339e525cab7dcfd2ba474e2b4ab5"
+name = "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -6644,7 +6624,7 @@ dependencies = [
  "async-channel",
  "chrono",
  "env_logger",
- "generated-gpui-1d08ae6cfd66f22afc399345f5522b6f",
+ "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a",
  "generated-gpui-cf24f4a63e06497c7d284f96518bbd7d",
  "gpui",
  "gpui_platform",
@@ -6715,6 +6695,10 @@ dependencies = [
  "verdant-voice",
  "zip 6.0.0",
 ]
+
+[[package]]
+name = "verdant-control-gesture-data"
+version = "0.1.0"
 
 [[package]]
 name = "verdant-domain"
@@ -6788,6 +6772,10 @@ dependencies = [
  "thiserror 2.0.21",
  "verdant-domain",
 ]
+
+[[package]]
+name = "verdant-note-gesture-data"
+version = "0.1.0"
 
 [[package]]
 name = "verdant-plughost"
@@ -6928,10 +6916,8 @@ dependencies = [
 name = "verdant-ui-protocol"
 version = "0.1.0"
 dependencies = [
- "generated-gpui-064ea77191cea03fb2e0f34678d5581a",
- "generated-gpui-28e1339e525cab7dcfd2ba474e2b4ab5",
- "serde",
- "serde_json",
+ "verdant-control-gesture-data",
+ "verdant-note-gesture-data",
 ]
 
 [[package]]

@@ -33,8 +33,9 @@ fi
 # A cold CI cache must be populated explicitly before offline compilation.
 # Pre-provisioned disconnected containers may set CARGO_NET_OFFLINE=true.
 cargo fetch --locked
-# Full metadata includes build/dev/target-specific edges; --no-deps and a lock
-# text scan cannot establish the native package identity used by consumers.
+# Full metadata includes build/dev/target-specific edges. It also proves that
+# the real session/protocol closure reaches the std-only data crates without
+# reaching the native components, SDK, GPUI or image support in this workspace.
 mkdir -p "${CARGO_TARGET_DIR:-target}"
 proto_ui_graph="${CARGO_TARGET_DIR:-target}/proto-ui-gpui-graph.json"
 node "$repo/frontend/proto-ui/tools/check-cargo-gpui.mjs" --offline > "$proto_ui_graph"

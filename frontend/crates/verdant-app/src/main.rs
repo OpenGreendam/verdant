@@ -37,6 +37,8 @@ mod lyric_view;
 mod menu;
 mod mix;
 mod mixer;
+#[cfg(test)]
+mod native_test_support;
 mod paint;
 mod phoneme_lane;
 mod proto_roll;
