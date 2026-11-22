@@ -17,7 +17,7 @@
           _ => false,
       }
   }
-  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("value").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("defaultValue").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("readOnly").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("placeholder").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("required").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("name").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("autoComplete").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("minLength").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("maxLength").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("inputMode").map_or(true, |prop| prop.is_null() || (prop.as_str() == Some("none") || prop.as_str() == Some("text") || prop.as_str() == Some("tel") || prop.as_str() == Some("url") || prop.as_str() == Some("email") || prop.as_str() == Some("numeric") || prop.as_str() == Some("decimal") || prop.as_str() == Some("search"))) && value.get("enterKeyHint").map_or(true, |prop| prop.is_null() || (prop.as_str() == Some("enter") || prop.as_str() == Some("done") || prop.as_str() == Some("go") || prop.as_str() == Some("next") || prop.as_str() == Some("previous") || prop.as_str() == Some("search") || prop.as_str() == Some("send"))) && value.get("ariaLabel").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("labelledBy").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("describedBy").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("autoFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("selectAllOnMount").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("submitOnEnter").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("cancelOnEscape").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("advanceOnTab").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("commitOnBlur").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("numeric").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("numericMin").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("numericMax").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("numericStep").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("numericDefault").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) }
+  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("value").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("defaultValue").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("readOnly").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("placeholder").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("required").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("name").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("autoComplete").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("minLength").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("maxLength").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("inputMode").map_or(true, |prop| prop.is_null() || (prop.as_str() == Some("none") || prop.as_str() == Some("text") || prop.as_str() == Some("tel") || prop.as_str() == Some("url") || prop.as_str() == Some("email") || prop.as_str() == Some("numeric") || prop.as_str() == Some("decimal") || prop.as_str() == Some("search"))) && value.get("enterKeyHint").map_or(true, |prop| prop.is_null() || (prop.as_str() == Some("enter") || prop.as_str() == Some("done") || prop.as_str() == Some("go") || prop.as_str() == Some("next") || prop.as_str() == Some("previous") || prop.as_str() == Some("search") || prop.as_str() == Some("send"))) && value.get("ariaLabel").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("labelledBy").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("describedBy").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("autoFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("selectAllOnMount").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("submitOnEnter").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("cancelOnEscape").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("advanceOnTab").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("commitOnBlur").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("searchNavigation").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("numeric").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("numericMin").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("numericMax").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("numericStep").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("numericDefault").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) }
   fn prop_valid(key: &str, value: &Json) -> bool { match key { "value" => value.is_string(),
         "defaultValue" => value.is_string(),
         "disabled" => value.is_boolean(),
@@ -39,6 +39,7 @@
         "cancelOnEscape" => value.is_boolean(),
         "advanceOnTab" => value.is_boolean(),
         "commitOnBlur" => value.is_boolean(),
+        "searchNavigation" => value.is_boolean(),
         "numeric" => value.is_boolean(),
         "numericMin" => value.as_f64().is_some_and(f64::is_finite),
         "numericMax" => value.as_f64().is_some_and(f64::is_finite),
@@ -124,16 +125,18 @@ pub struct GeneratedData0 {
     pub field_19: Option<bool>,
     #[serde(rename = "commitOnBlur", default, skip_serializing_if = "Option::is_none")]
     pub field_20: Option<bool>,
-    #[serde(rename = "numeric", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "searchNavigation", default, skip_serializing_if = "Option::is_none")]
     pub field_21: Option<bool>,
+    #[serde(rename = "numeric", default, skip_serializing_if = "Option::is_none")]
+    pub field_22: Option<bool>,
     #[serde(rename = "numericMin", default, skip_serializing_if = "Option::is_none")]
-    pub field_22: Option<f64>,
-    #[serde(rename = "numericMax", default, skip_serializing_if = "Option::is_none")]
     pub field_23: Option<f64>,
-    #[serde(rename = "numericStep", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "numericMax", default, skip_serializing_if = "Option::is_none")]
     pub field_24: Option<f64>,
-    #[serde(rename = "numericDefault", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "numericStep", default, skip_serializing_if = "Option::is_none")]
     pub field_25: Option<f64>,
+    #[serde(rename = "numericDefault", default, skip_serializing_if = "Option::is_none")]
+    pub field_26: Option<f64>,
 }
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -528,7 +531,7 @@ pub struct GeneratedData3 {
         })
     }
     pub fn state_14(&self) -> Result<f64, Value> { self.state("viewEpoch").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn method_21(&self, argument_0: f64, argument_1: f64, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_22(&self, argument_0: f64, argument_1: f64, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -542,7 +545,7 @@ pub struct GeneratedData3 {
         serde_json::from_value(result).expect("checked exposed method result")
         })
     }
-    pub fn method_22(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_23(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -556,7 +559,7 @@ pub struct GeneratedData3 {
         serde_json::from_value(result).expect("checked exposed method result")
         })
     }
-    pub fn method_23(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_24(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -570,7 +573,7 @@ pub struct GeneratedData3 {
         serde_json::from_value(result).expect("checked exposed method result")
         })
     }
-    pub fn method_24(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_25(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -584,7 +587,7 @@ pub struct GeneratedData3 {
         serde_json::from_value(result).expect("checked exposed method result")
         })
     }
-    pub fn method_25(&self, argument_0: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_26(&self, argument_0: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -598,7 +601,7 @@ pub struct GeneratedData3 {
         serde_json::from_value(result).expect("checked exposed method result")
         })
     }
-    pub fn method_26(&self, argument_0: f64, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_27(&self, argument_0: f64, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -696,293 +699,306 @@ pub struct GeneratedData3 {
           refresh_native_atoms(&owner_ref, window, cx);
           let _lexical_owner = enter_lexical_owner(&owner);
           let renderer = { let owner = owner.clone();  Value::Function(Rc::new(move |arguments: Vec<Value>| {
-            let v_6465665f5f62643431383264353637383738396565: Value = arg(&arguments, 0);
+            let v_6465665f5f66643465383832643333376433356466: Value = arg(&arguments, 0);
             let v_7374617465: LexicalBinding<Value> = lexical_binding();
             let v_666f637573: LexicalBinding<Value> = lexical_binding();
-            let v_7669657745706f63685f5f35386565663134663031333963653161: LexicalBinding<Value> = lexical_binding();
-            let v_72756e5f5f35643535313633623131306363613761: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
+            let v_7669657745706f63685f5f61336631366264333339623732366438: LexicalBinding<Value> = lexical_binding();
+            let v_72756e5f5f31306432313565396232363439653033: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_6d6f756e746564: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_646973706f736564: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_616c6c6f776564: LexicalBinding<Value> = lexical_binding();
-            let v_726571756573745f5f34643363303961303363373865383634: LexicalBinding<Value> = lexical_binding();
+            let v_726571756573745f5f64313837623536303030393732323934: LexicalBinding<Value> = lexical_binding();
             let v_73656c65637452616e6765: LexicalBinding<Value> = lexical_binding();
             let v_7265706c6163654472616674: LexicalBinding<Value> = lexical_binding();
             let v_7374657054657874: LexicalBinding<Value> = lexical_binding();
-            // Source "frontend/proto-ui/src/text-field.proto.ts":25:11
-            let v_696e68657269746564 = authored_hook_0(capability(&owner), Value::Undefined);
             // Source "frontend/proto-ui/src/text-field.proto.ts":26:11
+            let v_696e68657269746564 = authored_hook_0(definition_capability(&owner), Value::Undefined);
+            // Source "frontend/proto-ui/src/text-field.proto.ts":27:11
             v_7374617465.initialize((v_696e68657269746564.clone()).member("stateHandles", false));
-            // Source "frontend/proto-ui/src/text-field.proto.ts":27:5
+            // Source "frontend/proto-ui/src/text-field.proto.ts":28:5
             if (Value::boolean(!(v_7374617465.read()).truthy())).truthy() {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":27:17
+                // Source "frontend/proto-ui/src/text-field.proto.ts":28:17
                 throw_value(record(vec![("name", Value::string("Error")), ("message", Value::string(&(Value::string("Input root state projection is required")).error_message()))]));
             }
-            // Source "frontend/proto-ui/src/text-field.proto.ts":28:11
-            v_666f637573.initialize(native_builtin_hook(&owner, "asFocusable", || as_focusable(&owner)));
             // Source "frontend/proto-ui/src/text-field.proto.ts":29:11
-            v_7669657745706f63685f5f35386565663134663031333963653161.initialize({ let v_7075695f6e61746976655f3739 = v_6465665f5f62643431383264353637383738396565.clone(); create_state(&owner, "discrete", Value::string("viewEpoch"), Value::number(0.0), Value::Undefined) });
-            // Source "frontend/proto-ui/src/text-field.proto.ts":30:5
-            { let v_7075695f6e61746976655f3830 = v_6465665f5f62643431383264353637383738396565.clone(); expose_state(&owner, Value::string("viewEpoch"), v_7669657745706f63685f5f35386565663134663031333963653161.read()) };
+            v_666f637573.initialize(native_builtin_hook(&owner, "asFocusable", || as_focusable(&owner)));
+            // Source "frontend/proto-ui/src/text-field.proto.ts":30:11
+            v_7669657745706f63685f5f61336631366264333339623732366438.initialize({ let v_7075695f6e61746976655f3739 = v_6465665f5f66643465383832643333376433356466.clone(); create_state(&owner, "discrete", Value::string("viewEpoch"), Value::number(0.0), Value::Undefined) });
             // Source "frontend/proto-ui/src/text-field.proto.ts":31:5
-            { let v_7075695f6e61746976655f3831 = v_6465665f5f62643431383264353637383738396565.clone(); props_define(&owner, record(vec![("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("selectAllOnMount", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("submitOnEnter", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("cancelOnEscape", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("advanceOnTab", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("commitOnBlur", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("numeric", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("numericMin", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("numericMax", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("numericStep", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("numericDefault", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))]))])) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":44:5
-            { let v_7075695f6e61746976655f3832 = v_6465665f5f62643431383264353637383738396565.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into()), ("min-w-0".into(), "min-w-".into())])]) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":45:5
-            { let v_7075695f6e61746976655f3833 = v_6465665f5f62643431383264353637383738396565.clone(); expose_event(&owner, Value::string("submit")) };
+            { let v_7075695f6e61746976655f3830 = v_6465665f5f66643465383832643333376433356466.clone(); expose_state(&owner, Value::string("viewEpoch"), v_7669657745706f63685f5f61336631366264333339623732366438.read()) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":32:5
+            { let v_7075695f6e61746976655f3831 = v_6465665f5f66643465383832643333376433356466.clone(); props_define(&owner, record(vec![("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("selectAllOnMount", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("submitOnEnter", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("cancelOnEscape", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("advanceOnTab", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("commitOnBlur", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("searchNavigation", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("numeric", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("numericMin", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("numericMax", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("numericStep", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("numericDefault", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))]))])) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":46:5
-            { let v_7075695f6e61746976655f3834 = v_6465665f5f62643431383264353637383738396565.clone(); expose_event(&owner, Value::string("cancel")) };
+            { let v_7075695f6e61746976655f3832 = v_6465665f5f66643465383832643333376433356466.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into()), ("min-w-0".into(), "min-w-".into())])]) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":47:5
-            { let v_7075695f6e61746976655f3835 = v_6465665f5f62643431383264353637383738396565.clone(); expose_event(&owner, Value::string("advance")) };
+            { let v_7075695f6e61746976655f3833 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("submit")) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":48:5
-            { let v_7075695f6e61746976655f3836 = v_6465665f5f62643431383264353637383738396565.clone(); expose_event(&owner, Value::string("blurCommit")) };
+            { let v_7075695f6e61746976655f3834 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("cancel")) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":49:5
-            { let v_7075695f6e61746976655f3837 = v_6465665f5f62643431383264353637383738396565.clone(); expose_event(&owner, Value::string("selectionRequest")) };
+            { let v_7075695f6e61746976655f3835 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("advance")) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":50:5
-            { let v_7075695f6e61746976655f3838 = v_6465665f5f62643431383264353637383738396565.clone(); expose_event(&owner, Value::string("replacementRequest")) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":51:9
-            v_72756e5f5f35643535313633623131306363613761.initialize(Rc::new(std::cell::RefCell::new(Value::Json(Json::Null))));
-            // Source "frontend/proto-ui/src/text-field.proto.ts":52:9
+            { let v_7075695f6e61746976655f3836 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("blurCommit")) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":51:5
+            { let v_7075695f6e61746976655f3837 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("selectionRequest")) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":52:5
+            { let v_7075695f6e61746976655f3838 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("replacementRequest")) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":53:5
+            { let v_7075695f6e61746976655f3839 = v_6465665f5f66643465383832643333376433356466.clone(); expose_event(&owner, Value::string("navigationRequest")) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":54:9
+            v_72756e5f5f31306432313565396232363439653033.initialize(Rc::new(std::cell::RefCell::new(Value::Json(Json::Null))));
+            // Source "frontend/proto-ui/src/text-field.proto.ts":55:9
             v_6d6f756e746564.initialize(Rc::new(std::cell::RefCell::new(Value::boolean(false))));
-            // Source "frontend/proto-ui/src/text-field.proto.ts":53:9
+            // Source "frontend/proto-ui/src/text-field.proto.ts":56:9
             v_646973706f736564.initialize(Rc::new(std::cell::RefCell::new(Value::boolean(false))));
-            // Source "frontend/proto-ui/src/text-field.proto.ts":54:11
+            // Source "frontend/proto-ui/src/text-field.proto.ts":57:11
             v_616c6c6f776564.initialize({  let v_7374617465 = v_7374617465.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":54:36
-                return { let left = { let left = { let left = { let value = (v_6d6f756e746564.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()) } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3839 = (v_7374617465.read()).member("disabled", false); (v_7075695f6e61746976655f3839.clone()).get() }).truthy()) } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3930 = (v_7374617465.read()).member("composing", false); (v_7075695f6e61746976655f3930.clone()).get() }).truthy()) } else { left } };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":57:36
+                return { let left = { let left = { let left = { let value = (v_6d6f756e746564.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()) } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3930 = (v_7374617465.read()).member("disabled", false); (v_7075695f6e61746976655f3930.clone()).get() }).truthy()) } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3931 = (v_7374617465.read()).member("composing", false); (v_7075695f6e61746976655f3931.clone()).get() }).truthy()) } else { left } };
             })) });
-            // Source "frontend/proto-ui/src/text-field.proto.ts":55:11
-            v_726571756573745f5f34643363303961303363373865383634.initialize({  let v_7374617465 = v_7374617465.clone(); let v_7669657745706f63685f5f35386565663134663031333963653161 = v_7669657745706f63685f5f35386565663134663031333963653161.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/text-field.proto.ts":58:11
+            v_726571756573745f5f64313837623536303030393732323934.initialize({  let v_7374617465 = v_7374617465.clone(); let v_7669657745706f63685f5f61336631366264333339623732366438 = v_7669657745706f63685f5f61336631366264333339623732366438.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_6b696e64: Value = arg(&arguments, 0);
-                let v_666f72776172645f5f61323963643038383263313535653837: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":56:13
-                let v_63757272656e745f5f33653364356239393735353464336664 = { let value = (v_72756e5f5f35643535313633623131306363613761.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":57:7
-                if ({ let left = Value::boolean(!(v_63757272656e745f5f33653364356239393735353464336664.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":57:35
+                let v_666f72776172645f5f62323064383234343761376639396133: Value = arg(&arguments, 1);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":59:13
+                let v_63757272656e745f5f35666463343465343333326663663661 = { let value = (v_72756e5f5f31306432313565396232363439653033.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":60:7
+                if ({ let left = Value::boolean(!(v_63757272656e745f5f35666463343465343333326663663661.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":60:35
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":58:13
-                let v_64657461696c5f5f66393234366336663663363863623565 = record(vec![("value", { let v_7075695f6e61746976655f3931 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f3931.clone()).get() }), ("forward", v_666f72776172645f5f61323963643038383263313535653837.clone()), ("viewEpoch", { let v_7075695f6e61746976655f3932 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); (v_7075695f6e61746976655f3932.clone()).get() })]);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":59:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":61:13
+                let v_64657461696c5f5f63326536656134656562313466393335 = record(vec![("value", { let v_7075695f6e61746976655f3932 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f3932.clone()).get() }), ("forward", v_666f72776172645f5f62323064383234343761376639396133.clone()), ("viewEpoch", { let v_7075695f6e61746976655f3933 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f3933.clone()).get() })]);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":62:7
                 if (Value::boolean(strict_equal(&(v_6b696e64.clone()), &(Value::string("submit"))))).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":59:30
-                    { let v_7075695f6e61746976655f3933 = v_63757272656e745f5f33653364356239393735353464336664.clone(); emit(&(v_7075695f6e61746976655f3933.clone()).owner(), Value::string("submit"), v_64657461696c5f5f66393234366336663663363863623565.clone()) };
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":62:30
+                    { let v_7075695f6e61746976655f3934 = v_63757272656e745f5f35666463343465343333326663663661.clone(); emit(&(v_7075695f6e61746976655f3934.clone()).owner(), Value::string("submit"), v_64657461696c5f5f63326536656134656562313466393335.clone()) };
                 } else {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":60:12
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":63:12
                     if (Value::boolean(strict_equal(&(v_6b696e64.clone()), &(Value::string("cancel"))))).truthy() {
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":60:35
-                        { let v_7075695f6e61746976655f3934 = v_63757272656e745f5f33653364356239393735353464336664.clone(); emit(&(v_7075695f6e61746976655f3934.clone()).owner(), Value::string("cancel"), v_64657461696c5f5f66393234366336663663363863623565.clone()) };
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":63:35
+                        { let v_7075695f6e61746976655f3935 = v_63757272656e745f5f35666463343465343333326663663661.clone(); emit(&(v_7075695f6e61746976655f3935.clone()).owner(), Value::string("cancel"), v_64657461696c5f5f63326536656134656562313466393335.clone()) };
                     } else {
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":61:12
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":64:12
                         if (Value::boolean(strict_equal(&(v_6b696e64.clone()), &(Value::string("advance"))))).truthy() {
-                            // Source "frontend/proto-ui/src/text-field.proto.ts":61:36
-                            { let v_7075695f6e61746976655f3935 = v_63757272656e745f5f33653364356239393735353464336664.clone(); emit(&(v_7075695f6e61746976655f3935.clone()).owner(), Value::string("advance"), v_64657461696c5f5f66393234366336663663363863623565.clone()) };
+                            // Source "frontend/proto-ui/src/text-field.proto.ts":64:36
+                            { let v_7075695f6e61746976655f3936 = v_63757272656e745f5f35666463343465343333326663663661.clone(); emit(&(v_7075695f6e61746976655f3936.clone()).owner(), Value::string("advance"), v_64657461696c5f5f63326536656134656562313466393335.clone()) };
                         } else {
-                            // Source "frontend/proto-ui/src/text-field.proto.ts":62:12
+                            // Source "frontend/proto-ui/src/text-field.proto.ts":65:12
                             if (Value::boolean(strict_equal(&(v_6b696e64.clone()), &(Value::string("blurCommit"))))).truthy() {
-                                // Source "frontend/proto-ui/src/text-field.proto.ts":62:39
-                                { let v_7075695f6e61746976655f3936 = v_63757272656e745f5f33653364356239393735353464336664.clone(); emit(&(v_7075695f6e61746976655f3936.clone()).owner(), Value::string("blurCommit"), v_64657461696c5f5f66393234366336663663363863623565.clone()) };
+                                // Source "frontend/proto-ui/src/text-field.proto.ts":65:39
+                                { let v_7075695f6e61746976655f3937 = v_63757272656e745f5f35666463343465343333326663663661.clone(); emit(&(v_7075695f6e61746976655f3937.clone()).owner(), Value::string("blurCommit"), v_64657461696c5f5f63326536656134656562313466393335.clone()) };
                             } else {
-                                // Source "frontend/proto-ui/src/text-field.proto.ts":63:12
+                                // Source "frontend/proto-ui/src/text-field.proto.ts":66:12
                                 return Value::boolean(false);
                             }
                         }
                     }
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":64:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":67:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/text-field.proto.ts":68:11
-            v_73656c65637452616e6765.initialize({  let v_7374617465 = v_7374617465.clone(); let v_666f637573 = v_666f637573.clone(); let v_7669657745706f63685f5f35386565663134663031333963653161 = v_7669657745706f63685f5f35386565663134663031333963653161.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/text-field.proto.ts":71:11
+            v_73656c65637452616e6765.initialize({  let v_7374617465 = v_7374617465.clone(); let v_666f637573 = v_666f637573.clone(); let v_7669657745706f63685f5f61336631366264333339623732366438 = v_7669657745706f63685f5f61336631366264333339623732366438.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_7374617274: Value = arg(&arguments, 0);
                 let v_656e64: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":69:13
-                let v_63757272656e745f5f61376133396338373432663266626164 = { let value = (v_72756e5f5f35643535313633623131306363613761.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":70:7
-                if ({ let left = { let left = { let left = Value::boolean(!(v_63757272656e745f5f61376133396338373432663266626164.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_7374617274.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_656e64.clone()))).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":70:87
+                // Source "frontend/proto-ui/src/text-field.proto.ts":72:13
+                let v_63757272656e745f5f35363866663633336164383335313034 = { let value = (v_72756e5f5f31306432313565396232363439653033.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":73:7
+                if ({ let left = { let left = { let left = Value::boolean(!(v_63757272656e745f5f35363866663633336164383335313034.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_7374617274.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_656e64.clone()))).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":73:87
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":71:13
-                let v_6c656e677468 = ({ let v_7075695f6e61746976655f3937 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f3937.clone()).get() }).member("length", false);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":72:11
+                // Source "frontend/proto-ui/src/text-field.proto.ts":74:13
+                let v_6c656e677468 = ({ let v_7075695f6e61746976655f3938 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f3938.clone()).get() }).member("length", false);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":75:11
                 let v_66726f6d = Rc::new(std::cell::RefCell::new(Value::number((v_7374617274.clone()).num().floor())));
-                // Source "frontend/proto-ui/src/text-field.proto.ts":73:11
+                // Source "frontend/proto-ui/src/text-field.proto.ts":76:11
                 let v_746f = Rc::new(std::cell::RefCell::new(Value::number((v_656e64.clone()).num().floor())));
-                // Source "frontend/proto-ui/src/text-field.proto.ts":74:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":77:7
                 if ({ let relational_left = { let value = (v_66726f6d.clone()).borrow().clone(); value }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":74:21
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":77:21
                     { let value = Value::number(0.0); *(v_66726f6d.clone()).borrow_mut() = value; }
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":75:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":78:7
                 if ({ let relational_left = { let value = (v_746f.clone()).borrow().clone(); value }; let relational_right = { let value = (v_66726f6d.clone()).borrow().clone(); value }; Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":75:22
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":78:22
                     { let value = { let value = (v_66726f6d.clone()).borrow().clone(); value }; *(v_746f.clone()).borrow_mut() = value; }
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":76:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":79:7
                 if ({ let relational_left = { let value = (v_66726f6d.clone()).borrow().clone(); value }; let relational_right = v_6c656e677468.clone(); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":76:26
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":79:26
                     { let value = v_6c656e677468.clone(); *(v_66726f6d.clone()).borrow_mut() = value; }
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":77:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":80:7
                 if ({ let relational_left = { let value = (v_746f.clone()).borrow().clone(); value }; let relational_right = v_6c656e677468.clone(); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":77:24
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":80:24
                     { let value = v_6c656e677468.clone(); *(v_746f.clone()).borrow_mut() = value; }
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":78:13
-                let v_65706f63685f5f62346431316431373163633530626138 = { let v_7075695f6e61746976655f3938 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); (v_7075695f6e61746976655f3938.clone()).get() };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":79:7
-                { let v_7075695f6e61746976655f3939 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3939.clone()).owner(), Value::Undefined, false) };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":80:7
-                if ({ let left = Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313030 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); (v_7075695f6e61746976655f313030.clone()).get() }), &(v_65706f63685f5f62346431316431373163633530626138.clone()))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":80:52
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":81:7
-                { let v_7075695f6e61746976655f313031 = v_63757272656e745f5f61376133396338373432663266626164.clone(); emit(&(v_7075695f6e61746976655f313031.clone()).owner(), Value::string("selectionRequest"), record(vec![("start", { let value = (v_66726f6d.clone()).borrow().clone(); value }), ("end", { let value = (v_746f.clone()).borrow().clone(); value }), ("viewEpoch", v_65706f63685f5f62346431316431373163633530626138.clone())])) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":81:13
+                let v_65706f63685f5f64313230303034363437313234343139 = { let v_7075695f6e61746976655f3939 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f3939.clone()).get() };
                 // Source "frontend/proto-ui/src/text-field.proto.ts":82:7
+                { let v_7075695f6e61746976655f313030 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f313030.clone()).owner(), Value::Undefined, false) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":83:7
+                if ({ let left = Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313031 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f313031.clone()).get() }), &(v_65706f63685f5f64313230303034363437313234343139.clone()))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":83:52
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":84:7
+                { let v_7075695f6e61746976655f313032 = v_63757272656e745f5f35363866663633336164383335313034.clone(); emit(&(v_7075695f6e61746976655f313032.clone()).owner(), Value::string("selectionRequest"), record(vec![("start", { let value = (v_66726f6d.clone()).borrow().clone(); value }), ("end", { let value = (v_746f.clone()).borrow().clone(); value }), ("viewEpoch", v_65706f63685f5f64313230303034363437313234343139.clone())])) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":85:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/text-field.proto.ts":84:5
-            { let v_7075695f6e61746976655f313032 = v_6465665f5f62643431383264353637383738396565.clone(); expose_method(&owner, Value::string("selectRange"), v_73656c65637452616e6765.read()) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":85:5
-            { let v_7075695f6e61746976655f313033 = v_6465665f5f62643431383264353637383738396565.clone(); expose_method(&owner, Value::string("selectAll"), {  let v_7374617465 = v_7374617465.clone(); let v_73656c65637452616e6765 = v_73656c65637452616e6765.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":85:42
-                return v_73656c65637452616e6765.read().call_authored(vec![Value::number(0.0), ({ let v_7075695f6e61746976655f313034 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313034.clone()).get() }).member("length", false)]);
-            })) }) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":86:5
-            { let v_7075695f6e61746976655f313035 = v_6465665f5f62643431383264353637383738396565.clone(); expose_method(&owner, Value::string("requestSubmit"), {  let v_726571756573745f5f34643363303961303363373865383634 = v_726571756573745f5f34643363303961303363373865383634.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":86:46
-                return v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("submit"), Value::boolean(true)]);
-            })) }) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":87:5
-            { let v_7075695f6e61746976655f313036 = v_6465665f5f62643431383264353637383738396565.clone(); expose_method(&owner, Value::string("requestCancel"), {  let v_726571756573745f5f34643363303961303363373865383634 = v_726571756573745f5f34643363303961303363373865383634.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":87:46
-                return v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("cancel"), Value::boolean(false)]);
-            })) }) };
+            { let v_7075695f6e61746976655f313033 = v_6465665f5f66643465383832643333376433356466.clone(); expose_method(&owner, Value::string("selectRange"), v_73656c65637452616e6765.read()) };
             // Source "frontend/proto-ui/src/text-field.proto.ts":88:5
-            { let v_7075695f6e61746976655f313037 = v_6465665f5f62643431383264353637383738396565.clone(); expose_method(&owner, Value::string("requestAdvance"), {  let v_726571756573745f5f34643363303961303363373865383634 = v_726571756573745f5f34643363303961303363373865383634.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_666f72776172645f5f61656365653131333939656662376631: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":88:63
-                return v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("advance"), v_666f72776172645f5f61656365653131333939656662376631.clone()]);
+            { let v_7075695f6e61746976655f313034 = v_6465665f5f66643465383832643333376433356466.clone(); expose_method(&owner, Value::string("selectAll"), {  let v_7374617465 = v_7374617465.clone(); let v_73656c65637452616e6765 = v_73656c65637452616e6765.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/text-field.proto.ts":88:42
+                return v_73656c65637452616e6765.read().call_authored(vec![Value::number(0.0), ({ let v_7075695f6e61746976655f313035 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313035.clone()).get() }).member("length", false)]);
             })) }) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":89:11
-            v_7265706c6163654472616674.initialize({  let v_7374617465 = v_7374617465.clone(); let v_7669657745706f63685f5f35386565663134663031333963653161 = v_7669657745706f63685f5f35386565663134663031333963653161.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_76616c75655f5f33306330366331306264616363363437: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":90:13
-                let v_63757272656e745f5f38376539316434313631386139653132 = { let value = (v_72756e5f5f35643535313633623131306363613761.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":91:7
-                if ({ let left = { let left = Value::boolean(!(v_63757272656e745f5f38376539316434313631386139653132.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { { let v_7075695f6e61746976655f313038 = (v_7374617465.read()).member("readOnly", false); (v_7075695f6e61746976655f313038.clone()).get() } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":91:59
+            // Source "frontend/proto-ui/src/text-field.proto.ts":89:5
+            { let v_7075695f6e61746976655f313036 = v_6465665f5f66643465383832643333376433356466.clone(); expose_method(&owner, Value::string("requestSubmit"), {  let v_726571756573745f5f64313837623536303030393732323934 = v_726571756573745f5f64313837623536303030393732323934.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/text-field.proto.ts":89:46
+                return v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("submit"), Value::boolean(true)]);
+            })) }) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":90:5
+            { let v_7075695f6e61746976655f313037 = v_6465665f5f66643465383832643333376433356466.clone(); expose_method(&owner, Value::string("requestCancel"), {  let v_726571756573745f5f64313837623536303030393732323934 = v_726571756573745f5f64313837623536303030393732323934.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/text-field.proto.ts":90:46
+                return v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("cancel"), Value::boolean(false)]);
+            })) }) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":91:5
+            { let v_7075695f6e61746976655f313038 = v_6465665f5f66643465383832643333376433356466.clone(); expose_method(&owner, Value::string("requestAdvance"), {  let v_726571756573745f5f64313837623536303030393732323934 = v_726571756573745f5f64313837623536303030393732323934.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_666f72776172645f5f33626630393733623339383733353433: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":91:63
+                return v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("advance"), v_666f72776172645f5f33626630393733623339383733353433.clone()]);
+            })) }) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":92:11
+            v_7265706c6163654472616674.initialize({  let v_7374617465 = v_7374617465.clone(); let v_7669657745706f63685f5f61336631366264333339623732366438 = v_7669657745706f63685f5f61336631366264333339623732366438.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_76616c75655f5f33613566396566333734626664623932: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":93:13
+                let v_63757272656e745f5f64346235396163643830363766646232 = { let value = (v_72756e5f5f31306432313565396232363439653033.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":94:7
+                if ({ let left = { let left = Value::boolean(!(v_63757272656e745f5f64346235396163643830363766646232.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { { let v_7075695f6e61746976655f313039 = (v_7374617465.read()).member("readOnly", false); (v_7075695f6e61746976655f313039.clone()).get() } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":94:59
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":92:7
-                { let v_7075695f6e61746976655f313039 = v_63757272656e745f5f38376539316434313631386139653132.clone(); emit(&(v_7075695f6e61746976655f313039.clone()).owner(), Value::string("replacementRequest"), record(vec![("value", v_76616c75655f5f33306330366331306264616363363437.clone()), ("start", Value::number(0.0)), ("end", (v_76616c75655f5f33306330366331306264616363363437.clone()).member("length", false)), ("viewEpoch", { let v_7075695f6e61746976655f313130 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); (v_7075695f6e61746976655f313130.clone()).get() })])) };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":93:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":95:7
+                { let v_7075695f6e61746976655f313130 = v_63757272656e745f5f64346235396163643830363766646232.clone(); emit(&(v_7075695f6e61746976655f313130.clone()).owner(), Value::string("replacementRequest"), record(vec![("value", v_76616c75655f5f33613566396566333734626664623932.clone()), ("start", Value::number(0.0)), ("end", (v_76616c75655f5f33613566396566333734626664623932.clone()).member("length", false)), ("viewEpoch", { let v_7075695f6e61746976655f313131 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f313131.clone()).get() })])) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":96:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/text-field.proto.ts":95:11
-            v_7374657054657874.initialize({  let v_7374617465 = v_7374617465.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); let v_7265706c6163654472616674 = v_7265706c6163654472616674.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/text-field.proto.ts":98:11
+            v_7374657054657874.initialize({  let v_7374617465 = v_7374617465.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_616c6c6f776564 = v_616c6c6f776564.clone(); let v_7265706c6163654472616674 = v_7265706c6163654472616674.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_646972656374696f6e: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":96:13
-                let v_63757272656e745f5f39633266663139366566373432613965 = { let value = (v_72756e5f5f35643535313633623131306363613761.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":97:7
-                if ({ let left = { let left = Value::boolean(!(v_63757272656e745f5f39633266663139366566373432613965.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(({ let v_7075695f6e61746976655f313131 = v_63757272656e745f5f39633266663139366566373432613965.clone(); read_props(&(v_7075695f6e61746976655f313131.clone()).owner(), false) }).member("numeric", false)).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":97:67
+                // Source "frontend/proto-ui/src/text-field.proto.ts":99:13
+                let v_63757272656e745f5f35326138616466323734623961663030 = { let value = (v_72756e5f5f31306432313565396232363439653033.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":100:7
+                if ({ let left = { let left = Value::boolean(!(v_63757272656e745f5f35326138616466323734623961663030.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_616c6c6f776564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(({ let v_7075695f6e61746976655f313132 = v_63757272656e745f5f35326138616466323734623961663030.clone(); read_props(&(v_7075695f6e61746976655f313132.clone()).owner(), false) }).member("numeric", false)).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":100:67
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":98:13
-                let v_70726f70735f5f39366564386263366238666632336565 = { let v_7075695f6e61746976655f313132 = v_63757272656e745f5f39633266663139366566373432613965.clone(); read_props(&(v_7075695f6e61746976655f313132.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":99:13
-                let v_74657874 = { let v_7075695f6e61746976655f313133 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313133.clone()).get() };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":100:11
-                let v_76616c75655f5f35366337373939363337396465356134 = Rc::new(std::cell::RefCell::new(if (Value::boolean(strict_equal(&((v_74657874.clone()).member("length", false)), &(Value::number(0.0))))).truthy() { { let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericDefault", false); if left.nullish() { Value::number(0.0) } else { left } } } else { Value::number((v_74657874.clone()).scalar_number()) }));
-                // Source "frontend/proto-ui/src/text-field.proto.ts":101:7
-                if (Value::boolean(!(number_is_finite(&({ let value = (v_76616c75655f5f35366337373939363337396465356134.clone()).borrow().clone(); value }))).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":101:36
-                    { let value = { let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericDefault", false); if left.nullish() { Value::number(0.0) } else { left } }; *(v_76616c75655f5f35366337373939363337396465356134.clone()).borrow_mut() = value; }
-                }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":102:7
-                { let value = add({ let value = (v_76616c75655f5f35366337373939363337396465356134.clone()).borrow().clone(); value }, Value::number((v_646972656374696f6e.clone()).scalar_number() * ({ let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericStep", false); if left.nullish() { Value::number(1.0) } else { left } }).scalar_number())); *(v_76616c75655f5f35366337373939363337396465356134.clone()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":103:7
-                if ({ let relational_left = { let value = (v_76616c75655f5f35366337373939363337396465356134.clone()).borrow().clone(); value }; let relational_right = { let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericMin", false); if left.nullish() { Value::number(0.0) } else { left } }; Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":103:44
-                    { let value = { let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericMin", false); if left.nullish() { Value::number(0.0) } else { left } }; *(v_76616c75655f5f35366337373939363337396465356134.clone()).borrow_mut() = value; }
-                }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":101:13
+                let v_70726f70735f5f32353262326466343731336162356464 = { let v_7075695f6e61746976655f313133 = v_63757272656e745f5f35326138616466323734623961663030.clone(); read_props(&(v_7075695f6e61746976655f313133.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":102:13
+                let v_74657874 = { let v_7075695f6e61746976655f313134 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313134.clone()).get() };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":103:11
+                let v_76616c75655f5f65343066323861666530333436663332 = Rc::new(std::cell::RefCell::new(if (Value::boolean(strict_equal(&((v_74657874.clone()).member("length", false)), &(Value::number(0.0))))).truthy() { { let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericDefault", false); if left.nullish() { Value::number(0.0) } else { left } } } else { Value::number((v_74657874.clone()).scalar_number()) }));
                 // Source "frontend/proto-ui/src/text-field.proto.ts":104:7
-                if ({ let relational_left = { let value = (v_76616c75655f5f35366337373939363337396465356134.clone()).borrow().clone(); value }; let relational_right = { let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericMax", false); if left.nullish() { Value::number(1.0) } else { left } }; Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":104:44
-                    { let value = { let left = (v_70726f70735f5f39366564386263366238666632336565.clone()).member("numericMax", false); if left.nullish() { Value::number(1.0) } else { left } }; *(v_76616c75655f5f35366337373939363337396465356134.clone()).borrow_mut() = value; }
+                if (Value::boolean(!(number_is_finite(&({ let value = (v_76616c75655f5f65343066323861666530333436663332.clone()).borrow().clone(); value }))).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":104:36
+                    { let value = { let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericDefault", false); if left.nullish() { Value::number(0.0) } else { left } }; *(v_76616c75655f5f65343066323861666530333436663332.clone()).borrow_mut() = value; }
                 }
                 // Source "frontend/proto-ui/src/text-field.proto.ts":105:7
-                return v_7265706c6163654472616674.read().call_authored(vec![Value::string(&({ let value = (v_76616c75655f5f35366337373939363337396465356134.clone()).borrow().clone(); value }).scalar_text())]);
+                { let value = add({ let value = (v_76616c75655f5f65343066323861666530333436663332.clone()).borrow().clone(); value }, Value::number((v_646972656374696f6e.clone()).scalar_number() * ({ let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericStep", false); if left.nullish() { Value::number(1.0) } else { left } }).scalar_number())); *(v_76616c75655f5f65343066323861666530333436663332.clone()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":106:7
+                if ({ let relational_left = { let value = (v_76616c75655f5f65343066323861666530333436663332.clone()).borrow().clone(); value }; let relational_right = { let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericMin", false); if left.nullish() { Value::number(0.0) } else { left } }; Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":106:44
+                    { let value = { let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericMin", false); if left.nullish() { Value::number(0.0) } else { left } }; *(v_76616c75655f5f65343066323861666530333436663332.clone()).borrow_mut() = value; }
+                }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":107:7
+                if ({ let relational_left = { let value = (v_76616c75655f5f65343066323861666530333436663332.clone()).borrow().clone(); value }; let relational_right = { let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericMax", false); if left.nullish() { Value::number(1.0) } else { left } }; Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":107:44
+                    { let value = { let left = (v_70726f70735f5f32353262326466343731336162356464.clone()).member("numericMax", false); if left.nullish() { Value::number(1.0) } else { left } }; *(v_76616c75655f5f65343066323861666530333436663332.clone()).borrow_mut() = value; }
+                }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":108:7
+                return v_7265706c6163654472616674.read().call_authored(vec![Value::string(&({ let value = (v_76616c75655f5f65343066323861666530333436663332.clone()).borrow().clone(); value }).scalar_text())]);
             })) });
-            // Source "frontend/proto-ui/src/text-field.proto.ts":107:5
-            { let v_7075695f6e61746976655f313134 = v_6465665f5f62643431383264353637383738396565.clone(); expose_method(&owner, Value::string("stepText"), v_7374657054657874.read()) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":108:5
-            { let v_7075695f6e61746976655f313135 = v_6465665f5f62643431383264353637383738396565.clone(); listen(&owner, Value::string("key.down"), false, {  let v_7374617465 = v_7374617465.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_726571756573745f5f34643363303961303363373865383634 = v_726571756573745f5f34643363303961303363373865383634.clone(); let v_7265706c6163654472616674 = v_7265706c6163654472616674.clone(); let v_7374657054657874 = v_7374657054657874.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/text-field.proto.ts":110:5
+            { let v_7075695f6e61746976655f313135 = v_6465665f5f66643465383832643333376433356466.clone(); expose_method(&owner, Value::string("stepText"), v_7374657054657874.read()) };
+            // Source "frontend/proto-ui/src/text-field.proto.ts":111:5
+            { let v_7075695f6e61746976655f313136 = v_6465665f5f66643465383832643333376433356466.clone(); listen(&owner, Value::string("key.down"), false, {  let v_7374617465 = v_7374617465.clone(); let v_7669657745706f63685f5f61336631366264333339623732366438 = v_7669657745706f63685f5f61336631366264333339623732366438.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_726571756573745f5f64313837623536303030393732323934 = v_726571756573745f5f64313837623536303030393732323934.clone(); let v_7265706c6163654472616674 = v_7265706c6163654472616674.clone(); let v_7374657054657874 = v_7374657054657874.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_5f63757272656e74: Value = arg(&arguments, 0);
-                let v_6576656e745f5f39343537636635626333396533643766: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":109:13
-                let v_63757272656e745f5f34313163623732633635626666626161 = { let value = (v_72756e5f5f35643535313633623131306363613761.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":110:7
-                if ({ let left = { let left = { let left = Value::boolean(!(v_63757272656e745f5f34313163623732633635626666626161.clone()).truthy()); if !left.truthy() { Value::boolean(!({ let value = (v_6d6f756e746564.read()).borrow().clone(); value }).truthy()) } else { left } }; if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }; if !left.truthy() { { let v_7075695f6e61746976655f313136 = (v_7374617465.read()).member("disabled", false); (v_7075695f6e61746976655f313136.clone()).get() } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":110:69
+                let v_6576656e745f5f35383235316232616535616266383831: Value = arg(&arguments, 1);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":112:13
+                let v_63757272656e745f5f63653739366237643737333737613934 = { let value = (v_72756e5f5f31306432313565396232363439653033.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":113:7
+                if ({ let left = { let left = { let left = Value::boolean(!(v_63757272656e745f5f63653739366237643737333737613934.clone()).truthy()); if !left.truthy() { Value::boolean(!({ let value = (v_6d6f756e746564.read()).borrow().clone(); value }).truthy()) } else { left } }; if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }; if !left.truthy() { { let v_7075695f6e61746976655f313137 = (v_7374617465.read()).member("disabled", false); (v_7075695f6e61746976655f313137.clone()).get() } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":113:69
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":111:13
-                let v_6b6579 = (v_6576656e745f5f39343537636635626333396533643766.clone()).member("key", false);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":112:7
-                if ({ let v_7075695f6e61746976655f313137 = (v_7374617465.read()).member("composing", false); (v_7075695f6e61746976655f313137.clone()).get() }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":115:9
+                // Source "frontend/proto-ui/src/text-field.proto.ts":114:13
+                let v_6b6579 = (v_6576656e745f5f35383235316232616535616266383831.clone()).member("key", false);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":115:7
+                if ({ let v_7075695f6e61746976655f313138 = (v_7374617465.read()).member("composing", false); (v_7075695f6e61746976655f313138.clone()).get() }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":118:9
                     if ({ let left = { let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Enter")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Escape")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Tab")))) } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":115:67
-                        { let v_7075695f6e61746976655f313138 = v_6576656e745f5f39343537636635626333396533643766.clone(); prevent(v_7075695f6e61746976655f313138.clone()) };
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":118:67
+                        { let v_7075695f6e61746976655f313139 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313139.clone()) };
                     }
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":116:9
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":119:9
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":118:7
-                if ({ let left = { let left = (v_6576656e745f5f39343537636635626333396533643766.clone()).member("ctrlKey", false); if !left.truthy() { (v_6576656e745f5f39343537636635626333396533643766.clone()).member("metaKey", false) } else { left } }; if !left.truthy() { (v_6576656e745f5f39343537636635626333396533643766.clone()).member("altKey", false) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":118:59
+                // Source "frontend/proto-ui/src/text-field.proto.ts":121:13
+                let v_70726f70735f5f66323534366337303462623030616364 = { let v_7075695f6e61746976655f313230 = v_63757272656e745f5f63653739366237643737333737613934.clone(); read_props(&(v_7075695f6e61746976655f313230.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":122:13
+                let v_636f6d6d616e64 = { let left = Value::boolean(strict_equal(&((v_6576656e745f5f35383235316232616535616266383831.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e745f5f35383235316232616535616266383831.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":126:7
+                if ({ let left = { let left = (v_70726f70735f5f66323534366337303462623030616364.clone()).member("searchNavigation", false); if left.truthy() { Value::boolean(!((v_6576656e745f5f35383235316232616535616266383831.clone()).member("altKey", false)).truthy()) } else { left } }; if left.truthy() { { let left = { let left = Value::boolean(!(v_636f6d6d616e64.clone()).truthy()); if left.truthy() { { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Enter")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Escape")))) } else { left } } } else { left } }; if !left.truthy() { { let left = { let left = v_636f6d6d616e64.clone(); if left.truthy() { Value::boolean(!((v_6576656e745f5f35383235316232616535616266383831.clone()).member("shiftKey", false)).truthy()) } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("F")))) } else { left } } } else { left } } } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":129:9
+                    { let v_7075695f6e61746976655f313231 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313231.clone()) };
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":130:9
+                    { let v_7075695f6e61746976655f313232 = v_63757272656e745f5f63653739366237643737333737613934.clone(); emit(&(v_7075695f6e61746976655f313232.clone()).owner(), Value::string("navigationRequest"), record(vec![("key", { let left = v_6b6579.clone(); if left.nullish() { Value::string("") } else { left } }), ("value", { let v_7075695f6e61746976655f313233 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313233.clone()).get() }), ("shift", Value::boolean(strict_equal(&((v_6576656e745f5f35383235316232616535616266383831.clone()).member("shiftKey", false)), &(Value::boolean(true))))), ("command", v_636f6d6d616e64.clone()), ("viewEpoch", { let v_7075695f6e61746976655f313234 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f313234.clone()).get() })])) };
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":134:9
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":119:13
-                let v_70726f70735f5f32376336386532646639363863303836 = { let v_7075695f6e61746976655f313139 = v_63757272656e745f5f34313163623732633635626666626161.clone(); read_props(&(v_7075695f6e61746976655f313139.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":120:7
-                if ({ let left = (v_70726f70735f5f32376336386532646639363863303836.clone()).member("numeric", false); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowDown")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":121:9
-                    { let v_7075695f6e61746976655f313230 = v_6576656e745f5f39343537636635626333396533643766.clone(); prevent(v_7075695f6e61746976655f313230.clone()) };
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":122:9
+                // Source "frontend/proto-ui/src/text-field.proto.ts":136:7
+                if ({ let left = v_636f6d6d616e64.clone(); if !left.truthy() { (v_6576656e745f5f35383235316232616535616266383831.clone()).member("altKey", false) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":136:36
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":137:7
+                if ({ let left = (v_70726f70735f5f66323534366337303462623030616364.clone()).member("numeric", false); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowDown")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":138:9
+                    { let v_7075695f6e61746976655f313235 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313235.clone()) };
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":139:9
                     v_7374657054657874.read().call_authored(vec![if (Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp"))))).truthy() { Value::number(1.0) } else { Value::number(-(Value::number(1.0)).scalar_number()) }]);
                 } else {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":123:14
-                    if ({ let left = (v_70726f70735f5f32376336386532646639363863303836.clone()).member("numeric", false); if left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Delete")))) } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":124:9
-                        { let v_7075695f6e61746976655f313231 = v_6576656e745f5f39343537636635626333396533643766.clone(); prevent(v_7075695f6e61746976655f313231.clone()) };
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":125:9
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":140:14
+                    if ({ let left = (v_70726f70735f5f66323534366337303462623030616364.clone()).member("numeric", false); if left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Delete")))) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":141:9
+                        { let v_7075695f6e61746976655f313236 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313236.clone()) };
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":142:9
                         v_7265706c6163654472616674.read().call_authored(vec![Value::string("")]);
                     } else {
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":126:14
-                        if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Enter")))); if left.truthy() { (v_70726f70735f5f32376336386532646639363863303836.clone()).member("submitOnEnter", false) } else { left } }).truthy() {
-                            // Source "frontend/proto-ui/src/text-field.proto.ts":127:9
-                            { let v_7075695f6e61746976655f313232 = v_6576656e745f5f39343537636635626333396533643766.clone(); prevent(v_7075695f6e61746976655f313232.clone()) };
-                            // Source "frontend/proto-ui/src/text-field.proto.ts":128:9
-                            v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("submit"), Value::boolean(true)]);
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":143:14
+                        if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Enter")))); if left.truthy() { (v_70726f70735f5f66323534366337303462623030616364.clone()).member("submitOnEnter", false) } else { left } }).truthy() {
+                            // Source "frontend/proto-ui/src/text-field.proto.ts":144:9
+                            { let v_7075695f6e61746976655f313237 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313237.clone()) };
+                            // Source "frontend/proto-ui/src/text-field.proto.ts":145:9
+                            v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("submit"), Value::boolean(true)]);
                         } else {
-                            // Source "frontend/proto-ui/src/text-field.proto.ts":129:14
-                            if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Escape")))); if left.truthy() { (v_70726f70735f5f32376336386532646639363863303836.clone()).member("cancelOnEscape", false) } else { left } }).truthy() {
-                                // Source "frontend/proto-ui/src/text-field.proto.ts":130:9
-                                { let v_7075695f6e61746976655f313233 = v_6576656e745f5f39343537636635626333396533643766.clone(); prevent(v_7075695f6e61746976655f313233.clone()) };
-                                // Source "frontend/proto-ui/src/text-field.proto.ts":131:9
-                                v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("cancel"), Value::boolean(false)]);
+                            // Source "frontend/proto-ui/src/text-field.proto.ts":146:14
+                            if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Escape")))); if left.truthy() { (v_70726f70735f5f66323534366337303462623030616364.clone()).member("cancelOnEscape", false) } else { left } }).truthy() {
+                                // Source "frontend/proto-ui/src/text-field.proto.ts":147:9
+                                { let v_7075695f6e61746976655f313238 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313238.clone()) };
+                                // Source "frontend/proto-ui/src/text-field.proto.ts":148:9
+                                v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("cancel"), Value::boolean(false)]);
                             } else {
-                                // Source "frontend/proto-ui/src/text-field.proto.ts":132:14
-                                if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Tab")))); if left.truthy() { (v_70726f70735f5f32376336386532646639363863303836.clone()).member("advanceOnTab", false) } else { left } }).truthy() {
-                                    // Source "frontend/proto-ui/src/text-field.proto.ts":133:9
-                                    { let v_7075695f6e61746976655f313234 = v_6576656e745f5f39343537636635626333396533643766.clone(); prevent(v_7075695f6e61746976655f313234.clone()) };
-                                    // Source "frontend/proto-ui/src/text-field.proto.ts":134:9
-                                    v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("advance"), Value::boolean(!strict_equal(&((v_6576656e745f5f39343537636635626333396533643766.clone()).member("shiftKey", false)), &(Value::boolean(true))))]);
+                                // Source "frontend/proto-ui/src/text-field.proto.ts":149:14
+                                if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Tab")))); if left.truthy() { (v_70726f70735f5f66323534366337303462623030616364.clone()).member("advanceOnTab", false) } else { left } }).truthy() {
+                                    // Source "frontend/proto-ui/src/text-field.proto.ts":150:9
+                                    { let v_7075695f6e61746976655f313239 = v_6576656e745f5f35383235316232616535616266383831.clone(); prevent(v_7075695f6e61746976655f313239.clone()) };
+                                    // Source "frontend/proto-ui/src/text-field.proto.ts":151:9
+                                    v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("advance"), Value::boolean(!strict_equal(&((v_6576656e745f5f35383235316232616535616266383831.clone()).member("shiftKey", false)), &(Value::boolean(true))))]);
                                 }
                             }
                         }
@@ -990,73 +1006,73 @@ pub struct GeneratedData3 {
                 }
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":137:5
-            { let v_7075695f6e61746976655f313235 = v_6465665f5f62643431383264353637383738396565.clone(); listen(&owner, Value::string("host:blur"), false, {  let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_726571756573745f5f34643363303961303363373865383634 = v_726571756573745f5f34643363303961303363373865383634.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":138:13
-                let v_63757272656e745f5f31386635666162353436646434643638 = { let value = (v_72756e5f5f35643535313633623131306363613761.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":139:7
-                if ({ let left = v_63757272656e745f5f31386635666162353436646434643638.clone(); if left.truthy() { ({ let v_7075695f6e61746976655f313236 = v_63757272656e745f5f31386635666162353436646434643638.clone(); read_props(&(v_7075695f6e61746976655f313236.clone()).owner(), false) }).member("commitOnBlur", false) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":139:56
-                    v_726571756573745f5f34643363303961303363373865383634.read().call_authored(vec![Value::string("blurCommit"), Value::boolean(true)]);
+            // Source "frontend/proto-ui/src/text-field.proto.ts":154:5
+            { let v_7075695f6e61746976655f313330 = v_6465665f5f66643465383832643333376433356466.clone(); listen(&owner, Value::string("host:blur"), false, {  let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_726571756573745f5f64313837623536303030393732323934 = v_726571756573745f5f64313837623536303030393732323934.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/text-field.proto.ts":155:13
+                let v_63757272656e745f5f61323137613538313530663861343639 = { let value = (v_72756e5f5f31306432313565396232363439653033.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":156:7
+                if ({ let left = v_63757272656e745f5f61323137613538313530663861343639.clone(); if left.truthy() { ({ let v_7075695f6e61746976655f313331 = v_63757272656e745f5f61323137613538313530663861343639.clone(); read_props(&(v_7075695f6e61746976655f313331.clone()).owner(), false) }).member("commitOnBlur", false) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":156:56
+                    v_726571756573745f5f64313837623536303030393732323934.read().call_authored(vec![Value::string("blurCommit"), Value::boolean(true)]);
                 }
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":141:5
-            { let v_7075695f6e61746976655f313237 = v_6465665f5f62643431383264353637383738396565.clone(); register_life(&owner, "mounted", {  let v_7374617465 = v_7374617465.clone(); let v_666f637573 = v_666f637573.clone(); let v_7669657745706f63685f5f35386565663134663031333963653161 = v_7669657745706f63685f5f35386565663134663031333963653161.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73656c65637452616e6765 = v_73656c65637452616e6765.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_63757272656e745f5f61343561626430376364656237356137: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/text-field.proto.ts":142:7
+            // Source "frontend/proto-ui/src/text-field.proto.ts":158:5
+            { let v_7075695f6e61746976655f313332 = v_6465665f5f66643465383832643333376433356466.clone(); register_life(&owner, "mounted", {  let v_7374617465 = v_7374617465.clone(); let v_666f637573 = v_666f637573.clone(); let v_7669657745706f63685f5f61336631366264333339623732366438 = v_7669657745706f63685f5f61336631366264333339623732366438.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73656c65637452616e6765 = v_73656c65637452616e6765.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_63757272656e745f5f35323964623463663839396166643639: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":159:7
                 if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":142:21
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":159:21
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":143:7
-                { let value = v_63757272656e745f5f61343561626430376364656237356137.clone(); *(v_72756e5f5f35643535313633623131306363613761.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":144:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":160:7
+                { let value = v_63757272656e745f5f35323964623463663839396166643639.clone(); *(v_72756e5f5f31306432313565396232363439653033.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":161:7
                 { let value = Value::boolean(true); *(v_6d6f756e746564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":145:7
-                { let v_7075695f6e61746976655f313238 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); state_set(v_7075695f6e61746976655f313238.clone(), add({ let v_7075695f6e61746976655f313239 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); (v_7075695f6e61746976655f313239.clone()).get() }, Value::number(1.0)), Value::string("reason: text view mounted")) };
-                // Source "frontend/proto-ui/src/text-field.proto.ts":146:7
-                if (({ let v_7075695f6e61746976655f313330 = v_63757272656e745f5f61343561626430376364656237356137.clone(); read_props(&(v_7075695f6e61746976655f313330.clone()).owner(), false) }).member("selectAllOnMount", false)).truthy() {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":146:49
-                    v_73656c65637452616e6765.read().call_authored(vec![Value::number(0.0), ({ let v_7075695f6e61746976655f313331 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313331.clone()).get() }).member("length", false)]);
+                // Source "frontend/proto-ui/src/text-field.proto.ts":162:7
+                { let v_7075695f6e61746976655f313333 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); state_set(v_7075695f6e61746976655f313333.clone(), add({ let v_7075695f6e61746976655f313334 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f313334.clone()).get() }, Value::number(1.0)), Value::string("reason: text view mounted")) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":163:7
+                if (({ let v_7075695f6e61746976655f313335 = v_63757272656e745f5f35323964623463663839396166643639.clone(); read_props(&(v_7075695f6e61746976655f313335.clone()).owner(), false) }).member("selectAllOnMount", false)).truthy() {
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":163:49
+                    v_73656c65637452616e6765.read().call_authored(vec![Value::number(0.0), ({ let v_7075695f6e61746976655f313336 = (v_7374617465.read()).member("value", false); (v_7075695f6e61746976655f313336.clone()).get() }).member("length", false)]);
                 } else {
-                    // Source "frontend/proto-ui/src/text-field.proto.ts":147:12
-                    if ({ let left = ({ let v_7075695f6e61746976655f313332 = v_63757272656e745f5f61343561626430376364656237356137.clone(); read_props(&(v_7075695f6e61746976655f313332.clone()).owner(), false) }).member("autoFocus", false); if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f313333 = (v_7374617465.read()).member("disabled", false); (v_7075695f6e61746976655f313333.clone()).get() }).truthy()) } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/text-field.proto.ts":147:72
-                        { let v_7075695f6e61746976655f313334 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f313334.clone()).owner(), Value::Undefined, false) };
+                    // Source "frontend/proto-ui/src/text-field.proto.ts":164:12
+                    if ({ let left = ({ let v_7075695f6e61746976655f313337 = v_63757272656e745f5f35323964623463663839396166643639.clone(); read_props(&(v_7075695f6e61746976655f313337.clone()).owner(), false) }).member("autoFocus", false); if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f313338 = (v_7374617465.read()).member("disabled", false); (v_7075695f6e61746976655f313338.clone()).get() }).truthy()) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/text-field.proto.ts":164:72
+                        { let v_7075695f6e61746976655f313339 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f313339.clone()).owner(), Value::Undefined, false) };
                     }
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":149:5
-            { let v_7075695f6e61746976655f313335 = v_6465665f5f62643431383264353637383738396565.clone(); register_life(&owner, "unmounted", {  let v_7669657745706f63685f5f35386565663134663031333963653161 = v_7669657745706f63685f5f35386565663134663031333963653161.clone(); let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":150:7
+            // Source "frontend/proto-ui/src/text-field.proto.ts":166:5
+            { let v_7075695f6e61746976655f313430 = v_6465665f5f66643465383832643333376433356466.clone(); register_life(&owner, "unmounted", {  let v_7669657745706f63685f5f61336631366264333339623732366438 = v_7669657745706f63685f5f61336631366264333339623732366438.clone(); let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/text-field.proto.ts":167:7
                 { let value = Value::boolean(false); *(v_6d6f756e746564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":151:7
-                { let value = Value::Json(Json::Null); *(v_72756e5f5f35643535313633623131306363613761.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":152:7
-                { let v_7075695f6e61746976655f313336 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); state_set(v_7075695f6e61746976655f313336.clone(), add({ let v_7075695f6e61746976655f313337 = v_7669657745706f63685f5f35386565663134663031333963653161.read(); (v_7075695f6e61746976655f313337.clone()).get() }, Value::number(1.0)), Value::string("reason: text view retired")) };
+                // Source "frontend/proto-ui/src/text-field.proto.ts":168:7
+                { let value = Value::Json(Json::Null); *(v_72756e5f5f31306432313565396232363439653033.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":169:7
+                { let v_7075695f6e61746976655f313431 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); state_set(v_7075695f6e61746976655f313431.clone(), add({ let v_7075695f6e61746976655f313432 = v_7669657745706f63685f5f61336631366264333339623732366438.read(); (v_7075695f6e61746976655f313432.clone()).get() }, Value::number(1.0)), Value::string("reason: text view retired")) };
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":154:5
-            { let v_7075695f6e61746976655f313338 = v_6465665f5f62643431383264353637383738396565.clone(); register_life(&owner, "before-dispose", {  let v_72756e5f5f35643535313633623131306363613761 = v_72756e5f5f35643535313633623131306363613761.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/text-field.proto.ts":155:7
+            // Source "frontend/proto-ui/src/text-field.proto.ts":171:5
+            { let v_7075695f6e61746976655f313433 = v_6465665f5f66643465383832643333376433356466.clone(); register_life(&owner, "before-dispose", {  let v_72756e5f5f31306432313565396232363439653033 = v_72756e5f5f31306432313565396232363439653033.clone(); let v_6d6f756e746564 = v_6d6f756e746564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/text-field.proto.ts":172:7
                 { let value = Value::boolean(false); *(v_6d6f756e746564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":156:7
+                // Source "frontend/proto-ui/src/text-field.proto.ts":173:7
                 { let value = Value::boolean(true); *(v_646973706f736564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/text-field.proto.ts":157:7
-                { let value = Value::Json(Json::Null); *(v_72756e5f5f35643535313633623131306363613761.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/text-field.proto.ts":174:7
+                { let value = Value::Json(Json::Null); *(v_72756e5f5f31306432313565396232363439653033.read()).borrow_mut() = value; }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/text-field.proto.ts":159:5
+            // Source "frontend/proto-ui/src/text-field.proto.ts":176:5
             return { let callable=(v_696e68657269746564.clone()).member("render", false); match callable {
       Value::NativeFunction{render,..} => Value::Renderer(render),
       Value::Renderer(render) => Value::Renderer(render),
       Value::Undefined => Value::Undefined,
-      Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { { let pui_native_139 = callback(arguments); if matches!(&pui_native_139, Value::Json(Json::Null)) { native::gpui_native_owner::NativeSnapshot::empty() } else { native::gpui_native_owner::NativeSnapshot::invalid(pui_native_139) } } })),
+      Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { { let pui_native_144 = callback(arguments); if matches!(&pui_native_144, Value::Json(Json::Null)) { native::gpui_native_owner::NativeSnapshot::empty() } else { native::gpui_native_owner::NativeSnapshot::invalid(pui_native_144) } } })),
       _ => panic!("checked setup result must be a callable")
     } };
-        })) }.call_authored(vec![capability(&owner)]);
+        })) }.call_authored(vec![definition_capability(&owner)]);
           Owner::finish(&owner_ref, renderer);
           let focus_subscriptions = if native_focus_observation_needed(&owner_ref) {
           let focus_owner = owner_ref.clone();

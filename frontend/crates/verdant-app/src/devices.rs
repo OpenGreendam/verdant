@@ -1580,10 +1580,14 @@ mod native_tests {
     }
 
     fn hold_suite_knob(window: &mut Window, cx: &mut App) -> (verdant_normalized_knob::NormalizedKnobHandle, gpui::Point<Pixels>, serde_json::Value) {
-        let owner = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+        let mut owners = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().filter(|owner| {
             let owner = owner.borrow();
-            owner.mounted && owner.window_id == Some(window.window_handle().window_id()) && owner.declared_events.contains("valueCommit")
-        }).expect("the production compiled knob is mounted in this window");
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.declared_events.contains("exactValueRequested")
+                && owner.exposes.contains_key("phase") && owner.exposes.contains_key("value")
+        });
+        let owner = owners.next().expect("the production compiled knob is mounted in this window");
+        assert!(owners.next().is_none(), "the fixture has exactly one production knob, independently of the graph's compiled owners");
         let knob = verdant_normalized_knob::NormalizedKnobHandle { owner };
         let accepted = knob.state("value").unwrap();
         let start = knob.owner.borrow().native_hitbox.as_ref().unwrap().bounds.center();
@@ -1743,14 +1747,12 @@ mod native_tests {
         }).unwrap();
     }
 
-    struct EqTabHarness {
-        editor: Entity<Editor>, target: Target, desc: ParamDesc, tab_focus: FocusHandle,
-    }
+    struct EqTabHarness { editor: Entity<Editor>, target: Target, desc: ParamDesc }
 
     impl Render for EqTabHarness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             let tab = self.editor.update(cx, |ed, cx| eq_band_tab(ed, self.target.clone(), 2, EqParams::default().bands[2],
-                selected_band(ed, self.target.key, dsp::EQ_BANDS) == 2, cx).track_focus(&self.tab_focus));
+                selected_band(ed, self.target.key, dsp::EQ_BANDS) == 2, cx));
             div().size_full().flex().items_start().gap(px(20.))
                 .child(crate::proto_knob::knob(self.editor.clone(), self.target.track.clone(), self.target.slot,
                     self.target.key, self.desc.clone(), "Gain", self.editor.read(cx).theme, 64.))
@@ -1762,12 +1764,23 @@ mod native_tests {
     fn eq_tab_element_routes_keyboard_selection_after_retiring_focus_preview(cx: &mut TestAppContext) {
         let main = open(cx, false);
         let (editor, target, desc) = main.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
-        let window = cx.open_window(size(px(520.), px(220.)), |_, cx| EqTabHarness { editor, target, desc, tab_focus: cx.focus_handle() });
+        let window = cx.open_window(size(px(520.), px(220.)), |_, _| EqTabHarness { editor, target, desc });
         crate::native_test_support::frames(window, cx);
         let (knob, start, accepted) = window.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |host, window, cx| window.focus(&host.tab_focus, cx)).unwrap();
+        let tab = cx.update_window(window.into(), |_, window, cx| {
+            let owner = verdant_action_control::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("tab")
+                    && crate::proto_controls::source_index(owner.props.get("position")) == Some(2)
+            }).expect("the exact EQ tab's compiled action is mounted");
+            let tab = verdant_action_control::ActionControlHandle { owner };
+            tab.call("focusSelf", vec![], window, cx).unwrap();
+            tab
+        }).unwrap();
         crate::native_test_support::frames(window, cx);
+        assert_eq!(tab.state("focused").unwrap(), serde_json::json!(true), "keyboard input targets the source-owned focus handle");
         cx.simulate_keystrokes(window.into(), "space");
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
@@ -2086,6 +2099,17 @@ mod native_tests {
             let window = open(cx, false);
             window.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
             crate::native_test_support::frames(window, cx);
+            let point = window.update(cx, |_, window, _| {
+                let owner = verdant_graph_point::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                    let owner = owner.borrow();
+                    owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                        && owner.exposes.contains_key("axis") && owner.exposes.contains_key("x")
+                        && owner.declared_events.contains("valueCommit")
+                }).expect("the physical graph handle has its compiled owner");
+                let point = verdant_graph_point::GraphPointHandle { owner };
+                assert_eq!(point.state("focused").unwrap(), serde_json::json!(true), "the physical press focuses its own graph control");
+                point
+            }).unwrap();
             window.update(cx, |host, window, cx| match reason {
                 "exit" => { window.dispatch_event(gpui::PlatformInput::MouseExited(gpui::MouseExitEvent::default()), cx); }
                 "blur" => window.focus(&host.outside, cx),
@@ -2094,6 +2118,11 @@ mod native_tests {
             }).unwrap();
             crate::native_test_support::frames(window, cx);
             window.update(cx, |host, window, cx| {
+                if reason == "detach" {
+                    assert!(!point.owner.borrow().mounted, "detached source cannot accept another input");
+                } else {
+                    assert_eq!(point.state("phase").unwrap(), serde_json::json!("idle"), "{reason} retires the authored graph phase");
+                }
                 assert!(host.editor.read(cx).device_drag.is_none(), "{reason} removed the preview");
                 assert!(window.captured_hitbox().is_none(), "{reason} released native capture");
                 up(window, cx);

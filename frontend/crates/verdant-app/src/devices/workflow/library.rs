@@ -33,7 +33,8 @@ pub(in crate::devices) fn open(editor: Entity<Editor>, target: Target, device: S
     }, move |window, cx| {
         window.set_window_title("插件预设库 — Verdant");
         cx.new(|cx| {
-            let search = TextField::new("搜索名称、类别、作者、标签与用途", "", th, window, cx);
+            let search = TextField::with_options("搜索名称、类别、作者、标签与用途", "", th,
+                crate::proto_text::Options { search_navigation: true, ..Default::default() }, window, cx);
             let name = TextField::new("预设名称", "我的预设", th, window, cx);
             let tags = TextField::new("标签，用逗号分隔", "", th, window, cx);
             let category = TextField::new("类别", "", th, window, cx);
@@ -41,6 +42,15 @@ pub(in crate::devices) fn open(editor: Entity<Editor>, target: Target, device: S
             let description = TextField::new("用途与说明", "", th, window, cx);
             let focus = search.read(cx).focus.clone(); window.focus(&focus, cx);
             for field in [&search, &name, &tags, &category, &author, &description] { cx.observe(field, |_, _, cx| cx.notify()).detach(); }
+            cx.subscribe_in(&search, window, |view: &mut Library, _, event, window, cx| {
+                if let crate::proto_text::Event::Navigation { key, value, shift, command } = event {
+                    if view.search.read(cx).value() != value || view.search.read(cx).is_composing() { return; }
+                    let Some(collection) = view.collection.clone() else { return; };
+                    let revision = view.collection_revision(cx);
+                    crate::proto_collection::call(&collection, "keyFrom",
+                        vec!["search".into(), key.clone().into(), (*shift).into(), (*command).into(), revision.into()], window, cx);
+                }
+            }).detach();
             let scroll = gpui::ScrollHandle::new();
             let native_scroll = crate::proto_scroll::NativeScroll::new(scroll.clone());
             let mut view = Library { editor: weak, target, generation, device, params, search, name, tags, category, author, description,

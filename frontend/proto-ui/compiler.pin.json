@@ -2,7 +2,7 @@
   "schema": "verdant.proto-ui.compiler-pin.v3",
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "231be0e8d1d05367dfde14a172dc8ae4a014ed83"
+    "revision": "8eccebec744a89abf4579ebb3ba5442eeb1d7c92"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -35,7 +35,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "6f623dd01b878c9ab6ff617dee5ed719b6097f3cb0a9a1f50416c41aafdeb38f"
+    "contentSha256": "1542fc67a82f42fbc20e77e0ac0a0cc7a039d9e4103538e36243156fc155f3fa"
   },
   "units": [
     {

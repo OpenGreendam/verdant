@@ -55,6 +55,8 @@ fn lyric_event(ed: &mut Editor, event: Event, window: &mut Window, cx: &mut Cont
             ed.end_lyric(true, Some(forward), window, cx);
         }
         Event::Cancel => ed.end_lyric(false, None, window, cx),
+        // This editor does not enable the search collection policy.
+        Event::Navigation { .. } => {},
         Event::Failure(error) => { ed.notice(error); cx.notify(); },
     }
 }
@@ -73,7 +75,7 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, _cx: &mut Context<Edi
     let commands = Commands::default();
     let field = proto_text::inline(key, "输入歌词或读音…", lyric.state.text.clone(), th,
         Options { auto_focus: true, select_all: true, submit_on_enter: true, cancel_on_escape: true,
-            advance_on_tab: true, commit_on_blur: true, inline: true, numeric: None },
+            advance_on_tab: true, commit_on_blur: true, inline: true, numeric: None, search_navigation: false },
         move |event, window, cx| {
             let _ = owner.update(cx, |ed, cx| {
                 if ed.document_generation != generation || ed.text_prompt.is_some()

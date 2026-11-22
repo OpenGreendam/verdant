@@ -2,7 +2,7 @@
   "source": {
     "file": "frontend/proto-ui/src/text-field.proto.ts",
     "exportName": "default",
-    "sha256": "e51e3260223c0fa4309bb03983d5c3d8011e0b6b04c6cf708a9696d8ee6273b4"
+    "sha256": "6b09b90c0a1451d74a9bc2db74a747e890a683db3c0520394a3d1aaf08b5c9d4"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "6f623dd01b878c9ab6ff617dee5ed719b6097f3cb0a9a1f50416c41aafdeb38f",
+    "contentSha256": "1542fc67a82f42fbc20e77e0ac0a0cc7a039d9e4103538e36243156fc155f3fa",
     "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
     "bundled": false
   },
@@ -88,7 +88,7 @@
   "sourceFiles": [
     {
       "file": "frontend/proto-ui/src/text-field.proto.ts",
-      "sha256": "9c42200be4a0f974294e4c366153dd17d0b55bfd4268f362b81b2e62f2d8ec92"
+      "sha256": "92aeeccc40d48b80d8ef2c0234edd624b747408e1fe0d7c66185eb46fdcbd2e0"
     },
     {
       "file": "frontend/proto-ui/src/upstream-input/root.proto.ts",
@@ -99,17 +99,17 @@
       "sha256": "1e4402451be080acfa6e2d2f60a8a0b3a45e1d2565d081989c35bb044c730f48"
     }
   ],
-  "generatedSha256": "0dfe39d45d5aa19ea32c2c93dd2c7da6f5daaaf022360252cd9248fe622b702e",
+  "generatedSha256": "fe25f721a7eb126c804eb030b2d30194a8231dbb7812901639acc6daba5ce601",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "0dfe39d45d5aa19ea32c2c93dd2c7da6f5daaaf022360252cd9248fe622b702e"
+      "sha256": "fe25f721a7eb126c804eb030b2d30194a8231dbb7812901639acc6daba5ce601"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "713811cd0deca0da2abdb1d9c32c36f6325d572a58188b6209a6b0c15fc2cecc"
+      "sha256": "a0f8272903bff5eee0841f131216fa4ae1c891a79afe92a66d48c07aae7c67ce"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
@@ -119,7 +119,7 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "6c0b97677f1e21723a86cd6fdd32d3bc4fdfe7cfc44e7e570ba6bf83927ee66a"
+      "sha256": "c6713e7396239e3054db420d490a9020a82e0f8ed08997a3f7d5b6ed4726a1cd"
     }
   ]
 }

@@ -9,6 +9,7 @@ type Props = InputRootProps & {
   cancelOnEscape?: boolean;
   advanceOnTab?: boolean;
   commitOnBlur?: boolean;
+  searchNavigation?: boolean;
   numeric?: boolean;
   numericMin?: number;
   numericMax?: number;
@@ -35,6 +36,7 @@ export default definePrototype<Props>({
       cancelOnEscape: { type: 'boolean', default: false },
       advanceOnTab: { type: 'boolean', default: false },
       commitOnBlur: { type: 'boolean', default: false },
+      searchNavigation: { type: 'boolean', default: false },
       numeric: { type: 'boolean', default: false },
       numericMin: { type: 'number', default: 0 },
       numericMax: { type: 'number', default: 1 },
@@ -48,6 +50,7 @@ export default definePrototype<Props>({
     def.expose.event('blurCommit', { payload: 'json' });
     def.expose.event('selectionRequest', { payload: 'json' });
     def.expose.event('replacementRequest', { payload: 'json' });
+    def.expose.event('navigationRequest', { payload: 'json' });
     let run: RunHandle<Props> | null = null;
     let mounted = false;
     let disposed = false;
@@ -115,8 +118,22 @@ export default definePrototype<Props>({
         if (key === 'Enter' || key === 'Escape' || key === 'Tab') event.control.requestDefaultActionPrevention();
         return;
       }
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
       const props = current.props.get();
+      const command = event.ctrlKey === true || event.metaKey === true;
+      // A search field explicitly delegates only these collection requests.
+      // The authored request precedes native single-line caret/Enter defaults;
+      // ordinary editor keys and marked-text candidate navigation stay local.
+      if (props.searchNavigation && !event.altKey
+        && ((!command && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'Enter' || key === 'Escape'))
+          || (command && !event.shiftKey && (key === 'f' || key === 'F')))) {
+        event.control.requestDefaultActionPrevention();
+        current.expose.emit('navigationRequest', {
+          key: key ?? '', value: state.value.get(), shift: event.shiftKey === true,
+          command, viewEpoch: viewEpoch.get(),
+        });
+        return;
+      }
+      if (command || event.altKey) return;
       if (props.numeric && (key === 'ArrowUp' || key === 'ArrowDown')) {
         event.control.requestDefaultActionPrevention();
         stepText(key === 'ArrowUp' ? 1 : -1);

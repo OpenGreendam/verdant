@@ -462,7 +462,6 @@ pub struct GeneratedData5 {
           catch_authored(|| {
           let owner_ref = Owner::new(raw_props, parent.unwrap_or_default(), accepts_context, accepts_props, prop_valid, style_vocabulary());
           let owner = Rc::downgrade(&owner_ref);
-          
           set_instance_associations(&owner_ref, associations);
           let focus = cx.focus_handle();
           let view = cx.entity().downgrade();
@@ -1652,11 +1651,10 @@ pub struct GeneratedData5 {
             }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_147.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_147.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{render,..} => Value::Renderer(render),
       Value::Renderer(render) => Value::Renderer(render),
-      
       Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
       _ => panic!("checked setup result must be a callable")
     } };
-        })) }.call_authored(vec![capability(&owner)]);
+        })) }.call_authored(vec![definition_capability(&owner)]);
           Owner::finish(&owner_ref, renderer);
           let focus_subscriptions = if native_focus_observation_needed(&owner_ref) {
           let focus_owner = owner_ref.clone();

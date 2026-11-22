@@ -52,6 +52,20 @@ pub(crate) fn route_key(scope:&str,key:&str,down:bool,window:&mut Window,cx:&mut
     consumed
 }
 
+/// Retire every authored contact in this window's registered keyboard scope.
+///
+/// Window deactivation and hiding a keyboard are host lifecycle facts. Cancel
+/// each source synchronously so an older queued delivery observes its released
+/// state; deliver the resulting audio-domain changes after the host view lease.
+pub(crate) fn cancel_scope(scope:&str,window:&mut Window,cx:&mut App) {
+    let entries:Vec<_>=cx.try_global::<Keys>().map(|keys|keys.0.iter().filter(|((win,id,_),_)|
+        *win==window.window_handle().window_id()&&id==scope).map(|(_,entry)|entry.clone()).collect()).unwrap_or_default();
+    for entry in entries {
+        let _=entry.handle.call("cancel",vec![],window,cx);
+        cx.defer(move |cx|drain(&entry,cx));
+    }
+}
+
 #[derive(IntoElement)]
 pub(crate) struct Key { pub scope:String,pub note:u8,pub label:String,pub revision:String,pub disabled:bool,
     draw:Draw,callback:Callback,momentary:bool }
@@ -171,6 +185,14 @@ mod native_tests {
         window.dispatch_event(if down {PlatformInput::KeyDown(KeyDownEvent {keystroke,is_held:held,prefer_character_input:false})}
             else {PlatformInput::KeyUp(KeyUpEvent {keystroke})},cx);
     }
+    fn send_key(host:WindowHandle<Harness>,down:bool,held:bool,cx:&mut TestAppContext) {
+        // Native dispatch re-enters the parent view for its key listener. Do
+        // not hold a typed Harness lease while injecting that same input.
+        cx.update_window(host.into(),|_,window,cx|physical_key(down,held,window,cx)).unwrap();
+    }
+    fn send_key_pair(host:WindowHandle<Harness>,cx:&mut TestAppContext) {
+        cx.update_window(host.into(),|_,window,cx|{physical_key(true,false,window,cx);physical_key(false,false,window,cx);}).unwrap();
+    }
     fn entry(window:&Window,cx:&App)->Entry {
         cx.global::<Keys>().0.get(&(window.window_handle().window_id(),"native-performance".into(),60)).unwrap().clone()
     }
@@ -182,12 +204,13 @@ mod native_tests {
     #[gpui::test]
     fn native_held_key_repeats_and_pointer_overlap_release_only_the_last_contact(cx:&mut TestAppContext) {
         let host=open(cx,false);
-        host.update(cx,|_,window,cx|{physical_key(true,false,window,cx);physical_key(true,true,window,cx);}).unwrap();
+        send_key(host,true,false,cx);send_key(host,true,true,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,window,cx|{
             assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true)]);
-            click_sample(true,window,cx);physical_key(false,false,window,cx);
+            click_sample(true,window,cx);
         }).unwrap();
+        send_key(host,false,false,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,window,cx|{
             assert_eq!(host.delivered.borrow().len(),1,"typing release does not stop a physical pointer hold");
@@ -200,14 +223,14 @@ mod native_tests {
     #[gpui::test]
     fn native_revision_change_and_detach_release_the_held_target_without_late_note_on(cx:&mut TestAppContext) {
         let host=open(cx,false);
-        host.update(cx,|_,window,cx|physical_key(true,false,window,cx)).unwrap();
+        send_key(host,true,false,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,_,cx|{host.revision="instrument:two".into();cx.notify();}).unwrap();
         crate::native_test_support::frames(host,cx);
-        host.update(cx,|host,window,cx|{
+        host.update(cx,|host,_,_|{
             assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true),("instrument:one".into(),false)]);
-            physical_key(false,false,window,cx);physical_key(true,false,window,cx);
         }).unwrap();
+        send_key(host,false,false,cx);send_key(host,true,false,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,_,cx|{host.visible=false;cx.notify();}).unwrap();
         crate::native_test_support::frames(host,cx);
@@ -218,9 +241,8 @@ mod native_tests {
             host.visible=true;cx.notify();
         }).unwrap();
         crate::native_test_support::frames(host,cx);
-        host.update(cx,|host,window,cx|{
-            window.focus(&host.focus,cx);physical_key(true,false,window,cx);physical_key(false,false,window,cx);
-        }).unwrap();
+        host.update(cx,|host,window,cx|window.focus(&host.focus,cx)).unwrap();
+        send_key_pair(host,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,_,_|assert_eq!(host.delivered.borrow().len(),4,"a down/up batch retired before delivery never starts audio")).unwrap();
     }
@@ -232,10 +254,18 @@ mod native_tests {
             crate::native_test_support::frames(host,cx);
             host.update(cx,|host,window,cx|{
                 assert_eq!(host.delivered.borrow().last(),Some(&("instrument:one".into(),true)));
+                assert_eq!(entry(window,cx).handle.state("focused").unwrap(),Value::Bool(true),"a physical key hold owns its authored focus");
+                assert!(entry(window,cx).handle.owner.borrow().modules.focus.native.as_ref().is_some_and(|focus|focus.is_focused(window)),"the held key retains the actual native leaf focus");
                 if disable {host.disabled=true;cx.notify();} else {window.focus(&host.outside,cx);}
             }).unwrap();
             crate::native_test_support::frames(host,cx);
             host.update(cx,|host,window,cx|{
+                let key=entry(window,cx);
+                if !disable {assert!(host.outside.is_focused(window));}
+                let physical_focus=key.handle.owner.borrow().modules.focus.native.as_ref().map(|focus|focus.is_focused(window));
+                assert_eq!(key.handle.state("focused").unwrap(),Value::Bool(false),"key source focus after disable={disable}; physical_focus={:?}; failures={:?}",
+                    physical_focus,key.handle.take_failures());
+                assert_eq!(key.handle.state("pressed").unwrap(),Value::Bool(false),"source releases all contacts before its audio delivery");
                 assert_eq!(host.delivered.borrow().last(),Some(&("instrument:one".into(),false)));
                 click_sample(false,window,cx);
                 assert_eq!(host.delivered.borrow().len(),2);
@@ -245,13 +275,15 @@ mod native_tests {
     #[gpui::test]
     fn native_detached_owner_cannot_release_a_replacement_key_with_the_same_registration(cx:&mut TestAppContext) {
         let host=open(cx,false);
-        let retired=host.update(cx,|_,window,cx|{physical_key(true,false,window,cx);entry(window,cx)}).unwrap();
+        send_key(host,true,false,cx);
+        let retired=host.update(cx,|_,window,cx|entry(window,cx)).unwrap();
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,_,cx|{host.visible=false;cx.notify();}).unwrap();
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,_,cx|{host.visible=true;cx.notify();}).unwrap();
         crate::native_test_support::frames(host,cx);
-        host.update(cx,|host,window,cx|{window.focus(&host.focus,cx);physical_key(true,false,window,cx);}).unwrap();
+        host.update(cx,|host,window,cx|window.focus(&host.focus,cx)).unwrap();
+        send_key(host,true,false,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,window,cx|{
             let replacement=entry(window,cx);
@@ -262,8 +294,8 @@ mod native_tests {
             drain(&retired,cx);
             assert_eq!(replacement.handle.state("pressed").unwrap(),Value::Bool(true));
             assert_eq!(host.delivered.borrow().len(),3,"old cleanup cannot emit a second release after the replacement starts");
-            physical_key(false,false,window,cx);
         }).unwrap();
+        send_key(host,false,false,cx);
         crate::native_test_support::frames(host,cx);
         host.update(cx,|host,_,_|assert_eq!(host.delivered.borrow().last(),Some(&("instrument:one".into(),false)))).unwrap();
     }

@@ -314,7 +314,7 @@ mod tests {
     #[gpui::test]
     fn native_common_action_dispatches_once_for_pointer_keyboard_and_assistive_routes(cx: &mut TestAppContext) {
         let window = open(cx);
-        window.update(cx, |_, window, cx| {
+        cx.update_window(window.into(), |_, window, cx| {
             let source = handle("Native compiled action", window);
             let position = source.owner.borrow().bounds.expect("laid out semantic root").center();
             window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent { position, button: MouseButton::Left, ..Default::default() }), cx);
@@ -330,15 +330,17 @@ mod tests {
         crate::native_test_support::frames(window, cx);
         cx.simulate_keystrokes(window.into(), "enter space");
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |host, window, cx| {
+        window.update(cx, |host, _, _| {
             assert_eq!(host.activations, 3, "each native terminal key must activate exactly once");
+        }).unwrap();
+        cx.update_window(window.into(), |_, window, cx| {
             let source = handle("Native compiled action", window);
             dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
         }).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, _, cx| { assert_eq!(host.activations, 4); host.disabled = true; cx.notify(); }).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |_, window, cx| {
+        cx.update_window(window.into(), |_, window, cx| {
             let source = handle("Native compiled action", window);
             dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
         }).unwrap();
@@ -349,7 +351,7 @@ mod tests {
     #[gpui::test]
     fn native_common_tabs_use_authored_arrow_navigation_and_real_focus(cx: &mut TestAppContext) {
         let window = open(cx);
-        window.update(cx, |_, window, cx| { handle("Native tab 0", window).call("focusSelf", vec![], window, cx).unwrap(); }).unwrap();
+        cx.update_window(window.into(), |_, window, cx| { handle("Native tab 0", window).call("focusSelf", vec![], window, cx).unwrap(); }).unwrap();
         crate::native_test_support::frames(window, cx);
         cx.simulate_keystrokes(window.into(), "left");
         crate::native_test_support::frames(window, cx);
@@ -365,7 +367,7 @@ mod tests {
     #[gpui::test]
     fn native_action_preserves_shift_and_physical_origin_and_delivers_the_assistive_route(cx: &mut TestAppContext) {
         let window = open(cx);
-        window.update(cx, |_, window, cx| {
+        cx.update_window(window.into(), |_, window, cx| {
             let source = handle("Native compiled action", window);
             let position = source.owner.borrow().bounds.expect("laid out semantic root").center();
             let modifiers = gpui::Modifiers { shift: true, ..Default::default() };
@@ -380,8 +382,10 @@ mod tests {
         crate::native_test_support::frames(window, cx);
         cx.simulate_keystrokes(window.into(), "shift-enter");
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |host, window, cx| {
+        window.update(cx, |host, _, _| {
             assert_eq!(host.samples, vec![(true, true, false), (true, false, false)]);
+        }).unwrap();
+        cx.update_window(window.into(), |_, window, cx| {
             let source = handle("Separate assistive action", window);
             dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
         }).unwrap();
@@ -395,7 +399,7 @@ mod tests {
     #[gpui::test]
     fn native_context_menu_uses_compiled_mouse_and_named_keyboard_routes(cx: &mut TestAppContext) {
         let window = open(cx);
-        let position = window.update(cx, |_, window, cx| {
+        let position = cx.update_window(window.into(), |_, window, cx| {
             let source = handle("Native compiled action", window);
             let position = source.owner.borrow().bounds.unwrap().center();
             window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
@@ -464,16 +468,16 @@ mod tests {
             window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent { position, button:MouseButton::Left, ..Default::default() }), cx);
             window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position, button:MouseButton::Left, ..Default::default() }), cx);
         };
-        window.update(cx, |_, window, cx| click("Nested child action", false, window, cx)).unwrap();
+        cx.update_window(window.into(), |_, window, cx| click("Nested child action", false, window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, _, _| {
             assert_eq!(host.child_clicks, 1, "foreground child must receive the physical click through its own source");
             assert_eq!(host.parent_clicks, 0, "child activation must not run the background source command");
         }).unwrap();
-        window.update(cx, |_, window, cx| click("Nested scalar", false, window, cx)).unwrap();
+        cx.update_window(window.into(), |_, window, cx| click("Nested scalar", false, window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, _, _| { assert_eq!(host.scalar_taps, 1); assert_eq!(host.parent_clicks, 0); }).unwrap();
-        window.update(cx, |_, window, cx| click("Nested parent action", true, window, cx)).unwrap();
+        cx.update_window(window.into(), |_, window, cx| click("Nested parent action", true, window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
             assert_eq!(host.parent_clicks, 1); assert_eq!(host.child_clicks, 1); assert_eq!(host.scalar_taps, 1);
@@ -493,16 +497,18 @@ mod tests {
             let focus = host.scalar_focus.as_ref().expect("compiled scalar focus").clone(); window.focus(&focus, cx);
         }).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |_, window, cx| {
+        cx.update_window(window.into(), |_, window, cx| {
             let scalar = handle("Nested scalar", window);
             assert_eq!(scalar.state("focused").unwrap(), Value::Bool(true));
             assert_eq!(handle("Nested child action", window).state("focused").unwrap(), Value::Bool(false));
             dispatch_accessibility_action(&scalar.owner, "increment", None); drive_owners(window, cx);
         }).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |host, window, cx| {
+        window.update(cx, |host, _, _| {
             assert_eq!(host.scalar_commits, 1); assert!((host.scalar_value-0.6).abs()<1e-10);
             assert_eq!(host.parent_clicks, 1); assert_eq!(host.child_clicks, 2);
+        }).unwrap();
+        cx.update_window(window.into(), |_, window, cx| {
             dispatch_accessibility_action(&handle("Nested child action", window).owner, "activate", None); drive_owners(window, cx);
         }).unwrap();
         crate::native_test_support::frames(window, cx);

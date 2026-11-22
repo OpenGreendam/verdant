@@ -59,14 +59,16 @@ struct NoteModDrag {
 #[derive(Default)]
 struct RollExtraDragState {
     mod_drag: Option<NoteModDrag>,
-    loop_drag: Option<(gpui::EntityId, bool, bool, i64, i64)>, // (editor, is_arrange, dragging_start, start_tick, end_tick)
+    loop_drag: Option<LoopPreview>,
 }
+#[derive(Clone,Copy)]
+struct LoopPreview { editor:gpui::EntityId, arrange:bool, dragging_start:bool, start:i64, end:i64, snap:bool }
 impl gpui::Global for RollExtraDragState {}
 
 pub(crate) fn has_extra_drag(editor: gpui::EntityId, cx: &App) -> bool {
     cx.try_global::<RollExtraDragState>().is_some_and(|s| {
         s.mod_drag.as_ref().is_some_and(|d| d.editor == editor)
-            || s.loop_drag.is_some_and(|(eid, _, _, _, _)| eid == editor)
+            || s.loop_drag.is_some_and(|drag| drag.editor == editor)
     })
 }
 
@@ -99,7 +101,7 @@ impl Editor {
 pub(crate) fn cancel_extra_drag(editor: gpui::EntityId, cx: &mut App) {
     if let Some(state) = cx.try_global::<RollExtraDragState>() {
         let cancel_mod = state.mod_drag.as_ref().is_some_and(|d| d.editor == editor);
-        let cancel_loop = state.loop_drag.is_some_and(|(eid, _, _, _, _)| eid == editor);
+        let cancel_loop = state.loop_drag.is_some_and(|drag| drag.editor == editor);
         if cancel_mod {
             cx.global_mut::<RollExtraDragState>().mod_drag = None;
         }
@@ -1247,7 +1249,7 @@ pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
         move |input|native_ruler(draw.clone(),arrange,input).into_any_element(),
         move |_,window,cx| {
             crate::ruler_navigation::cancel(cancel.entity_id(),window,cx);
-            let owned=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|(e,a,_,_,_)|e==cancel.entity_id()&&a==arrange);
+            let owned=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|drag|drag.editor==cancel.entity_id()&&drag.arrange==arrange);
             if owned { cx.global_mut::<RollExtraDragState>().loop_drag=None;cancel.update(cx,|_,cx|cx.notify()); }
         }).audio_keys(arrange)
 }
@@ -1313,8 +1315,8 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                 let transport=ed.playback_settings();
                 let loop_preview = cx.global::<RollExtraDragState>()
                     .loop_drag
-                    .filter(|(eid, _, _, _, _)| *eid == editor.entity_id())
-                    .map(|(_, _, _, s, e)| (s, e));
+                    .filter(|drag| drag.editor == editor.entity_id())
+                    .map(|drag| (drag.start,drag.end));
                 let (ls, le) = loop_preview.unwrap_or((transport.loop_start, transport.loop_end));
                 if le > ls {
                     let a = vp.tick_to_x(ls as f64);
@@ -1334,7 +1336,7 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                 window.paint_quad(fill(b(0.0, hgt - 1.0, w, 1.0, o), th.shade));
             }
             flush_texts(window, cx, bounds, texts);
-            if over_loop_handle || cx.global::<RollExtraDragState>().loop_drag.is_some_and(|(eid, arr, _, _, _)| eid == editor.entity_id() && arr == arrange) {
+            if over_loop_handle || cx.global::<RollExtraDragState>().loop_drag.is_some_and(|drag| drag.editor == editor.entity_id() && drag.arrange == arrange) {
                 window.set_cursor_style(CursorStyle::ResizeLeftRight, &hitbox);
             }
             if arrange {
@@ -1353,8 +1355,8 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                 let mut scrub = false;
                 e.update(cx, |ed, cx| {
                     let vp = if arrange { ed.arrange } else { ed.session.viewport };
-                    let tick=ed.session.snap.snap(vp.start_tick+x/vp.px_per_tick).max(0);
-                    let segment=ed.language_segments.at(&ed.session.track,tick).map(|segment|segment.key.clone());
+                    let raw_tick=vp.start_tick+x/vp.px_per_tick;
+                    let segment=ed.language_segments.at(&ed.session.track,ed.session.snap.snap(raw_tick).max(0)).map(|segment|segment.key.clone());
                     let pb=ed.playback_settings();let(ls,le)=(pb.loop_start,pb.loop_end);
                     let loop_band=le>ls&&y<=12.;
                     let start_hit=loop_band&&(x-vp.tick_to_x(ls as f64)).abs()<=6.5;
@@ -1362,6 +1364,7 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                     let Some(intent)=policy.intent(ed,"rulerGesture",vec![(event.phase==PointerPhase::Context).into(),
                         (event.clicks as u64).into(),arrange.into(),segment.is_some().into(),start_hit.into(),end_hit.into(),
                         event.modifiers.shift.into(),event.modifiers.alt.into()],window,cx) else{return;};
+                    let tick=if intent.snap {ed.session.snap.snap(raw_tick)} else {raw_tick.round() as i64}.max(0);
                     if intent.kind=="ruler-menu" {
                         use crate::menu::MenuItem as I;use crate::editor::{MenuAction as M,WorkflowAction as A};
                         let tempo=ed.project().tempo_map.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
@@ -1384,15 +1387,15 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                         return;
                     }
                     if matches!(intent.kind.as_str(),"drag-loop-start"|"drag-loop-end") {
-                        started_loop_drag=Some((intent.kind=="drag-loop-start",ls,le));return;
+                        started_loop_drag=Some((intent.kind=="drag-loop-start",ls,le,intent.snap));return;
                     }
                     let min_loop_len = ed.project().ppq.max(1);
                     if intent.kind=="set-loop-start"{ed.edit_playback("循环起点",cx,|s|{s.loop_start=tick;if s.loop_end<=tick{s.loop_end=tick+min_loop_len;}s.looping=true;});}
                     else if intent.kind=="set-loop-end"{ed.edit_playback("循环终点",cx,|s|{s.loop_end=tick.max(s.loop_start+1);s.looping=true;});}
                     else if intent.kind=="scrub" { scrub = true; }
                 });
-                if let Some((drag_start, ls, le)) = started_loop_drag {
-                    cx.global_mut::<RollExtraDragState>().loop_drag = Some((e.entity_id(), arrange, drag_start, ls, le));
+                if let Some((drag_start, ls, le,snap)) = started_loop_drag {
+                    cx.global_mut::<RollExtraDragState>().loop_drag = Some(LoopPreview{editor:e.entity_id(),arrange,dragging_start:drag_start,start:ls,end:le,snap});
                     return true;
                 } else if scrub { return crate::ruler_navigation::begin_pointer(&e,arrange,bounds,&h_down,&policy,window,cx,event.position); }
                 false
@@ -1417,18 +1420,18 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
 }
 
 fn sample_loop_range(editor:&Entity<Editor>,arrange:bool,x:f64,cx:&mut App) {
-    let Some((eid,arr,start,ls,le))=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag) else { return };
-    if eid!=editor.entity_id()||arr!=arrange { return; }
+    let Some(drag)=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag) else { return };
+    if drag.editor!=editor.entity_id()||drag.arrange!=arrange { return; }
     let ed=editor.read(cx);let vp=if arrange { ed.arrange } else { ed.session.viewport };
-    let tick=ed.session.snap.snap(vp.x_to_tick(x)).max(0);let minimum=ed.project().ppq.max(1).min(120);
-    let (ls,le)=if start { (tick.min(le-1).max(0),le) } else { (ls,tick.max(ls+minimum)) };
-    if let Some(drag)=cx.global_mut::<RollExtraDragState>().loop_drag.as_mut() { drag.3=ls;drag.4=le; }
+    let raw=vp.x_to_tick(x);let tick=if drag.snap{ed.session.snap.snap(raw)}else{raw.round() as i64}.max(0);let minimum=ed.project().ppq.max(1).min(120);
+    let (ls,le)=if drag.dragging_start { (tick.min(drag.end-1).max(0),drag.end) } else { (drag.start,tick.max(drag.start+minimum)) };
+    if let Some(drag)=cx.global_mut::<RollExtraDragState>().loop_drag.as_mut() { drag.start=ls;drag.end=le; }
     editor.update(cx,|_,cx|cx.notify());
 }
 fn finish_loop_range(editor:&Entity<Editor>,arrange:bool,window:&mut Window,cx:&mut App) {
-    let matched=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|(eid,arr,_,_,_)|eid==editor.entity_id()&&arr==arrange);
+    let matched=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|drag|drag.editor==editor.entity_id()&&drag.arrange==arrange);
     if !matched { return; }
-    if let Some((_,_,_,start,end))=cx.global_mut::<RollExtraDragState>().loop_drag.take() {
+    if let Some(LoopPreview{start,end,..})=cx.global_mut::<RollExtraDragState>().loop_drag.take() {
         editor.update(cx,|ed,cx| {
             ed.edit_playback("拖拽循环范围",cx,|s| { s.loop_start=start;s.loop_end=end.max(start+1);s.looping=true; });cx.notify();
         });

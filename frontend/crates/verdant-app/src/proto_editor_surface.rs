@@ -33,6 +33,14 @@ pub(crate) fn has_contact(editor:EntityId,cx:&App)->bool {
 pub(crate) fn source_state(editor:EntityId,key:&str,name:&str,cx:&App)->Option<Value> {
     cx.try_global::<Surfaces>()?.inputs.get(&(editor,key.to_owned()))?.1.handle.state(name).ok()
 }
+#[cfg(test)]
+pub(crate) fn source_native_snapshot(editor:EntityId,key:&str,window:&Window,cx:&App)->Option<Value> {
+    let handle=&cx.try_global::<Surfaces>()?.inputs.get(&(editor,key.to_owned()))?.1.handle;
+    let owner=handle.owner.borrow();
+    Some(json!({"focused":owner.focused,"physicalFocus":owner.modules.focus.native.as_ref().is_some_and(|focus|focus.is_focused(window)),
+        "focusRequested":owner.focus_requested,"mounted":owner.mounted,"present":owner.present,"epoch":owner.epoch,
+        "phase":handle.state("phase").ok(),"pointer":handle.state("pointer").ok(),"lease":handle.state("lease").ok()}))
+}
 
 #[derive(Clone)]
 struct Target { editor: WeakEntity<Editor>, revision: String, cancel: Cancel }

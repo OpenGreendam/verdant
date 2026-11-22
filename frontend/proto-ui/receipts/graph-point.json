@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "231be0e8d1d05367dfde14a172dc8ae4a014ed83"
+    "revision": "8eccebec744a89abf4579ebb3ba5442eeb1d7c92"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -81,7 +81,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "6f623dd01b878c9ab6ff617dee5ed719b6097f3cb0a9a1f50416c41aafdeb38f"
+    "contentSha256": "1542fc67a82f42fbc20e77e0ac0a0cc7a039d9e4103538e36243156fc155f3fa"
   },
   "artifacts": [
     {
@@ -92,22 +92,22 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "3446737bd16d8e262251b811cd4ee187f993be514791444d5136372c5d5eddf9"
+      "sha256": "510e0f5f49b7c612bdd1526e66c2f06dfab8f4da164cdc67636075a49dd5b6a5"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "46093696758f7e2895b8d527ea3b5b06ff0ccef40ce0c2af6a4f41b43d896571"
+      "sha256": "fff2caf0522af8ed403f78308ac0e9ec569b3d16e248fd4a0a3d7d64e1cd692d"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "b4763a6d6cf75e631740c6461a83286c1f7238e5593eca7c486eda8ca3b676ca"
+      "sha256": "91cc15d004a48e30fb3e2d1339c0fc602e840af0c40fb68d313a2976ab65f87d"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "2477b36a6b04c5ad0e99aa3ecd9c6694b28bbcd11920004b16a5d255259aba17"
+      "sha256": "f00f0fc5aaa53c5bcfbb5a3f55a7900bbdcdd35e05696f4de8db015b728b384e"
     }
   ]
 }

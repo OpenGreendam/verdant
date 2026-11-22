@@ -1,4 +1,4 @@
-import { definePrototype, type A11ySetValueEventPayload, type RunHandle } from '@proto.ui/core';
+import { definePrototype, tw, type A11ySetValueEventPayload, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable } from '@proto.ui/hooks';
 
 type Props = {
@@ -45,6 +45,9 @@ export default definePrototype<Props>({
     accessible.action('increment', { event: 'host:verdant-scalar-increment' });
     accessible.action('decrement', { event: 'host:verdant-scalar-decrement' });
     accessible.action('setValue', { event: 'host:verdant-scalar-set-value' });
+    // Native visual slots have no intrinsic size. The authored root is the
+    // interactive surface and occupies the allocation provided by its host.
+    def.feedback.style.use(tw('w-full h-full'));
     def.expose.state('value', value);
     def.expose.state('initialValue', initialValue);
     def.expose.state('phase', phase);

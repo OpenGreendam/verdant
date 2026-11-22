@@ -68,7 +68,7 @@ pub fn assert_native_slot_children(children:&[NativeSnapshot]) {
 #[derive(Clone)]
 pub enum Value {
     Undefined, Opaque(Rc<()>), ContextKey(NativeContextKey), Number(f64), Json(Json), Record(Rc<NativeRecord>), Array(Rc<Vec<Value>>), CaughtStringUnit(u16),
-    Function(Callback), NativeFunction{identity:Rc<()>,render:NativeRenderer}, Renderer(NativeRenderer), Owner(OwnerWeak), State(Rc<State>), BorrowedState(Rc<State>),
+    Function(Callback), NativeFunction{identity:Rc<()>,render:NativeRenderer}, Renderer(NativeRenderer), Owner(OwnerWeak), Definition(OwnerWeak), RenderHandle(OwnerWeak), State(Rc<State>), BorrowedState(Rc<State>),
     Style(Vec<(String, String)>), Resource(Rc<Cell<bool>>),
     Input(Rc<Input>),
     StaticCapability(&'static StaticDeclaration), Handle(OwnerWeak, &'static str),
@@ -151,11 +151,14 @@ impl Value {
     // Native consumers use call(), which returns before any GPUI lease unwinds.
     pub fn call_authored(&self, args: Vec<Self>) -> Self { match self { Self::Function(f)=>f(args), _=>value_type_error("Value is not callable") } }
     pub fn get(&self) -> Self { match self { Self::State(state)|Self::BorrowedState(state)=>{ensure(&state.owner);state.value.borrow().clone()}, Self::Observed(owner, key)=>observed(owner,key), _=>value_type_error("expected State handle") } }
-    pub fn owner(&self) -> OwnerWeak { match self { Self::Owner(owner)|Self::Handle(owner,_)|Self::HostTarget(owner)|Self::Part(owner,_)|Self::ObjectRef(owner)=>owner.clone(), _=>panic!("expected owner capability") } }
+    pub fn owner(&self) -> OwnerWeak { match self { Self::Owner(owner)|Self::Definition(owner)|Self::RenderHandle(owner)|Self::Handle(owner,_)|Self::HostTarget(owner)|Self::Part(owner,_)|Self::ObjectRef(owner)=>owner.clone(), _=>panic!("expected owner capability") } }
     pub fn items(&self) -> Vec<Self> { match self {Self::Array(v)=>(**v).clone(),Self::Json(Json::Array(v))=>v.iter().cloned().map(Self::json).collect(),_=>value_type_error("expected array")} }
 }
 pub fn strict_equal(a:&Value,b:&Value)->bool {
     match (a,b) {
+        // Callback handles are retained references to one owner. Comparing
+        // clones observes identity without granting a new callback scope.
+        (Value::Owner(a),Value::Owner(b))|(Value::Definition(a),Value::Definition(b))|(Value::RenderHandle(a),Value::RenderHandle(b))=>return Weak::ptr_eq(a,b),
         (Value::CaughtStringUnit(a),Value::CaughtStringUnit(b))=>return a==b,
         (Value::CaughtStringUnit(unit),Value::Json(Json::String(text)))|(Value::Json(Json::String(text)),Value::CaughtStringUnit(unit))=>return text.encode_utf16().eq(std::iter::once(*unit)),
         _=>{},
@@ -244,6 +247,8 @@ pub fn ensure(owner:&OwnerWeak)->OwnerRef{let owner=owner.upgrade().unwrap_or_el
 pub fn setup(owner:&OwnerWeak)->OwnerRef{let owner=ensure(owner);if owner.borrow().phase!="setup"{value_error("setup-only capability")}owner}
 pub fn runtime(owner:&OwnerWeak)->OwnerRef{let owner=ensure(owner);if matches!(owner.borrow().phase,"setup"|"render"|"before-dispose"){value_error("callback capability required")}owner}
 pub fn capability(owner:&OwnerWeak)->Value{Value::Owner(owner.clone())}
+pub fn definition_capability(owner:&OwnerWeak)->Value{Value::Definition(owner.clone())}
+pub fn renderer_capability(owner:&OwnerWeak)->Value{Value::RenderHandle(owner.clone())}
 pub struct State { pub value:RefCell<Value>, pub kind:&'static str, pub spec:Value, pub owner:OwnerWeak }
 #[derive(Clone)]
 struct Watcher { active:Rc<Cell<bool>>, keys:Option<Vec<String>>, raw:bool, callback:Value }
@@ -329,7 +334,7 @@ impl Owner {
         let guard=PhaseGuard{owner:Rc::downgrade(owner),previous};
         // C-CORE-SYNTAX-0004-C: void setup projects one anonymous slot.
         let _lexical_owner=enter_lexical_owner(&Rc::downgrade(owner));
-        let result=match renderer{Value::Undefined=>NativeSnapshot::slot(),Value::Renderer(render)=>render(vec![capability(&Rc::downgrade(owner))]),_=>panic!("expected compiled native renderer")};
+        let result=match renderer{Value::Undefined=>NativeSnapshot::slot(),Value::Renderer(render)=>render(vec![renderer_capability(&Rc::downgrade(owner))]),_=>panic!("expected compiled native renderer")};
         result.assert_children();
         {let mut o=owner.borrow_mut();o.projection=Some(result);o.projection_revision+=1;}
         drop(guard);
@@ -1041,6 +1046,27 @@ pub fn global_key_up(event:&gpui::KeyUpEvent,window:&mut Window,cx:&mut App){
     if prevented{window.prevent_default();cx.stop_propagation();}drive_owners(window,cx);
 }
 
+#[cfg(all(test,feature="test-support"))]
+mod callback_handle_identity_tests {
+    use super::*;
+    #[test]
+    fn retained_callback_handles_keep_identity_without_reviving_disposed_authority(){
+        let first=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+        let second=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+        let handle=capability(&Rc::downgrade(&first));let retained=handle.clone();
+        assert!(strict_equal(&handle,&retained));
+        assert!(strict_equal(&handle,&capability(&Rc::downgrade(&first))));
+        assert!(!strict_equal(&handle,&capability(&Rc::downgrade(&second))));
+        assert!(!strict_equal(&handle,&Value::HostTarget(Rc::downgrade(&first))));
+        let definition=definition_capability(&Rc::downgrade(&first));let renderer=renderer_capability(&Rc::downgrade(&first));
+        assert!(strict_equal(&definition,&definition.clone()));assert!(strict_equal(&renderer,&renderer.clone()));
+        assert!(!strict_equal(&definition,&handle));assert!(!strict_equal(&renderer,&handle));assert!(!strict_equal(&definition,&renderer));
+        Owner::finish(&first,Value::Undefined);Owner::dispose(&first);
+        assert!(strict_equal(&handle,&retained),"reference identity survives retirement");
+        assert!(catch_authored(||runtime(&handle.owner())).is_err(),"identity is not callback authority");
+    }
+}
+
 // These are scalar conversion primitives, not an evaluator for authored IR.
 // StringToNumber accepts the ECMAScript numeric-string grammar; Rust's FromStr
 // additionally accepts inf/infinity and has a different whitespace predicate.
@@ -1290,7 +1316,7 @@ pub fn authored_hook(owner:&OwnerWeak,name:&str,mode:&'static str,input:Value,in
     {let mut owner=owner_ref.borrow_mut();if mode!="multiple"{owner.authored.entries.insert(name.into(),entry.clone());}
      owner.authored.frames.push(AuthoredFrame{id:order,names:BTreeSet::new(),states:BTreeMap::new(),methods:BTreeMap::new(),children:Vec::new()});}
     let mut guard=CaptureGuard{owner:owner.clone(),open:true};
-    let render=install.call_authored(vec![capability(owner),input.clone(),api.clone()]);
+    let render=install.call_authored(vec![definition_capability(owner),input.clone(),api.clone()]);
     let frame=owner_ref.borrow_mut().authored.frames.pop().expect("capture frame");guard.open=false;
     let result=finish_capture(frame,render);
     // Capture succeeded even if projection subsequently throws. Preserve that
@@ -2415,6 +2441,15 @@ pub fn text_blur(owner:&OwnerRef,window:&mut Window,cx:&mut App){
     if changed&&!owner.borrow().disposed&&owner.borrow().mounted&&owner.borrow().present{text_event(owner,"change",&value,false,None,None,window,cx);}
 }
 pub struct NativeTextInput {owner:OwnerWeak,epoch:u64}
+/// Native consumer evidence can exercise the production InputHandler lease.
+/// This does not create an editor, replace a lease, or change authored State.
+#[cfg(feature="test-support")]
+pub fn native_text_input_for_test(owner:&OwnerRef,window:&Window)->Option<NativeTextInput>{
+    if !ready(owner){return None}
+    let o=owner.borrow();let text=&o.modules.text;
+    if o.window_id!=Some(window.window_handle().window_id())||!text.supported||!text.declared||!text.initialized{return None}
+    Some(NativeTextInput{owner:Rc::downgrade(owner),epoch:text.lease_epoch})
+}
 impl NativeTextInput {
     fn replace(&mut self,range:Option<Range<usize>>,input:&str,input_type:Option<&str>,window:&mut Window,cx:&mut App){
         let Some(owner)=self.live().filter(text_editable)else{return};
@@ -2671,6 +2706,7 @@ mod text_owner_tests {
         let window=open(cx);let other=open(cx);
         let owner=window.update(cx,|_,window,cx|{
             let owner=text_owner(window,"a😀候b");
+            assert!(native_text_input_for_test(&owner,window).is_some());
             assert!(text_select_utf16(&owner,2,3,window,cx));
             assert_eq!(input(&owner).selected_text_range(false,window,cx).unwrap().range,1..3);
             assert!(text_select_utf16(&owner,2,2,window,cx));
@@ -2684,12 +2720,14 @@ mod text_owner_tests {
             text_sync(&Rc::downgrade(&owner),record(vec![("disabled",Value::boolean(false))]));
             owner
         }).unwrap();
-        other.update(cx,|_,window,cx|assert!(!text_select_utf16(&owner,0,0,window,cx))).unwrap();
+        other.update(cx,|_,window,cx|{assert!(!text_select_utf16(&owner,0,0,window,cx));assert!(native_text_input_for_test(&owner,window).is_none());}).unwrap();
         window.update(cx,|_,window,cx|{
             owner.borrow_mut().mounted=false;
             assert!(!text_select_utf16(&owner,0,0,window,cx));
+            assert!(native_text_input_for_test(&owner,window).is_none());
             owner.borrow_mut().mounted=true;Owner::dispose(&owner);
             assert!(!text_select_utf16(&owner,0,0,window,cx));
+            assert!(native_text_input_for_test(&owner,window).is_none());
         }).unwrap();
     }
 
@@ -3150,7 +3188,7 @@ impl Drop for ControlLabelBinding {fn drop(&mut self){self.reference.0.borrow_mu
 #[derive(Default)]
 pub struct ControlLabelModule {
     kind:Option<&'static str>,callback:Value,binding:Option<ControlLabelBinding>,notify:Option<Rc<dyn Fn()>>,
-    naming:bool,activation:bool,view:Option<(u64,gpui::WindowId)>,pointer:Option<ControlLabelPointer>,
+    naming:bool,activation:bool,view:Option<(u64,gpui::WindowId,Option<gpui::accesskit::NodeId>)>,pointer:Option<ControlLabelPointer>,
 }
 #[derive(Clone)]
 struct ControlLabelPointer {pair:ControlLabelPair,origin:gpui::Point<Pixels>}
@@ -3198,8 +3236,13 @@ pub fn control_label_sync(owner:&OwnerWeak,options:Value)->Value{
     if let Some(reference)=reference{control_label_changed(&reference);}Value::Undefined
 }
 pub fn control_label_commit(owner:&OwnerRef){
-    let view={let o=owner.borrow();if !ready(owner){None}else{o.window_id.map(|window|(o.epoch,window))}};
-    let reference={let mut o=owner.borrow_mut();let module=&mut o.modules.control_label;if module.view==view{return}module.view=view;module.binding.as_ref().map(|binding|binding.reference.clone())};
+    // A logical participant may be painted through more than one native
+    // parent. Keep an exact unique-node receipt, without treating each layout
+    // frame as a new lease. Ambiguity and replacement retire pending input;
+    // a stable ambiguous tree must not schedule an endless redraw loop.
+    let view={let o=owner.borrow();if !ready(owner){None}else{o.window_id.map(|window|
+        (o.epoch,window,if o.modules.a11y_frame!=0&&o.modules.a11y_bindings==1{o.modules.a11y_node}else{None}))}};
+    let reference={let mut o=owner.borrow_mut();let module=&mut o.modules.control_label;if module.view==view{return}module.view=view;module.pointer=None;module.binding.as_ref().map(|binding|binding.reference.clone())};
     if let Some(reference)=reference{control_label_changed(&reference);}
 }
 pub fn control_label_detach(owner:&OwnerRef){
@@ -3220,7 +3263,10 @@ fn control_label_pair(owner:&OwnerRef,frame:Option<u64>)->Result<ControlLabelPai
     if labels.len()!=1||targets.len()!=1{return Err("missing-binding")}
     let label=labels.remove(0);let target=targets.remove(0);let l=label.borrow();let t=target.borrow();
     if l.window_id.is_none()||l.window_id!=t.window_id{return Err("foreign-tree-scope")}
-    if let Some(frame)=frame{if l.modules.a11y_frame!=frame||t.modules.a11y_frame!=frame||l.modules.a11y_bindings!=1||t.modules.a11y_bindings!=1{return Err("missing-view")}}
+    if l.modules.a11y_bindings>1||t.modules.a11y_bindings>1{return Err("ambiguous-view")}
+    let frame=frame.unwrap_or(l.modules.a11y_frame);
+    if frame==0||l.modules.a11y_frame!=frame||t.modules.a11y_frame!=frame||l.modules.a11y_bindings!=1||t.modules.a11y_bindings!=1
+        ||l.modules.a11y_node.is_none()||t.modules.a11y_node.is_none(){return Err("missing-view")}
     Ok(ControlLabelPair{reference,revision,label:Rc::downgrade(&label),target:Rc::downgrade(&target),label_epoch:l.epoch,target_epoch:t.epoch})
 }
 fn control_label_name_conflict(target:&OwnerRef)->bool{
@@ -3286,7 +3332,9 @@ mod control_label_lease_tests {
         let weak=Rc::downgrade(&owner);control_label_declare(&weak,kind,callback);
         control_label_sync(&weak,record(vec![("naming",Value::boolean(true)),("activation",Value::boolean(true))]));
         set_instance_associations(&owner,NativeInstanceAssociations{control_label:Some(reference.clone())});Owner::finish(&owner,Value::Undefined);
-        {let mut o=owner.borrow_mut();o.window_id=Some(window.window_handle().window_id());o.mounted=true;o.bounds=Some(Bounds::default());o.epoch=1;}
+        {let mut o=owner.borrow_mut();o.window_id=Some(window.window_handle().window_id());o.mounted=true;o.bounds=Some(Bounds::default());o.epoch=1;
+            o.modules.a11y_frame=1;o.modules.a11y_bindings=1;o.modules.a11y_node=Some(gpui::accesskit::NodeId(if kind=="label"{1}else{2}));}
+        control_label_commit(&owner);
         owner
     }
     #[gpui::test]
@@ -3308,7 +3356,9 @@ mod control_label_lease_tests {
             assert!(control_label_accessibility_action(&label,window,cx));assert_eq!(calls.get(),1);
             assert!(control_label_accessibility_action(&label,window,cx));assert_eq!(calls.get(),2);
             let stale=control_label_pair(&label,None).unwrap();detach_native_view(&target);assert!(!stale.current());
-            {let mut o=target.borrow_mut();o.mounted=true;o.bounds=Some(Bounds::default());o.epoch+=1;}
+            {let mut o=target.borrow_mut();o.mounted=true;o.bounds=Some(Bounds::default());o.epoch+=1;
+                o.modules.a11y_frame=1;o.modules.a11y_bindings=1;o.modules.a11y_node=Some(gpui::accesskit::NodeId(2));}
+            control_label_commit(&target);
             assert!(!stale.current());assert!(control_label_accessibility_action(&label,window,cx));assert_eq!(calls.get(),3);
             Owner::dispose(&label);Owner::dispose(&target);
         }).unwrap();
@@ -3323,6 +3373,34 @@ mod control_label_lease_tests {
             assert_eq!(control_label_diagnostic(&label),Some("name-conflict"));assert!(control_label_accessibility_action(&label,window,cx));assert_eq!(calls.get(),1);
             set_instance_associations(&target,NativeInstanceAssociations::default());assert_eq!(target.borrow().modules.accessible_text["name"].text(),"Consumer name");
             assert!(!control_label_accessibility_action(&label,window,cx));Owner::dispose(&label);Owner::dispose(&target);
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn pending_requests_cannot_revive_after_unique_node_replacement_or_physical_ambiguity(cx:&mut TestAppContext){
+        let window=cx.update(|cx|cx.open_window(Default::default(),|_,cx|cx.new(|_|Empty)).unwrap());
+        window.update(cx,|_,window,cx|{
+            let reference=ControlLabelRef::new();let label=owner(window,"label",&reference,Value::Undefined);
+            let retained=Rc::new(RefCell::new(Value::Undefined));let captured=retained.clone();
+            let target=owner(window,"target",&reference,Value::Function(Rc::new(move|arguments|{
+                *captured.borrow_mut()=arguments[1].clone();Value::Undefined
+            })));
+            assert!(control_label_accessibility_action(&label,window,cx));let original=retained.borrow().clone();
+            assert!(control_label_request_current(original.clone()).bool());
+            target.borrow_mut().modules.a11y_node=Some(gpui::accesskit::NodeId(3));control_label_commit(&target);
+            assert!(!control_label_request_current(original.clone()).bool(),"a new physical node is a new view lease even if its owner and window stay the same");
+            assert!(control_label_accessibility_action(&label,window,cx));let replaced=retained.borrow().clone();
+            target.borrow_mut().modules.a11y_node=Some(gpui::accesskit::NodeId(2));control_label_commit(&target);
+            assert!(!control_label_request_current(original).bool());assert!(!control_label_request_current(replaced).bool());
+            assert!(control_label_accessibility_action(&label,window,cx));let unique=retained.borrow().clone();
+            target.borrow_mut().modules.a11y_bindings=2;control_label_commit(&target);
+            assert_eq!(control_label_diagnostic(&label),Some("ambiguous-view"));
+            assert!(!control_label_accessibility_action(&label,window,cx));assert!(!control_label_request_current(unique.clone()).bool());
+            let ambiguous_revision=reference.0.borrow().revision;control_label_commit(&target);
+            assert_eq!(reference.0.borrow().revision,ambiguous_revision,"stable ambiguity does not repeatedly notify or invalidate");
+            target.borrow_mut().modules.a11y_bindings=1;control_label_commit(&target);
+            assert!(!control_label_request_current(unique).bool());
+            assert!(control_label_accessibility_action(&label,window,cx));assert!(control_label_request_current(retained.borrow().clone()).bool());
+            Owner::dispose(&label);Owner::dispose(&target);
         }).unwrap();
     }
     #[test]

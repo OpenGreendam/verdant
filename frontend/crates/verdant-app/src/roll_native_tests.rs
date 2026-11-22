@@ -160,6 +160,8 @@ fn note_exit_blur_detach_and_project_change_release_capture_before_up(cx: &mut T
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
             assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","focused",cx),Some(serde_json::Value::Bool(true)), "accepted note contact physically focuses its authored source");
+            assert_eq!(crate::proto_editor_surface::source_native_snapshot(host.editor.entity_id(),"piano-roll",window,cx).as_ref().and_then(|value|value.get("physicalFocus")),Some(&serde_json::Value::Bool(true)),
+                "accepted note contact retains the actual native leaf focus");
             match reason {
             "exit" => { window.dispatch_event(gpui::PlatformInput::MouseExited(gpui::MouseExitEvent::default()), cx); }
             "blur" => window.focus(&host.outside, cx),
@@ -174,6 +176,13 @@ fn note_exit_blur_detach_and_project_change_release_capture_before_up(cx: &mut T
         }}).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
+            if reason=="blur" {
+                assert!(host.outside.is_focused(window),"the native focus transfer reaches the outside target");
+                assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","focused",cx),Some(serde_json::Value::Bool(false)),
+                    "blur updates the authored focus fact: {:?}",crate::proto_editor_surface::source_native_snapshot(host.editor.entity_id(),"piano-roll",window,cx));
+                assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","phase",cx),Some(serde_json::Value::String("idle".into())),
+                    "blur retires the authored contact before domain delivery");
+            }
             assert!(host.editor.read(cx).session.pointer_owner().is_none(), "{reason} retired logical ownership");
             assert!(window.captured_hitbox().is_none(), "{reason} released native capture without up");
             let revision = host.editor.read(cx).revision();
@@ -228,6 +237,10 @@ fn note_mod_handle_blur_uses_the_same_cancel_executor(cx: &mut TestAppContext) {
     window.update(cx, |host, window, cx| window.focus(&host.outside, cx)).unwrap();
     crate::native_test_support::frames(window, cx);
     window.update(cx, |host, window, cx| {
+        assert!(host.outside.is_focused(window));
+        assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","focused",cx),Some(serde_json::Value::Bool(false)),
+            "modulation blur updates source focus: {:?}",crate::proto_editor_surface::source_native_snapshot(host.editor.entity_id(),"piano-roll",window,cx));
+        assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","phase",cx),Some(serde_json::Value::String("idle".into())));
         assert!(!has_note_mod_drag(host.editor.entity_id(), cx));
         assert!(window.captured_hitbox().is_none());
         mouse_up(window, cx, point(px(190.0), px(80.0)));

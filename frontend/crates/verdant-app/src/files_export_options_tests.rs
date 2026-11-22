@@ -151,8 +151,10 @@ fn native_export_dialog_uses_compiled_text_selection_radio_and_submit(cx: &mut g
     crate::native_test_support::frames(window, cx);
     cx.simulate_keystrokes(window.into(), "up");
     crate::native_test_support::frames(window, cx);
-    window.update(cx, |view, window, cx| {
+    window.update(cx, |view, _, cx| {
         assert_eq!(view.ppq.read(cx).value(), "1921");
+    }).unwrap();
+    cx.update_window(window.into(), |_, window, cx| {
         let radio = all_owners().into_iter().find(|owner| {
             let owner = owner.borrow();
             owner.mounted && owner.window_id == Some(window.window_handle().window_id())

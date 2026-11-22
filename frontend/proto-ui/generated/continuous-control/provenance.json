@@ -2,7 +2,7 @@
   "source": {
     "file": "frontend/proto-ui/src/continuous-control.proto.ts",
     "exportName": "default",
-    "sha256": "573ea6b03397a7e01bd46b62a21878e540580aff752a9ae2a39ccd290c169a54"
+    "sha256": "2c4af781e29d6a78d219d47acce4ba9248e772d2759b33faf3231c0027dbe36e"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "6f623dd01b878c9ab6ff617dee5ed719b6097f3cb0a9a1f50416c41aafdeb38f",
+    "contentSha256": "1542fc67a82f42fbc20e77e0ac0a0cc7a039d9e4103538e36243156fc155f3fa",
     "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
     "bundled": false
   },
@@ -88,20 +88,20 @@
   "sourceFiles": [
     {
       "file": "frontend/proto-ui/src/continuous-control.proto.ts",
-      "sha256": "56627147fbaaede3b82de116a8ec662b10421b0df84e2bf22928052dc3142f58"
+      "sha256": "e99f62e9365e2f5a4ed52acaeb02c5c6324b6c959d95272659b5b88443c3bd2c"
     }
   ],
-  "generatedSha256": "81d31d64e33bd850b26dedafeeaa8d3af74d5787d61facc264328dce317ec30d",
+  "generatedSha256": "99cf99c085beebba94cfc64ea0b58fbca960c6767c124fe36448d6229ba5cad2",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "81d31d64e33bd850b26dedafeeaa8d3af74d5787d61facc264328dce317ec30d"
+      "sha256": "99cf99c085beebba94cfc64ea0b58fbca960c6767c124fe36448d6229ba5cad2"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "729f4ba6833b7e32d401a134405379a9bc2b591c996134245a930c895008f7eb"
+      "sha256": "5b760ec7b76d95513c338f982a88b9dda65ef3b315134045cfa6e99a5be7f8c4"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
@@ -111,7 +111,7 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "34c0f0781d335b43235694e55f59555577c1f06e223adc4bf58338a97a0701df"
+      "sha256": "4076ecb7c4459e0b1bdd8b4449c5f63540c304a3144593331a2d2124d2112928"
     }
   ]
 }

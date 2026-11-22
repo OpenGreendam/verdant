@@ -138,3 +138,33 @@ runtimeTest('optional numeric text policy steps bounds and clears automatic valu
   f.key('ArrowUp');f.key('Delete');
   assert.equal(f.named('replacementRequest').length,count);
 });
+
+runtimeTest('search text delegates finite collection keys before editing defaults and keeps IME local', async t => {
+  const f = await fixture(t, { defaultValue:'query', searchNavigation:true, submitOnEnter:false, cancelOnEscape:false, advanceOnTab:false });
+  for (const key of ['ArrowDown','ArrowUp','Enter','Escape']) assert.equal(f.key(key).defaultPrevented,true);
+  assert.equal(f.key('f',{ctrlKey:true}).defaultPrevented,true);
+  assert.deepEqual(f.named('navigationRequest').map(({key,value,shift,command,viewEpoch})=>({key,value,shift,command,viewEpoch})),
+    ['ArrowDown','ArrowUp','Enter','Escape','f'].map(key=>({key,value:'query',shift:false,command:key==='f',viewEpoch:1})));
+  const count=f.named('navigationRequest').length;
+  for (const key of ['ArrowLeft','ArrowRight','Home','End','Delete','Backspace','Tab']) assert.equal(f.key(key).defaultPrevented,false);
+  assert.equal(f.key('ArrowDown',{altKey:true}).defaultPrevented,false);
+  assert.equal(f.key('ArrowDown',{ctrlKey:true}).defaultPrevented,false);
+  assert.equal(f.key('f',{ctrlKey:true,shiftKey:true}).defaultPrevented,false);
+  assert.equal(f.named('navigationRequest').length,count);
+  assert.deepEqual(f.named('submit'),[]);
+  assert.deepEqual(f.named('cancel'),[]);
+  f.target.dispatchEvent(new CompositionEvent('compositionstart',{data:'候'}));
+  f.target.value='候选';
+  f.target.dispatchEvent(new InputEvent('input',{data:'候选',inputType:'insertCompositionText',isComposing:true}));
+  for (const key of ['ArrowUp','ArrowDown','Enter','Escape','Tab']) f.key(key);
+  assert.equal(f.named('navigationRequest').length,count);
+  f.target.dispatchEvent(new CompositionEvent('compositionend',{data:'候选'}));
+  f.key('ArrowDown',{shiftKey:true});
+  assert.deepEqual(f.named('navigationRequest').at(-1),{key:'ArrowDown',value:'候选',shift:true,command:false,viewEpoch:1});
+  await f.session.unmount();
+  f.key('Enter');
+  assert.equal(f.named('navigationRequest').length,count+1);
+  const normal=await fixture(t,{defaultValue:'plain',submitOnEnter:false,cancelOnEscape:false,advanceOnTab:false});
+  for (const key of ['ArrowDown','ArrowUp','Enter','Escape']) assert.equal(normal.key(key).defaultPrevented,false);
+  assert.deepEqual(normal.named('navigationRequest'),[]);
+});
