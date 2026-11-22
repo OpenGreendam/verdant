@@ -235,6 +235,28 @@ mod tests {
         Bundle::from_reader(&serde_json::to_vec(&manifest).unwrap(), |_| Ok(document.as_bytes().to_vec())).unwrap()
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn canonical_windows_bundle_paths_load_from_disk() {
+        use std::path::{Component, PathBuf};
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("bundle with spaces");
+        fs::create_dir_all(source.join("verdant-test")).unwrap();
+        let expected = bundle("0.1.0", "Canonical Windows bundle");
+        fs::write(source.join("manifest.json"), serde_json::to_vec(expected.manifest()).unwrap()).unwrap();
+        fs::write(source.join("verdant-test").join("SKILL.md"), expected.read("verdant-test", "SKILL.md").unwrap()).unwrap();
+
+        let source = source.canonicalize().unwrap();
+        let mut components = source.components();
+        assert!(matches!(components.next(), Some(Component::Prefix(_))));
+        assert_eq!(components.next(), Some(Component::RootDir));
+        let root: PathBuf = source.components().take(2).map(|part| part.as_os_str()).collect();
+        files::directory(&root, false).unwrap();
+        let loaded = Bundle::load(&source).unwrap();
+        assert_eq!(loaded.manifest(), expected.manifest());
+        assert_eq!(loaded.read("verdant-test", "SKILL.md").unwrap(), expected.read("verdant-test", "SKILL.md").unwrap());
+    }
+
     #[test]
     fn install_update_uninstall_are_idempotent_and_dry_run_is_read_only() {
         let temp = tempfile::tempdir().unwrap();

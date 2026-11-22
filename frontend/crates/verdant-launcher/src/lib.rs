@@ -8,7 +8,7 @@ use std::{
 
 pub const HELP: &str = "Usage: verdant gui [--wait | --check] [--gui-binary PATH] [--json] [--] [GUI OPTIONS]\n\
 Open the graphical editor explicitly. By default this command returns after launch.\n\
-  --wait          Wait for the editor to exit; return its exit status\n\
+  --wait          Wait for the editor to exit and report its result\n\
   --check         Report the resolved editor and resource paths without opening it\n\
   --gui-binary    Explicit editor executable (otherwise use the same installation)\n\
 GUI OPTIONS include PROJECT.verp, --import FILE, --silent-audio, --appearance light|dark,\n\

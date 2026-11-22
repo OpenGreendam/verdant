@@ -29,6 +29,9 @@ pub(crate) fn directory(path: &Path, allow_missing: bool) -> Result<()> {
     for part in path.components() {
         if matches!(part, Component::CurDir | Component::ParentDir) { return Err(invalid("unresolved skill directory path")); }
         current.push(part.as_os_str());
+        // A Windows drive or UNC prefix is not yet the complete directory root.
+        // Validate it when the following RootDir component has been accumulated.
+        if matches!(part, Component::Prefix(_)) { continue; }
         match fs::symlink_metadata(&current) {
             Ok(meta) if is_link(&meta) || !meta.is_dir() => return Err(conflict(format!("skill directory traverses a link or nondirectory: {}", current.display()))),
             Ok(_) => {},

@@ -74,8 +74,9 @@ jobs:
         env:
           VERDANT_VOICE_BANK_SHA256: e2415c3917dd102861ce8043b0c0daf497b18a0903f7255f314baf72cb73bbc1
         run: |
-          cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-launcher -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
+          # Check filesystem and launcher portability before the full GUI build.
           cargo test --offline --locked --release -p verdant-agent-skills -p verdant-launcher
+          cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-launcher -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
           cargo test --offline --locked --release -p verdant-cli --test entrypoints
           cargo test --offline --locked --release -p verdant-cli --test native_studio
           cargo test --offline --locked --release -p verdant-media --test advanced_edits
