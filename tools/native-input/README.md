@@ -13,30 +13,50 @@ the prepared D-Bus/GI environment, `xdotool`, and libX11 for screenshots.
 
 ## Execution status on 2026-11-22
 
-The original nine cases completed on both X11 and windowed Wayland: **18/18
-passed**, with no skipped cases, on source commit
-`8fc5f4e675b8cb28801cb622ff58f45508da6e23`, application SHA-256
-`036570672e66befdd8d32482b5774d29d9ed91f68ae8a55b362256a022c1bba5`,
-and compiler pin `5712266648fdbce2f6662636cb83f01eb849adb1`.
-The executed probe was SHA-256
-`f6543afcb6c192370f16603508e5a04fd3fe4ca5bca29161312ace7583e8816d`.
+The complete current suite passed **22/22 cases with no skips**: eleven on
+X11 and eleven on windowed Wayland, including the actual native plugin
+window close/reopen and preset-menu cancellation cases. The successful
+[CI run 45026004598](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)
+used job `137223338246`, Ubuntu 24.04 and **Weston 13.0.0**.
 
-The two native plugin window cases below and the associated multiple-window
-selection/geometry changes were added afterward. **The expanded suite has not
-yet completed successfully.** The remote execution service exhausted its monthly
-quota before the first expanded run. Current default execution has **eleven cases
-per backend**; the earlier 18 passes do not establish a pass for this expanded
-script or subsequent application changes. Offline tests cover frame selection,
-Weston scene parsing, recorded pointer-contact interpretation, and refusal of
-incomplete, filtered or mismatched CI observations:
+| Identity | Recorded value |
+|---|---|
+| Branch head | `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` |
+| Actual checked-out/tested synthetic merge commit | `9e6cd34715b9da4b733466b95d749764e5c410b3` |
+| Application SHA-256, both backends | `273e3ea6fa8015d436ea885ccc7eaf721c4e80d71950ae60d1659d412793cf20` |
+| Worker SHA-256, both backends | `c4542e8a6f151c7b2f9556e0008547646c4a55ce180eda3ffdf8e40963765033` |
+| Compiler pin | `5712266648fdbce2f6662636cb83f01eb849adb1` |
+| Evidence ZIP SHA-256 | `588dd0087e554d621b40f0af2e860815a0c4175b5a5b7da8ccabed7feb967c5b` |
+
+X11 took 111.849 seconds; Wayland took 114.044 seconds. Each retained **40
+observed steps**, including AT-SPI trees, numeric/focus state, saved project
+bytes and screenshots. Both projects finished at **−8 dB, revision 12**.
+The independent local readback matched the marked job-log summary to the
+downloaded artifact, verified its GitHub ZIP digest, and reran the unchanged
+artifact validator against every retained step. Its reconstructed results
+exactly matched the CI report. Source-selection, manifest and observation
+source hashes also matched.
+
+The full per-case gain/revision/hash/focus observations and Wayland contact
+trace are in
+[`NATIVE-INPUT-2026-11-22.json`](../../frontend/proto-ui/NATIVE-INPUT-2026-11-22.json).
+The raw [native-input-linux artifact](https://github.com/OpenGreendam/verdant/actions/runs/45026004598/artifacts/14756497529)
+is retained until 2026-12-06 by CI policy. The historical 18/18 remote baseline
+on `8fc5f4e675b8cb28801cb622ff58f45508da6e23` remains a separate record; it is
+not substituted for this current 22-case result.
+
+Offline tests cover frame selection, Weston scene parsing, recorded
+pointer-contact interpretation, and refusal of incomplete, filtered or
+mismatched CI observations:
 
 ```sh
 python3 -B -m unittest discover -s tools/native-input -p 'test_*.py' -v
 ```
 
 These eleven tests do not start GPUI, D-Bus or an operating-system window.
-The historical result and pending expanded scope are recorded separately in
-[`NATIVE-INPUT-2026-11-22.json`](../../frontend/proto-ui/NATIVE-INPUT-2026-11-22.json).
+
+### Retained failed attempts
+
 The replacement local environment loaded the official Debian 13 D-Bus/GI
 dependencies, but `socket(AF_UNIX, SOCK_STREAM)` itself returned `EPERM`
 before bind. Its process reported `Seccomp: 2` and `NoNewPrivs: 1`; consequently
@@ -53,7 +73,8 @@ the push-button role inside that observed frame. Weston 13 created its output,
 but title-based discovery failed before a Wayland app started; the wrapper now
 uses that owned compositor's logged output ID and checks its actual X11
 geometry. Both failures remain recorded in the original `native-input-linux`
-artifact. The corrections have offline regressions; a complete rerun is pending.
+artifact. The corrections have offline regressions and were then exercised by
+the complete 22-case successful run identified above.
 
 ## CI package and evidence gate
 
@@ -204,7 +225,8 @@ Its `libweston/compositor.c` prints the PID, surface ID, transformed rectangle
 and buffer dimensions; `libweston/shell-utils/shell-utils.c` supplies the
 actual title/app id. `compositor/main.c` advertises `--renderer=pixman`,
 and `weston_module_path_from_env` accepts the same semicolon-delimited module
-map. These are source compatibility checks, not an executed Weston 13 OS result.
+map. These source checks preceded the successful recorded Weston 13 OS run;
+the actual runtime version remains part of its evidence.
 
 The observer annotates every node with the frame reference reached through
 the real tree's parent/child traversal. Main and plugin windows can both
@@ -246,8 +268,8 @@ windowed exit case must contain a measured outside-window motion sample.
 | Numeric accessibility | Write `Value.CurrentValue = 0.63`, read it back, save −5.1 dB as one revision, then undo once. |
 | Numeric takeover | Write the same numeric value during a pointer preview, save before up, send another move and late up, and require no second revision or document change; undo once. |
 | Lease reuse | Perform another real drag and undo after the cancellation cases, demonstrating that a new pointer edit can start and finish. |
-| Native window close — complete pass pending | Click the instrument card's **打开界面** button, drag its native window's gain while held, invoke that window's advertised **关闭** push-button action, observe the frame disappear, send the late up, and save in the main window with identical gain/revision/hash. Reopen through the same real button, make a new 18-pixel drag, close, then save and undo once. |
-| Native preset menu — not yet executed | Open the native window, hold a gain preview, invoke its **自定义** combobox's advertised click, observe **上下文菜单** and the restored gain, dismiss with Escape while still held, then release, close and verify the main saved document is unchanged. |
+| Native window close | Click the instrument card's **打开界面** button, drag its native window's gain while held, invoke that window's advertised **关闭** push-button action, observe the frame disappear, send the late up, and save in the main window with identical gain/revision/hash. Reopen through the same real button, make a new 18-pixel drag, close, then save and undo once. |
+| Native preset menu | Open the native window, hold a gain preview, invoke its **自定义** combobox's advertised click, observe **上下文菜单** and the restored gain, dismiss with Escape while still held, then release, close and verify the main saved document is unchanged. |
 
 The fixture's native editor is opened through the actual instrument card,
 not by creating an application entity or calling an editor command. Its title
@@ -283,7 +305,9 @@ saved document bytes after saving.
 Only displacement-derived drag expectations allow **0.001 dB** of numeric
 error: a real X11 54-pixel sample produced 1.0001373291015625 dB instead of
 the ideal 1 dB after native floating-point pixel conversion. The failed strict
-run is retained. Keyboard and accessibility edits use the original strict
+run is retained. The final CI run measured 1.0001424153645821 dB on X11 and
+0.9999999999999964 dB on Wayland; both use that same predeclared 0.001 dB
+pixel-drag tolerance. Keyboard and accessibility edits use the original strict
 numeric comparisons; cancellation/undo values, revisions and hashes are not
 relaxed. The result records both this tolerance and the actual observed values.
 
