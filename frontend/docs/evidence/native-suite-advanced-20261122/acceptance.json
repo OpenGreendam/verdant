@@ -1,0 +1,181 @@
+{
+  "schema": "verdant.native-suite.acceptance.v1",
+  "record_date": "2026-11-22",
+  "timezone": "Asia/Shanghai",
+  "source_revision": "2486f1e67c9bc0e01f4b5d8931a360264d967f84",
+  "advanced_dsp_revision": "07ae7c8dd5db1862cc455474ed4178074252137e",
+  "environment": {
+    "os": "Debian 13 Linux x86_64",
+    "rust": "1.98.1",
+    "ui": "GPUI, Xvfb, Openbox, Mesa lavapipe",
+    "audio": "silent audio output; actual native PCM captured before the output sink",
+    "physical_midi_soundcard_verified": false,
+    "macos_windows_interaction_verified": false
+  },
+  "suite": {
+    "effects": 12,
+    "instruments": 2,
+    "parameters": 3542,
+    "control_protocol": 5,
+    "audio_protocol": 3,
+    "internal_sample_rate": 48000,
+    "internal_channels": 2
+  },
+  "workspace": {
+    "log": "advanced-workspace-tests4.log",
+    "original_sha256": "bded07ab32e19c2ff5944e46bdcc6437d681895f249aefd9ed6703bb3ea31bad",
+    "targets": 107,
+    "passed": 1056,
+    "failed": 0,
+    "ignored": 15
+  },
+  "additional_explicit_tests": [
+    {
+      "target": "native-host",
+      "log": "advanced-final-native-host.log",
+      "original_sha256": "b98960471e132d481fe1191e4b672ff03cf10e23e00dbd5c55200875218e7620",
+      "targets": 1,
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "service-host",
+      "log": "advanced-final-service-host.log",
+      "original_sha256": "69d0a2ed3b50b7c4b0e2c0b603f1820138b2fe0378d4534328a8dfbcd05329c6",
+      "targets": 1,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "factory-corpus",
+      "log": "advanced-final-factory-corpus.log",
+      "original_sha256": "b15a085178e8e1c2cfe2ecb67d3864ef131004b54278c7f59357a95f4b385550",
+      "targets": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "proto_rules": {
+    "cases_passed": 5,
+    "original_sha256": "46f2925f6c07037a3e73f1c1cc9dffa014ffc42cb4b6d7515c5a3c01432bb21d"
+  },
+  "proto_regeneration": {
+    "exit_code": 10,
+    "status": "allowed skip: pinned upstream checkout absent; retained artifacts checked",
+    "original_sha256": "96e9bff2a3dbdea68e692ad15918ef70e846a8c5303a79dc6cd674fc817b7049"
+  },
+  "fixture": {
+    "path": "spec/examples/native-suite-advanced.verp",
+    "bytes": 80894,
+    "sha256": "3b8c4c9ee1f1e3ca1e5774140643a4947f08a49d174264b02ecc99b824694af9",
+    "tracks": 14,
+    "notes_per_track": 8,
+    "unique_effect_types": 12,
+    "effect_instances_including_master": 14,
+    "instrument_types": 2,
+    "sidechains": 4,
+    "tempo_bpm": [
+      120,
+      90,
+      150
+    ]
+  },
+  "export": {
+    "schema": "verdant-native-suite-export-validation/1",
+    "path": "native-suite-advanced.wav",
+    "bytes": 9209656,
+    "sha256": "44c0947ac98d9ec8f078adbe4c097026b79421ca4ff6bd0f344e0b2602b569ac",
+    "format": "IEEE Float32",
+    "sample_rate": 48000,
+    "channels": 2,
+    "frames": 1151200,
+    "duration_seconds": 23.983333333333334,
+    "nonfinite_samples": 0,
+    "peak": 0.2680390179157257,
+    "rms": 0.02218795526528575,
+    "channel_rms": [
+      0.022165609590172136,
+      0.02221027845851358
+    ],
+    "source_revision": "07ae7c8dd5db1862cc455474ed4178074252137e",
+    "elapsed_seconds": 349.15,
+    "binary_sha256": {
+      "verdant-cli": "4d77cfb06583883c4c579b8843e7c2b44307faf6a80f0e8a3555bfb476ff6167",
+      "verdant-plughost": "2a61962224ed0e47cfab26ce0d24e892209daa72e036a1832f2ed6edbee7aa4c",
+      "verdant-worker": "fa27081631bb6b6836c77b9b2656cbc9d8197b0409f1881654e5a206a8519961"
+    }
+  },
+  "current_debug_binary_sha256": {
+    "verdant": "8c6ed75f5f36592a6e5a104d5f7d13c8cd428dcf3b78942f4545658b0d2af7d3",
+    "verdant-cli": "4d77cfb06583883c4c579b8843e7c2b44307faf6a80f0e8a3555bfb476ff6167",
+    "verdant-plughost": "2a61962224ed0e47cfab26ce0d24e892209daa72e036a1832f2ed6edbee7aa4c",
+    "verdant-worker": "fa27081631bb6b6836c77b9b2656cbc9d8197b0409f1881654e5a206a8519961"
+  },
+  "cargo_lock_sha256": "2e3445309948b3e794427f5daf3112101e5704f86c434bbe34174006151f7b0a",
+  "factory_presets": {
+    "recognized": 1769,
+    "complete_parameter_translation": 23,
+    "partial_with_diagnostics": 437,
+    "identified_only": 1309,
+    "parse_failures": 0,
+    "meaning": "parameter translation only; not proprietary DSP or audible equivalence"
+  },
+  "screenshots": [
+    {
+      "file": "eq-ab-restored.png",
+      "title": "Adwaita 浅色 EQ 与 A/B 恢复",
+      "description": "高级套件最终构建中，旧 A/B 快照补齐新增参数，经过固定 FIR 路径重建、切换和关闭重开后恢复。图中为验收用极端频段设置。",
+      "capture_stage": "advanced suite build 7; before keyboard-repeat-only fix",
+      "sha256": "b1c7666a981714fffae11d8aa2fc11ace9fa97f9e59f97b8577a0e68472868de",
+      "bytes": 205823
+    },
+    {
+      "file": "one-held-first.png",
+      "title": "One 持续演奏：11.33 秒",
+      "description": "键盘自动重复开启，A 持续按下，C4 高亮；音频累计 11.33 秒、综合响度约 −15.0 LUFS。",
+      "capture_revision": "2486f1e67c9bc0e01f4b5d8931a360264d967f84",
+      "sha256": "f818f2db257d36f82c2ac9d632e95ecf08732fac8d2e351bbc557616b7b22ddb",
+      "bytes": 175939
+    },
+    {
+      "file": "one-held-later.png",
+      "title": "One 持续演奏：22.89 秒",
+      "description": "同次长按继续保持，音频累计推进至 22.89 秒，曲线和电平继续刷新，综合响度保持有限值。",
+      "capture_revision": "2486f1e67c9bc0e01f4b5d8931a360264d967f84",
+      "sha256": "46881cd01aa8be6c63cc68c5acd79998408dd5e78958dc11f1b5e6d80b953e23",
+      "bytes": 175592
+    },
+    {
+      "file": "ffp-translation-preview.png",
+      "title": "Adwaita 深色预设映射预览",
+      "description": "高级功能交互验收阶段的实际截图。导入前展示已转换参数及未映射的动态字段，由用户明确选择部分转换；不把格式识别当作完全兼容。",
+      "capture_stage": "advanced suite workflow validation; before final A/B and keyboard fixes",
+      "sha256": "0d732369af60b1a971c1831fe376261afc1be49ffc922851f0ab54a7d86e51d4",
+      "bytes": 232604
+    },
+    {
+      "file": "one-key-released.png",
+      "title": "One 松键后正确停音",
+      "description": "Fresh keydown→keyup 序列中，音频累计 371.14 秒，C4 已取消高亮；峰值和 RMS 回落至 −120 dBFS，综合响度保留已累计的测量。另一次失焦／返回也确认正确释放。",
+      "capture_revision": "2486f1e67c9bc0e01f4b5d8931a360264d967f84",
+      "sha256": "21227eb968e7f3cebb948429bb358a4ee6abfc10af64ca38c901110713537649",
+      "bytes": 129736
+    }
+  ],
+  "ci": {
+    "location": "https://github.com/OpenGreendam/verdant/pull/4/checks",
+    "rule": "Use checks for the final PR head; this local record does not assert a future CI result."
+  },
+  "limits": [
+    "The host is 48 kHz stereo; surround and Dolby Atmos object/multichannel hosting are not implemented.",
+    "The suite is an independent implementation; proprietary algorithms and original timbre are not certified equivalent.",
+    "FFP import covers the documented Q3/Q4/C3/R2/MB subsets. Most other binary formats are identified only.",
+    "Reverb IR import fits algorithm parameters; it is not convolution. EQ Match/Sketch use finite Bell fitting.",
+    "Hard real-time, physical MIDI/audio drivers, screen readers, IME and macOS/Windows GUI interactions are not certified by these runs.",
+    "The native effect process bridge retains 9472 samples of base transport buffering; no low-latency claim is made.",
+    "Shared instrument modulation is global; per-voice MPE expression is a separate native synth path."
+  ]
+}
