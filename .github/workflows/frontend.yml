@@ -219,6 +219,76 @@ jobs:
           path: .ci/target/proto-ui-gpui-graph.json
           if-no-files-found: error
 
+  native-input:
+    name: Real Linux window input and accessibility (22 cases)
+    needs: [linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create OS evidence directory
+        run: mkdir -p .ci/native-input-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          # No run-id or cross-run artifact lookup: these are the exact package
+          # bytes validated by this workflow's linux producer job.
+          name: verdant-linux
+          path: .ci/native-input-download
+      - name: Install only this job's native display and accessibility dependencies
+        run: |
+          sudo apt-get update 2>&1 | tee .ci/native-input-evidence/apt-update.log
+          sudo apt-get install --no-install-recommends -y \
+            xvfb xauth xdotool x11-xkb-utils xkb-data weston \
+            dbus-daemon dbus-x11 at-spi2-core gir1.2-atspi-2.0 \
+            python3-dbus python3-gi python3-pyatspi gsettings-desktop-schemas \
+            fontconfig fonts-dejavu-core fonts-noto-cjk \
+            mesa-vulkan-drivers libvulkan1 libgl1-mesa-dri libegl1 libgbm1 \
+            libasound2t64 libx11-xcb1 libxcb-xinput0 libxkbcommon-x11-0 \
+            2>&1 | tee .ci/native-input-evidence/apt-install.log
+          dpkg-query -W > .ci/native-input-evidence/installed-packages.txt
+          /usr/bin/python3 -B -m unittest discover -s tools/native-input -p 'test_*.py' -v
+      - name: Bind the packaged app and worker to this checkout
+        id: package
+        run: |
+          /usr/bin/python3 -B tools/native-input/ci.py prepare \
+            --artifact-dir .ci/native-input-download --repo "$PWD" \
+            --work-dir "$RUNNER_TEMP/verdant-native-package" \
+            --evidence-dir .ci/native-input-evidence/package \
+            --expected-source-commit "$GITHUB_SHA"
+      - name: Run all 11 real X11 input and accessibility cases
+        if: ${{ always() && steps.package.outcome == 'success' }}
+        timeout-minutes: 8
+        run: |
+          /usr/bin/python3 -B tools/native-input/ci.py run \
+            --package-info .ci/native-input-evidence/package/package.json \
+            --repo "$PWD" --deps-root / --backend x11 \
+            --run-dir "$RUNNER_TEMP/verdant-os-x11"
+      - name: Run all 11 real windowed Wayland input and accessibility cases
+        if: ${{ always() && steps.package.outcome == 'success' }}
+        timeout-minutes: 8
+        run: |
+          /usr/bin/python3 -B tools/native-input/ci.py run \
+            --package-info .ci/native-input-evidence/package/package.json \
+            --repo "$PWD" --deps-root / --backend wayland \
+            --run-dir "$RUNNER_TEMP/verdant-os-wayland"
+      - name: Require both complete observations and retain their evidence
+        if: always()
+        run: |
+          /usr/bin/python3 -B tools/native-input/ci.py check \
+            --package-info .ci/native-input-evidence/package/package.json \
+            --x11-run "$RUNNER_TEMP/verdant-os-x11" \
+            --wayland-run "$RUNNER_TEMP/verdant-os-wayland" \
+            --output .ci/native-input-evidence/result.json
+      - name: Upload all OS evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-input-linux
+          path: .ci/native-input-evidence/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
   native:
     needs: [proto-retained, proto-fresh, headless-session]
     strategy:
