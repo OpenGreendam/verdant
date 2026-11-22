@@ -268,10 +268,7 @@ impl Editor {
 fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, initial: Vec<(String, f64)>, defaults: Vec<(String, f64)>,
     ev: &MouseDownEvent, hitbox: gpui::HitboxId, surface: &crate::host_pointer::SurfaceToken, window: &mut Window, cx: &mut Context<Editor>) -> bool {
     if ed.device_drag.as_ref().is_some_and(|drag| !drag.surface.is_live()) { ed.cancel_device_drag(cx); }
-    if ed.device_drag.is_some() || ed.session.pointer_owner().is_some() || ed.lane_stroke.is_some()
-        || ed.note_creation.is_some() || ed.mixer_drag.is_some() || ed.master_drag.is_some() || ed.has_proto_pointer_contact()
-        || ed.menu.is_some() || ed.text_prompt.is_some() || ed.modal_dialog.is_some()
-        || !surface.is_live() { return false; }
+    if !may_begin_device_input(ed) || !surface.is_live() { return false; }
     let scope = DeviceScope::for_window(window);
     if !scope.allows(&target.track, ed) { return false; }
     let Some(basis) = target.basis(ed) else { return false; };
@@ -302,6 +299,12 @@ fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, in
         cx.notify();
     }
     decision.consumed
+}
+
+fn may_begin_device_input(ed: &Editor) -> bool {
+    ed.device_drag.is_none() && ed.session.pointer_owner().is_none() && ed.lane_stroke.is_none()
+        && ed.note_creation.is_none() && ed.mixer_drag.is_none() && ed.master_drag.is_none() && !ed.has_proto_pointer_contact()
+        && ed.menu.is_none() && ed.text_prompt.is_none() && ed.modal_dialog.is_none()
 }
 
 impl DeviceDrag {
@@ -409,6 +412,29 @@ fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th
 pub(crate) fn open_parameter_value(editor: &Entity<Editor>, owner: DeviceTarget, slot: usize,
     key: InsertKey, desc: ParamDesc, cx: &mut gpui::App) {
     value_entry::open(editor, Target { track: owner, slot, key }, desc, cx);
+}
+
+pub(crate) type SemanticCommand = Rc<dyn Fn(Option<&gpui::ClickEvent>, &mut Window, &mut gpui::App)>;
+
+/// Semantic activation must not synthesize pointer input. GPUI's default
+/// accessible Click creates a MouseUp which can otherwise commit an unrelated
+/// held preview before a toolbar command hides or changes its input surface.
+pub(crate) fn semantic_command<T: 'static>(editor: gpui::WeakEntity<Editor>, actor: gpui::WeakEntity<T>,
+    command: impl Fn(&mut T, Option<&gpui::ClickEvent>, &mut Window, &mut Context<T>) + 'static) -> SemanticCommand {
+    Rc::new(move |event, window, cx| {
+        // Native cancellation calls the authored prototype and can report an
+        // error through Editor. Release the read borrow before invoking it.
+        let contact = editor.upgrade().and_then(|editor| editor.read(cx).proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade));
+        if let Some(contact) = contact { contact.cancel_in_window(window, cx); }
+        let _ = editor.update(cx, |ed, cx| ed.cancel_device_drag_in(window.window_handle(), cx));
+        let _ = actor.update(cx, |actor, cx| command(actor, event, window, cx));
+    })
+}
+
+pub(crate) fn semantic_click(button: gpui::Stateful<gpui::Div>, command: SemanticCommand) -> gpui::Stateful<gpui::Div> {
+    let pointer = command.clone();
+    button.on_click(move |event, window, cx| pointer(Some(event), window, cx))
+        .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| command(None, window, cx))
 }
 
 // ---------------------------------------------------------------------------
@@ -693,7 +719,7 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                         if let Some((writes, select)) = double(n) {
                             e.update(cx, |ed, cx| {
                                 if !DeviceScope::for_window(window).allows(&target.track, ed)
-                                    || target.basis(ed).is_none() || ed.has_proto_pointer_contact() || !down_surface.is_live() { return; }
+                                    || !may_begin_device_input(ed) || target.basis(ed).is_none() || !down_surface.is_live() { return; }
                                 if let Some(band) = select { select_band(ed, key, band); }
                                 write_if_current(ed, &target, writes, cx);
                             });
@@ -773,20 +799,20 @@ fn choice(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
     div().flex().flex_wrap().p(gpui::rems(2.0/16.)).gap(gpui::rems(2.0/16.)).rounded(gpui::rems(8.0/16.)).bg(th.control).children(labels.iter().enumerate().map(|(i, label)| {
         let (target, id_owned) = (target.clone(), id.to_string());
         let on = i == current;
-        let (key_target, key_id) = (target.clone(), id_owned.clone());
-        div().id(SharedString::from(format!("choice-{slot}-{id}-{i}"))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
+        let command = parameter_command(target, vec![(id_owned, i as f64)], cx);
+        let key_command = command.clone();
+        semantic_click(div().id(SharedString::from(format!("choice-{slot}-{id}-{i}"))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
             .h(gpui::rems(26.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
             .when(on, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
             .hover(move |s| s.bg(if on { th.checked } else { th.hover }))
             .active(move |s| s.bg(th.control_pressed))
-            .child(label.to_string())
-            .on_click(cx.listener(move |ed, _, _, cx| { if let Some(target) = &target { write_if_current(ed, target, vec![(id_owned.clone(), i as f64)], cx); } }))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+            .child(label.to_string()), command)
+            .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
                 if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                    if let Some(target) = &key_target { write_if_current(ed, target, vec![(key_id.clone(), i as f64)], cx); }
+                    key_command(None, window, cx);
                     window.prevent_default(); cx.stop_propagation();
                 }
-            }))
+            })
     })).into_any_element()
 }
 
@@ -795,35 +821,46 @@ fn toggle(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
     let th = ed.theme;
     let on = param(params, id).is_some_and(|d| d.value >= 0.5);
     let (target, id_owned) = (target_for(ed, track, slot), id.to_string());
-    let (key_target, key_id) = (target.clone(), id_owned.clone());
-    div().id(SharedString::from(format!("toggle-{slot}-{id}"))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
+    let command = parameter_command(target, vec![(id_owned, if on { 0.0 } else { 1.0 })], cx);
+    let key_command = command.clone();
+    semantic_click(div().id(SharedString::from(format!("toggle-{slot}-{id}"))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
         .flex().items_center().gap(gpui::rems(8.0/16.)).cursor_pointer().text_sm()
-        .child(label.to_string()).child(crate::view::switch(on, th))
-        .on_click(cx.listener(move |ed, _, _, cx| { if let Some(target) = &target { write_if_current(ed, target, vec![(id_owned.clone(), if on { 0.0 } else { 1.0 })], cx); } }))
-        .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+        .child(label.to_string()).child(crate::view::switch(on, th)), command)
+        .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
             if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                if let Some(target) = &key_target { write_if_current(ed, target, vec![(key_id.clone(), if on { 0.0 } else { 1.0 })], cx); }
+                key_command(None, window, cx);
                 window.prevent_default(); cx.stop_propagation();
             }
-        }))
+        })
         .into_any_element()
+}
+
+fn parameter_command(target: Option<Target>, values: Vec<(String, f64)>, cx: &Context<Editor>) -> SemanticCommand {
+    semantic_command(cx.weak_entity(), cx.weak_entity(), move |ed, _, window, cx| {
+        let Some(target) = &target else { return };
+        if may_begin_device_input(ed) && DeviceScope::for_window(window).allows(&target.track, ed) {
+            write_if_current(ed, target, values.clone(), cx);
+        }
+    })
 }
 
 /// A dropdown-looking button that opens a menu (AdwComboRow's button).
 pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
-    let items = Rc::new(items);
-    let key_items = items.clone();
-    div().id(id).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
+    let command = semantic_command(cx.weak_entity(), cx.weak_entity(), move |ed, event, window, cx| {
+        let position = event.map_or_else(|| window.mouse_position(), gpui::ClickEvent::position);
+        ed.show_menu(position, items(ed), window, cx);
+    });
+    let key_command = command.clone();
+    semantic_click(div().id(id).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
         .rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
         .child(div().max_w(gpui::rems(120.0/16.)).truncate().child(label))
-        .child(svg().path(icon("chevron-down")).size(gpui::rems(12.0/16.)).text_color(th.text_secondary))
-        .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| { let items = items(ed); ed.show_menu(ev.position(), items, w, cx); }))
-        .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+        .child(svg().path(icon("chevron-down")).size(gpui::rems(12.0/16.)).text_color(th.text_secondary)), command)
+        .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
             if matches!(event.keystroke.key.as_str(), "enter" | "space" | "down") {
-                let items = key_items(ed); ed.show_menu(window.mouse_position(), items, window, cx);
+                key_command(None, window, cx);
                 window.prevent_default(); cx.stop_propagation();
             }
-        }))
+        })
         .into_any_element()
 }
 
@@ -1701,6 +1738,7 @@ mod native_tests {
         outside: FocusHandle,
         block_up: Rc<Cell<bool>>,
         with_knob: bool,
+        double: Option<DoubleClick>,
     }
 
     impl Render for Harness {
@@ -1716,7 +1754,7 @@ mod native_tests {
             div().id("native-device-harness").relative().size_full().track_focus(&focus)
                 .when(self.show, |view| view.child(div().w(px(WIDTH)).h(px(HEIGHT)).child(graph(
                     self.editor.clone(), self.target.clone(), vec![desc.clone()], "test-graph", "Gain graph", theme,
-                    Rc::new(|_, _, _, _| {}), vec![handle], None, None).size_full())))
+                    Rc::new(|_, _, _, _| {}), vec![handle], None, self.double.clone()).size_full())))
                 .when(self.with_knob, |view| view.child(div().absolute().left(px(250.0)).top_0().child(crate::proto_knob::knob(
                     self.editor.clone(), self.target.track.clone(), self.target.slot, self.target.key, desc, "Gain", theme, 64.0))))
                 .child(div().id("outside-device").track_focus(&self.outside).absolute().left(px(400.0)).top(px(160.0)).size(px(20.0)))
@@ -1735,7 +1773,7 @@ mod native_tests {
             let key = crate::instrument::instrument_key_for_generation(&track, dsp::SYNTH_ID, editor.read(cx).document_generation);
             let target = Target { key, track: DeviceTarget::Track(track), slot: crate::instrument::INSTRUMENT_SLOT };
             let desc = target.basis(editor.read(cx)).unwrap().params.into_iter().find(|desc| desc.id == "gain").unwrap();
-            Harness { editor, target, desc, show: true, outside: cx.focus_handle(), block_up: Rc::new(Cell::new(false)), with_knob }
+            Harness { editor, target, desc, show: true, outside: cx.focus_handle(), block_up: Rc::new(Cell::new(false)), with_knob, double: None }
         });
         window.update(cx, |_, window, _| window.activate_window()).unwrap();
         crate::native_test_support::frames(window, cx);
@@ -1946,7 +1984,7 @@ mod native_tests {
         crate::native_test_support::frames(first, cx);
         let second = cx.open_window(size(px(520.0), px(220.0)), |_, cx| {
             Harness { editor, target, desc, show: true, outside: cx.focus_handle(),
-                block_up: Rc::new(Cell::new(false)), with_knob: false }
+                block_up: Rc::new(Cell::new(false)), with_knob: false, double: None }
         });
         crate::native_test_support::frames(second, cx);
         second.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
@@ -1968,6 +2006,76 @@ mod native_tests {
             assert!(window.captured_hitbox().is_none());
             up(window, cx);
             assert_eq!(host.editor.read(cx).revision().get(), 0);
+        }).unwrap();
+    }
+
+    struct RollWindow { editor: Entity<Editor> }
+
+    impl Render for RollWindow {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().track_focus(&self.editor.read(cx).focus_roll)
+                .child(crate::roll::piano_roll(self.editor.clone()))
+        }
+    }
+
+    #[gpui::test]
+    fn blank_graph_double_click_respects_a_live_touch_session_and_then_can_commit(cx: &mut TestAppContext) {
+        let graph_window = cx.open_window(size(px(520.0), px(220.0)), |window, cx| {
+            let mut project = crate::native_test_support::instrument_project();
+            project.tracks[0].notes = vec![verdant_domain::Note::new(100, 100, 60)];
+            project.tracks[0].refresh_index();
+            let editor = cx.new(|cx| {
+                let mut editor = Editor::for_native_test(project, window, cx);
+                editor.needs_fit = false;
+                editor.session.snap.grid_ticks = 0;
+                editor.session.viewport.start_tick = 0.0;
+                editor.session.viewport.px_per_tick = 1.0;
+                editor.session.viewport.top_pitch = 65.0;
+                editor.session.viewport.row_height = 20.0;
+                editor
+            });
+            let track = editor.read(cx).session.track.clone();
+            let key = crate::instrument::instrument_key_for_generation(&track, dsp::SYNTH_ID, editor.read(cx).document_generation);
+            let target = Target { track: track.into(), slot: crate::instrument::INSTRUMENT_SLOT, key };
+            let desc = target.basis(editor.read(cx)).unwrap().params.into_iter().find(|desc| desc.id == "gain").unwrap();
+            Harness { editor, target, desc, show: true, outside: cx.focus_handle(),
+                block_up: Rc::new(Cell::new(false)), with_knob: false,
+                double: Some(Rc::new(|_| Some((vec![("gain".into(), -2.0)], None)))) }
+        });
+        let editor = graph_window.update(cx, |host, _, _| host.editor.clone()).unwrap();
+        let roll_window = cx.open_window(size(px(480.0), px(180.0)), |_, _| RollWindow { editor });
+        crate::native_test_support::frames(graph_window, cx);
+        crate::native_test_support::frames(roll_window, cx);
+        roll_window.update(cx, |host, window, cx| {
+            for (phase, x) in [(gpui::TouchPhase::Started, 150.0), (gpui::TouchPhase::Moved, 180.0)] {
+                window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+                    id: gpui::TouchId(83), phase, position: point(px(x), px(90.0)), ..Default::default()
+                }), cx);
+            }
+            assert_eq!(host.editor.read(cx).session.pointer_owner(), Some(verdant_session::PointerId::Touch(0)));
+        }).unwrap();
+        graph_window.update(cx, |host, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                button: MouseButton::Left, click_count: 2, position: point(px(20.0), px(70.0)), ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).session.pointer_owner(), Some(verdant_session::PointerId::Touch(0)), "the rival input cannot retire its owner");
+            assert_eq!(host.editor.read(cx).revision().get(), 0);
+            assert_eq!(gain(host, cx), host.desc.value);
+            up(window, cx);
+        }).unwrap();
+        roll_window.update(cx, |_, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+                id: gpui::TouchId(83), phase: gpui::TouchPhase::Cancelled,
+                position: point(px(180.0), px(90.0)), ..Default::default()
+            }), cx);
+        }).unwrap();
+        graph_window.update(cx, |host, window, cx| {
+            assert!(host.editor.read(cx).session.pointer_owner().is_none());
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                button: MouseButton::Left, click_count: 2, position: point(px(20.0), px(70.0)), ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).revision().get(), 1, "normal blank double-click remains a domain command");
+            assert_eq!(gain(host, cx), -2.0);
         }).unwrap();
     }
 }
