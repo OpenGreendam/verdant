@@ -680,7 +680,9 @@ class Probe:
         if self.active_frame_reference in (None, self.main_frame_reference):
             raise RuntimeError("Close action requires the observed native plugin window")
         reference = self.active_frame_reference
-        self.advertised_action(self.node("关闭"))
+        # The real synth editor also has radio choices named 关闭. Its window
+        # close control is the distinct advertised push-button role.
+        self.advertised_action(self.node("关闭", "push button"))
         self.wait(self.snapshot, lambda tree: all(tuple(node["reference"]) != reference
                   and all(tuple(child) != reference for child in node["children"])
                   for node in tree["nodes"]),
