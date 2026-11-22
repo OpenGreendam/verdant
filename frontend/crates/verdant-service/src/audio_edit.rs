@@ -621,6 +621,8 @@ mod tests {
         fn new() -> Self {
             let directory=std::env::temp_dir().join(format!("verdant-audio-edit-{}",Uuid::new_v4()));
             std::fs::create_dir(&directory).unwrap();
+            // macOS temp_dir may use /var while verified assets resolve to /private/var.
+            let directory=std::fs::canonicalize(directory).unwrap();
             let path=directory.join("original.wav");
             let samples:Vec<_>=(0..48_000).flat_map(|i|{
                 let value=if (16_000..32_000).contains(&i){0.0}else{(i as f32*std::f32::consts::TAU*440.0/48_000.0).sin()*0.25};
