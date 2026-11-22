@@ -10,6 +10,7 @@ import { setTimeout } from 'node:timers/promises';
 import { acquireProducerLock, assertOwnedInventory, publishBatch, recoverPublication } from '../lib/artifact-publication.mjs';
 
 const hash = (value) => createHash('sha256').update(value).digest('hex');
+const componentSnapshot = (contents) => ({ kind: 'directory', directories: [], files: [{ path: 'Component.rs', sha256: hash(contents) }] });
 const stateDirectory = (lock) => lstatSync(lock).isDirectory()
   ? lock : `${lock}.state-${JSON.parse(readFileSync(lock, 'utf8')).id}`;
 const moduleUrl = new URL('../lib/artifact-publication.mjs', import.meta.url).href;
@@ -41,6 +42,60 @@ function fixture(t) {
   const release = acquireProducerLock(lockDirectory);
   t.after(release);
   return { root, lockDirectory, unit, options, release };
+}
+
+async function crashPublication(t, units, options, crash) {
+  const script = `import fs from 'node:fs'; import path from 'node:path'; import {syncBuiltinESMExports} from 'node:module';
+    const crash=${JSON.stringify(crash)}, write=fs.writeFileSync, rename=fs.renameSync, remove=fs.rmSync;
+    fs.writeFileSync=function(filename,...args) {
+      if(crash.partialWrite && String(filename).includes('.producer-') && String(filename).endsWith('/Component.rs')) {
+        write.call(this,filename,String(args[0]).slice(0,3),args[1]);process.kill(process.pid,'SIGKILL');
+      }
+      return write.call(this,filename,...args);
+    };
+    fs.renameSync=function(source,target) {
+      const result=rename.call(this,source,target);
+      if(crash.committed && path.basename(String(target))==='journal.json') process.kill(process.pid,'SIGKILL');
+      return result;
+    };
+    fs.rmSync=function(filename,...args) {
+      const result=remove.call(this,filename,...args);
+      if(crash.cleanup && String(filename).endsWith('.backup')) process.kill(process.pid,'SIGKILL');
+      return result;
+    };
+    syncBuiltinESMExports();
+    const {acquireProducerLock,publishBatch}=await import(${JSON.stringify(moduleUrl)});
+    const options=${JSON.stringify(options)};
+    acquireProducerLock(options.lockDirectory,options.root);
+    let renames=0;
+    publishBatch(${JSON.stringify(units)},{...options,rename(source,target) {
+      if(++renames===crash.beforeRename) process.kill(process.pid,'SIGKILL');
+      fs.renameSync(source,target);
+      if(renames===crash.afterRename) process.kill(process.pid,'SIGKILL');
+    }});`;
+  const status = await childProcess(t, script).completion;
+  assert.equal(status.signal, 'SIGKILL', status.output);
+  return JSON.parse(readFileSync(path.join(stateDirectory(options.lockDirectory), 'journal.json'), 'utf8'));
+}
+
+function publicationPaths(root, journal) {
+  const read = (filename) => {
+    if (!existsSync(filename)) return null;
+    if (lstatSync(filename).isFile()) return readFileSync(filename).toString('base64');
+    return Object.fromEntries(readdirSync(filename).sort().map((name) => [name, read(path.join(filename, name))]));
+  };
+  return Object.fromEntries(journal.replacements.flatMap((replacement) =>
+    ['target', 'staging', 'backup'].map((key) => [replacement[key], read(path.join(root, replacement[key]))])));
+}
+
+function assertRecoveryPreservesEvidence(root, lockDirectory, journal, pattern = /compiler-owned snapshot/) {
+  const before = publicationPaths(root, journal);
+  const journalPath = path.join(stateDirectory(lockDirectory), 'journal.json');
+  const contents = readFileSync(journalPath, 'utf8');
+  assert.throws(() => recoverPublication(lockDirectory, root), pattern);
+  assert.deepEqual(publicationPaths(root, journal), before, 'whole-batch preflight must precede all artifact and receipt mutations');
+  assert.equal(readFileSync(journalPath, 'utf8'), contents, 'failed recovery keeps the journal');
+  assert.equal(existsSync(lockDirectory), true, 'failed recovery keeps the owner lock');
 }
 
 test('publication owns the exact receipt inventory and preserves extra consumer files', (t) => {
@@ -106,7 +161,7 @@ test('interrupted publication recovery restores backups before releasing its loc
   renameSync(original.outDirectory, backup);
   mkdirSync(original.outDirectory);
   writeFileSync(path.join(original.outDirectory, 'Component.rs'), 'partly published');
-  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v1', committed: false, replacements: [{ target: 'one', staging: path.basename(staging), backup: path.basename(backup), existed: true }] }));
+  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v2', committed: false, replacements: [{ target: 'one', staging: path.basename(staging), backup: path.basename(backup), existed: true, before: componentSnapshot('old'), after: componentSnapshot('partly published') }] }));
   assert.equal(recoverPublication(lockDirectory, root), true);
   assert.equal(readFileSync(path.join(original.outDirectory, 'Component.rs'), 'utf8'), 'old');
   assert.equal(existsSync(lockDirectory), false);
@@ -146,7 +201,7 @@ test('staging interruptions are journaled and recovery removes partial staging',
   const staging = path.join(root, 'one.producer-interrupted.staging');
   mkdirSync(staging);
   writeFileSync(path.join(staging, 'partial.rs'), 'partial compiler output');
-  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v1', committed: false, replacements: [{ target: 'one', staging: path.basename(staging), backup: 'one.producer-interrupted.backup', existed: false }] }));
+  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v2', committed: false, replacements: [{ target: 'one', staging: path.basename(staging), backup: 'one.producer-interrupted.backup', existed: false, before: null, after: { kind: 'directory', directories: [], files: [{ path: 'missing.rs', sha256: hash('not written before interruption') }, { path: 'partial.rs', sha256: hash('partial compiler output') }] } }] }));
   assert.equal(recoverPublication(lockDirectory, root), true);
   assert.equal(existsSync(staging), false);
   assert.equal(existsSync(path.join(root, 'one')), false);
@@ -197,7 +252,7 @@ test('concurrent recovery cannot delete the restored original', { timeout: 10000
   renameSync(original.outDirectory, backup);
   mkdirSync(original.outDirectory);
   writeFileSync(path.join(original.outDirectory, 'Component.rs'), 'partial replacement');
-  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v1', committed: false, replacements: [{ target: 'one', staging: 'one.producer-interrupted.staging', backup: path.basename(backup), existed: true }] }));
+  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v2', committed: false, replacements: [{ target: 'one', staging: 'one.producer-interrupted.staging', backup: path.basename(backup), existed: true, before: componentSnapshot(original.artifacts[0].contents), after: componentSnapshot('partial replacement') }] }));
   const marker = path.join(root, 'first-recovery-claimed');
   const moduleUrl = new URL('../lib/artifact-publication.mjs', import.meta.url).href;
   const firstScript = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
@@ -242,7 +297,7 @@ test('a killed recovery can be resumed without deleting another recovery claim',
   renameSync(original.outDirectory, backup);
   mkdirSync(original.outDirectory);
   writeFileSync(path.join(original.outDirectory, 'Component.rs'), 'partial replacement');
-  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v1', committed: false, replacements: [{ target: 'one', staging: 'one.producer-interrupted.staging', backup: path.basename(backup), existed: true }] }));
+  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify({ schema: 'verdant.proto-ui.publication.v2', committed: false, replacements: [{ target: 'one', staging: 'one.producer-interrupted.staging', backup: path.basename(backup), existed: true, before: componentSnapshot(original.artifacts[0].contents), after: componentSnapshot('partial replacement') }] }));
   const moduleUrl = new URL('../lib/artifact-publication.mjs', import.meta.url).href;
   const script = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
     const rename = fs.renameSync;
@@ -540,4 +595,148 @@ test('unknown legacy locks, forged state identities and extra private files rema
   assert.equal(existsSync(lockDirectory), true);
   rmSync(humanFile);
   nextRelease();
+});
+
+for (const mutation of ['added file', 'modified file', 'empty directory', 'modified receipt']) {
+  test(`SIGKILL replacement recovery preserves a ${mutation} and leaves the entire batch intact`, { timeout: 10000 }, async (t) => {
+    const { root, lockDirectory, unit, options, release } = fixture(t);
+    publishBatch([unit('one', 'old one'), unit('two', 'old two')], options);
+    release();
+    const journal = await crashPublication(t, [unit('one', 'new one'), unit('two', 'new two')], options, { afterRename: 8 });
+    // One is restored last in reverse-order rollback. Finding its edit only
+    // when reaching it would already have destroyed two's crash evidence.
+    if (mutation === 'added file') writeFileSync(path.join(root, 'one', 'human-notes.md'), 'keep manual notes');
+    else if (mutation === 'modified file') writeFileSync(path.join(root, 'one', 'Component.rs'), 'manual correction');
+    else if (mutation === 'empty directory') mkdirSync(path.join(root, 'one', 'manual-directory'));
+    else writeFileSync(path.join(root, 'one.json'), 'manual receipt correction');
+    assertRecoveryPreservesEvidence(root, lockDirectory, journal);
+  });
+}
+
+test('the original second-rename interruption cannot delete a later manual file', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, unit, options, release } = fixture(t);
+  publishBatch([unit('one', 'old')], options);
+  release();
+  const journal = await crashPublication(t, [unit('one', 'new')], options, { afterRename: 2 });
+  const manual = path.join(root, 'one', 'human-notes.md');
+  writeFileSync(manual, 'written after the producer stopped');
+  assertRecoveryPreservesEvidence(root, lockDirectory, journal);
+  assert.equal(readFileSync(manual, 'utf8'), 'written after the producer stopped');
+  // Once the caller explicitly relocates its own file, the unchanged journal
+  // can finish recovery without rebuilding or guessing the old generation.
+  renameSync(manual, path.join(root, 'saved-human-notes.md'));
+  assert.equal(recoverPublication(lockDirectory, root), true);
+  assert.equal(readFileSync(path.join(root, 'one', 'Component.rs'), 'utf8'), 'old');
+});
+
+test('recovery preserves files added to a newly created target without a backup', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, unit, options, release } = fixture(t);
+  release();
+  const journal = await crashPublication(t, [unit('one', 'new')], options, { afterRename: 1 });
+  assert.equal(journal.replacements[0].existed, false);
+  writeFileSync(path.join(root, 'one', 'human-notes.md'), 'a new output is not permission to delete this');
+  assertRecoveryPreservesEvidence(root, lockDirectory, journal);
+});
+
+test('recovery preserves unknown staged files even before the first target rename', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, unit, options, release } = fixture(t);
+  publishBatch([unit('one', 'old')], options);
+  release();
+  const journal = await crashPublication(t, [unit('one', 'new')], options, { beforeRename: 1 });
+  writeFileSync(path.join(root, journal.replacements[0].staging, 'human-notes.md'), 'inspect before deleting');
+  assertRecoveryPreservesEvidence(root, lockDirectory, journal);
+  assert.equal(readFileSync(path.join(root, 'one', 'Component.rs'), 'utf8'), 'old');
+});
+
+for (const mutation of ['backup addition', 'backup edit', 'target addition', 'receipt edit']) {
+  test(`committed cleanup preserves a ${mutation} before touching any backup`, { timeout: 10000 }, async (t) => {
+    const { root, lockDirectory, unit, options, release } = fixture(t);
+    publishBatch([unit('one', 'old one'), unit('two', 'old two')], options);
+    release();
+    const journal = await crashPublication(t, [unit('one', 'new one'), unit('two', 'new two')], options, { committed: true });
+    assert.equal(journal.committed, true);
+    // Mutate the later unit; all earlier backups must remain untouched too.
+    const output = journal.replacements.find((replacement) => replacement.target === 'two');
+    if (mutation === 'backup addition') writeFileSync(path.join(root, output.backup, 'human-notes.md'), 'retain this backup');
+    else if (mutation === 'backup edit') writeFileSync(path.join(root, output.backup, 'Component.rs'), 'edited original');
+    else if (mutation === 'target addition') writeFileSync(path.join(root, 'two', 'human-notes.md'), 'retain both generations');
+    else writeFileSync(path.join(root, 'two.json'), 'edited receipt');
+    assertRecoveryPreservesEvidence(root, lockDirectory, journal);
+  });
+}
+
+test('an interrupted committed cleanup resumes after an earlier complete backup removal', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, unit, options, release } = fixture(t);
+  publishBatch([unit('one', 'old one'), unit('two', 'old two')], options);
+  release();
+  const journal = await crashPublication(t, [unit('one', 'new one'), unit('two', 'new two')], options, { cleanup: true });
+  assert.equal(journal.committed, true);
+  assert.equal(existsSync(path.join(root, journal.replacements[0].backup)), false);
+  assert.equal(recoverPublication(lockDirectory, root), true);
+  assert.equal(readFileSync(path.join(root, 'one', 'Component.rs'), 'utf8'), 'new one');
+  assert.equal(readFileSync(path.join(root, 'two', 'Component.rs'), 'utf8'), 'new two');
+});
+
+test('a real partial staging write fails safely with its bytes and recovery evidence preserved', { timeout: 10000 }, async (t) => {
+  const { root, lockDirectory, unit, options, release } = fixture(t);
+  publishBatch([unit('one', 'old')], options);
+  release();
+  const journal = await crashPublication(t, [unit('one', 'replacement is longer than its partial write')], options, { partialWrite: true });
+  const partial = path.join(root, journal.replacements[0].staging, 'Component.rs');
+  assert.equal(readFileSync(partial, 'utf8'), 'rep');
+  assertRecoveryPreservesEvidence(root, lockDirectory, journal);
+  assert.equal(readFileSync(path.join(root, 'one', 'Component.rs'), 'utf8'), 'old');
+  // There is no automatic permission to unlink truncated bytes. Only this
+  // fixture's explicit removal admits the subsequent known-subset cleanup.
+  rmSync(partial);
+  assert.equal(recoverPublication(lockDirectory, root), true);
+});
+
+for (const committed of [false, true]) {
+  test(`SIGKILL during ${committed ? 'committed backup cleanup' : 'replacement rollback'} resumes a proven complete-file subset`, { timeout: 10000 }, async (t) => {
+    const { root, lockDirectory, unit, options, release } = fixture(t);
+    const complete = (contents) => {
+      const result = unit('one', contents);
+      result.artifacts.push({ path: 'nested/second.rs', kind: 'source', contents: `${contents} second` });
+      result.receipt.artifacts.push({ path: 'nested/second.rs', kind: 'source', sha256: hash(`${contents} second`) });
+      return result;
+    };
+    publishBatch([complete('old')], options);
+    release();
+    const journal = await crashPublication(t, [complete('new')], options, committed ? { committed: true } : { afterRename: 4 });
+    const discard = path.join(root, journal.replacements[0][committed ? 'backup' : 'target']);
+    const script = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+      const remove=fs.rmSync;
+      fs.rmSync=function(filename,...args) {
+        if(String(filename)===${JSON.stringify(discard)}) {
+          fs.unlinkSync(${JSON.stringify(path.join(discard, 'Component.rs'))});
+          process.kill(process.pid,'SIGKILL');
+        }
+        return remove.call(this,filename,...args);
+      };
+      syncBuiltinESMExports();
+      const {recoverPublication}=await import(${JSON.stringify(moduleUrl)});
+      recoverPublication(${JSON.stringify(lockDirectory)},${JSON.stringify(root)});`;
+    const result = await childProcess(t, script).completion;
+    assert.equal(result.signal, 'SIGKILL', result.output);
+    assert.equal(existsSync(path.join(discard, 'Component.rs')), false);
+    assert.equal(existsSync(path.join(discard, 'nested', 'second.rs')), true);
+    assert.equal(recoverPublication(lockDirectory, root), true);
+    assert.equal(readFileSync(path.join(root, 'one', 'Component.rs'), 'utf8'), committed ? 'new' : 'old');
+    assert.equal(readFileSync(path.join(root, 'one', 'nested', 'second.rs'), 'utf8'), committed ? 'new second' : 'old second');
+  });
+}
+
+test('legacy journals without ownership snapshots preserve every path for manual recovery', (t) => {
+  const { root, lockDirectory, unit, options, release } = fixture(t);
+  publishBatch([unit('one', 'old')], options);
+  release();
+  mkdirSync(lockDirectory);
+  writeFileSync(path.join(lockDirectory, 'owner.json'), JSON.stringify({ pid: 2147483647, host: os.hostname() }));
+  const journal = { schema: 'verdant.proto-ui.publication.v1', committed: false, replacements: [{ target: 'one', staging: 'one.producer-legacy.staging', backup: 'one.producer-legacy.backup', existed: true }] };
+  renameSync(path.join(root, 'one'), path.join(root, journal.replacements[0].backup));
+  mkdirSync(path.join(root, 'one'));
+  writeFileSync(path.join(root, 'one', 'human-notes.md'), 'legacy journal cannot authorize deleting this');
+  writeFileSync(path.join(lockDirectory, 'journal.json'), JSON.stringify(journal));
+  assertRecoveryPreservesEvidence(root, lockDirectory, journal, /Legacy publication journal has no ownership snapshots/);
 });

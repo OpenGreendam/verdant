@@ -13,7 +13,9 @@ import path from 'node:path';
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const slash = (value) => value.split(path.sep).join('/');
 const lockSchema = 'verdant.proto-ui.producer-lock.v2';
+const journalSchema = 'verdant.proto-ui.publication.v2';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
 export function insidePath(root, relative) {
   if (typeof relative !== 'string' || relative === '' || relative.includes('\\') || relative.includes('\0')) {
@@ -90,6 +92,89 @@ export function assertOwnedInventory(directory, receiptPath, root) {
       throw new Error(`Refusing to overwrite a modified compiler artifact: ${artifact.path}`);
     }
   }
+}
+
+// Recovery may run hours after a crashed producer. A pathname or an old
+// receipt alone cannot authorize deleting files added or edited in that time.
+// Bind both generations, including empty directories and the receipt bytes,
+// before publishing the initial journal.
+function fileSnapshot(contents) {
+  return { kind: 'file', sha256: sha256(contents) };
+}
+
+function pathSnapshot(filename) {
+  let stat;
+  try { stat = lstatSync(filename); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  if (stat.isFile()) return fileSnapshot(readFileSync(filename));
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`Non-regular publication path is not compiler-owned: ${filename}`);
+  const directories = [], files = [];
+  const walk = (directory, prefix = '') => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const child = path.join(directory, entry.name);
+      if (entry.isDirectory()) { directories.push(relative); walk(child, relative); }
+      else if (entry.isFile()) files.push({ path: relative, sha256: sha256(readFileSync(child)) });
+      else throw new Error(`Non-regular publication path is not compiler-owned: ${child}`);
+    }
+  };
+  walk(filename);
+  return { kind: 'directory', directories: directories.sort(), files: files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0) };
+}
+
+function artifactSnapshot(artifacts, directory) {
+  const directories = new Set(), files = new Map();
+  for (const artifact of artifacts) {
+    insidePath(directory, artifact.path);
+    if (files.has(artifact.path)) throw new Error(`Duplicate emitted artifact: ${artifact.path}`);
+    files.set(artifact.path, { path: artifact.path, sha256: sha256(artifact.contents) });
+    let parent = path.posix.dirname(artifact.path);
+    while (parent !== '.') { directories.add(parent); parent = path.posix.dirname(parent); }
+  }
+  for (const directory of directories) if (files.has(directory)) throw new Error(`Emitted file also names a directory: ${directory}`);
+  return { kind: 'directory', directories: [...directories].sort(), files: [...files.values()].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0) };
+}
+
+function validateSnapshot(snapshot, root) {
+  const digest = (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+  if (snapshot?.kind === 'file' && digest(snapshot.sha256)
+    && same(Object.keys(snapshot).sort(), ['kind', 'sha256'])) return;
+  if (snapshot?.kind !== 'directory' || !Array.isArray(snapshot.directories) || !Array.isArray(snapshot.files)
+    || !same(Object.keys(snapshot).sort(), ['directories', 'files', 'kind'])) throw new Error('Invalid publication ownership snapshot.');
+  const directories = new Set(), files = new Set();
+  for (const directory of snapshot.directories) { insidePath(root, directory); directories.add(directory); }
+  for (const file of snapshot.files) {
+    if (!file || !digest(file.sha256) || !same(Object.keys(file).sort(), ['path', 'sha256'])) throw new Error('Invalid publication file snapshot.');
+    insidePath(root, file.path); files.add(file.path);
+    let parent = path.posix.dirname(file.path);
+    while (parent !== '.') {
+      if (!directories.has(parent)) throw new Error('Publication file snapshot lacks its parent directory.');
+      parent = path.posix.dirname(parent);
+    }
+  }
+  if (directories.size !== snapshot.directories.length || files.size !== snapshot.files.length
+    || [...files].some((file) => directories.has(file))
+    || !same([...directories].sort(), snapshot.directories)
+    || !same([...files].sort(), snapshot.files.map((file) => file.path))) throw new Error('Invalid publication snapshot inventory.');
+}
+
+function assertSnapshot(filename, expected, { optional = false, subset = false } = {}) {
+  const actual = pathSnapshot(filename);
+  if (actual === null && optional) return;
+  let matches = same(actual, expected);
+  if (subset && actual?.kind === 'directory' && expected?.kind === 'directory') {
+    const files = new Map(expected.files.map((file) => [file.path, file.sha256]));
+    matches = actual.directories.every((directory) => expected.directories.includes(directory))
+      && actual.files.every((file) => files.get(file.path) === file.sha256);
+  }
+  if (!matches) throw new Error(`Refusing publication recovery: ${filename} differs from its compiler-owned snapshot; preserve the lock, journal and all paths for manual recovery.`);
+}
+
+function removeKnownPath(filename, expected, options = {}) {
+  // Repeat the local check immediately before deletion as well as the whole
+  // batch preflight. This also refuses symlinks and unknown empty directories.
+  assertSnapshot(filename, expected, { ...options, optional: true });
+  rmSync(filename, { force: true, recursive: true });
 }
 
 function writeCompleteFile(filename, contents) {
@@ -199,31 +284,81 @@ export function acquireProducerLock(lockDirectory, root = path.dirname(lockDirec
 
 function checkedJournal(lockDirectory, root) {
   const journal = JSON.parse(readFileSync(path.join(lockDirectory, 'journal.json'), 'utf8'));
-  if (journal.schema !== 'verdant.proto-ui.publication.v1' || !Array.isArray(journal.replacements)) throw new Error('Invalid publication recovery journal.');
+  if (journal.schema === 'verdant.proto-ui.publication.v1') throw new Error('Legacy publication journal has no ownership snapshots; preserve the lock, journal and all paths for manual recovery.');
+  if (journal.schema !== journalSchema || typeof journal.committed !== 'boolean' || !Array.isArray(journal.replacements)) throw new Error('Invalid publication recovery journal.');
+  const paths = [];
   for (const replacement of journal.replacements) {
-    for (const key of ['target', 'staging', 'backup']) ownedPath(root, replacement[key]);
+    for (const key of ['target', 'staging', 'backup']) {
+      ownedPath(root, replacement[key]);
+      if (paths.some((existing) => existing === replacement[key] || existing.startsWith(`${replacement[key]}/`) || replacement[key].startsWith(`${existing}/`))) throw new Error('Publication recovery paths overlap.');
+      paths.push(replacement[key]);
+    }
     const target = path.dirname(replacement.target);
     if (path.dirname(replacement.staging) !== target || path.dirname(replacement.backup) !== target ||
-        !path.basename(replacement.staging).includes('.producer-') || !replacement.backup.endsWith('.backup')) {
+        !replacement.staging.startsWith(`${replacement.target}.producer-`) || !replacement.staging.endsWith('.staging') ||
+        !replacement.backup.startsWith(`${replacement.target}.producer-`) || !replacement.backup.endsWith('.backup')) {
       throw new Error('Publication recovery paths are not sibling staging/backup paths.');
     }
+    if (typeof replacement.existed !== 'boolean' || (replacement.before !== null) !== replacement.existed) throw new Error('Publication recovery lacks its original ownership snapshot.');
+    if (replacement.existed) validateSnapshot(replacement.before, root);
+    validateSnapshot(replacement.after, root);
   }
   return journal;
 }
 
+function preflightRecovery(journal, root) {
+  // Validate the entire batch before the first removal or backup restore. A
+  // problem in the last unit must leave the first unit's evidence intact too.
+  for (const replacement of journal.replacements) {
+    const target = ownedPath(root, replacement.target);
+    const backup = ownedPath(root, replacement.backup);
+    const staging = ownedPath(root, replacement.staging);
+    assertSnapshot(staging, replacement.after, { optional: true, subset: true });
+    if (journal.committed) {
+      assertSnapshot(target, replacement.after);
+      // A prior cleanup may have stopped between file removals. The complete
+      // new target is already verified; only known old bytes may remain here.
+      assertSnapshot(backup, replacement.before, { optional: true, subset: true });
+    } else if (existsSync(backup)) {
+      if (!replacement.existed) throw new Error(`Unexpected publication backup; preserve it for manual recovery: ${backup}`);
+      assertSnapshot(backup, replacement.before);
+      // Likewise a rollback may have interrupted deletion of the replacement.
+      // Its restore source (the backup) must still be complete.
+      assertSnapshot(target, replacement.after, { optional: true, subset: true });
+    } else if (replacement.existed) {
+      // Either this replacement has not started, or an earlier interrupted
+      // recovery already restored it. Both have the same original snapshot.
+      assertSnapshot(target, replacement.before);
+    } else assertSnapshot(target, replacement.after, { optional: true, subset: true });
+  }
+}
+
 function rollback(lockDirectory, root) {
   const journal = checkedJournal(lockDirectory, root);
+  preflightRecovery(journal, root);
   for (const replacement of [...journal.replacements].reverse()) {
     const target = insidePath(root, replacement.target);
     const backup = insidePath(root, replacement.backup);
     const staging = insidePath(root, replacement.staging);
     if (existsSync(backup)) {
-      rmSync(target, { force: true, recursive: true });
+      removeKnownPath(target, replacement.after, { subset: true });
+      assertSnapshot(backup, replacement.before);
       renameSync(backup, target);
     } else if (!replacement.existed) {
-      rmSync(target, { force: true, recursive: true });
+      removeKnownPath(target, replacement.after, { subset: true });
     }
-    rmSync(staging, { force: true, recursive: true });
+    removeKnownPath(staging, replacement.after, { subset: true });
+  }
+  rmSync(path.join(lockDirectory, 'journal.json'));
+}
+
+function finishCommittedPublication(lockDirectory, root) {
+  const journal = checkedJournal(lockDirectory, root);
+  if (!journal.committed) throw new Error('Publication is not committed.');
+  preflightRecovery(journal, root);
+  for (const replacement of journal.replacements) {
+    removeKnownPath(insidePath(root, replacement.backup), replacement.before, { subset: true });
+    removeKnownPath(insidePath(root, replacement.staging), replacement.after, { subset: true });
   }
   rmSync(path.join(lockDirectory, 'journal.json'));
 }
@@ -303,13 +438,8 @@ export function recoverPublication(lockDirectory, root) {
     assertPrivateInventory(lock.directory);
     if (existsSync(path.join(lock.directory, 'journal.json'))) {
       const journal = checkedJournal(lock.directory, root);
-      if (journal.committed) {
-        for (const replacement of journal.replacements) {
-          rmSync(insidePath(root, replacement.backup), { recursive: true, force: true });
-          rmSync(insidePath(root, replacement.staging), { recursive: true, force: true });
-        }
-        rmSync(path.join(lock.directory, 'journal.json'));
-      } else rollback(lock.directory, root);
+      if (journal.committed) finishCommittedPublication(lock.directory, root);
+      else rollback(lock.directory, root);
     }
     removeLock(lock);
     return true;
@@ -327,22 +457,24 @@ export function publishBatch(units, { root, lockDirectory, rename = renameSync }
   for (const unit of units) assertOwnedInventory(unit.outDirectory, unit.receiptPath, root);
   const replacements = [];
   const journalPath = path.join(lock.directory, 'journal.json');
-  const add = (target, staging) => {
+  const add = (target, staging, after) => {
     assertNoSymlinkAncestors(root, target);
     assertNoSymlinkAncestors(root, staging);
+    const before = pathSnapshot(target);
     const replacement = {
       target: slash(path.relative(root, target)), staging: slash(path.relative(root, staging)),
-      backup: slash(path.relative(root, `${target}.producer-${randomUUID()}.backup`)), existed: existsSync(target),
+      backup: slash(path.relative(root, `${target}.producer-${randomUUID()}.backup`)), existed: before !== null,
+      before, after,
     };
     replacements.push(replacement);
     return replacement;
   };
   const plans = units.map((unit) => ({
     unit,
-    output: add(unit.outDirectory, `${unit.outDirectory}.producer-${randomUUID()}.staging`),
-    receipt: add(unit.receiptPath, `${unit.receiptPath}.producer-${randomUUID()}.staging`),
+    output: add(unit.outDirectory, `${unit.outDirectory}.producer-${randomUUID()}.staging`, artifactSnapshot(unit.artifacts, unit.outDirectory)),
+    receipt: add(unit.receiptPath, `${unit.receiptPath}.producer-${randomUUID()}.staging`, fileSnapshot(`${JSON.stringify(unit.receipt, null, 2)}\n`)),
   }));
-  const journal = { schema: 'verdant.proto-ui.publication.v1', committed: false, replacements };
+  const journal = { schema: journalSchema, committed: false, replacements };
   // Record all planned staging paths before the first write. A process killed
   // during staging can therefore recover without orphaned untracked outputs.
   const initialJournal = path.join(lock.directory, 'journal.initial.json');
@@ -366,6 +498,13 @@ export function publishBatch(units, { root, lockDirectory, rename = renameSync }
       const stagedReceipt = ownedPath(root, receipt.staging);
       writeFileSync(stagedReceipt, `${JSON.stringify(unit.receipt, null, 2)}\n`, { flag: 'wx' });
     }
+    // Staging did not grant permission to overwrite a consumer edit made
+    // since the initial inventory read. Admit all replacements together.
+    for (const replacement of replacements) {
+      assertSnapshot(ownedPath(root, replacement.target), replacement.before);
+      assertSnapshot(ownedPath(root, replacement.staging), replacement.after);
+      assertSnapshot(ownedPath(root, replacement.backup), null);
+    }
     for (const replacement of replacements) {
       const target = insidePath(root, replacement.target);
       if (replacement.existed) rename(target, insidePath(root, replacement.backup));
@@ -376,13 +515,13 @@ export function publishBatch(units, { root, lockDirectory, rename = renameSync }
     const committedJournal = `${journalPath}.committed`;
     writeFileSync(committedJournal, `${JSON.stringify({ ...journal, committed: true })}\n`, { flag: 'wx' });
     renameSync(committedJournal, journalPath);
-    for (const replacement of replacements) rmSync(insidePath(root, replacement.backup), { recursive: true, force: true });
-    rmSync(journalPath);
+    finishCommittedPublication(lock.directory, root);
   } catch (error) {
     if (existsSync(journalPath)) {
       if (!checkedJournal(lock.directory, root).committed) rollback(lock.directory, root);
     } else {
-      for (const replacement of replacements) rmSync(insidePath(root, replacement.staging), { recursive: true, force: true });
+      for (const replacement of replacements) assertSnapshot(insidePath(root, replacement.staging), replacement.after, { optional: true, subset: true });
+      for (const replacement of replacements) removeKnownPath(insidePath(root, replacement.staging), replacement.after, { subset: true });
     }
     throw error;
   }

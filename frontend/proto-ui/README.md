@@ -59,7 +59,9 @@ producer 按各单元的 target 调用上游 `compileFile` 或 `compileRustDataF
 
 生成物替换先验证 receipt 的完整 inventory 和每个文件内容。额外文件、人工改动、符号链接和不完整 inventory 会被拒绝；它们不会被“目录里有 provenance”这一条件授权删除。发布使用互斥锁、唯一 staging、备份和恢复 journal。
 
-公开锁是完整 owner 记录的原子、仅创建 hard link；owner 先在唯一私有 state 目录完整写入，再公开锁，竞争获取不能覆盖已有锁。初始 journal 同样先完整写入，再原子公开，且先于任何 staging 写入。进程在这两个初始化窗口被杀，不会暴露半份 owner/journal；尚未公开的私有残留不会阻塞新 publisher，也不会通过通配扫描删除。释放和恢复绑定 owner identity，旧 owner 不得移除后来 owner 的锁；完整的旧目录锁仍可恢复，缺 owner 或包含未知内容的旧锁保持拒绝。
+公开锁是完整 owner 记录的原子、仅创建 hard link；owner 先在唯一私有 state 目录完整写入，再公开锁，竞争获取不能覆盖已有锁。初始 journal 同样先完整写入，再原子公开，且先于任何 staging 写入。进程在这两个初始化窗口被杀，不会暴露半份 owner/journal；尚未公开的私有残留不会阻塞新 publisher，也不会通过通配扫描删除。释放和恢复绑定 owner identity，旧 owner 不得移除后来 owner 的锁。没有发布 journal 的完整旧目录锁仍可回收；缺 owner、包含未知内容的旧锁，以及没有所有权快照的 v1 发布 journal 都保留并明确拒绝自动恢复。
+
+v2 journal 在首次 staging 写入前记录每个替换目标的旧、新所有权快照，包含目录、空目录、文件内容摘要和 receipt 字节。恢复旧批次和清理已提交批次都先核对全部 target、staging、backup，再执行任何删除或还原；每次删除前再次核对对应路径。崩溃后添加的文件、人工修改、未知目录或截断的写入都会使恢复失败，锁、journal 和所有产物保留供检查。staging 只有在内容是计划库存中已完整写入的子集时才允许自动清理；路径名称本身不能授权递归删除。
 
 这是针对进程中断的可恢复多目录替换，不保证断电持久性，也不是跨目录的原子快照。只有遵守 producer 锁的读写方才具备批次一致性；不要在再生成过程中同时运行 Cargo。
 
