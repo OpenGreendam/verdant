@@ -302,10 +302,14 @@ fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, in
     decision.consumed
 }
 
-fn may_begin_device_input(ed: &Editor) -> bool {
-    ed.device_drag.is_none() && ed.session.pointer_owner().is_none() && ed.lane_stroke.is_none()
-        && ed.note_creation.is_none() && ed.mixer_drag.is_none() && ed.master_drag.is_none() && !ed.has_proto_pointer_contact()
+fn device_input_available(ed: &Editor) -> bool {
+    ed.session.pointer_owner().is_none() && ed.lane_stroke.is_none()
+        && ed.note_creation.is_none() && ed.mixer_drag.is_none() && ed.master_drag.is_none()
         && ed.menu.is_none() && ed.text_prompt.is_none() && ed.modal_dialog.is_none()
+}
+
+fn may_begin_device_input(ed: &Editor) -> bool {
+    device_input_available(ed) && ed.device_drag.is_none() && !ed.has_proto_pointer_contact()
 }
 
 impl DeviceDrag {
@@ -1861,6 +1865,166 @@ mod native_tests {
         let editor = host.editor.read(cx);
         let params = crate::instrument::synth_params(editor.project().track(host.target.track.track_id().unwrap()).unwrap()).unwrap();
         crate::instrument::synth_descs(&params).into_iter().find(|desc| desc.id == "gain").unwrap().value
+    }
+
+    fn hold_suite_knob(window: &mut Window, cx: &mut App) -> (verdant_normalized_knob::NormalizedKnobHandle, gpui::Point<Pixels>, serde_json::Value) {
+        let owner = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id()) && owner.declared_events.contains("valueCommit")
+        }).expect("the production compiled knob is mounted in this window");
+        let knob = verdant_normalized_knob::NormalizedKnobHandle { owner };
+        let accepted = knob.state("value").unwrap();
+        let start = knob.owner.borrow().native_hitbox.as_ref().unwrap().bounds.center();
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: start, button: MouseButton::Left, ..Default::default()
+        }), cx);
+        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+            position: start + point(px(0.), px(-36.)), pressed_button: Some(MouseButton::Left), ..Default::default()
+        }), cx);
+        assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"));
+        assert!(knob.state("value").unwrap().as_f64().unwrap() > accepted.as_f64().unwrap());
+        (knob, start, accepted)
+    }
+
+    fn release_suite_knob(start: gpui::Point<Pixels>, window: &mut Window, cx: &mut App) {
+        window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+            position: start + point(px(0.), px(-36.)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+    }
+
+    // GPUI's ActionRequest dispatcher is crate-private. These tests exercise
+    // the production command shared by pointer/keyboard/accessible activation
+    // with real window input and the durable store; OS action transport is a
+    // separate test lane, not simulated by directly invoking this callback.
+    #[gpui::test]
+    fn suite_commands_cancel_preview_before_comparison_copy_and_reset(cx: &mut TestAppContext) {
+        for action in [suite::SuiteAction::Compare(1), suite::SuiteAction::CopyComparison, suite::SuiteAction::Reset] {
+            let window = open(cx, true);
+            if matches!(action, suite::SuiteAction::Reset) {
+                window.update(cx, |host, _, cx| {
+                    host.editor.update(cx, |ed, cx| {
+                        assert!(ed.set_device_params(host.target.track.clone(), host.target.slot, vec![("gain".into(), -18.)], cx));
+                    });
+                    host.desc = current_params(host.editor.read(cx), &host.target).unwrap().into_iter().find(|d| d.id == "gain").unwrap();
+                    cx.notify();
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+            }
+            window.update(cx, |host, window, cx| {
+                let before = host.editor.read(cx).revision();
+                let accepted_gain = gain(host, cx);
+                if matches!(action, suite::SuiteAction::Compare(_)) {
+                    host.editor.update(cx, |ed, _| {
+                        let saved = current_params(ed, &host.target).unwrap().into_iter()
+                            .map(|p| (p.id.clone(), if p.id == "gain" { -14. } else { p.value })).collect();
+                        ed.device_anim.entry(host.target.key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now()))
+                            .comparison.slots[1] = Some(saved);
+                    });
+                }
+                let command = host.editor.update(cx, |ed, cx| suite::command(ed, host.target.clone(), action.clone(), cx));
+                let (knob, start, accepted) = hold_suite_knob(window, cx);
+                command(None, window, cx);
+                assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
+                assert_eq!(knob.state("value").unwrap(), accepted);
+                assert!(!host.editor.read(cx).has_proto_pointer_contact());
+                let (expected_gain, writes) = match action {
+                    suite::SuiteAction::Compare(_) => (-14., 1),
+                    suite::SuiteAction::Reset => (host.desc.default_value.unwrap(), 1),
+                    suite::SuiteAction::CopyComparison => {
+                        let ed = host.editor.read(cx);
+                        for values in &ed.device_anim[&host.target.key].comparison.slots {
+                            assert_eq!(values.as_ref().unwrap().iter().find(|(id, _)| id == "gain").unwrap().1, accepted_gain,
+                                "copy saves the accepted value, never the held preview");
+                        }
+                        (accepted_gain, 0)
+                    }
+                    _ => unreachable!(),
+                };
+                assert_eq!(gain(host, cx), expected_gain);
+                assert_eq!(host.editor.read(cx).revision().get(), before.get() + writes);
+                release_suite_knob(start, window, cx);
+                assert_eq!(gain(host, cx), expected_gain);
+                assert_eq!(host.editor.read(cx).revision().get(), before.get() + writes, "late release cannot add a second edit");
+            }).unwrap();
+        }
+    }
+
+    #[gpui::test]
+    fn suite_old_target_cannot_cancel_a_replacement_knob(cx: &mut TestAppContext) {
+        for changed in ["generation", "instrument", "selected-track"] {
+            let window = open(cx, true);
+            let old_command = window.update(cx, |host, _, cx| {
+                let command = host.editor.update(cx, |ed, cx| suite::command(ed, host.target.clone(), suite::SuiteAction::CopyComparison, cx));
+                host.editor.update(cx, |ed, _| {
+                    match changed {
+                        "generation" => ed.document_generation += 1,
+                        "instrument" => {
+                            ed.persistence.commit(ed.revision(), CommandBatch::single("Replace instrument", Command::SetTrackInstrument {
+                                track: ed.session.track.clone(), instrument: Some(crate::instrument::builtin_instrument_spec(
+                                    dsp::ONE_SYNTH_ID, &dsp::SynthParams::one_defaults(), "test")),
+                            })).unwrap();
+                        }
+                        "selected-track" => {
+                            let track = ed.project().tracks[1].id.clone();
+                            ed.persistence.commit(ed.revision(), CommandBatch::single("Instrument on another track", Command::SetTrackInstrument {
+                                track: track.clone(), instrument: Some(crate::instrument::synth_spec(&dsp::SynthParams::default(), "test")),
+                            })).unwrap();
+                            ed.session.track = track;
+                        }
+                        _ => unreachable!(),
+                    }
+                    host.target = target_for(ed, &DeviceTarget::Track(ed.session.track.clone()), crate::instrument::INSTRUMENT_SLOT).unwrap();
+                    host.desc = current_params(ed, &host.target).unwrap().into_iter().find(|d| d.id == "gain").unwrap();
+                });
+                cx.notify(); command
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                let before = host.editor.read(cx).revision();
+                let (knob, start, _) = hold_suite_knob(window, cx);
+                old_command(None, window, cx);
+                assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"), "old {changed} command cannot retire the replacement owner");
+                assert!(host.editor.read(cx).has_proto_pointer_contact());
+                assert_eq!(host.editor.read(cx).revision(), before);
+                release_suite_knob(start, window, cx);
+                assert_eq!(host.editor.read(cx).revision().get(), before.get() + 1);
+            }).unwrap();
+        }
+    }
+
+    #[gpui::test]
+    fn suite_commands_preserve_another_window_and_a_new_lease(cx: &mut TestAppContext) {
+        let first = open(cx, true);
+        let (editor, target, desc) = first.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
+        let second = cx.open_window(size(px(520.), px(220.)), |_, cx| Harness {
+            editor, target, desc, show: true, outside: cx.focus_handle(), block_up: Rc::new(Cell::new(false)), with_knob: true, double: None,
+        });
+        crate::native_test_support::frames(second, cx);
+        let (knob, old_start, accepted) = second.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
+        first.update(cx, |host, window, cx| {
+            let command = host.editor.update(cx, |ed, cx| suite::command(ed, host.target.clone(), suite::SuiteAction::CopyComparison, cx));
+            command(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"));
+            assert!(host.editor.read(cx).has_proto_pointer_contact());
+            assert_eq!(host.editor.read(cx).revision().get(), 0);
+            assert!(host.editor.read(cx).device_anim.get(&host.target.key).is_none_or(|state| state.comparison.slots[0].is_none()),
+                "a rival window cannot copy the other contact's preview");
+        }).unwrap();
+        let (_, replacement_start, _) = second.update(cx, |host, window, cx| {
+            let command = host.editor.update(cx, |ed, cx| suite::command(ed, host.target.clone(), suite::SuiteAction::CopyComparison, cx));
+            command(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
+            assert_eq!(knob.state("value").unwrap(), accepted);
+            release_suite_knob(old_start, window, cx);
+            assert_eq!(host.editor.read(cx).revision().get(), 0);
+            hold_suite_knob(window, cx)
+        }).unwrap();
+        crate::native_test_support::frames(second, cx);
+        second.update(cx, |host, window, cx| {
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"), "queued cleanup cannot retire the replacement generation");
+            release_suite_knob(replacement_start, window, cx);
+            assert_eq!(host.editor.read(cx).revision().get(), 1);
+        }).unwrap();
     }
 
     #[gpui::test]
