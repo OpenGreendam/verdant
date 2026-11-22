@@ -591,20 +591,23 @@ mod tests {
     fn toolbar_layout_toggles_cancel_the_owned_preview_before_redraw(cx: &mut TestAppContext) {
         let (_main, editor, windows) = native_windows(cx, 1);
         let native = windows[0];
-        cx.update_window(native.into(), |_, window, cx| {
-            let view = window.root::<NativePluginWindow>().flatten().unwrap();
-            let focus = view.read(cx).focus.clone();
-            window.focus(&focus, cx);
-        }).unwrap();
-        crate::native_test_support::frames(native, cx);
-        cx.update_window(native.into(), |_, window, cx| {
-            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
-                keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false,
-            }), cx);
-        }).unwrap();
-        cx.run_until_parked();
-        native.update(cx, |view, _, _| assert!(view.held_notes.contains(&60))).unwrap();
         for action in [ToolbarAction::Tools, ToolbarAction::Keyboard] {
+            // The rendered performance keys also end their held note on a
+            // mouse-up outside. Give each layout command its own physical
+            // typing press instead of carrying it through the prior drag's up.
+            cx.update_window(native.into(), |_, window, cx| {
+                let view = window.root::<NativePluginWindow>().flatten().unwrap();
+                let focus = view.read(cx).focus.clone();
+                window.focus(&focus, cx);
+            }).unwrap();
+            crate::native_test_support::frames(native, cx);
+            cx.update_window(native.into(), |_, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                    keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false, prefer_character_input: false,
+                }), cx);
+            }).unwrap();
+            cx.run_until_parked();
+            native.update(cx, |view, _, _| assert!(view.held_notes.contains(&60))).unwrap();
             cx.update_window(native.into(), |_, window, cx| {
                 let knob = gain_knob(window);
                 let accepted = knob.state("value").unwrap();
@@ -613,7 +616,7 @@ mod tests {
                 if matches!(action, ToolbarAction::Keyboard) {
                     assert!(view.read(cx).held_notes.contains(&60), "a performance note is still held before hiding its keyboard");
                     window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
-                        keystroke: gpui::Keystroke::parse("s").unwrap(), is_held: false,
+                        keystroke: gpui::Keystroke::parse("s").unwrap(), is_held: false, prefer_character_input: false,
                     }), cx);
                     assert!(view.read(cx).pending_notes.contains(&62), "the second physical key is reserved before deferral");
                 }
@@ -639,6 +642,11 @@ mod tests {
                 assert!(!editor.read(cx).has_proto_pointer_contact());
                 release_knob(start, window, cx);
                 assert_eq!(editor.read(cx).revision().get(), 0, "layout commands cannot commit a held preview");
+                for key in if matches!(action, ToolbarAction::Keyboard) { &["a", "s"][..] } else { &["a"][..] } {
+                    window.dispatch_event(gpui::PlatformInput::KeyUp(gpui::KeyUpEvent {
+                        keystroke: gpui::Keystroke::parse(key).unwrap(),
+                    }), cx);
+                }
             }).unwrap();
             crate::native_test_support::frames(native, cx);
         }
