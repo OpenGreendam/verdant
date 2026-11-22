@@ -176,6 +176,75 @@ runtimeTest('continuous synchronous draft echoes cannot swallow the final releas
   assert.equal(f.x.value.get(), 0.7);
 });
 
+runtimeTest('continuous commit retains an exact preview echo for the next keyboard step and drag', async (t) => {
+  for (const nextInput of ['keyboard', 'drag']) {
+    const f = await fixture(t, { value: 35, min: 0, max: 240, step: 5, fineStep: 1, previewEcho: true });
+    f.onEvent((name, payload) => {
+      if (name === 'valuePreview' || name === 'valueCommit') f.update({ value: payload.value });
+    });
+    f.call('begin', 35, false, false, false);
+    f.call('sample', 154, 36, true, false);
+    assert.equal(f.call('finish', 154, 36, true, false), true);
+    assert.deepEqual(f.commits(), [{ value: 154, revision: 'document:1' }]);
+    assert.equal(f.x.phase.get(), 'idle');
+    assert.equal(f.x.value.get(), 154, 'an unchanged final host echo remains the idle authority');
+    assert.deepEqual(f.cancels(), []);
+    if (nextInput === 'keyboard') {
+      assert.equal(f.key('ArrowRight', { shiftKey: true }).defaultPrevented, true);
+      assert.equal(f.commits().at(-1).value, 155);
+      assert.equal(f.x.value.get(), 155);
+    } else {
+      assert.equal(f.call('begin', 154, false, false, false), true);
+      assert.equal(f.x.initialValue.get(), 154, 'the next drag starts at the committed echo');
+      f.call('sample', 170, 155, true, false);
+      f.call('cancel');
+      assert.equal(f.x.value.get(), 154);
+      assert.deepEqual(f.cancels(), [{ value: 154, revision: 'document:1' }]);
+    }
+  }
+});
+
+runtimeTest('continuous preview echo remains provisional until that exact value is committed', async (t) => {
+  const cancelled = await fixture(t, { previewEcho: true });
+  cancelled.onEvent((name, payload) => {
+    if (name === 'valuePreview') cancelled.update({ value: payload.value });
+  });
+  cancelled.call('begin', 0.5, false, false, false);
+  cancelled.call('sample', 0.7, 0.52, true, false);
+  cancelled.call('cancel');
+  assert.equal(cancelled.x.value.get(), 0.5);
+  assert.deepEqual(cancelled.cancels(), [{ value: 0.5, revision: 'document:1' }]);
+
+  for (const previewEcho of [false, true]) {
+    const rejected = await fixture(t, { previewEcho });
+    rejected.onEvent((name, payload) => {
+      if (previewEcho && name === 'valuePreview' && payload.value === 0.6) rejected.update({ value: 0.6 });
+    });
+    rejected.call('begin', 0.5, false, false, false);
+    rejected.call('sample', 0.6, 0.51, true, false);
+    assert.equal(rejected.call('finish', 0.8, 0.53, true, false), true);
+    assert.equal(rejected.x.value.get(), 0.5, 'an earlier echo cannot accept a different final proposal');
+    rejected.call('adjust', 1, false);
+    assert.deepEqual(rejected.commits().map(payload => payload.value), [0.8, 0.51]);
+  }
+});
+
+runtimeTest('continuous commit echo cannot overwrite a reentrant host replacement', async (t) => {
+  const f = await fixture(t, { previewEcho: true });
+  f.onEvent((name, payload) => {
+    if (name === 'valuePreview') f.update({ value: payload.value });
+    if (name === 'valueCommit') f.update({ value: 0.2, revision: 'document:2' });
+  });
+  f.call('begin', 0.5, false, false, false);
+  f.call('sample', 0.6, 0.51, true, false);
+  assert.equal(f.call('finish', 0.7, 0.52, true, false), true);
+  assert.equal(f.x.value.get(), 0.2);
+  assert.equal(f.call('begin', 0.2, false, false, false), true);
+  assert.equal(f.x.initialValue.get(), 0.2);
+  f.call('cancel');
+  assert.deepEqual(f.cancels(), [{ value: 0.2, revision: 'document:2' }]);
+});
+
 runtimeTest('continuous numeric scrubbing owns rounding, physical steps and fine steps', async (t) => {
   const f = await fixture(t, { value: 120, min: 40, max: 300, step: 1, fineStep: 0.1, dragMode: 'steps', role: 'spinbutton' });
   f.call('begin', 0, false, false, false);

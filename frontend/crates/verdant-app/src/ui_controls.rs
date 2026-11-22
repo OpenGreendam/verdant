@@ -767,7 +767,7 @@ mod splitter_precision_tests {
                 });
                 window.update(cx, |_, window, _| window.activate_window()).unwrap();
                 crate::native_test_support::frames(window, cx);
-                let (source, start, initial) = window.update(cx, |host, window, cx| {
+                let (source, start, initial, saved_layout) = window.update(cx, |host, window, cx| {
                     let owners = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter()
                         .filter(|owner| {
                             let owner = owner.borrow();
@@ -779,7 +779,8 @@ mod splitter_precision_tests {
                     let bounds = source.owner.borrow().native_hitbox.as_ref().expect("painted production splitter").bounds;
                     assert!(bounds.size.width > px(0.0) && bounds.size.height > px(0.0));
                     let start = bounds.center();
-                    (source, start, f64::from(value(host.editor.read(cx).layout, kind)))
+                    let editor = host.editor.read(cx);
+                    (source, start, f64::from(value(editor.layout, kind)), editor.prefs.extra.get(LAYOUT_PREFS_KEY).cloned())
                 }).unwrap();
                 cx.update_window(window.into(), |_, window, cx| {
                     window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
@@ -809,7 +810,10 @@ mod splitter_precision_tests {
                         assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"), "{kind:?}, fine={fine}");
                         assert_eq!(value(editor.layout, kind), expected);
                         assert_eq!(source.state("value").unwrap().as_f64(), Some(f64::from(expected)));
-                        assert!(!editor.prefs_dirty, "preview must not persist layout preferences");
+                        // Window-bounds observation can independently dirty
+                        // preferences; inspect the actual persisted layout.
+                        assert_eq!(editor.prefs.extra.get(LAYOUT_PREFS_KEY), saved_layout.as_ref(),
+                            "preview must not persist layout preferences");
                         assert!(window.captured_hitbox().is_some(), "the same drag must retain native capture after repaint");
                     }).unwrap();
                 }
@@ -824,8 +828,11 @@ mod splitter_precision_tests {
                     let editor = host.editor.read(cx);
                     assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
                     assert_eq!(value(editor.layout, kind), expected);
+                    assert_eq!(source.state("value").unwrap().as_f64(), Some(f64::from(expected)),
+                        "release must retain the accepted layout for the next interaction");
                     assert!(editor.prefs_dirty, "release commits the production layout callback");
                     assert_eq!(LayoutPrefs::from_prefs(&editor.prefs), editor.layout);
+                    assert_ne!(editor.prefs.extra.get(LAYOUT_PREFS_KEY), saved_layout.as_ref());
                     assert!(window.captured_hitbox().is_none());
                     assert!(source.take_failures().is_empty());
                 }).unwrap();

@@ -41,6 +41,8 @@
 
 所有 `src/*.proto.ts` 顶层入口必须登记在 pin 中，所有 `generated/*/Cargo.toml` 消费者也必须属于相同清单；遗漏入口或遗留未登记生成 crate 都会失败。嵌套的 vendored helper 由 source graph 记录。应用 Rust 中依赖的 package 名从真实生成 Cargo.toml 更新，生成文件本身不可手改。
 
+Verdant 固定的 GPUI fork 提供平台文本选区通知 API，因此应用的普通 SDK 依赖显式启用 `gpui-text-selection-notification`。此能力独立于元素 API 版本；共享 SDK 的默认 GPUI profile 可以保持自身的实际 API 边界。
+
 `build-proto-ui.mjs --check` 校验固定、干净的上游提交及实际 Node/pnpm/TypeScript/tsx、来源闭包、SDK 内容和全部产物字节。`--check-retained` 仅证明当前来源与保留产物自洽，两者必须分开报告。session 仍只依赖两个无 GPUI、无 serde 的标准库 data crates。
 
 ## 验证范围

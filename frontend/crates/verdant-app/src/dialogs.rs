@@ -1447,6 +1447,8 @@ mod slider_precision_tests {
             window.update(cx, |host, window, cx| {
                 assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
                 assert_eq!((case.read)(host.editor.read(cx).modal_dialog.as_ref().unwrap()), expected);
+                assert_eq!(source.state("value").unwrap().as_f64(), Some(expected),
+                    "release must retain the accepted draft for the next interaction");
                 assert_ne!(expected, initial, "the completed gesture must change this draft");
                 assert_eq!(host.editor.read(cx).revision().get(), 0, "Apply remains the project transaction boundary");
                 assert!(window.captured_hitbox().is_none());

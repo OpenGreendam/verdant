@@ -100,8 +100,22 @@ export default definePrototype<Props>({
       if (!current(ticket) || !enabled() || !Number.isFinite(next)) return false;
       const proposal = clamp(next);
       const basis = revision;
+      const props = run?.props.get();
+      // A draft host may already project the final preview, so committing it
+      // need not change any prop or invoke sync again. Promote only that exact
+      // echoed value when its interaction retires; ordinary proposals and
+      // cancellation still use the last committed authority.
+      const echoed = phase.get() !== 'idle' && props?.previewEcho === true
+        && props.value === proposal && (props.revision ?? '') === basis
+        && (props.min ?? 0) === minimum.get() && (props.max ?? 1) === maximum.get()
+        && props.disabled !== true && (props.step ?? 0.01) === stepPolicy
+        && (props.fineStep ?? 0.001) === finePolicy && (props.dragMode ?? 'absolute') === dragPolicy
+        && (props.doubleAction ?? 'reset') === doublePolicy && (props.tapAction ?? 'none') === tapPolicy
+        && (props.keyboardMode ?? 'full') === keyboardPolicy;
       phase.set('idle', 'reason: continuous control proposal');
-      if (!current(ticket) || !publish(accepted, ticket)) return false;
+      if (!current(ticket)) return false;
+      if (echoed) accepted = proposal;
+      if (!publish(accepted, ticket)) return false;
       if (run) run.expose.emit('valueCommit', { value: proposal, revision: basis });
       return true;
     };

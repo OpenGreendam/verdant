@@ -26,7 +26,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "eaaa513406f61fb5e81a6bc8674d1b2647888a2b"
+    "revision": "84a9d7eedafb8118bdbcc5e42ec75f723e3e1680"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -64,7 +64,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "5dd9bfcad34021a981573445e8cf8efd371ed1db4875e13bdcdc05b501c9b6fa"
+    "contentSha256": "d79fa3ff8d112e6e491b9f9343ea44068a11acde30ab37a9dbafceb47e25fd0d"
   },
   "artifacts": [
     {
@@ -75,7 +75,7 @@
     {
       "path": ".proto-ui/gpui-native/Cargo.toml",
       "kind": "source",
-      "sha256": "bd80c6fd338469b51446c771ac8171942b07c654f689809933c9fad0d25420a0"
+      "sha256": "1ba98e2753931029fc808a6ae5f7b164b7f2cd449fe2737d9f5c349a9b47379e"
     },
     {
       "path": ".proto-ui/gpui-native/LICENSE",
@@ -115,7 +115,7 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "b3b562a232222370406603c8e8ed8945e490720ebd3445ef55887c9eca333110"
+      "sha256": "f4d9d50ba3b64895352405028c26a214dee4e7b5b589a58671c3b1365dee3fe8"
     },
     {
       "path": ".proto-ui/gpui-native/src/lib.rs",
@@ -150,12 +150,12 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "6a4b718cf669b4acab6008e7ee0070f8f502f6f186e1cfe53396287f7ff2fd3e"
+      "sha256": "bf81ab90c1b779d746824e89d380c1b3265d4c66b873a560ae74236e5d836dc7"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "a71a63a7beb7e27112641af4273d5a3f2ddeb71a59861c93b07ec22d0f7beb6e"
+      "sha256": "28b1c57cc51a29dcd9b0b735eb30e59106aeeebca104382ad9b5ef447471d494"
     },
     {
       "path": "Component.rs.map",
@@ -165,7 +165,7 @@
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "a4026573ba81f4de145019f9bb5125a8b82e34d7b61b314bb8706f9c5c105840"
+      "sha256": "c433ac1c6011a7dc4dd9370da717d6de8bc3a8db3deac6a98d3065483ff0b97d"
     }
   ]
 }
