@@ -68,6 +68,21 @@ test('shared consumers cannot redirect their SDK path or add another owner', (t)
   assert.throws(() => loadPin(filename, root), code(EXIT.pin));
 });
 
+test('every application authored entry and generated Cargo consumer is pinned', (t) => {
+  const root = fixture(t);
+  const filename = path.join(root, 'frontend/proto-ui/compiler.pin.json');
+  const original = json(filename);
+  const omitted = structuredClone(original);
+  omitted.units = omitted.units.filter((unit) => unit.name !== 'action-control');
+  writeFileSync(filename, JSON.stringify(omitted));
+  assert.throws(() => loadPin(filename, root), (error) => code(EXIT.pin)(error) && /Authored entry.*action-control/.test(error.message));
+  writeFileSync(filename, JSON.stringify(original));
+  const orphan = path.join(root, 'frontend/proto-ui/generated/unpinned-control');
+  mkdirSync(orphan);
+  writeFileSync(path.join(orphan, 'Cargo.toml'), '[package]\nname="orphan"\nversion="0.1.0"\n');
+  assert.throws(() => loadPin(filename, root), (error) => code(EXIT.pin)(error) && /Generated Cargo consumer.*unpinned-control/.test(error.message));
+});
+
 test('each data unit pins selected pure methods, a stable package and an empty dependency closure', (t) => {
   const root = fixture(t);
   const pin = loadPin(path.join(root, 'frontend/proto-ui/compiler.pin.json'), root);

@@ -2085,7 +2085,77 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a"
+name = "generated-gpui-0bb48e76a16ab1cf509c2ed318c81986"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-5e29a42c91ccdf55fde36f5aac535c7b"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-7d01816207564a6fc835c1e2d99879cd"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-81784682f0712df350c44444ab52c0db"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-858132349e9c591a4ef64ccb6716f095"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-900f115712c53d0ecd4c1d5c3bf9aec9"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-b3ef13fdcfd6ca100482a4eb2a6c6c33"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-b90b57d53d23256ae6711e22560ce7f2"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2096,6 +2166,36 @@ dependencies = [
 
 [[package]]
 name = "generated-gpui-cf24f4a63e06497c7d284f96518bbd7d"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-ea03381ad29c0309e03b86c331eaa2ce"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-ef5995e06354dd7f3f4289c37aa5ee27"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-f566693d5de77c3630a31c3fcc84b78e"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -6637,8 +6737,18 @@ dependencies = [
  "async-channel",
  "chrono",
  "env_logger",
- "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a",
+ "generated-gpui-0bb48e76a16ab1cf509c2ed318c81986",
+ "generated-gpui-5e29a42c91ccdf55fde36f5aac535c7b",
+ "generated-gpui-7d01816207564a6fc835c1e2d99879cd",
+ "generated-gpui-81784682f0712df350c44444ab52c0db",
+ "generated-gpui-858132349e9c591a4ef64ccb6716f095",
+ "generated-gpui-900f115712c53d0ecd4c1d5c3bf9aec9",
+ "generated-gpui-b3ef13fdcfd6ca100482a4eb2a6c6c33",
+ "generated-gpui-b90b57d53d23256ae6711e22560ce7f2",
  "generated-gpui-cf24f4a63e06497c7d284f96518bbd7d",
+ "generated-gpui-ea03381ad29c0309e03b86c331eaa2ce",
+ "generated-gpui-ef5995e06354dd7f3f4289c37aa5ee27",
+ "generated-gpui-f566693d5de77c3630a31c3fcc84b78e",
  "gpui",
  "gpui_platform",
  "semver",

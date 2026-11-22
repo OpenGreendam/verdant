@@ -2,7 +2,7 @@
   "schema": "verdant.proto-ui.compiler-pin.v3",
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "5712266648fdbce2f6662636cb83f01eb849adb1"
+    "revision": "1a76e079a4ae3877b08af6a09b4110bfac82df71"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -35,7 +35,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774"
+    "contentSha256": "4882eb155ebd673ae4c48916474dfdf81fe400fdaa8d3aea68ca523c1448e479"
   },
   "units": [
     {
@@ -95,6 +95,146 @@
         "profile": "gpui-source-v1",
         "gpuiDependency": "workspace",
         "componentName": "NormalizedKnob",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "action-control",
+      "source": "frontend/proto-ui/src/action-control.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/action-control",
+        "receipt": "frontend/proto-ui/receipts/action-control.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "ActionControl",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "collection-control",
+      "source": "frontend/proto-ui/src/collection-control.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/collection-control",
+        "receipt": "frontend/proto-ui/receipts/collection-control.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "CollectionControl",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "continuous-control",
+      "source": "frontend/proto-ui/src/continuous-control.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/continuous-control",
+        "receipt": "frontend/proto-ui/receipts/continuous-control.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "ContinuousControl",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "editor-surface",
+      "source": "frontend/proto-ui/src/editor-surface.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/editor-surface",
+        "receipt": "frontend/proto-ui/receipts/editor-surface.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "EditorSurface",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "performance-key",
+      "source": "frontend/proto-ui/src/performance-key.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/performance-key",
+        "receipt": "frontend/proto-ui/receipts/performance-key.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "PerformanceKey",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "drag-source",
+      "source": "frontend/proto-ui/src/drag-source.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/drag-source",
+        "receipt": "frontend/proto-ui/receipts/drag-source.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "DragSource",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "overlay-control",
+      "source": "frontend/proto-ui/src/overlay-control.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/overlay-control",
+        "receipt": "frontend/proto-ui/receipts/overlay-control.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "OverlayControl",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "text-field",
+      "source": "frontend/proto-ui/src/text-field.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/text-field",
+        "receipt": "frontend/proto-ui/receipts/text-field.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "TextField",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "graph-point",
+      "source": "frontend/proto-ui/src/graph-point.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/graph-point",
+        "receipt": "frontend/proto-ui/receipts/graph-point.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "GraphPoint",
+        "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+      }
+    },
+    {
+      "name": "scroll-region",
+      "source": "frontend/proto-ui/src/scroll-region.proto.ts",
+      "output": {
+        "directory": "frontend/proto-ui/generated/scroll-region",
+        "receipt": "frontend/proto-ui/receipts/scroll-region.json"
+      },
+      "target": {
+        "profile": "gpui-source-v1",
+        "gpuiDependency": "workspace",
+        "componentName": "ScrollRegion",
         "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
       }
     }

@@ -354,8 +354,12 @@ jobs:
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui theme::tests
           cargo test --offline --locked --release -p verdant-ui-protocol -p verdant-session
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui host_pointer::tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui proto_knob::tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui devices::native_tests
+          # Exercise all compiled control owners and their real native bindings
+          # on every platform; the former knob-only filter omitted new controls.
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui proto_
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui devices::
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui table::
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui menu::
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui roll::native_tests
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui pointer_boundary_tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package

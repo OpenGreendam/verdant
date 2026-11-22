@@ -350,7 +350,7 @@ pub fn appearance_controls(editor: &crate::editor::Editor, cx: &mut gpui::Contex
             ("appearance-dark", "深色", AppearancePreference::Dark),
         ].into_iter().map(|(id, label, preference)| {
             let active = selected == preference;
-            div().id(id).role(gpui::Role::Button).aria_label(format!("外观：{label}"))
+            crate::proto_controls::action(id, format!("外观：{label}")).role(gpui::Role::RadioButton)
                 .aria_selected(active).cursor_pointer().h(px(crate::ui_controls::BAR_BTN_H)).px(px(8.0)).flex().items_center().justify_center().rounded(px(5.0))
                 .bg(if active { theme.accent } else { theme.control })
                 .text_color(if active { theme.accent_text } else { theme.text })
@@ -373,7 +373,7 @@ pub fn pride_controls(editor: &crate::editor::Editor, cx: &mut gpui::Context<cra
             ("pride-off", "关", PridePreference::Off),
         ].into_iter().map(|(id, label, preference)| {
             let active = selected == preference;
-            div().id(id).role(gpui::Role::Button).aria_label(format!("Pride 彩虹主题：{label}"))
+            crate::proto_controls::action(id, format!("Pride 彩虹主题：{label}")).role(gpui::Role::RadioButton)
                 .aria_selected(active).cursor_pointer().h(px(crate::ui_controls::BAR_BTN_H)).px(px(8.0))
                 .flex().items_center().justify_center().rounded(px(5.0))
                 .bg(if active { theme.accent } else { theme.control })

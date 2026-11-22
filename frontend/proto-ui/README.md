@@ -4,6 +4,8 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 
 ## 当前边界
 
+本轮将其余应用交互扩展到 **12 个原生编译组件 + 2 个标准库决策单元**；完整的 18 类映射、宿主边界与验证范围见 [CONTROL-MIGRATION.md](CONTROL-MIGRATION.md)。下表保留原有四个基础单元的职责，新增的十个单元与它们共用生成、pin、receipt 和 CI 门禁。
+
 | 单元 | 原型拥有的职责 | Rust 宿主拥有的职责 |
 |---|---|---|
 | `pitch-gesture-surface` | 原生根、尺寸/裁剪和 slot；共享 SDK 的 artifact owner | 卷帘绘图、音乐坐标、音高采样、领域预览与提交；上游 MoveGesture lease 的宿主绑定 |
@@ -53,7 +55,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
 
 producer 按各单元的 target 调用上游 `compileFile` 或 `compileRustDataFile`，共用 `FileSourceGraph`，记录仓库边界内的入口、导入 helper、包解析输入以及未命中的候选路径；已有的仓库外来源会被拒绝。编译前后核对来源字节与解析图，避免只哈希入口却遗漏 helper 或 exports 变化。
 
-`pitch-gesture-surface` 发射唯一的 `.proto-ui/gpui-native`；`normalized-knob` 通过上游 `nativeSdkPath` 引用它。两个 data 单元不使用 SDK。pin 绑定 owner、路径、package/version、ABI feature 和 SDK 内容摘要；data target 则绑定稳定 crate 名、公开方法和空依赖集合。增加原生单元时必须复用 SDK，不能复制同名 package，也不能改生成 Rust 来修 Cargo 冲突。
+`pitch-gesture-surface` 发射唯一的 `.proto-ui/gpui-native`；其他 11 个原生单元通过上游 `nativeSdkPath` 引用它。两个 data 单元不使用 SDK。pin 绑定 owner、路径、package/version、ABI feature 和 SDK 内容摘要；data target 则绑定稳定 crate 名、公开方法和空依赖集合。增加原生单元时必须复用 SDK，不能复制同名 package，也不能改生成 Rust 来修 Cargo 冲突。
 
 生成物替换先验证 receipt 的完整 inventory 和每个文件内容。额外文件、人工改动、符号链接和不完整 inventory 会被拒绝；它们不会被“目录里有 provenance”这一条件授权删除。发布使用互斥锁、唯一 staging、备份和恢复 journal。
 
@@ -102,7 +104,7 @@ node frontend/proto-ui/tools/check-native-source-mutation.mjs --run .ci/proto-ui
 
 保留字节一致、Cargo graph、Rust trace、GPUI 框架事件、OS 窗口输入和物理设备分别提供不同证据。哈希或截图不能代替取消/捕获正确性，GPUI 测试不能替代物理触摸、IME 或屏幕阅读器验收。跨平台剩余范围仍见 [PLATFORM-ACCEPTANCE.md](../docs/PLATFORM-ACCEPTANCE.md)。
 
-## 本次验收
+## 迁移前基线验收（#79）
 
 | 检查 | #79 的实际结果 |
 |---|---|
@@ -119,7 +121,7 @@ Rust 各 crate 的数量是 Linux 总数中的子集，不重复相加。macOS/W
 
 #68 的发布来源分类失败、#72 的原生关闭按钮消歧和 Weston 输出发现失败均保留在完成记录中；#79 在修复后重新运行了完整链。早先 `8fc5f4e` 的 344 项 Rust 和 18 项 OS 结果保留为历史基线，不用来替代本次 app/worker 的验证。原始 OS artifact 与摘要的独立读回、摘要和源身份校验见 [机器记录](NATIVE-INPUT-2026-11-22.json)；[CI 原始证据](https://github.com/OpenGreendam/verdant/actions/runs/45026004598/artifacts/14756497529) 按 14 天策略保留至 2026-12-06。
 
-本次真实窗口验收发生在 Linux；它不等于物理触摸设备、IME、屏幕阅读器或 macOS/Windows 的 OS 输入验收。上游 PR #1710 的相关测试和真实数值链已经验证，但其更大的整仓 CI 仍有未全部解决的测试失败，PR 保持 draft；不能用 Verdant 的通过结果宣称上游整仓全绿。
+本次真实窗口验收发生在 Linux；它不等于物理触摸设备、IME、屏幕阅读器或 macOS/Windows 的 OS 输入验收。上游 PR #1710 的相关测试和真实数值链已经验证，该段记录仅对应 #79 当时的提交与运行；后续上游状态和本轮迁移验收应查看各自 PR 的最新 Checks，不能以历史结果替代。
 
 ## 上游依据
 

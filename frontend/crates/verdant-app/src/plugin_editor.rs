@@ -293,6 +293,61 @@ impl Editor {
     }
 }
 
+impl NativePluginWindow {
+    fn render_device_body(&self, window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let Some(editor) = self.editor.upgrade() else { window.remove_window(); return div().into_any_element(); };
+        let target = &self.target; let binding = &self.binding;
+        let generation = self.generation; let generic = self.generic;
+        editor.update(cx, |ed, cx| {
+            if ed.project().project_id != self.project || ed.document_generation != generation {
+                ed.cancel_device_drag_in(window.window_handle(), cx); window.remove_window(); return div().into_any_element();
+            }
+            let th = ed.theme; let editor_entity = cx.entity();
+            let body = match binding {
+                Binding::Insert { instance, key, id } => {
+                    let specs = ed.device_insert_specs(target);
+                    let slot = match instance {
+                        Some(instance) => instance_slot(&specs, instance),
+                        None => (0..specs.len()).find(|slot| ed.live_device_insert(target, *slot).is_some_and(|handle| handle.key() == *key)),
+                    }.filter(|slot| specs[*slot].id == *id);
+                    let Some(slot) = slot else {
+                        ed.cancel_device_drag_in(window.window_handle(), cx);
+                        window.remove_window();
+                        return div().into_any_element();
+                    };
+                    ed.fetch_device_params(target, slot, cx);
+                    let live = ed.live_device_insert(target, slot);
+                    let running = live.as_ref().is_some_and(|handle| matches!(handle.status(), verdant_plugins::InsertStatus::Running));
+                    let body = if let Some(handle) = live.filter(|_| running) {
+                        if let Some(mut params) = ed.plugin_params.get(&handle.key()).cloned() {
+                            crate::devices::preview_and_animate(ed, handle.key(), &mut params, window);
+                            if generic { crate::devices::generic_editor(ed, &editor_entity, target, slot, handle.key(), &params) }
+                            else { crate::devices::render_builtin_editor(ed, &editor_entity, target, slot, handle.key(), &params, cx) }
+                        } else { div().p(gpui::rems(24./16.)).child("正在读取参数…").into_any_element() }
+                    } else { div().p(gpui::rems(24./16.)).text_color(th.warning).child("插件未运行，工程参数已保留。请在效果器链重新加载。").into_any_element() };
+                    body
+                }
+                Binding::Instrument { id } => {
+                    let track = match target { DeviceTarget::Track(track) => track, DeviceTarget::Master => unreachable!() };
+                    let current = ed.project().track(track).filter(|track| track.instrument().and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str) == Some(id.as_str()));
+                    let Some(params) = current.and_then(crate::instrument::synth_params) else {
+                        ed.cancel_device_drag_in(window.window_handle(), cx);
+                        window.remove_window();
+                        return div().into_any_element();
+                    };
+                    let key = crate::instrument::instrument_key_for_generation(track, id, generation);
+                    let mut descs = crate::instrument::synth_descs_for(id, &params);
+                    crate::devices::preview_and_animate(ed, key, &mut descs, window);
+                    let body = if generic { crate::devices::generic_editor(ed, &editor_entity, target, crate::instrument::INSTRUMENT_SLOT, key, &descs) }
+                        else { crate::devices::synth_editor(ed, &editor_entity, track, key, &descs, cx) };
+                    body
+                }
+            };
+            div().p(gpui::rems(12./16.)).child(body).into_any_element()
+        })
+    }
+}
+
 impl Render for NativePluginWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(editor) = self.editor.upgrade() else {
@@ -300,8 +355,8 @@ impl Render for NativePluginWindow {
             return div().into_any_element();
         };
         let native_entity = cx.entity();
-        let note_down = native_entity.clone();
-        let note_up = native_entity.clone();
+        let keyboard_scope=format!("native-keyboard-{:?}",native_entity.entity_id());
+        let keyboard_down=keyboard_scope.clone();let keyboard_up=keyboard_scope.clone();
         let instrument_window = matches!(self.binding, Binding::Instrument { .. });
         let project = &self.project;
         let generation = self.generation;
@@ -321,7 +376,7 @@ impl Render for NativePluginWindow {
             let zoom = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.).clamp(0.75, 2.);
             window.set_rem_size(px(16. * zoom as f32));
             let editor_entity = cx.entity();
-            let (slot, name, bypassed, busy, body) = match binding {
+            let (slot, name, bypassed, busy) = match binding {
                 Binding::Insert { instance, key, id } => {
                     let specs = ed.device_insert_specs(target);
                     let slot = match instance {
@@ -329,38 +384,18 @@ impl Render for NativePluginWindow {
                         None => (0..specs.len()).find(|slot| ed.live_device_insert(target, *slot).is_some_and(|handle| handle.key() == *key)),
                     }.filter(|slot| specs[*slot].id == *id);
                     let Some(slot) = slot else {
-                        ed.cancel_device_drag_in(window.window_handle(), cx);
-                        window.remove_window();
-                        return div().into_any_element();
+                        ed.cancel_device_drag_in(window.window_handle(), cx); window.remove_window(); return div().into_any_element();
                     };
                     let spec = &specs[slot];
-                    ed.fetch_device_params(target, slot, cx);
-                    let live = ed.live_device_insert(target, slot);
-                    let running = live.as_ref().is_some_and(|handle| matches!(handle.status(), verdant_plugins::InsertStatus::Running));
-                    let busy = ed.inserts_loading || live.as_ref().is_some_and(|handle| ed.plugin_busy.contains(&handle.key()));
-                    let body = if let Some(handle) = live.filter(|_| running) {
-                        if let Some(mut params) = ed.plugin_params.get(&handle.key()).cloned() {
-                            crate::devices::preview_and_animate(ed, handle.key(), &mut params, window);
-                            if generic { crate::devices::generic_editor(ed, &editor_entity, target, slot, handle.key(), &params) }
-                            else { crate::devices::render_builtin_editor(ed, &editor_entity, target, slot, handle.key(), &params, cx) }
-                        } else { div().p(gpui::rems(24./16.)).child("正在读取参数…").into_any_element() }
-                    } else { div().p(gpui::rems(24./16.)).text_color(th.warning).child("插件未运行，工程参数已保留。请在效果器链重新加载。").into_any_element() };
-                    (slot, spec.name.clone(), spec.bypass, busy, body)
+                    let busy = ed.inserts_loading || ed.live_device_insert(target, slot).is_some_and(|handle| ed.plugin_busy.contains(&handle.key()));
+                    (slot, spec.name.clone(), spec.bypass, busy)
                 }
                 Binding::Instrument { id } => {
                     let track = match target { DeviceTarget::Track(track) => track, DeviceTarget::Master => unreachable!() };
-                    let current = ed.project().track(track).filter(|track| track.instrument().and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str) == Some(id.as_str()));
-                    let Some(params) = current.and_then(crate::instrument::synth_params) else {
-                        ed.cancel_device_drag_in(window.window_handle(), cx);
-                        window.remove_window();
-                        return div().into_any_element();
-                    };
-                    let key = crate::instrument::instrument_key_for_generation(track, id, generation);
-                    let mut descs = crate::instrument::synth_descs_for(id, &params);
-                    crate::devices::preview_and_animate(ed, key, &mut descs, window);
-                    let body = if generic { crate::devices::generic_editor(ed, &editor_entity, target, crate::instrument::INSTRUMENT_SLOT, key, &descs) }
-                        else { crate::devices::synth_editor(ed, &editor_entity, track, key, &descs, cx) };
-                    (crate::instrument::INSTRUMENT_SLOT, verdant_plugins::builtin_dsp::instrument_name(id).unwrap_or("Verdant Synth").into(), false, false, body)
+                    if ed.project().track(track).and_then(|track| track.instrument()).and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str) != Some(id.as_str()) {
+                        ed.cancel_device_drag_in(window.window_handle(), cx); window.remove_window(); return div().into_any_element();
+                    }
+                    (crate::instrument::INSTRUMENT_SLOT, verdant_plugins::builtin_dsp::instrument_name(id).unwrap_or("Verdant Synth").to_string(), false, false)
                 }
             };
             window.set_window_title(&format!("{name} — Verdant"));
@@ -373,7 +408,7 @@ impl Render for NativePluginWindow {
                 DeviceTarget::Track(track) => ed.project().track(track).map(|track| track.name.clone()).unwrap_or_default(),
                 DeviceTarget::Master => "主总线".into(),
             };
-            let button = |id: &'static str, label: &'static str, action| crate::devices::semantic_click(div().id(id).role(Role::Button)
+            let button = |id: &'static str, label: &'static str, action| crate::devices::semantic_click(crate::proto_controls::action(id, label)
                 .aria_label(label).cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
                 .bg(gpui::transparent_black()).hover(move |s| s.bg(th.hover)).text_size(px(13.)).child(label),
                 toolbar_command(editor_entity.downgrade(), native_entity.downgrade(), action));
@@ -382,34 +417,16 @@ impl Render for NativePluginWindow {
                 .aria_label(format!("{name} 原生编辑器")).size_full().relative()
                 .bg(th.view).text_color(th.text).font(crate::theme::plugin_ui_font(ed.ui_font.clone()))
                 .flex().flex_col().track_focus(&focus)
-                .on_key_up(move |event: &gpui::KeyUpEvent, _, cx| {
-                    if instrument_window { if let Some(note) = typing_note(&event.keystroke.key) {
-                        note_up.update(cx, |view, cx| { view.note(note, false, cx); cx.notify(); });
-                    } }
+                .on_key_up(move |event: &gpui::KeyUpEvent, window, cx| {
+                    if instrument_window { crate::proto_performance_key::route_key(&keyboard_up,&event.keystroke.key,false,window,cx); }
                 })
-                // Some X11 backends report auto-repeat with is_held=false.
-                // De-duplicate physical note presses before any Editor update,
-                // deferred work or notification, including the first-press gap.
                 .on_key_down(move |event: &KeyDownEvent, window, cx| {
-                    let key = event.keystroke.key.as_str();
-                    if instrument_window && !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt
-                        && key_editor.read(cx).menu.is_none() {
-                        if let Some(note) = typing_note(key) {
-                            let already_down = { let view = note_down.read(cx); view.held_notes.contains(&note) || view.pending_notes.contains(&note) };
-                            if !already_down {
-                                let reserved = note_down.update(cx, |view, _| reserve_note_press(&view.held_notes, &mut view.pending_notes, note));
-                                if reserved {
-                                    let entity = note_down.downgrade();
-                                    cx.defer(move |cx| {
-                                        let Some(entity) = entity.upgrade() else { return };
-                                        entity.update(cx, |view, cx| {
-                                            if view.pending_notes.remove(&note) { view.note(note, true, cx); cx.notify(); }
-                                        });
-                                    });
-                                }
-                            }
-                            window.prevent_default(); cx.stop_propagation(); return;
-                        }
+                    if window.default_prevented() { return; }
+                    let key=event.keystroke.key.as_str();
+                    if instrument_window && keyboard_open && !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt
+                        && key_editor.read(cx).menu.is_none()
+                        && crate::proto_performance_key::route_key(&keyboard_down,key,true,window,cx) {
+                        window.prevent_default();cx.stop_propagation();return;
                     }
                     if event.keystroke.modifiers.control || event.keystroke.modifiers.platform {
                         if key == "z" {
@@ -448,11 +465,15 @@ impl Render for NativePluginWindow {
                     .child(button("native-zoom-in", "＋", ToolbarAction::Zoom(0.125)).aria_label("放大插件界面"))
                     .child(button("native-zoom-reset", "100%", ToolbarAction::ZoomReset))
                     .child(button("native-fullscreen", "全屏", ToolbarAction::Fullscreen))))
-                .child(crate::devices::modulation_source_bar(ed, target, slot, if generic { None } else { modulation_key }))
-                .child(div().id("native-plugin-scroll").flex_1().min_h_0().overflow_y_scroll().overflow_x_scroll()
-                    .p(gpui::rems(12./16.)).child(body))
+                .child(crate::devices::modulation_source_bar(ed, &editor, target, slot, if generic { None } else { modulation_key }))
+                .child(div().flex_1().min_h_0().child({
+                    let owner = native_entity.clone();
+                    crate::proto_scroll::content("native-plugin-scroll", "插件参数", move |window, cx| {
+                        owner.update(cx, |view, cx| view.render_device_body(window, cx))
+                    }).axes("both")
+                }))
                 .when(instrument_window && keyboard_open, |root| root.child(div().flex_none().px(gpui::rems(12./16.)).pt(gpui::rems(8./16.)).border_t_1().border_color(th.shade)
-                    .child(performance_keyboard(&native_entity, &self.held_notes, th))))
+                    .child(performance_keyboard(&native_entity,&keyboard_scope,format!("{}:{}:{}",self.project,self.generation,self.binding.identity()),th))))
                 .child(div().flex_none().px(px(16.)).py(px(6.)).text_size(px(12.)).text_color(th.text_secondary)
                     .child(if busy { "正在提交参数…" } else if bypassed { "效果器已旁通" } else { "拖动调节 · Shift 微调 · 点击数值精确输入 · Alt 点击复位" }));
             if let Some(notice) = ed.notices.back() {
@@ -473,31 +494,35 @@ fn reserve_note_press(held: &std::collections::BTreeSet<u8>, pending: &mut std::
     !held.contains(&note) && pending.insert(note)
 }
 
+#[cfg(test)]
 fn typing_note(key: &str) -> Option<u8> {
     ["a", "w", "s", "e", "d", "f", "t", "g", "y", "h", "u", "j", "k"].iter().position(|&s| s == key).map(|i| 60 + i as u8)
 }
-fn performance_keyboard(view: &gpui::Entity<NativePluginWindow>, held: &std::collections::BTreeSet<u8>, th: crate::theme::Theme) -> gpui::AnyElement {
-    let mut keyboard = div().relative().h(gpui::rems(60./16.)).w_full();
-    for black_pass in [false, true] {
-        let mut white = 0usize;
-        for key in 48u8..72 {
-            let black = matches!(key % 12, 1 | 3 | 6 | 8 | 10);
-            if black == black_pass {
-                let pressed = held.contains(&key);
-                let down = view.clone(); let up = view.clone(); let outside = view.clone();
-                let label = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"][key as usize % 12];
-                keyboard = keyboard.child(div().id(format!("play-note-{key}")).role(Role::Button).aria_label(format!("{label}{}", key / 12 - 1))
-                    .absolute().top(gpui::rems(0.)).left(gpui::relative((white as f32 - if black { 0.32 } else { 0. }) / 14.))
-                    .w(gpui::relative(if black { 0.64 / 14. } else { 1. / 14. }))
-                    .h(gpui::rems(if black { 38./16. } else { 60./16. })).rounded(gpui::rems(4./16.))
-                    .border_1().border_color(th.shade).bg(if pressed { th.accent } else if black { th.key_black } else { th.key_white })
-                    .text_color(if black { th.text_secondary } else { th.text }).cursor_pointer().flex().items_end().justify_center().pb(gpui::rems(4./16.)).text_xs()
-                    .child(if black { String::new() } else { format!("{label}{}", key / 12 - 1) })
-                    .on_mouse_down(gpui::MouseButton::Left, move |_, _, cx| { down.update(cx, |view, cx| { view.note(key, true, cx); cx.notify(); }); })
-                    .on_mouse_up(gpui::MouseButton::Left, move |_, _, cx| { up.update(cx, |view, cx| { view.note(key, false, cx); cx.notify(); }); })
-                    .on_mouse_up_out(gpui::MouseButton::Left, move |_, _, cx| { outside.update(cx, |view, cx| { view.note(key, false, cx); cx.notify(); }); }));
+fn performance_keyboard(view:&gpui::Entity<NativePluginWindow>,scope:&str,revision:String,th:crate::theme::Theme)->gpui::AnyElement {
+    let mut keyboard=div().relative().h(gpui::rems(60./16.)).w_full();
+    for black_pass in [false,true] {
+        let mut white=0usize;
+        for note in 48u8..=72 {
+            let black=matches!(note%12,1|3|6|8|10);
+            if black==black_pass {
+                let label=["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"][note as usize%12];
+                let name=format!("{label}{}",note/12-1);
+                let display=if black { String::new() } else { name.clone() };
+                let target=view.downgrade();
+                let basis=revision.clone();
+                let key=crate::proto_performance_key::key(scope,note,name,revision.clone(),false,
+                    move |pressed|div().size_full().rounded(gpui::rems(4./16.)).border_1().border_color(th.shade)
+                        .bg(if pressed{th.accent}else if black{th.key_black}else{th.key_white})
+                        .text_color(if black{th.text_secondary}else{th.text}).cursor_pointer().flex().items_end().justify_center().pb(gpui::rems(4./16.)).text_xs()
+                        .child(display.clone()).into_any_element(),
+                    move |pressed,cx|{let _=target.update(cx,|view,cx| {
+                        if pressed&&(!view.keyboard_open||format!("{}:{}:{}",view.project,view.generation,view.binding.identity())!=basis){return;}
+                        view.note(note,pressed,cx);cx.notify();
+                    });});
+                keyboard=keyboard.child(div().absolute().top(gpui::rems(0.)).left(gpui::relative((white as f32-if black{0.32}else{0.})/15.))
+                    .w(gpui::relative(if black{0.64/15.}else{1./15.})).h(gpui::rems(if black{38./16.}else{60./16.})).child(key));
             }
-            if !black { white += 1; }
+            if !black{white+=1;}
         }
     }
     div().flex().flex_col().gap(gpui::rems(6./16.)).child(keyboard)

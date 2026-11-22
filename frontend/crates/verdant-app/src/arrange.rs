@@ -7,7 +7,7 @@
 //! trim. Preview-only drags commit once on release, including cross-track moves.
 //! Horizontal scrolling and editor navigation use the session viewport bounds.
 use std::collections::{HashMap, HashSet};
-use gpui::{App, BorderStyle, Bounds, ClickEvent, Context, DispatchPhase, Entity, FontWeight, Hitbox, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TouchDragEvent, TouchPhase, PinchEvent, Pixels, ScrollDelta, ScrollEvent, SharedString, Window, canvas, div, fill, prelude::*, px, quad};
+use gpui::{App, BorderStyle, Bounds, Context, DispatchPhase, Entity, FontWeight, Hitbox, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TouchDragEvent, TouchPhase, PinchEvent, Pixels, ScrollDelta, ScrollEvent, SharedString, Window, canvas, div, fill, prelude::*, px, quad};
 use verdant_backend::{PhrasePlan, SlotStatus};
 use verdant_domain::{Project,Revision,TrackId,Command,CommandBatch};
 use verdant_session::PointerId;
@@ -125,18 +125,18 @@ pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement 
         let (select, color, menu) = (track.id.clone(), track.id.clone(), track.id.clone());
         let route_label = crate::ui_controls::route_short_name(verdant_backend::adapter::desktop_route(ed.project(), track, ed.scheduler.capabilities.as_ref()));
         let hdr_h = px(crate::ui_controls::HDR_BTN_H);
-        div().id(SharedString::from(format!("track-{}", track.id))).role(gpui::Role::Button).aria_label(track.name.clone()).aria_selected(selected)
+        crate::proto_controls::action(SharedString::from(format!("track-{}", track.id)), track.name.clone()).aria_selected(selected)
             .h(px(ed.arrange_track_height as f32)).flex_none().w_full().flex().flex_col().justify_center().gap(px(4.0)).px(px(10.0))
             .bg(if selected { mix(th.surface, th.accent, 0.14) } else { th.surface }).border_b_1().border_color(th.shade)
-            .on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
+            .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, window, cx| {
                 if ed.select_track(select.clone(), cx) { window.focus(&ed.focus_arrange, cx); }
                 else { cx.stop_propagation(); }
             }))
-            .on_mouse_down(MouseButton::Right, cx.listener(move |ed, ev: &MouseDownEvent, window, cx| { if ed.select_track(menu.clone(), cx) { ed.track_menu(menu.clone(), ev.position, window, cx); } cx.stop_propagation(); }))
+            .on_context_menu(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| { if ed.select_track(menu.clone(), cx) { ed.track_menu(menu.clone(), ev.position(), window, cx); } cx.stop_propagation(); }))
             .child(div().flex().items_center().gap(px(5.0))
                 .child(div().text_size(px(10.5)).text_color(th.text_tertiary).w(px(15.0)).flex_none().child(format!("{:02}", i + 1)))
-                .child(div().id("color").role(gpui::Role::Button).aria_label("切换轨道颜色").size(px(11.0)).rounded(px(3.0)).bg(th.track(track.color.as_deref()))
-                    .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| ed.cycle_color(&color, cx))))
+                .child(crate::proto_controls::action("color", "切换轨道颜色").size(px(11.0)).rounded(px(3.0)).bg(th.track(track.color.as_deref()))
+                    .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| { ed.cycle_color(&color, cx); cx.stop_propagation(); })))
                 .child(div().flex_1().truncate().text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).child(track.name.clone()))
                 .child(crate::ui_controls::selectable_command_button(ed, CommandId::ToggleTrackAutomation, CommandArg::Track(track.id.clone()), "A", SharedString::from(format!("auto-btn-{}", track.id)), auto_expanded, cx)
                     .h(hdr_h).w(px(23.0)).px(px(0.0)).rounded(px(4.0)).aria_label("展开/收起自动化曲线"))
@@ -164,10 +164,10 @@ pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement 
                     ("复制", "复制音频片段到播放头", AudioRegionEdit::Duplicate),
                     ("静音", "切换音频片段静音", AudioRegionEdit::Mute),
                 ].into_iter().map(|(label,description,edit)| {
-                    div().id(SharedString::from(format!("audio-region-{label}"))).role(gpui::Role::Button)
-                        .aria_label(description).px(px(4.0)).rounded(px(2.0)).bg(th.control).cursor_pointer()
-                        .child(label).on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
-                            window.focus(&ed.focus_arrange,cx); edit_audio_region(ed,edit,cx);cx.stop_propagation();
+                    crate::proto_controls::action(SharedString::from(format!("audio-region-{label}")), description)
+                        .px(px(4.0)).rounded(px(2.0)).bg(th.control).cursor_pointer()
+                        .child(label).on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
+                             edit_audio_region(ed,edit,cx);cx.stop_propagation();
                         }))
                 })))
             })
@@ -175,6 +175,16 @@ pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement 
 }
 
 pub fn region_lanes(editor: Entity<Editor>) -> impl IntoElement {
+    let draw = editor.clone(); let cancel = editor.clone();
+    crate::proto_editor_surface::surface(editor, "arrangement", "编曲区：选择、移动、裁剪与淡入淡出", 4.0,
+        move |input| native_region_lanes(draw.clone(), input).into_any_element(),
+        move |_, window, cx| cancel.update(cx, |ed, cx| {
+            ed.arrange_drag = None; ed.integrations.audio_edit.range_drag = None;
+             cx.notify();
+        })).audio_keys(true)
+}
+
+fn native_region_lanes(editor: Entity<Editor>, input: crate::proto_editor_surface::Input) -> impl IntoElement {
     let pre = editor.clone();
     canvas(move |bounds, window, cx| {
         pre.update(cx, |ed, _| {
@@ -187,56 +197,37 @@ pub fn region_lanes(editor: Entity<Editor>) -> impl IntoElement {
         let mut texts = Texts::new(); let mut labels = Vec::new();
         paint_regions(&editor, bounds, window, cx, &mut texts, &mut labels); flush_texts(window, cx, bounds, texts);
         for (clip_bounds, label) in labels { flush_texts(window, cx, clip_bounds, label); }
-        let (e, h) = (editor.clone(), hitbox.clone());
-        window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-            if phase != DispatchPhase::Bubble || !h.is_hovered(window) { return; }
-            let local = ev.position - bounds.origin;
-            e.update(cx, |ed, cx| {
-                if region_down(ed,local.x.as_f32()as f64,local.y.as_f32()as f64,ev.button,ev.click_count,ev.modifiers.control,ev.modifiers.shift,ev.modifiers.alt,PointerId::Mouse,ev.position,window,cx){window.capture_pointer(h.id);cx.stop_propagation();}
-            });
-        });
-        let e=editor.clone();
-        window.on_mouse_event(move|ev:&MouseMoveEvent,phase,_,cx|{if phase!=DispatchPhase::Bubble{return;}let p=ev.position-bounds.origin;e.update(cx,|ed,cx|region_moved(ed,PointerId::Mouse,p.x.as_f32()as f64,p.y.as_f32()as f64,ev.modifiers.alt,cx));});
-        let e=editor.clone();
-        window.on_mouse_event(move|ev:&MouseUpEvent,phase,window,cx|{if phase==DispatchPhase::Bubble&&ev.button==MouseButton::Left{e.update(cx,|ed,cx|region_up(ed,PointerId::Mouse,window,cx));}});
-        let e=editor.clone();let h=hitbox.clone();
-        window.on_mouse_event(move|ev:&TouchDragEvent,phase,window,cx|{
-            if phase!=DispatchPhase::Bubble{return;}let p=ev.position-bounds.origin;
-            e.update(cx,|ed,cx|match ev.phase{
-                TouchPhase::Started if h.is_hovered_at(ev.start_position,window)=>{let start=ev.start_position-bounds.origin;if region_down(ed,start.x.as_f32()as f64,start.y.as_f32()as f64,MouseButton::Left,1,false,false,false,PointerId::Touch(0),ev.start_position,window,cx){window.capture_pointer(h.id);window.prevent_default();}},
-                TouchPhase::Moved=>region_moved(ed,PointerId::Touch(0),p.x.as_f32()as f64,p.y.as_f32()as f64,false,cx),
-                TouchPhase::Ended=>region_up(ed,PointerId::Touch(0),window,cx),
-                TouchPhase::Cancelled if ed.arrange_drag.as_ref().is_some_and(|drag|drag.pointer==PointerId::Touch(0))||ed.integrations.audio_edit.range_drag.as_ref().is_some_and(|drag|drag.pointer==PointerId::Touch(0))=>{ed.arrange_drag=None;ed.integrations.audio_edit.range_drag=None;window.release_pointer();cx.notify();},_=>{}
-            });
-        });
-        install_timeline_scroll(&editor, bounds, &hitbox, window);
         let e = editor.clone();
+        crate::proto_editor_surface::install_pointer_input(&input, bounds, &hitbox, window, move |event, window, cx| {
+            use crate::proto_editor_surface::PointerPhase;
+            e.update(cx, |ed, cx| match event.phase {
+                PointerPhase::Begin | PointerPhase::Context => region_down(ed,event.x,event.y,
+                    if event.phase == PointerPhase::Context { MouseButton::Right } else { MouseButton::Left },
+                    event.clicks,event.modifiers.control,event.modifiers.shift,event.modifiers.alt,event.pointer,event.position,window,cx),
+                PointerPhase::Sample => { region_moved(ed,event.pointer,event.x,event.y,event.modifiers.alt,cx); true }
+                PointerPhase::Finish => { region_up(ed,event.pointer,window,cx); true }
+            })
+        });
+        install_timeline_scroll(&editor,bounds,&hitbox,&input,window);
+        let e = editor.clone();let gate=input.clone();
         window.on_mouse_event(move |ev: &PinchEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble || !hitbox.is_hovered(window) { return; }
+            if !gate.pinch(1.0+f64::from(ev.delta),window,cx) {return;}
             e.update(cx, |ed, cx| { ed.arrange.zoom_x_at((ev.position - bounds.origin).x.as_f32() as f64, 1.0 + ev.delta as f64); ed.notify_viewport(crate::clock::Space::Arrange, cx); });
         });
     }).size_full()
 }
 
-pub(crate) fn install_timeline_scroll(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox, window: &mut Window) {
+pub(crate) fn install_timeline_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,input:&crate::proto_editor_surface::Input,window:&mut Window) {
     let editor = editor.clone();
-    let hitbox = hitbox.clone();
+    let hitbox = hitbox.clone();let input=input.clone();
     window.on_mouse_event(move |event: &ScrollEvent, phase, window, cx| {
         if phase != DispatchPhase::Bubble || !hitbox.is_hovered(window) { return; }
-        let (dx, dy) = match event.delta {
-            ScrollDelta::Pixels(delta) => (delta.x.as_f32() as f64, delta.y.as_f32() as f64),
-            ScrollDelta::Lines(delta) => (delta.x as f64 * 40.0, delta.y as f64 * 40.0),
-        };
-        let zoom = event.modifiers.control || event.modifiers.platform;
-        if !zoom && !event.modifiers.shift && dx == 0.0 { return; }
-        editor.update(cx, |ed, cx| {
-            if zoom {
-                let x = (event.position.x - bounds.origin.x).as_f32() as f64;
-                ed.arrange.zoom_x_at(x, 1.0015f64.powf(dy));
-            } else {
-                ed.arrange.pan_px(-if dx != 0.0 { dx } else { dy }, 0.0);
-            }
-            ed.notify_viewport(crate::clock::Space::Arrange, cx);
+        let Some(intent)=input.wheel(event.delta,event.modifiers,true,window,cx) else { return };
+        editor.update(cx,|ed,cx| {
+            if intent.kind=="zoom-x" { ed.arrange.zoom_x_at(f64::from(event.position.x-bounds.origin.x),1.0015f64.powf(intent.amount)); }
+            else { ed.arrange.pan_px(intent.x,intent.y); }
+            ed.notify_viewport(crate::clock::Space::Arrange,cx);
         });
         cx.stop_propagation();
     });
@@ -492,7 +483,7 @@ pub(crate) fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut 
         }
         Err(e)=>ed.notice(e),
     }
-    window.focus(&ed.focus_arrange,cx);cx.notify();
+    cx.notify();
 }
 
 impl AuthoredTarget{fn same(&self,other:&Self)->bool{match(self,other){(Self::Part(a),Self::Part(b))|(Self::Audio(a),Self::Audio(b))=>a==b,_=>false}}}
@@ -510,7 +501,7 @@ fn authored_hit(ed:&Editor,track:&TrackId,tick:f64,row_y:f64)->Option<AuthoredTa
 fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,extend_selection:bool,unsnapped:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
     let row=(y/ed.arrange_track_height).floor()as usize;let Some(track)=ed.project().tracks.get(row).map(|t|t.id.clone())else{return false;};
     if !matches!(button,MouseButton::Left|MouseButton::Right)||!ed.select_track(track.clone(),cx){return false;}
-    let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);window.focus(&ed.focus_arrange,cx);
+    let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);
     if ed.integrations.audio_edit.range_tool&&button==MouseButton::Left{
         let tick=if unsnapped{tick.max(0.)}else{arrange_snap(ed,tick).max(0)as f64};
         ed.integrations.audio_edit.range_drag=Some(crate::editor::integrations::audio_edit_ui::RangeDrag{pointer,anchor_tick:tick,anchor_track:row});
@@ -593,7 +584,8 @@ fn region_moved(ed:&mut Editor,pointer:PointerId,x:f64,y:f64,unsnapped:bool,cx:&
 
     // A press only becomes a drag after DRAG_THRESHOLD px, so a click selects.
     let Some(drag)=ed.arrange_drag.as_mut().filter(|drag|drag.pointer==pointer)else{return;};
-    if !drag.armed{if !crossed_drag_threshold(drag.press,(x,y)){return;}drag.armed=true;}
+    // The compiled surface admits movement after its authored threshold.
+    drag.armed = true;
     let tick=ed.arrange.x_to_tick(x);let at=if unsnapped{tick.round()as i64}else{arrange_snap(ed,tick)};let tempo=ed.tempo();
     let mut destination_row=(y.max(0.)/ed.arrange_track_height).floor()as usize;
     if let Some(audio)=ed.arrange_drag.as_ref().and_then(|drag|drag.audio.as_ref()){
@@ -643,10 +635,10 @@ fn region_moved(ed:&mut Editor,pointer:PointerId,x:f64,y:f64,unsnapped:bool,cx:&
 }
 fn region_up(ed:&mut Editor,pointer:PointerId,window:&mut Window,cx:&mut Context<Editor>){
     if ed.integrations.audio_edit.range_drag.as_ref().is_some_and(|drag|drag.pointer==pointer){
-        ed.integrations.audio_edit.range_drag=None;window.release_pointer();cx.notify();return;
+        ed.integrations.audio_edit.range_drag=None;cx.notify();return;
     }
 
-    if !ed.arrange_drag.as_ref().is_some_and(|drag|drag.pointer==pointer){return;}let drag=ed.arrange_drag.take().unwrap();window.release_pointer();
+    if !ed.arrange_drag.as_ref().is_some_and(|drag|drag.pointer==pointer){return;}let drag=ed.arrange_drag.take().unwrap();
     if !drag.armed {
         if matches!(drag.target,AuthoredTarget::Audio(_)) {
             if let Ok(clip)=ed.selected_audio_clip(){ed.select_audio_clip(&clip,false,false);}

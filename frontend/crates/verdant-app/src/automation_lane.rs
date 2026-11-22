@@ -167,7 +167,7 @@ fn owns_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, cx: 
 fn cancel_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, window: &mut Window, cx: &mut gpui::App) {
     if !owns_automation_drag(editor, target, cx) { return; }
     cx.global_mut::<AutoPointDragState>().drag = None;
-    window.release_pointer();
+
     editor.update(cx, |_, cx| cx.notify());
 }
 
@@ -225,10 +225,7 @@ pub fn automation_header(
                 .items_center()
                 .gap(px(4.0))
                 .child(
-                    div()
-                        .id(SharedString::from(format!("auto-target-{id_key}")))
-                        .role(Role::Button)
-                        .aria_label("切换自动化目标参数")
+                    crate::proto_controls::action(SharedString::from(format!("auto-target-{id_key}")), "切换自动化目标参数")
                         .flex_1()
                         .h(px(22.0))
                         .px(px(6.0))
@@ -242,8 +239,9 @@ pub fn automation_header(
                         .text_xs()
                         .child(div().truncate().child(format!("自动化 · {label}")))
                         .child("▾")
-                        .on_click(cx.listener(move |ed, ev: &ClickEvent, window, cx| {
-                            show_automation_target_picker(ed, pick_owner.clone(), ev.position(), window, cx);
+                        .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| {
+                            let position = ev.native_event().map(ClickEvent::position).unwrap_or_else(|| window.mouse_position());
+                            show_automation_target_picker(ed, pick_owner.clone(), position, window, cx);
                             cx.stop_propagation();
                         })),
                 ),
@@ -351,6 +349,14 @@ fn show_automation_target_picker(
 
 /// Renders the right-hand interactive graphical automation curve aligned with `ed.arrange`.
 pub fn automation_curve_canvas(editor: Entity<Editor>, target: AutomationTarget) -> impl IntoElement {
+    let draw=editor.clone(); let cancel=editor.clone(); let cancel_target=target.clone();
+    crate::proto_editor_surface::surface(editor,format!("automation-{target:?}"),"自动化控制点",0.0,
+        move |input| native_automation_curve(draw.clone(),target.clone(),input).into_any_element(),
+        move |_,window,cx| cancel_automation_drag(&cancel,&cancel_target,window,cx))
+}
+
+fn native_automation_curve(editor: Entity<Editor>, target: AutomationTarget,
+    input: crate::proto_editor_surface::Input) -> impl IntoElement {
     canvas(
         |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
         move |bounds, hitbox, window, cx| {
@@ -466,132 +472,48 @@ pub fn automation_curve_canvas(editor: Entity<Editor>, target: AutomationTarget)
             }
             flush_texts(window, cx, bounds, texts);
 
-            let (e_down, h_down, t_down) = (editor.clone(), hitbox.clone(), target.clone());
-            window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || !h_down.is_hovered(window) {
-                    return;
-                }
-                let local = ev.position - bounds.origin;
-                let (lx, ly) = (local.x.as_f32() as f64, local.y.as_f32() as f64);
-                let h = bounds.size.height.as_f32() as f64;
-
-                e_down.update(cx, |ed, cx| {
-                    let vp = ed.arrange;
-                    let range = target_domain_range(ed, &t_down);
-                    let doc = AutomationDocument::from_project(ed.project()).unwrap_or_default();
-                    let hit_pt = doc.lane(&t_down).and_then(|lane| {
-                        lane.points
-                            .iter()
-                            .find(|pt| (vp.tick_to_x(pt.tick as f64) - lx).abs() <= 7.0 && (value_to_y(pt.value, range, h) - ly).abs() <= 8.0)
-                            .cloned()
-                    });
-
-                    if ev.button == MouseButton::Right {
-                        if let Some(pt) = hit_pt {
-                            let next_interp = if pt.interpolation == Interpolation::Step {
-                                Interpolation::Linear
+            let (e,t)=(editor.clone(),target.clone());
+            crate::proto_editor_surface::install_pointer_input(&input,bounds,&hitbox,window,move |event,window,cx| {
+                use crate::proto_editor_surface::PointerPhase;
+                match event.phase {
+                    PointerPhase::Begin|PointerPhase::Context => {
+                        e.update(cx,|ed,cx| {
+                            let vp=ed.arrange; let height=f64::from(bounds.size.height);
+                            let range=target_domain_range(ed,&t);
+                            let doc=AutomationDocument::from_project(ed.project()).unwrap_or_default();
+                            let hit=doc.lane(&t).and_then(|lane|lane.points.iter().find(|pt|
+                                (vp.tick_to_x(pt.tick as f64)-event.x).abs()<=7.0 &&
+                                (value_to_y(pt.value,range,height)-event.y).abs()<=8.0).cloned());
+                            if event.phase==PointerPhase::Context {
+                                if let Some(point)=hit {
+                                    let interpolation=if point.interpolation==Interpolation::Step { Interpolation::Linear } else { Interpolation::Step };
+                                    ed.show_menu(event.position,vec![
+                                        MenuItem::action(if interpolation==Interpolation::Linear { "切换为线性插值 (Linear)" } else { "切换为阶梯保持 (Step)" },
+                                            MenuAction::AutomationPointInterp { target:t.clone(),tick:point.tick,interpolation }),
+                                        MenuItem::separator(),MenuItem::action("删除此控制点",MenuAction::DeleteAutomationPoint { target:t.clone(),tick:point.tick })],window,cx);
+                                }
+                                return false;
+                            }
+                            if cx.global::<AutoPointDragState>().drag.is_some() { return false; }
+                            let raw_tick=vp.x_to_tick(event.x).max(0.0);
+                            let tick=if event.modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick).max(0) };
+                            let drag=if let Some(point)=hit {
+                                AutoPointDrag { editor:e.entity_id(),target:t.clone(),base:ed.revision(),original_tick:Some(point.tick),tick:point.tick,value:point.value,interpolation:point.interpolation }
                             } else {
-                                Interpolation::Step
+                                AutoPointDrag { editor:e.entity_id(),target:t.clone(),base:ed.revision(),original_tick:None,tick,value:y_to_value(event.y,range,height,&t),interpolation:Interpolation::Linear }
                             };
-                            let items = vec![
-                                MenuItem::action(
-                                    if pt.interpolation == Interpolation::Step { "切换为线性插值 (Linear)" } else { "切换为阶梯保持 (Step)" },
-                                    MenuAction::AutomationPointInterp {
-                                        target: t_down.clone(),
-                                        tick: pt.tick,
-                                        interpolation: next_interp,
-                                    },
-                                ),
-                                MenuItem::separator(),
-                                MenuItem::action(
-                                    "删除此控制点",
-                                    MenuAction::DeleteAutomationPoint { target: t_down.clone(), tick: pt.tick },
-                                ),
-                            ];
-                            ed.show_menu(ev.position, items, window, cx);
-                        }
-                        cx.stop_propagation();
-                        return;
+                            cx.global_mut::<AutoPointDragState>().drag=Some(drag);cx.notify();true
+                        })
                     }
+                    PointerPhase::Sample => { sample_automation_drag(&e,&t,event.position,bounds,event.modifiers,cx);true }
+                    PointerPhase::Finish => {
+                        if !owns_automation_drag(&e,&t,cx) { return false; }
+                        let Some(drag)=cx.global_mut::<AutoPointDragState>().drag.take() else { return false };
 
-                    if ev.button != MouseButton::Left {
-                        return;
+                        e.update(cx,|ed,cx| ed.commit_automation_point_drag(drag.base,drag.target,drag.original_tick,drag.tick,drag.value,drag.interpolation,cx));
+                        true
                     }
-
-                    let raw_tick = vp.x_to_tick(lx).max(0.0);
-                    let snapped_tick = if ev.modifiers.alt {
-                        raw_tick.round() as i64
-                    } else {
-                        ed.session.snap.snap(raw_tick).max(0)
-                    };
-                    let val = y_to_value(ly, range, h, &t_down);
-                    let drag = if let Some(pt) = hit_pt {
-                        AutoPointDrag {
-                            editor: e_down.entity_id(),
-                            target: t_down.clone(),
-                            base: ed.revision(),
-                            original_tick: Some(pt.tick),
-                            tick: pt.tick,
-                            value: pt.value,
-                            interpolation: pt.interpolation,
-                        }
-                    } else {
-                        AutoPointDrag {
-                            editor: e_down.entity_id(),
-                            target: t_down.clone(),
-                            base: ed.revision(),
-                            original_tick: None,
-                            tick: snapped_tick,
-                            value: val,
-                            interpolation: Interpolation::Linear,
-                        }
-                    };
-                    cx.global_mut::<AutoPointDragState>().drag = Some(drag);
-                    window.capture_pointer(h_down.id);
-                    cx.notify();
-                    cx.stop_propagation();
-                });
-            });
-
-            let (e_move, t_move) = (editor.clone(), target.clone());
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-                if phase != DispatchPhase::Capture || !owns_automation_drag(&e_move, &t_move, cx) { return; }
-                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-                    cancel_automation_drag(&e_move, &t_move, window, cx);
-                    return;
                 }
-                sample_automation_drag(&e_move, &t_move, ev.position, bounds, ev.modifiers, cx);
-            });
-
-            let (e_up, t_up) = (editor.clone(), target);
-            window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Capture || ev.button != MouseButton::Left {
-                    return;
-                }
-                let matched = cx.try_global::<AutoPointDragState>()
-                    .and_then(|s| s.drag.as_ref())
-                    .is_some_and(|d| d.editor == e_up.entity_id() && d.target == t_up);
-                if !matched {
-                    return;
-                }
-                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-                    cancel_automation_drag(&e_up, &t_up, window, cx);
-                    return;
-                }
-                sample_automation_drag(&e_up, &t_up, ev.position, bounds, ev.modifiers, cx);
-                let Some(drag) = cx.global_mut::<AutoPointDragState>().drag.take() else { return };
-                window.release_pointer();
-                e_up.update(cx, |ed, cx| {
-                    ed.commit_automation_point_drag(
-                        drag.base,
-                        drag.target,
-                        drag.original_tick,
-                        drag.tick,
-                        drag.value,
-                        drag.interpolation,
-                        cx,
-                    );
-                });
             });
         },
     )

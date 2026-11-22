@@ -30,7 +30,7 @@ mod plugin_ui;
 #[path = "phonemes.rs"]
 mod phonemes;
 #[path = "curves.rs"]
-mod curves;
+pub(crate) mod curves;
 #[path = "project_audio.rs"]
 pub(crate) mod project_audio;
 #[path = "integrations.rs"]
@@ -394,6 +394,8 @@ pub struct Editor {
     pub table_focus: crate::table::TableFocus,
     pub table_scroll: gpui::UniformListScrollHandle,
     pub point_scroll: gpui::UniformListScrollHandle,
+    pub(crate) table_native_scroll: crate::proto_scroll::NativeScroll,
+    pub(crate) point_native_scroll: crate::proto_scroll::NativeScroll,
     pub numeric_preview: Option<(crate::generated::controls::NumericId, crate::generated::controls::CommandArg, f64)>,
     /// Plugin host client and live insert state per track.
     pub plugins: Option<Arc<verdant_plugins::PluginClient>>,
@@ -463,10 +465,6 @@ impl Editor {
         let focus_lyric = cx.focus_handle();
         let focus_table = cx.focus_handle();
         let focus_devices = cx.focus_handle();
-        cx.on_blur(&focus_lyric, window, |this: &mut Self, window, cx| {
-            this.end_lyric(true, None, window, cx);
-        })
-        .detach();
         cx.on_blur(&focus_roll, window, |this: &mut Self, window, cx| {
             if this.session.pointer_owner().is_some() || this.note_creation.is_some()
                 || this.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll)
@@ -528,6 +526,10 @@ impl Editor {
             });
         }
         let layout = crate::ui_controls::LayoutPrefs::from_prefs(&opts.prefs);
+        let table_scroll = gpui::UniformListScrollHandle::new();
+        let point_scroll = gpui::UniformListScrollHandle::new();
+        let table_native_scroll = crate::proto_scroll::NativeScroll::new(table_scroll.0.borrow().base_handle.clone());
+        let point_native_scroll = crate::proto_scroll::NativeScroll::new(point_scroll.0.borrow().base_handle.clone());
         let mut ed = Editor {
             persistence,
             project_path,
@@ -622,8 +624,10 @@ impl Editor {
             table_cursor: 0,
             table_anchor: None,
             table_focus: crate::table::TableFocus::default(),
-            table_scroll: gpui::UniformListScrollHandle::new(),
-            point_scroll: gpui::UniformListScrollHandle::new(),
+            table_scroll,
+            point_scroll,
+            table_native_scroll,
+            point_native_scroll,
             numeric_preview: None,
             plugins: None,
             insert_runtime: plugin_ui::InsertRuntime::default(),
@@ -1506,7 +1510,7 @@ impl Editor {
                 else { self.import_project_path(path, window, cx); }
             }
             MenuAction::ExportProject => crate::files::export_dialog(self, window, cx),
-            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.is_focused(window) => {
+            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.contains_focused(window, cx) => {
                 use integrations::audio_edit_ui::AudioUiAction as A;
                 let action=match action{MenuAction::Cut=>A::Cut,MenuAction::Copy=>A::Copy,MenuAction::Paste=>A::Paste,MenuAction::DeleteSelection=>A::Delete,MenuAction::SelectAll=>A::SelectAll,_=>A::Duplicate};
                 if let Err(error)=self.run_audio_ui(action,window,cx){self.notice(error);cx.notify();}
@@ -2184,9 +2188,9 @@ impl Editor {
     }
 
     /// Turn a lyric field text into one transaction (lyric + explicit pinyin).
-    pub fn commit_lyric_text(&mut self, id: &NoteId, text: &str, cx: &mut Context<Self>) {
+    pub fn commit_lyric_text(&mut self, id: &NoteId, text: &str, cx: &mut Context<Self>) -> bool {
         let track = self.session.track.clone();
-        self.commit_lyric_on_track(&track, id, text, cx);
+        self.commit_lyric_on_track(&track, id, text, cx)
     }
 
     fn commit_lyric_on_track(&mut self, track: &TrackId, id: &NoteId, text: &str, cx: &mut Context<Self>) -> bool {

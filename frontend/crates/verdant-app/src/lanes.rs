@@ -46,7 +46,6 @@ struct PhonemeBoundaryDrag {
     total_seconds: f64,
     lower_seconds: f64,
     upper_seconds: f64,
-    focus: gpui::FocusHandle,
 }
 
 impl PhonemeBoundaryDrag {
@@ -71,25 +70,10 @@ fn panel_note(ed: &Editor) -> Option<&verdant_domain::Note> {
 /// resolved segment names and scheduled durations are available to readers.
 pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl IntoElement {
     let th = ed.theme;
-    let key_editor = editor.clone();
     let mut panel = gpui::div().id("phoneme-timing-panel").flex().flex_col().gap(px(4.0))
         .mt(px(8.0)).pt(px(8.0)).border_t_1().border_color(th.shade)
-        .on_key_down(move |ev: &gpui::KeyDownEvent, window, cx| {
-            if ev.keystroke.key == "escape" {
-                let pointer = cx.try_global::<PhonemePanelState>().and_then(|state| state.drag.as_ref())
-                    .filter(|drag| drag.editor == key_editor.entity_id()).map(|drag| drag.pointer);
-                if let Some(pointer) = pointer {
-                    end_phoneme_drag(&key_editor, pointer, true, window, cx);
-                    window.prevent_default(); cx.stop_propagation();
-                }
-            }
-        })
         .child(gpui::div().text_sm().child("音素边界"))
         .child(gpui::div().h(px(54.0)).w_full().child(phoneme_strip(editor.clone())));
-    if let Some(drag) = cx.try_global::<PhonemePanelState>().and_then(|state| state.drag.as_ref())
-        .filter(|drag| drag.editor == editor.entity_id()) {
-        panel = panel.track_focus(&drag.focus);
-    }
     let Some(note) = panel_note(ed) else {
         return panel.child(gpui::div().text_xs().text_color(th.text_secondary).child("选择音符以查看音素时序"));
     };
@@ -118,8 +102,7 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
         }
     }
     let durations = preview.as_deref().unwrap_or(&budget.durations_seconds);
-    let mut rows = gpui::div().id("phoneme-duration-rows").max_h(px(180.0)).overflow_y_scroll()
-        .flex().flex_col().gap(px(3.0));
+    let mut row_labels = Vec::with_capacity(budget.labels.len());
     for (index, (label, duration)) in budget.labels.iter().zip(durations).enumerate() {
         let scheduled = schedule.as_ref().and_then(|s| s.durations.get(index)).copied()
             .or_else(|| (!anchored).then_some(budget.durations_seconds[index]));
@@ -127,9 +110,13 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
             Some(seconds) => format!("{} · 预算 {:.1} ms · 计划 {:.1} ms", label, duration * 1000.0, seconds * 1000.0),
             None => format!("{} · 预算 {:.1} ms · 计划待预检", label, duration * 1000.0),
         };
-        rows = rows.child(gpui::div().text_xs().child(text));
+        row_labels.push(text);
     }
-    panel = panel.child(rows);
+    let rows_height = (row_labels.len() as f32 * 22.0).min(180.0).max(22.0);
+    panel = panel.child(gpui::div().h(px(rows_height)).child(crate::proto_scroll::native_content("phoneme-duration-region", "音素时长明细", move |scroll, _, _| {
+        gpui::div().id("phoneme-duration-rows").size_full().overflow_y_scroll().track_scroll(scroll)
+            .flex().flex_col().gap(px(3.0)).children(row_labels.iter().map(|text| gpui::div().flex_none().text_xs().child(text.clone()))).into_any_element()
+    })));
     if let Some(schedule) = schedule {
         panel = panel.child(gpui::div().text_xs().text_color(th.text_secondary).child(format!(
             "计划辅音先行 {:.1} ms · 让出尾部 {:.1} ms", schedule.prefix_seconds * 1000.0, schedule.tail_trim_seconds * 1000.0)));
@@ -148,13 +135,24 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
 }
 
 fn phoneme_strip(editor: Entity<Editor>) -> impl IntoElement {
+    let draw = editor.clone(); let cancel = editor.clone();
+    crate::proto_editor_surface::surface(editor, "phoneme-boundaries", "音素时长边界", 0.0,
+        move |input| native_phoneme_strip(draw.clone(), input).into_any_element(),
+        move |_, window, cx| {
+            let owned = cx.try_global::<PhonemePanelState>().and_then(|state| state.drag.as_ref())
+                .is_some_and(|drag| drag.editor == cancel.entity_id());
+            if owned { cx.global_mut::<PhonemePanelState>().drag = None;  cancel.update(cx, |_, cx| cx.notify()); }
+        })
+}
+
+fn native_phoneme_strip(editor: Entity<Editor>, input: crate::proto_editor_surface::Input) -> impl IntoElement {
     canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
         if cx.try_global::<PhonemePanelState>().is_none() { cx.set_global(PhonemePanelState::default()); }
         let stale = cx.global::<PhonemePanelState>().drag.as_ref().is_some_and(|drag|
             drag.editor == editor.entity_id() && !drag.matches(&editor, editor.read(cx)));
         if stale {
             cx.global_mut::<PhonemePanelState>().drag = None;
-            window.release_pointer();
+            input.cancel(window, cx);
         }
         let mut text = Texts::new();
         {
@@ -191,7 +189,7 @@ fn phoneme_strip(editor: Entity<Editor>) -> impl IntoElement {
             }
         }
         flush_texts(window, cx, bounds, text);
-        install_phoneme_input(&editor, bounds, &hitbox, window);
+        install_phoneme_input(&editor, bounds, &hitbox, &input, window);
     }).size_full()
 }
 
@@ -228,9 +226,7 @@ fn begin_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, x: f64, bound
     let drag = PhonemeBoundaryDrag {
         editor: editor.entity_id(), track, note, revision, pointer, boundary, start_x: x,
         initial_seconds: position, position_seconds: position, total_seconds, lower_seconds, upper_seconds,
-        focus: editor.update(cx, |_, cx| cx.focus_handle()),
     };
-    window.focus(&drag.focus, cx);
     cx.global_mut::<PhonemePanelState>().drag = Some(drag);
     editor.update(cx, |_, cx| cx.notify());
     true
@@ -251,9 +247,9 @@ fn end_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, cancel: bool, w
     if !cx.global::<PhonemePanelState>().drag.as_ref().is_some_and(|drag|
         drag.editor == editor.entity_id() && drag.pointer == pointer) { return; }
     let Some(drag) = cx.global_mut::<PhonemePanelState>().drag.take() else { return };
-    window.release_pointer();
+
     editor.update(cx, |ed, cx| {
-        window.focus(&ed.focus_roll, cx);
+
         if cancel { cx.notify(); return; }
         if !drag.matches(editor, ed) { ed.notice("音符或工程已改变，已取消音素拖动"); cx.notify(); return; }
         if (drag.position_seconds - drag.initial_seconds).abs() < 1e-12 { cx.notify(); return; }
@@ -267,61 +263,17 @@ fn end_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, cancel: bool, w
     });
 }
 
-fn install_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox, window: &mut Window) {
+fn install_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox,
+    input: &crate::proto_editor_surface::Input, window: &mut Window) {
     if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::ResizeLeftRight, hitbox); }
-    let (e, h) = (editor.clone(), hitbox.clone());
-    window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || !h.is_hovered(window) { return; }
-        if ev.button == MouseButton::Right {
-            end_phoneme_drag(&e, PointerId::Mouse, true, window, cx); cx.stop_propagation();
-        } else if ev.button == MouseButton::Left && begin_phoneme_drag(&e, PointerId::Mouse,
-            (ev.position.x - bounds.origin.x).as_f32() as f64, bounds, window, cx) {
-            window.capture_pointer(h.id); cx.stop_propagation();
-        }
-    });
     let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-        if phase != DispatchPhase::Capture { return; }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            end_phoneme_drag(&e, PointerId::Mouse, true, window, cx);
-            return;
-        }
-        move_phoneme_drag(&e, PointerId::Mouse, (ev.position.x - bounds.origin.x).as_f32() as f64, bounds, cx);
-    });
-    let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-        if phase == DispatchPhase::Capture && ev.button == MouseButton::Left {
-            if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-                end_phoneme_drag(&e, PointerId::Mouse, true, window, cx);
-                return;
-            }
-            move_phoneme_drag(&e, PointerId::Mouse, (ev.position.x - bounds.origin.x).as_f32() as f64, bounds, cx);
-            end_phoneme_drag(&e, PointerId::Mouse, false, window, cx);
-        }
-    });
-    let (e, h) = (editor.clone(), hitbox.clone());
-    window.on_mouse_event(move |ev: &TouchDragEvent, phase, window, cx| {
-        let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
-        if phase != expected_phase { return; }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            end_phoneme_drag(&e, PointerId::Touch(0), true, window, cx);
-            return;
-        }
-        let x = (ev.position.x - bounds.origin.x).as_f32() as f64;
-        match ev.phase {
-            TouchPhase::Started if h.is_hovered_at(ev.start_position, window) => {
-                if begin_phoneme_drag(&e, PointerId::Touch(0), (ev.start_position.x - bounds.origin.x).as_f32() as f64, bounds, window, cx) {
-                    window.prevent_default(); window.capture_pointer(h.id); cx.stop_propagation();
-                    move_phoneme_drag(&e, PointerId::Touch(0), x, bounds, cx);
-                }
-            }
-            TouchPhase::Moved => move_phoneme_drag(&e, PointerId::Touch(0), x, bounds, cx),
-            TouchPhase::Ended => {
-                move_phoneme_drag(&e, PointerId::Touch(0), x, bounds, cx);
-                end_phoneme_drag(&e, PointerId::Touch(0), false, window, cx);
-            }
-            TouchPhase::Cancelled => end_phoneme_drag(&e, PointerId::Touch(0), true, window, cx),
-            _ => {},
+    crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
+        use crate::proto_editor_surface::PointerPhase;
+        match event.phase {
+            PointerPhase::Begin => begin_phoneme_drag(&e,event.pointer,event.x,bounds,window,cx),
+            PointerPhase::Sample => { move_phoneme_drag(&e,event.pointer,event.x,bounds,cx); true }
+            PointerPhase::Finish => { end_phoneme_drag(&e,event.pointer,false,window,cx); true }
+            PointerPhase::Context => { end_phoneme_drag(&e,event.pointer,true,window,cx); true }
         }
     });
 }
@@ -352,13 +304,24 @@ pub fn lane(ed: &Editor, editor: Entity<Editor>, param: Param, slot: usize) -> i
 
 fn parameter_lane(ed: &Editor, editor: Entity<Editor>, param: Param, slot: usize) -> impl IntoElement {
     let surface_editor = editor.clone();
-    let surface = canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
+    let cancel = editor.clone();
+    let surface = crate::proto_editor_surface::surface(editor.clone(), format!("parameter-{slot}-{param:?}"),
+        format!("{param:?} 参数曲线"), 0.0,
+        move |input| {
+          let surface_editor = surface_editor.clone();
+          canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
         let mut text = Texts::new();
         paint_lane(&surface_editor,bounds,param,window,cx,&mut text);
         flush_texts(window, cx, bounds, text);
-        install_input(&surface_editor,bounds,&hitbox,param,slot,window,cx);
-        crate::roll::install_roll_scroll(&surface_editor, bounds, &hitbox, crate::roll::ScrollSurface::Timeline, window);
-    }).size_full();
+        install_input(&surface_editor,bounds,&hitbox,param,slot,&input,window,cx);
+        crate::roll::install_roll_scroll(&surface_editor, bounds, &hitbox, crate::roll::ScrollSurface::Timeline,&input,window);
+          }).size_full().into_any_element()
+        },
+        move |_,window,cx| cancel.update(cx, |ed,cx| {
+            if ed.integrations.active_panel == slot && ed.lane_stroke.as_ref().is_some_and(|s| !s.roll && s.param == param) {
+                ed.lane_stroke = None;  cx.notify();
+            }
+        }));
     if param == Param::Dyn || (param.is_expression() && param != Param::Portamento) {
         gpui::div().flex().flex_col().size_full()
             .child(region_controls(ed, editor, param, slot))
@@ -479,22 +442,37 @@ fn tempo_points<'a>(points: &'a [verdant_domain::model::TempoPoint], drag: Optio
 }
 
 pub fn tempo_lane(editor: Entity<Editor>) -> impl IntoElement {
+    let held: std::rc::Rc<std::cell::RefCell<Option<TempoPreview>>> = Default::default();
+    let draw_state = held.clone(); let draw = editor.clone(); let cancel = editor.clone();
+    crate::proto_editor_surface::surface(editor, "tempo-points", "速度曲线", 0.0,
+        move |input| native_tempo_lane(draw.clone(),input,draw_state.clone()).into_any_element(),
+        move |_,window,cx| {
+            if let Some(preview) = held.borrow().as_ref() {
+                if preview.borrow_mut().take().is_some() {  cancel.update(cx,|_,cx|cx.notify()); }
+            }
+        })
+}
+
+fn native_tempo_lane(editor: Entity<Editor>, input: crate::proto_editor_surface::Input,
+    held: std::rc::Rc<std::cell::RefCell<Option<TempoPreview>>>) -> impl IntoElement {
     let prepaint_editor = editor.clone();
+    let prepaint_input = input.clone();
     canvas(move |bounds, window, cx| {
         let state = window.use_keyed_state("tempo-event-preview", cx, |_, _| TempoPreview::default());
         let preview = state.read(cx).clone();
+        *held.borrow_mut() = Some(preview.clone());
         let ed = prepaint_editor.read(cx);
         let stale = preview.borrow().as_ref().is_some_and(|drag| {
             drag.base != ed.revision() || drag.project_id != ed.project().project_id || !window.is_window_active()
         });
-        if stale { preview.borrow_mut().take(); window.release_pointer(); }
+        if stale { preview.borrow_mut().take(); prepaint_input.cancel(window,cx); }
         (window.insert_hitbox(bounds, HitboxBehavior::Normal), preview)
     }, move |bounds, (hitbox, preview), window, cx| {
         let mut text = Texts::new();
         paint_tempo(&editor, bounds, preview.borrow().as_ref(), window, cx, &mut text);
         flush_texts(window, cx, bounds, text);
-        install_tempo_input(&editor, bounds, &hitbox, &preview, window);
-        crate::roll::install_roll_scroll(&editor, bounds, &hitbox, crate::roll::ScrollSurface::Timeline, window);
+        install_tempo_input(&editor, bounds, &hitbox, &preview, &input, window);
+        crate::roll::install_roll_scroll(&editor, bounds, &hitbox, crate::roll::ScrollSurface::Timeline,&input,window);
     }).size_full()
 }
 
@@ -554,7 +532,7 @@ fn begin_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f
         base: ed.revision(), project_id: ed.project().project_id.clone(), pointer, source_tick,
         tick, micro_bpm, start_tick: tick, start_bpm: micro_bpm, origin: (x, y), range, moved: false,
     });
-    window.focus(&ed.focus_roll, cx);
+
     cx.notify();
     true
 }
@@ -587,7 +565,7 @@ fn move_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f6
 fn end_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
     if !preview.borrow().as_ref().is_some_and(|drag| drag.pointer == pointer) { return; }
     let drag = preview.borrow_mut().take().unwrap();
-    window.release_pointer();
+
     if drag.base != ed.revision() || drag.project_id != ed.project().project_id { cx.notify(); return; }
     let mut commands = Vec::with_capacity(2);
     if let Some(tick) = drag.source_tick.filter(|tick| *tick != drag.tick) {
@@ -601,7 +579,7 @@ fn end_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, window
 fn cancel_tempo(preview: &TempoPreview, pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
     if !preview.borrow().as_ref().is_some_and(|drag| drag.pointer == pointer) { return; }
     preview.borrow_mut().take();
-    window.release_pointer();
+
     cx.notify();
 }
 
@@ -616,85 +594,26 @@ fn tempo_context(ed: &mut Editor, x: f64, y: f64, height: f64, window: &mut Wind
     ], window, cx);
 }
 
-fn install_tempo_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox, preview: &TempoPreview, window: &mut Window) {
+fn install_tempo_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox,
+    preview: &TempoPreview, input: &crate::proto_editor_surface::Input, window: &mut Window) {
     if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::Crosshair, hitbox); }
-    let height = bounds.size.height.as_f32() as f64;
-    let (e, h, state) = (editor.clone(), hitbox.clone(), preview.clone());
-    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || !h.is_hovered(window) { return; }
-        let position = event.position - bounds.origin;
-        let (x, y) = (position.x.as_f32() as f64, position.y.as_f32() as f64);
-        e.update(cx, |ed, cx| {
-            if event.button == MouseButton::Right {
-                state.borrow_mut().take(); window.release_pointer();
-                tempo_context(ed, x, y, height, window, cx); cx.stop_propagation();
-            } else if event.button == MouseButton::Left {
-                if event.click_count == 2 {
-                    let tick = tempo_hit(ed, x, y, height, tempo_range(&ed.project().tempo_map))
-                        .unwrap_or_else(|| ed.session.snap.snap(ed.session.viewport.x_to_tick(x)).max(0));
-                    ed.run_workflow(crate::editor::WorkflowAction::EditTempo(tick), window, cx);
-                    cx.stop_propagation();
-                } else if begin_tempo(ed, &state, PointerId::Mouse, x, y, height, event.modifiers, window, cx) {
-                    window.capture_pointer(h.id); cx.stop_propagation();
-                }
+    let (e,state) = (editor.clone(),preview.clone());
+    let height = f64::from(bounds.size.height);
+    crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
+        use crate::proto_editor_surface::PointerPhase;
+        e.update(cx, |ed,cx| match event.phase {
+            PointerPhase::Begin => {
+                if event.clicks >= 2 {
+                    let tick = tempo_hit(ed,event.x,event.y,height,tempo_range(&ed.project().tempo_map))
+                        .unwrap_or_else(||ed.session.snap.snap(ed.session.viewport.x_to_tick(event.x)).max(0));
+                    ed.run_workflow(crate::editor::WorkflowAction::EditTempo(tick),window,cx);
+                    false
+                } else { begin_tempo(ed,&state,event.pointer,event.x,event.y,height,event.modifiers,window,cx) }
             }
-        });
-    });
-    let (e, state) = (editor.clone(), preview.clone());
-    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-        if phase != DispatchPhase::Capture { return; }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(event.position.x), f64::from(event.position.y))) {
-            e.update(cx, |_, cx| cancel_tempo(&state, PointerId::Mouse, window, cx));
-            return;
-        }
-        let position = event.position - bounds.origin;
-        e.update(cx, |ed, cx| move_tempo(ed, &state, PointerId::Mouse, position.x.as_f32() as f64, position.y.as_f32() as f64, height, event.modifiers, cx));
-    });
-    let (e, state) = (editor.clone(), preview.clone());
-    window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-        if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
-            e.update(cx, |ed, cx| {
-                if !crate::host_pointer::contains_window_point(window, (f64::from(event.position.x), f64::from(event.position.y))) {
-                    cancel_tempo(&state, PointerId::Mouse, window, cx);
-                    return;
-                }
-                let position = event.position - bounds.origin;
-                move_tempo(ed, &state, PointerId::Mouse, position.x.as_f32() as f64, position.y.as_f32() as f64, height, event.modifiers, cx);
-                end_tempo(ed, &state, PointerId::Mouse, window, cx);
-            });
-        }
-    });
-    let (e, state) = (editor.clone(), preview.clone());
-    window.on_key_event(move |event: &gpui::KeyDownEvent, phase, window, cx| {
-        if phase == DispatchPhase::Capture && event.keystroke.key == "escape" && state.borrow_mut().take().is_some() {
-            window.release_pointer(); e.update(cx, |_, cx| cx.notify()); cx.stop_propagation();
-        }
-    });
-    let (e, h, state) = (editor.clone(), hitbox.clone(), preview.clone());
-    window.on_mouse_event(move |event: &TouchDragEvent, phase, window, cx| {
-        let expected_phase = if event.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
-        if phase != expected_phase { return; }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(event.position.x), f64::from(event.position.y))) {
-            e.update(cx, |_, cx| cancel_tempo(&state, PointerId::Touch(0), window, cx));
-            return;
-        }
-        let position = event.position - bounds.origin;
-        e.update(cx, |ed, cx| match event.phase {
-            TouchPhase::Started if h.is_hovered_at(event.start_position, window) => {
-                let start = event.start_position - bounds.origin;
-                if begin_tempo(ed, &state, PointerId::Touch(0), start.x.as_f32() as f64, start.y.as_f32() as f64, height, gpui::Modifiers::default(), window, cx) {
-                    window.prevent_default(); window.capture_pointer(h.id);
-                    move_tempo(ed, &state, PointerId::Touch(0), position.x.as_f32() as f64, position.y.as_f32() as f64, height, gpui::Modifiers::default(), cx);
-                }
-            }
-            TouchPhase::Moved => move_tempo(ed, &state, PointerId::Touch(0), position.x.as_f32() as f64, position.y.as_f32() as f64, height, gpui::Modifiers::default(), cx),
-            TouchPhase::Ended => {
-                move_tempo(ed, &state, PointerId::Touch(0), position.x.as_f32() as f64, position.y.as_f32() as f64, height, gpui::Modifiers::default(), cx);
-                end_tempo(ed, &state, PointerId::Touch(0), window, cx);
-            }
-            TouchPhase::Cancelled => cancel_tempo(&state, PointerId::Touch(0), window, cx),
-            _ => {},
-        });
+            PointerPhase::Sample => { move_tempo(ed,&state,event.pointer,event.x,event.y,height,event.modifiers,cx); true }
+            PointerPhase::Finish => { end_tempo(ed,&state,event.pointer,window,cx); true }
+            PointerPhase::Context => { state.borrow_mut().take(); tempo_context(ed,event.x,event.y,height,window,cx); true }
+        })
     });
 }
 
@@ -845,7 +764,7 @@ fn down(ed:&mut Editor,param:Param,slot:usize,pointer: PointerId, x: f64, y: f64
         None => (None, None, if modifiers.alt || ed.param == Param::Portamento || ed.lane_tool != LaneTool::Select { tick } else { ed.session.snap.snap(tick) as f64 }, value),
     };
     if !ed.begin_curve(ed.param, pointer, note, point, false, tick, value, (x, y), erase) { return false; }
-    window.focus(&ed.focus_roll, cx); cx.notify(); true
+     cx.notify(); true
 }
 fn moved(ed:&mut Editor,param:Param,pointer: PointerId, x: f64, y: f64, height: f64, modifiers: gpui::Modifiers, cx: &mut Context<Editor>) {
     if !ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && !s.roll && s.param==param) { return; }
@@ -856,7 +775,7 @@ fn moved(ed:&mut Editor,param:Param,pointer: PointerId, x: f64, y: f64, height: 
 }
 fn up(ed:&mut Editor,param:Param,pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
     if !ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && !s.roll && s.param==param) { return; }
-    window.release_pointer();
+
     {
         let (from, to) = ed.lane_stroke.as_ref().unwrap().samples.iter()
             .fold((f64::INFINITY, f64::NEG_INFINITY), |(from, to), sample| (from.min(sample.0), to.max(sample.0)));
@@ -899,73 +818,22 @@ fn cancel_lane_pointer(ed: &mut Editor, param: Param, slot: usize, pointer: Poin
     if ed.integrations.active_panel != slot || !ed.lane_stroke.as_ref()
         .is_some_and(|stroke| stroke.pointer == pointer && !stroke.roll && stroke.param == param) { return; }
     ed.lane_stroke = None;
-    window.release_pointer();
+
     cx.notify();
 }
 
-fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,param:Param,slot:usize,window: &mut Window, _: &mut App) {
-    if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::Crosshair, hitbox); }
-    let height = bounds.size.height.as_f32() as f64;
-    let (e, h) = (editor.clone(), hitbox.clone());
-    window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || !h.is_hovered(window) { return; }
-        let p = ev.position - bounds.origin;
-        e.update(cx, |ed, cx| {
-            if ev.button == MouseButton::Right { ed.param=param;ed.integrations.active_panel=slot;context(ed, ed.session.viewport.x_to_tick(p.x.as_f32() as f64) as i64, window, cx); cx.stop_propagation(); }
-            else if ev.button == MouseButton::Left && down(ed,param,slot,PointerId::Mouse, p.x.as_f32() as f64, p.y.as_f32() as f64, height, ev.modifiers, window, cx) {
-                window.capture_pointer(h.id); cx.stop_propagation();
-            }
-        });
-    });
-    let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-        if phase != DispatchPhase::Capture || e.read(cx).integrations.active_panel != slot { return; }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            e.update(cx, |ed, cx| cancel_lane_pointer(ed, param, slot, PointerId::Mouse, window, cx));
-            return;
-        }
-        let p = ev.position - bounds.origin;
-        e.update(cx, |ed, cx| moved(ed,param,PointerId::Mouse, p.x.as_f32() as f64, p.y.as_f32() as f64, height, ev.modifiers, cx));
-    });
-    let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-        if phase == DispatchPhase::Capture && ev.button == MouseButton::Left && e.read(cx).integrations.active_panel == slot { e.update(cx, |ed, cx| {
-            if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-                cancel_lane_pointer(ed, param, slot, PointerId::Mouse, window, cx);
-                return;
-            }
-            let p = ev.position - bounds.origin;
-            moved(ed,param,PointerId::Mouse,p.x.as_f32() as f64,p.y.as_f32() as f64,height,ev.modifiers,cx);
-            up(ed,param,PointerId::Mouse, window, cx);
-        }); }
-    });
-    let (e, h) = (editor.clone(), hitbox.clone());
-    window.on_mouse_event(move |ev: &TouchDragEvent, phase, window, cx| {
-        let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
-        if phase != expected_phase { return; }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            e.update(cx, |ed, cx| cancel_lane_pointer(ed, param, slot, PointerId::Touch(0), window, cx));
-            return;
-        }
-        let p = ev.position - bounds.origin;
-        e.update(cx, |ed, cx| match ev.phase {
-            TouchPhase::Started if h.is_hovered_at(ev.start_position, window) => {
-                let start = ev.start_position - bounds.origin;
-                if down(ed,param,slot,PointerId::Touch(0), start.x.as_f32() as f64, start.y.as_f32() as f64, height, gpui::Modifiers::default(), window, cx) {
-                    window.prevent_default(); window.capture_pointer(h.id);
-                    moved(ed,param,PointerId::Touch(0), p.x.as_f32() as f64, p.y.as_f32() as f64, height, gpui::Modifiers::default(), cx);
-                }
-            }
-            TouchPhase::Moved if ed.integrations.active_panel == slot => {
-                moved(ed,param,PointerId::Touch(0), p.x.as_f32() as f64, p.y.as_f32() as f64, height, gpui::Modifiers::default(), cx);
-            },
-            TouchPhase::Ended if ed.integrations.active_panel == slot => {
-                moved(ed,param,PointerId::Touch(0),p.x.as_f32() as f64,p.y.as_f32() as f64,height,gpui::Modifiers::default(),cx);
-                up(ed,param,PointerId::Touch(0), window, cx);
-            },
-            TouchPhase::Cancelled => cancel_lane_pointer(ed, param, slot, PointerId::Touch(0), window, cx),
-            _ => {},
-        });
+fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,param:Param,slot:usize,
+    input:&crate::proto_editor_surface::Input,window:&mut Window,_:&mut App) {
+    if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::Crosshair,hitbox); }
+    let e=editor.clone(); let height=f64::from(bounds.size.height);
+    crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
+        use crate::proto_editor_surface::PointerPhase;
+        e.update(cx,|ed,cx| match event.phase {
+            PointerPhase::Begin => down(ed,param,slot,event.pointer,event.x,event.y,height,event.modifiers,window,cx),
+            PointerPhase::Sample => { if ed.integrations.active_panel==slot { moved(ed,param,event.pointer,event.x,event.y,height,event.modifiers,cx); } true }
+            PointerPhase::Finish => { if ed.integrations.active_panel==slot { up(ed,param,event.pointer,window,cx); } true }
+            PointerPhase::Context => { ed.param=param; ed.integrations.active_panel=slot; context(ed,ed.session.viewport.x_to_tick(event.x) as i64,window,cx); true }
+        })
     });
 }
 
@@ -978,11 +846,20 @@ mod pointer_boundary_tests {
     impl Render for Harness {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             let (editor, tempo, preview) = (self.editor.clone(), self.tempo, self.preview.clone());
-            div().size_full().child(canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-                move |bounds, hitbox, window, cx| {
-                    if tempo { install_tempo_input(&editor, bounds, &hitbox, &preview, window); }
-                    else { install_input(&editor, bounds, &hitbox, Param::Dyn, 0, window, cx); }
-                }).w(px(160.0)).h(px(80.0)))
+            let cancel_editor = editor.clone(); let cancel_preview = preview.clone();
+            let compiled = crate::proto_editor_surface::surface(editor.clone(), "lane-native-regression", "参数曲线", 0.0,
+                move |input| {
+                    let editor = editor.clone(); let preview = preview.clone();
+                    canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move |bounds,hitbox,window,cx| {
+                        if tempo { install_tempo_input(&editor,bounds,&hitbox,&preview,&input,window); }
+                        else { install_input(&editor,bounds,&hitbox,Param::Dyn,0,&input,window,cx); }
+                    }).size_full().into_any_element()
+                },
+                move |_,window,cx| {
+                    cancel_preview.borrow_mut().take();
+                    cancel_editor.update(cx,|ed,cx| { ed.lane_stroke=None;cx.notify(); });
+                });
+            div().size_full().child(div().w(px(160.0)).h(px(80.0)).child(compiled))
                 .child(canvas(|_, _, _| {}, |_, _, window, _| {
                     window.on_mouse_event(|_: &MouseUpEvent, phase, _, cx| {
                         if phase == DispatchPhase::Bubble { cx.stop_propagation(); }

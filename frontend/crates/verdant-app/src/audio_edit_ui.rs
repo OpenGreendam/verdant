@@ -51,8 +51,8 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
             ("范围","拖动选择时间与轨道范围",AudioUiAction::RangeTool,ed.integrations.audio_edit.range_tool),
             ("分割","在播放头或选区边界切分",AudioUiAction::Split,false),
             ("片段 ▾","剪切、淡化、变速与合并",AudioUiAction::Menu,false),
-        ].into_iter().map(|(label,description,action,selected)|div().id(SharedString::from(format!("audio-tool-{label}")))
-            .role(gpui::Role::Button).aria_label(description).aria_selected(selected)
+        ].into_iter().map(|(label,description,action,selected)|crate::proto_controls::action(SharedString::from(format!("audio-tool-{label}")),description)
+            .when(matches!(action,AudioUiAction::SelectTool|AudioUiAction::RangeTool),|button|button.aria_selected(selected))
             .h(px(26.0)).px(px(9.0)).flex().items_center().rounded(px(6.0)).cursor_pointer()
             .bg(if selected{th.control}else{th.surface}).hover(move|style|style.bg(th.hover))
             .child(label).on_click(cx.listener(move|ed,_,window,cx|{
@@ -61,21 +61,24 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
         .child(div().flex_1().min_w_0().truncate().text_xs().text_color(th.text_secondary).child(detail))
 }
 pub fn key_down(ed:&mut Editor,event:&KeyDownEvent,window:&mut Window,cx:&mut Context<Editor>){
-    if !ed.focus_arrange.is_focused(window)||event.is_held{return;}
-    let modifiers=event.keystroke.modifiers;
-    let secondary=modifiers.control||modifiers.platform;
-    let action=match event.keystroke.key.as_str(){
-        "delete"|"backspace" if !secondary=>Some(if modifiers.shift{AudioUiAction::RippleDelete}else{AudioUiAction::Delete}),
-        "i" if secondary=>Some(AudioUiAction::Split),
-        "a" if secondary=>Some(AudioUiAction::SelectAll),
-        "j" if secondary=>Some(AudioUiAction::Join),
-        "r" if !secondary&&!modifiers.alt=>Some(AudioUiAction::RangeTool),
-        "v" if !secondary&&!modifiers.alt=>Some(AudioUiAction::SelectTool),
-        "escape"=>{ed.integrations.audio_edit.range=None;ed.integrations.audio_edit.range_drag=None;ed.arrange_drag=None;window.release_pointer();cx.notify();Some(AudioUiAction::SelectTool)},
-        _=>None,
+    let Some((command, retired)) = crate::proto_editor_surface::audio_key(ed, cx.entity_id(), event, window, cx) else { return; };
+    if retired || command == "escape" {
+        ed.integrations.audio_edit.range_drag = None; ed.arrange_drag = None;
+        if command == "escape" { ed.integrations.audio_edit.range = None; }
+        cx.notify();
+    }
+    let action = match command.as_str() {
+        "delete" => Some(AudioUiAction::Delete), "ripple-delete" => Some(AudioUiAction::RippleDelete),
+        "split" => Some(AudioUiAction::Split), "select-all" => Some(AudioUiAction::SelectAll),
+        "join" => Some(AudioUiAction::Join), "range-tool" => Some(AudioUiAction::RangeTool),
+        "select-tool" | "escape" => Some(AudioUiAction::SelectTool), _ => None,
     };
-    if let Some(action)=action{if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}cx.stop_propagation();}
+    if let Some(action) = action {
+        if let Err(error) = ed.run_audio_ui(action,window,cx) { ed.notice(error); cx.notify(); }
+        window.prevent_default(); cx.stop_propagation();
+    }
 }
+
 impl Editor{
     pub fn audio_selection(&self)->Vec<AudioClipRef>{
         let mut selected=self.integrations.audio_edit.selected.iter().filter(|reference|

@@ -15,7 +15,7 @@
 // 11 absent retained artifacts. Exit 10 is a failure, never a successful check.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -100,6 +100,24 @@ export function loadPin(filename, root = defaultRoot) {
     if (!unit.output.directory.startsWith('frontend/proto-ui/generated/') || !unit.output.receipt.startsWith('frontend/proto-ui/receipts/')) fail(EXIT.pin, 'Unit outputs and receipts must stay in their dedicated directories.');
     if (outputs.some((output) => output === unit.output.directory || output.startsWith(`${unit.output.directory}/`) || unit.output.directory.startsWith(`${output}/`)) || receipts.has(unit.output.receipt)) fail(EXIT.pin, 'Compilation outputs overlap.');
     outputs.push(unit.output.directory); receipts.add(unit.output.receipt);
+  }
+  // Every top-level authored entry is a build unit. Imported prototype modules
+  // live in subdirectories and remain part of each unit's source-graph receipt.
+  // An added consumer must never escape fresh/retained checks by being omitted
+  // from this list while Cargo's workspace glob quietly includes its output.
+  const sources = new Set(pin.units.map((unit) => unit.source));
+  const authored = path.join(root, 'frontend/proto-ui/src');
+  for (const file of readdirSync(authored, { withFileTypes: true })) {
+    if (file.isFile() && file.name.endsWith('.proto.ts') && !sources.has(`frontend/proto-ui/src/${file.name}`)) {
+      fail(EXIT.pin, `Authored entry is absent from the compiler pin: ${file.name}`);
+    }
+  }
+  const generated = path.join(root, 'frontend/proto-ui/generated');
+  if (existsSync(generated)) for (const file of readdirSync(generated, { withFileTypes: true })) {
+    if (file.isDirectory() && existsSync(path.join(generated, file.name, 'Cargo.toml'))
+      && !outputs.includes(`frontend/proto-ui/generated/${file.name}`)) {
+      fail(EXIT.pin, `Generated Cargo consumer is absent from the compiler pin: ${file.name}`);
+    }
   }
   const sdk = pin.sharedSdk;
   if (!sdk || !names.has(sdk.owner) || sdk.package !== 'proto-ui-gpui-native' || !/^\d+\.\d+\.\d+$/.test(sdk.version) || !Array.isArray(sdk.features) || !/^[0-9a-f]{64}$/.test(sdk.contentSha256)) fail(EXIT.pin, 'Pin must bind the shared native SDK owner, ABI and content.');

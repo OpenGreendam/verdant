@@ -12,7 +12,7 @@ gpui-modern-element-api = []
 # Requires an explicit local upstream focus-tree patch; not an advertised profile capability.
 experimental-focus-tree = []
 # Native consumer evidence only; no product introspection surface by default.
-test-support = []
+test-support = ["gpui/test-support"]
 
 [dependencies]
 gpui = { workspace = true }

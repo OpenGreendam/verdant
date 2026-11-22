@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774",
+    "contentSha256": "4882eb155ebd673ae4c48916474dfdf81fe400fdaa8d3aea68ca523c1448e479",
     "path": ".proto-ui/gpui-native",
     "bundled": true
   },
@@ -111,7 +111,7 @@
     {
       "path": ".proto-ui/gpui-native/Cargo.toml",
       "kind": "source",
-      "sha256": "aeb413c6146dcffaf1c17064242685d15cd33cd89fc669d68fbf5fe5e4e3d38e"
+      "sha256": "bd80c6fd338469b51446c771ac8171942b07c654f689809933c9fad0d25420a0"
     },
     {
       "path": ".proto-ui/gpui-native/src/lib.rs",
@@ -121,12 +121,12 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "adc07e4bc02e4ecf65c215c37f72faff4dbf7f100bb678f652bc28ee847c1507"
+      "sha256": "ce21ae86f6039b7c550a92c24b337fa810fe108354a3b4b2e0a3cf43fdfcff7a"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-a11y.rs",
       "kind": "source",
-      "sha256": "64c5a3ec99881a4fff33dc85ffdc4bfdd40404ce977d24953c6381ce216de468"
+      "sha256": "126e82d134284620a5dba6ded986f5f771a67a3a45902170f8322f73907a42fc"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-host.rs",

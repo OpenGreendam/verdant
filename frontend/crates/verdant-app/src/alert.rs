@@ -7,7 +7,7 @@
 use std::sync::Mutex;
 
 use gpui::{
-    App, Context, EventEmitter, FocusHandle, Focusable, FontWeight, KeyDownEvent, PromptButton, PromptHandle, PromptLevel,
+    App, Context, EventEmitter, FocusHandle, Focusable, FontWeight, PromptButton, PromptHandle, PromptLevel,
     PromptResponse, Render, RenderablePromptHandle, Window, div, prelude::*, px,
 };
 
@@ -53,7 +53,29 @@ impl Focusable for AlertDialog {
 }
 
 impl Render for AlertDialog {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let revision = format!("alert:{}", cx.entity_id());
+        let props = serde_json::json!({"label":self.heading, "description":self.body.clone().unwrap_or_default(),
+            "role":"alertdialog", "open":true, "revision":revision, "choices":self.actions.len(),
+            "defaultChoice":Self::suggested(&self.actions).map(|v|v as i64).unwrap_or(-1),
+            "cancelChoice":Self::cancel(&self.actions).map(|v|v as i64).unwrap_or(-1)});
+        let editor = cx.entity(); let basis = revision.clone();
+        let draw = std::rc::Rc::new(move |handle: &verdant_overlay_control::OverlayControlHandle, focus: &FocusHandle, window: &mut Window, cx: &mut App| {
+            editor.update(cx, |alert, cx| {
+                alert.focus = focus.clone();
+                alert.native_content(handle, &basis, window, cx).into_any_element()
+            })
+        });
+        let editor = cx.entity().downgrade();
+        let response = std::rc::Rc::new(move |index: usize, _window: &mut Window, cx: &mut App| {
+            let _ = editor.update(cx, |alert, cx| { if index < alert.actions.len() { cx.emit(PromptResponse(index)); } });
+        });
+        crate::proto_overlay::overlay("compiled-alert-dialog", props, draw, response)
+    }
+}
+
+impl AlertDialog {
+    fn native_content(&self, handle: &verdant_overlay_control::OverlayControlHandle, revision: &str, window: &mut Window, _cx: &mut Context<Self>) -> gpui::AnyElement {
         let th = theme(window);
         let suggested = Self::suggested(&self.actions);
         let destructive = self.level == PromptLevel::Critical;
@@ -66,33 +88,26 @@ impl Render for AlertDialog {
                 (true, false) => (th.accent, gpui::rgb(0xffffff)),
                 _ => (th.control, th.text),
             };
-            div().id(ix).role(gpui::Role::Button).aria_label(action.label().to_string())
+            let response = handle.clone(); let basis = revision.to_string();
+            crate::proto_controls::action(ix, action.label().to_string())
                 .h(px(40.0)).px(px(16.0)).flex().items_center().justify_center().rounded(px(10.0))
                 .bg(bg).text_color(fg).text_sm().font_weight(FontWeight::SEMIBOLD).cursor_pointer()
                 .hover(move |s| s.bg(with_alpha(bg, 0.85))).active(move |s| s.bg(with_alpha(bg, 0.7)))
                 .when(!stacked, |b| b.flex_1())
                 .child(action.label().clone())
-                .on_click(cx.listener(move |_, _, _, cx| { cx.emit(PromptResponse(ix)); cx.stop_propagation(); }))
+                .on_click(move |_, window, cx| { crate::proto_overlay::choose(&response, ix, &basis, window, cx); cx.stop_propagation(); })
         });
-        let actions = self.actions.clone();
-        let card = div().id("alert-dialog").role(gpui::Role::AlertDialog).aria_label(self.heading.clone())
-            .track_focus(&self.focus).w(px(372.0)).max_w(px(560.0)).flex().flex_col().gap(px(6.0))
+        let keyboard = handle.clone();
+        let card = div().id("alert-dialog").w(px(372.0)).max_w(px(560.0)).flex().flex_col().gap(px(6.0))
             .p(px(24.0)).rounded(px(14.0)).bg(th.popover).border_1().border_color(th.shade).shadow_lg()
-            .on_key_down(cx.listener(move |_, ev: &KeyDownEvent, _, cx| {
-                let pick = match ev.keystroke.key.as_str() {
-                    "enter" => Self::suggested(&actions),
-                    "escape" => Self::cancel(&actions),
-                    _ => None,
-                };
-                if let Some(ix) = pick { cx.emit(PromptResponse(ix)); cx.stop_propagation(); }
-            }))
+            .on_key_down(move |event, window, cx| crate::proto_overlay::key(&keyboard, event, window, cx))
             .child(div().w_full().text_center().text_color(th.text).font_weight(FontWeight::BOLD).child(self.heading.clone()))
             .children(self.body.clone().map(|body| div().w_full().text_center().text_sm().text_color(th.text_secondary)
                 .whitespace_normal().child(body)))
             .child(div().h(px(14.0)))
             .child(div().w_full().flex().gap(px(12.0)).when(stacked, |d| d.flex_col()).children(buttons));
         let size = window.viewport_size();
-        div().w(size.width).h(size.height).occlude().bg(gpui::rgba(0x00000066)).flex().items_center().justify_center().child(card)
+        div().w(size.width).h(size.height).occlude().bg(gpui::rgba(0x00000066)).flex().items_center().justify_center().child(card).into_any_element()
     }
 }
 

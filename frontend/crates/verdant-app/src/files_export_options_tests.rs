@@ -133,3 +133,43 @@ fn export_dialog_cannot_discard_its_only_real_vsqx_voice_table() {
     };
     assert!(resolve_score_options(Format::Vsqx, explicit, "").is_ok());
 }
+
+#[gpui::test]
+fn native_export_dialog_uses_compiled_text_selection_radio_and_submit(cx: &mut gpui::TestAppContext) {
+    use verdant_action_control::native::gpui_native_owner::{all_owners, dispatch_accessibility_action, drive_owners, resolved};
+    let (send, receive) = async_channel::bounded(1);
+    let window = cx.open_window(gpui::size(px(560.), px(620.)), move |window, cx| {
+        ScoreExportDialog::new(Format::Midi, ExportOptions::default(), vec!["first".into(), "selected".into()], send, window, cx)
+    });
+    window.update(cx, |_, window, _| window.activate_window()).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |view, window, cx| {
+        let focus = view.ppq.read(cx).focus.clone(); window.focus(&focus, cx);
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    cx.simulate_input(window.into(), "1920");
+    crate::native_test_support::frames(window, cx);
+    cx.simulate_keystrokes(window.into(), "up");
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |view, window, cx| {
+        assert_eq!(view.ppq.read(cx).value(), "1921");
+        let radio = all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text() == "第 2 轨 · selected")
+        }).expect("actual export track is a compiled radio control");
+        dispatch_accessibility_action(&radio, "activate", None); drive_owners(window, cx);
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |view, window, cx| {
+        assert_eq!(view.options.track, Some(1));
+        let focus = view.ppq.read(cx).focus.clone(); window.focus(&focus, cx);
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    cx.simulate_keystrokes(window.into(), "enter");
+    cx.run_until_parked();
+    let options = receive.try_recv().expect("one compiled text submit confirms the native export window");
+    assert_eq!(options.midi_ppq, Some(1921));
+    assert_eq!(options.track, Some(1));
+    assert!(receive.try_recv().is_err());
+}

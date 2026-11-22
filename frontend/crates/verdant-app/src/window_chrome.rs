@@ -175,7 +175,7 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
         let mut button = if windows {
             // Windows keeps its own caption layout: 46 px cells, red close.
             let hover = if close { gpui::rgb(0xc42b1c) } else { th.control_pressed };
-            div().id(id).role(gpui::Role::Button).aria_label(label)
+            crate::proto_controls::action(id, label).disabled(!enabled)
                 .w(px(46.0)).h_full().flex().items_center().justify_center().occlude()
                 .child(svg().path(icon(name)).size(px(if caption == Caption::Maximize { 12.0 } else { 15.0 })).text_color(fg))
                 .when(enabled, |b| b.hover(move |s| s.bg(hover)))
@@ -184,7 +184,7 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
             // and pressed, inside a larger hit area.
             let base = crate::theme::with_alpha(th.text, 0.10);
             let (hover, pressed) = (crate::theme::with_alpha(th.text, 0.16), crate::theme::with_alpha(th.text, 0.26));
-            div().id(id).role(gpui::Role::Button).aria_label(label)
+            crate::proto_controls::action(id, label).disabled(!enabled)
                 .w(px(34.0)).h_full().flex().items_center().justify_center().occlude().cursor_pointer().group(id)
                 .child(div().id(SharedString::from(format!("{id}-disc"))).size(px(24.0)).rounded(px(12.0)).flex().items_center().justify_center().bg(base)
                     .group_hover(id, move |s| s.bg(hover)).group_active(id, move |s| s.bg(pressed))
@@ -195,13 +195,18 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
             if enabled {
                 button = button.window_control_area(area);
             }
-        } else {
-            button = button.on_click(cx.listener(move |ed, _, window, cx| match caption {
+        }
+        // Windows retains non-client mouse hit testing (including snap layouts).
+        // GPUI keyboard and assistive routes, and every non-Windows click, pass
+        // through the compiled action before this native window command.
+        button = button.on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, window, cx| {
+            if windows && event.is_mouse() { return; }
+            match caption {
                 Caption::Minimize => window.minimize_window(),
                 Caption::Maximize => window.zoom_window(),
                 Caption::Close => ed.close_window(window, cx),
-            }));
-        }
+            }
+        }));
         row = row.child(button);
     }
     Some(row.into_any_element())

@@ -278,6 +278,18 @@ fn mods(m: &gpui::Modifiers) -> Modifiers {
 }
 
 pub fn piano_roll(editor: Entity<Editor>) -> impl IntoElement {
+    let draw=editor.clone();let cancel_editor=editor.clone();
+    crate::proto_editor_surface::surface(editor,"piano-roll","钢琴卷帘：音符、音高与表情编辑",0.0,
+        move |input|native_piano_roll(draw.clone(),input).into_any_element(),
+        move |_,window,cx|cancel_editor.update(cx,|ed,cx| {
+            cancel(ed,PointerId::Mouse,CancelReason::PointerCancel,window,cx);
+            cancel(ed,PointerId::Touch(0),CancelReason::PointerCancel,window,cx);
+            if has_note_mod_drag(cx.entity_id(),cx) { cx.global_mut::<RollExtraDragState>().mod_drag=None; }
+            ed.release_roll_capture(window,cx);cx.notify();
+        }))
+}
+
+fn native_piano_roll(editor: Entity<Editor>, input: crate::proto_editor_surface::Input) -> impl IntoElement {
     let ed_prepaint = editor.clone();
     canvas(
         move |bounds, window, cx| {
@@ -305,7 +317,7 @@ pub fn piano_roll(editor: Entity<Editor>) -> impl IntoElement {
             let mut texts = Texts::new();
             paint_roll(&editor, bounds, window, cx, &mut texts);
             flush_texts(window, cx, bounds, texts);
-            install_roll_input(&editor, bounds, &hitbox, &surface, window, cx);
+            install_roll_input(&editor,bounds,&hitbox,&surface,&input,window,cx);
         },
     )
     .size_full()
@@ -785,7 +797,7 @@ fn cancel_roll_mouse(ed: &mut Editor, window: &mut Window, cx: &mut gpui::Contex
 }
 
 fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox,
-    surface: &crate::host_pointer::SurfaceToken, window: &mut Window, cx: &mut App) {
+    surface: &crate::host_pointer::SurfaceToken, input: &crate::proto_editor_surface::Input, window: &mut Window, cx: &mut App) {
     if cx.try_global::<RollExtraDragState>().is_none() {
         cx.set_global(RollExtraDragState::default());
     }
@@ -809,211 +821,64 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
         }
     }
 
-    // ---- mouse ----
-    let h = hitbox.clone();
-    let e = editor.clone();
-    let down_surface = surface.clone();
-    window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || !h.is_hovered(window) || !down_surface.is_live() {
-            return;
-        }
-        let l = ev.position - bounds.origin;
-        let (x, y) = (l.x.as_f32() as f64, l.y.as_f32() as f64);
-        match ev.button {
-            MouseButton::Left => {
-                if e.read(cx).tool == Tool::Pitch { return; }
-                let ed = e.read(cx);
+    let (e,h,live)=(editor.clone(),hitbox.clone(),surface.clone());
+    crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
+        use crate::proto_editor_surface::PointerPhase;
+        if !live.is_live() { return false; }
+        match event.phase {
+            PointerPhase::Begin => {
+                let ed=e.read(cx);
                 if ed.has_proto_pointer_contact() || ed.note_creation.is_some() || ed.session.pointer_owner().is_some()
                     || ed.lane_stroke.is_some() || ed.device_drag.is_some() || ed.mixer_drag.is_some()
-                    || has_note_mod_drag(e.entity_id(), cx) { return; }
-                let maybe_mod = hit_mod_handle(e.read(cx), x, y).map(|mut d| { d.editor = e.entity_id(); d });
-                if let Some(mod_drag) = maybe_mod {
-                    cx.global_mut::<RollExtraDragState>().mod_drag = Some(mod_drag);
-                    e.update(cx, |ed, cx| { ed.capture_roll_pointer(h.id, window, cx); window.focus(&ed.focus_roll, cx); cx.notify(); });
-                    cx.stop_propagation();
-                    return;
+                    || has_note_mod_drag(e.entity_id(),cx) { return false; }
+                if matches!(event.pointer,PointerId::Touch(_)) && ed.tool==Tool::Pointer {
+                    let claim=ed.active_track().is_some_and(|t|!matches!(hit_test_touch(t,&ed.session.viewport,&ed.session.selection,event.x,event.y),Hit::Background));
+                    if !claim { return false; }
                 }
-                e.update(cx, |ed, cx| {
-                    pointer_down(ed, PointerId::Mouse, x, y, mods(&ev.modifiers), ev.click_count as u32, &h, window, cx)
-                });
-                cx.stop_propagation();
-            }
-            MouseButton::Right => {
-                e.update(cx, |ed, cx| roll_context_menu(ed, ev.position, x, y, window, cx));
-                cx.stop_propagation();
-            }
-            _ => {}
-        }
-    });
-    let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            if phase == DispatchPhase::Capture { e.update(cx, |ed, cx| cancel_roll_mouse(ed, window, cx)); }
-            return;
-        }
-        if phase != DispatchPhase::Bubble {
-            return;
-        }
-        let l = ev.position - bounds.origin;
-        let (lx, ly) = (l.x.as_f32() as f64, l.y.as_f32() as f64);
-        let updated_mod = {
-            let Some(drag) = cx.try_global::<RollExtraDragState>().and_then(|s| s.mod_drag.as_ref()) else {
-                e.update(cx, |ed, cx| {
-                    if ed.note_creation.as_ref().is_some_and(|c|c.pointer==PointerId::Mouse) || matches!(ed.session.pointer_owner(), Some(PointerId::Mouse)) {
-                        pointer_move(ed, PointerId::Mouse, lx, ly, mods(&ev.modifiers), window, cx)
+                if event.pointer==PointerId::Mouse && ed.tool!=Tool::Pitch {
+                    if let Some(mut drag)=hit_mod_handle(ed,event.x,event.y) {
+                        drag.editor=e.entity_id();cx.global_mut::<RollExtraDragState>().mod_drag=Some(drag);
+                        e.update(cx,|ed,cx| { ed.capture_roll_pointer(h.id,window,cx);cx.notify(); });return true;
                     }
-                });
-                return;
-            };
-            if drag.editor != e.entity_id() { return; }
-            let ed = e.read(cx);
-            Some(drag.sample_values(ed, lx, ly))
-        };
-        if let Some((p_ms, dl_pm, dp_c)) = updated_mod {
-            if let Some(drag) = cx.global_mut::<RollExtraDragState>().mod_drag.as_mut() {
-                drag.portamento_ms = p_ms;
-                drag.delay_permille = dl_pm;
-                drag.depth_cents = dp_c;
+                }
+                e.update(cx,|ed,cx| {
+                    pointer_down(ed,event.pointer,event.x,event.y,mods(&event.modifiers),event.clicks as u32,&h,window,cx);
+                    ed.note_creation.as_ref().is_some_and(|c|c.pointer==event.pointer)
+                        || ed.session.pointer_owner()==Some(event.pointer)
+                        || ed.lane_stroke.as_ref().is_some_and(|s|s.roll&&s.pointer==event.pointer)
+                })
             }
-            e.update(cx, |_, cx| cx.notify());
-        }
-    });
-    let e = editor.clone();
-    let up_surface = surface.clone();
-    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-        if phase != DispatchPhase::Capture || ev.button != MouseButton::Left || !up_surface.is_live() {
-            return;
-        }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            e.update(cx, |ed, cx| cancel_roll_mouse(ed, window, cx));
-            return;
-        }
-        if cx.try_global::<RollExtraDragState>().and_then(|s| s.mod_drag.as_ref()).is_some_and(|d| d.editor == e.entity_id()) {
-            let finished = cx.global_mut::<RollExtraDragState>().mod_drag.take();
-            if let Some(mut drag) = finished {
-                e.update(cx, |ed, cx| {
-                    ed.release_roll_capture(window, cx);
-                    if !drag.test_matches(ed) { cx.notify(); return; }
-                    let l = ev.position - bounds.origin;
-                    (drag.portamento_ms, drag.delay_permille, drag.depth_cents) = drag.sample_values(ed, f64::from(l.x), f64::from(l.y));
-                    let ids: Vec<NoteId> = if ed.session.selection.contains(&drag.note_id) {
-                        ed.session.selection_in_order(ed.project())
-                    } else {
-                        vec![drag.note_id]
-                    };
-                    match drag.kind {
-                        ModHandleKind::Portamento => {
-                            ed.commit(drag.base, CommandBatch::single("拖拽调整滑音时长", Command::SetPortamento {
-                                track: drag.track,
-                                note_ids: ids,
-                                portamento_ms: Some(drag.portamento_ms),
-                            }), cx);
-                        }
-                        ModHandleKind::Vibrato => {
-                            let mut notes = ed.selected_notes();
-                            for n in &mut notes {
-                                if drag.depth_cents == 0 {
-                                    n.vibrato = None;
-                                } else {
-                                    let mut vib = n.vibrato.clone().unwrap_or(verdant_domain::Vibrato::DEFAULT);
-                                    vib.depth_cents = drag.depth_cents;
-                                    vib.delay_permille = drag.delay_permille;
-                                    n.vibrato = Some(vib);
-                                }
-                            }
-                            if !notes.is_empty() {
-                                ed.commit(drag.base, CommandBatch::single("拖拽调整音符颤音", Command::ReplaceNotes {
-                                    track: drag.track,
-                                    notes,
-                                }), cx);
-                            }
-                        }
+            PointerPhase::Sample => {
+                let values=cx.try_global::<RollExtraDragState>().and_then(|s|s.mod_drag.as_ref())
+                    .filter(|d|d.editor==e.entity_id()).map(|d|d.sample_values(e.read(cx),event.x,event.y));
+                if let Some((portamento,delay,depth))=values {
+                    if let Some(drag)=cx.global_mut::<RollExtraDragState>().mod_drag.as_mut() {
+                        drag.portamento_ms=portamento;drag.delay_permille=delay;drag.depth_cents=depth;
                     }
-                    cx.notify();
-                });
+                    e.update(cx,|_,cx|cx.notify());
+                } else { e.update(cx,|ed,cx|pointer_move(ed,event.pointer,event.x,event.y,mods(&event.modifiers),window,cx)); }
+                true
             }
-            return;
+            PointerPhase::Finish => {
+                if has_note_mod_drag(e.entity_id(),cx) { finish_note_modulation(&e,window,cx); }
+                else { e.update(cx,|ed,cx|pointer_up(ed,event.pointer,event.x,event.y,mods(&event.modifiers),window,cx)); }
+                true
+            }
+            PointerPhase::Context => { e.update(cx,|ed,cx|roll_context_menu(ed,event.position,event.x,event.y,window,cx));false }
         }
-        e.update(cx, |ed, cx| {
-            if ed.note_creation.as_ref().is_some_and(|c|c.pointer==PointerId::Mouse) || matches!(ed.session.pointer_owner(), Some(PointerId::Mouse)) {
-                let l = ev.position - bounds.origin;
-                pointer_up(ed, PointerId::Mouse, f64::from(l.x), f64::from(l.y), mods(&ev.modifiers), window, cx)
-            }
-        });
     });
 
-    let e = editor.clone();
-    let exit_surface = surface.clone();
-    window.on_mouse_event(move |_: &gpui::MouseExitEvent, phase, window, cx| {
-        if phase != DispatchPhase::Capture || !exit_surface.is_live() { return; }
-        e.update(cx, |ed, cx| cancel_roll_mouse(ed, window, cx));
-    });
-
-    // ---- touch: claim drags that start on a note (or with an editing tool);
-    // unclaimed drags stay pans, handled by the scroll listener below ----
-    let h = hitbox.clone();
-    let e = editor.clone();
-    let touch_surface = surface.clone();
-    window.on_mouse_event(move |ev: &TouchDragEvent, phase, window, cx| {
-        // Pitch strokes use the compiled root's MoveGestureLease for both
-        // mouse and touch; this path owns note/pencil gestures only.
-        let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
-        if phase != expected_phase || e.read(cx).tool == Tool::Pitch || !touch_surface.is_live() {
-            return;
-        }
-        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx));
-            return;
-        }
-        let l = ev.position - bounds.origin;
-        let (x, y) = (l.x.as_f32() as f64, l.y.as_f32() as f64);
-        match ev.phase {
-            TouchPhase::Started => {
-                let s = ev.start_position - bounds.origin;
-                let (sx, sy) = (s.x.as_f32() as f64, s.y.as_f32() as f64);
-                if !h.is_hovered_at(ev.start_position, window) {
-                    return;
-                }
-                let ed = e.read(cx);
-                if ed.has_proto_pointer_contact() || ed.note_creation.is_some() || ed.session.pointer_owner().is_some()
-                    || ed.lane_stroke.is_some() || ed.device_drag.is_some() || ed.mixer_drag.is_some()
-                    || has_note_mod_drag(e.entity_id(), cx) { return; }
-                let claim = e.read(cx).active_track().is_some_and(|t| {
-                    let ed = e.read(cx);
-                    ed.tool != Tool::Pointer
-                        || !matches!(hit_test_touch(t, &ed.session.viewport, &ed.session.selection, sx, sy), Hit::Background)
-                });
-                if claim {
-                    window.prevent_default();
-                    e.update(cx, |ed, cx| {
-                        pointer_down(ed, PointerId::Touch(0), sx, sy, Modifiers::default(), 1, &h, window, cx);
-                        pointer_move(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
-                    });
-                }
-            }
-            TouchPhase::Moved => e.update(cx, |ed, cx| {
-                if ed.note_creation.as_ref().is_some_and(|c|c.pointer==PointerId::Touch(0)) || matches!(ed.session.pointer_owner(), Some(PointerId::Touch(0))) || ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == PointerId::Touch(0) && s.roll) {
-                    pointer_move(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
-                }
-            }),
-            TouchPhase::Ended => e.update(cx, |ed, cx| {
-                if ed.note_creation.as_ref().is_some_and(|c|c.pointer==PointerId::Touch(0)) || matches!(ed.session.pointer_owner(), Some(PointerId::Touch(0))) || ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == PointerId::Touch(0) && s.roll) {
-                    pointer_up(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
-                }
-            }),
-            TouchPhase::Cancelled => e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx)),
-        }
-    });
     let h = hitbox.clone();
     let e = editor.clone();
     let long_surface = surface.clone();
+    let gate=input.clone();
     window.on_mouse_event(move |ev: &LongPressEvent, phase, window, cx| {
         let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
         if phase != expected_phase || e.read(cx).tool == Tool::Pitch || !long_surface.is_live() {
             return;
         }
         if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
-            e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx));
+            gate.cancel_pointer(PointerId::Touch(0),window,cx);
             return;
         }
         let l = ev.position - bounds.origin;
@@ -1026,6 +891,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                 let ed = e.read(cx);
                 if ed.has_proto_pointer_contact() || ed.device_drag.is_some() || ed.note_creation.is_some()
                     || ed.mixer_drag.is_some() || has_note_mod_drag(e.entity_id(), cx) { return; }
+                if !gate.begin(PointerId::Touch(0),x,y,window,cx) { return; }
                 window.prevent_default();
                 e.update(cx, |ed, cx| {
                     if ed.session.pointer_owner().is_some_and(|p| p != PointerId::Touch(0)) || ed.lane_stroke.is_some() { return; }
@@ -1054,25 +920,27 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                     }
                 });
             }
-            TouchPhase::Moved => e.update(cx, |ed, cx| {
+            TouchPhase::Moved => { if !gate.sample(PointerId::Touch(0),x,y,window,cx) { return; } e.update(cx, |ed, cx| {
                 if matches!(ed.session.pointer_owner(), Some(PointerId::Touch(_))) {
                     pointer_move(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
                 }
-            }),
-            TouchPhase::Ended => e.update(cx, |ed, cx| {
+            }); },
+            TouchPhase::Ended => { if !gate.finish(PointerId::Touch(0),x,y,window,cx) { return; } e.update(cx, |ed, cx| {
                 if matches!(ed.session.pointer_owner(), Some(PointerId::Touch(_))) {
                     pointer_up(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
                 }
-            }),
-            TouchPhase::Cancelled => e.update(cx, |ed, cx| cancel(ed, PointerId::Touch(0), CancelReason::PointerCancel, window, cx)),
+            }); },
+            TouchPhase::Cancelled => gate.cancel_pointer(PointerId::Touch(0),window,cx),
         }
     });
     let h = hitbox.clone();
     let e = editor.clone();
+    let gate=input.clone();
     window.on_mouse_event(move |ev: &PinchEvent, phase, window, cx| {
         if phase != DispatchPhase::Bubble || !h.is_hovered(window) {
             return;
         }
+        if !gate.pinch(1.0+f64::from(ev.delta),window,cx) {return;}
         let l = ev.position - bounds.origin;
         e.update(cx, |ed, cx| {
             ed.session.viewport.zoom_x_at(l.x.as_f32() as f64, 1.0 + ev.delta as f64);
@@ -1080,7 +948,30 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
         });
         cx.stop_propagation();
     });
-    install_roll_scroll(editor, bounds, hitbox, ScrollSurface::Roll, window);
+    install_roll_scroll(editor,bounds,hitbox,ScrollSurface::Roll,input,window);
+}
+
+fn finish_note_modulation(editor:&Entity<Editor>,window:&mut Window,cx:&mut App) {
+    let Some(drag)=cx.global_mut::<RollExtraDragState>().mod_drag.take() else { return };
+    editor.update(cx,|ed,cx| {
+        ed.release_roll_capture(window,cx);
+        if !drag.test_matches(ed) { cx.notify();return; }
+        let ids:Vec<NoteId>=if ed.session.selection.contains(&drag.note_id) { ed.session.selection_in_order(ed.project()) } else { vec![drag.note_id] };
+        match drag.kind {
+            ModHandleKind::Portamento => { ed.commit(drag.base,CommandBatch::single("拖拽调整滑音时长",Command::SetPortamento {
+                track:drag.track,note_ids:ids,portamento_ms:Some(drag.portamento_ms) }),cx); }
+            ModHandleKind::Vibrato => {
+                let mut notes=ed.selected_notes();
+                for note in &mut notes {
+                    if drag.depth_cents==0 { note.vibrato=None; }
+                    else { let mut vibrato=note.vibrato.clone().unwrap_or(verdant_domain::Vibrato::DEFAULT);
+                        vibrato.depth_cents=drag.depth_cents;vibrato.delay_permille=drag.delay_permille;note.vibrato=Some(vibrato); }
+                }
+                if !notes.is_empty() { ed.commit(drag.base,CommandBatch::single("拖拽调整音符颤音",Command::ReplaceNotes { track:drag.track,notes }),cx); }
+            }
+        }
+        cx.notify();
+    });
 }
 
 pub(crate) fn begin_pitch_stroke(
@@ -1102,7 +993,6 @@ pub(crate) fn begin_pitch_stroke(
     if let Hit::Body(id) | Hit::Handle(id, _) = hit {
         ed.session.selection = [id].into();
     }
-    window.focus(&ed.focus_roll, cx);
     let music = ed.session.viewport.to_music(x, y);
     let started = ed.begin_curve(verdant_backend::params::Param::Pit, pointer, None, None, true,
         music.tick.max(0.0), music.pitch, (x, y), false);
@@ -1132,7 +1022,6 @@ fn pointer_down(
         ed.end_lyric(true, None, window, cx);
         if ed.lyric.is_some() { return; }
     }
-    window.focus(&ed.focus_roll, cx);
     let p = ed.store().snapshot();
     let Some(track) = p.track(&ed.session.track) else { return };
     // Bounded candidate scan through the note index; touch gets the
@@ -1328,11 +1217,12 @@ fn roll_context_menu(ed: &mut Editor, position: gpui::Point<Pixels>, x: f64, y: 
 #[derive(Clone, Copy)]
 pub(crate) enum ScrollSurface { Roll, Timeline, Keyboard }
 
-pub(crate) fn install_roll_scroll(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox, surface: ScrollSurface, window: &mut Window) {
-    let (e, h) = (editor.clone(), hitbox.clone());
+pub(crate) fn install_roll_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,surface:ScrollSurface,input:&crate::proto_editor_surface::Input,window:&mut Window) {
+    let (e, h) = (editor.clone(), hitbox.clone());let input=input.clone();
     window.on_mouse_event(move |ev: &ScrollEvent, phase, window, cx| {
         if phase != DispatchPhase::Bubble || !h.should_handle_scroll(window) { return; }
         let local = ev.position - bounds.origin;
+        let Some(intent)=input.wheel(ev.delta,ev.modifiers,false,window,cx) else {return;};
         e.update(cx, |ed, cx| {
             let vp = &mut ed.session.viewport;
             let anchor = match surface {
@@ -1340,13 +1230,18 @@ pub(crate) fn install_roll_scroll(editor: &Entity<Editor>, bounds: Bounds<Pixels
                 ScrollSurface::Timeline => (local.x.as_f32() as f64, vp.height * 0.5),
                 ScrollSurface::Keyboard => (0.0, local.y.as_f32() as f64),
             };
-            scroll_viewport(vp, ev.delta, ev.modifiers, anchor);
+            match intent.kind.as_str() {
+                "zoom-x"=>vp.zoom_x_at(anchor.0,1.0015f64.powf(intent.amount)),
+                "zoom-y"=>vp.zoom_y_at(anchor.1,1.0015f64.powf(intent.amount)),
+                _=>vp.pan_px(intent.x,intent.y),
+            }
             ed.notify_viewport(crate::clock::Space::Editor, cx);
         });
         cx.stop_propagation();
     });
 }
 
+#[cfg(test)]
 fn scroll_viewport(vp: &mut Viewport, delta: ScrollDelta, modifiers: gpui::Modifiers, anchor: (f64, f64)) {
     let d = match delta {
         ScrollDelta::Pixels(p) => (p.x.as_f32() as f64, p.y.as_f32() as f64),
@@ -1366,6 +1261,17 @@ fn scroll_viewport(vp: &mut Viewport, delta: ScrollDelta, modifiers: gpui::Modif
 
 /// Bar ruler for a horizontal view. `arrange` selects which viewport.
 pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
+    let draw=editor.clone();let cancel=editor.clone();
+    crate::proto_editor_surface::surface(editor,format!("ruler-{arrange}"),"时间标尺与循环范围",0.0,
+        move |input|native_ruler(draw.clone(),arrange,input).into_any_element(),
+        move |_,window,cx| {
+            crate::ruler_navigation::cancel(cancel.entity_id(),window,cx);
+            let owned=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|(e,a,_,_,_)|e==cancel.entity_id()&&a==arrange);
+            if owned { cx.global_mut::<RollExtraDragState>().loop_drag=None;cancel.update(cx,|_,cx|cx.notify()); }
+        }).audio_keys(arrange)
+}
+
+fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_surface::Input)->impl IntoElement {
     canvas(
         move |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
         move |bounds, hitbox, window, cx| {
@@ -1451,26 +1357,23 @@ pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
                 window.set_cursor_style(CursorStyle::ResizeLeftRight, &hitbox);
             }
             if arrange {
-                crate::arrange::install_timeline_scroll(&editor, bounds, &hitbox, window);
+                crate::arrange::install_timeline_scroll(&editor,bounds,&hitbox,&input,window);
             } else {
-                install_roll_scroll(&editor, bounds, &hitbox, ScrollSurface::Timeline, window);
+                install_roll_scroll(&editor,bounds,&hitbox,ScrollSurface::Timeline,&input,window);
             }
             crate::ruler_navigation::install(&editor, arrange, bounds, &hitbox, window, cx);
-            let (e, h_down) = (editor.clone(), hitbox.clone());
-            window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || !h_down.is_hovered(window) {
-                    return;
-                }
-                if !matches!(ev.button, MouseButton::Left | MouseButton::Right) { return; }
-                if ev.button == MouseButton::Left && window.captured_hitbox().is_some() { return; }
-                let local = ev.position - bounds.origin;
-                let (x, y) = (local.x.as_f32() as f64, local.y.as_f32() as f64);
+            let (e,h_down)=(editor.clone(),hitbox.clone());
+            crate::proto_editor_surface::install_pointer_input(&input,bounds,&hitbox,window,move |event,window,cx| {
+                use crate::proto_editor_surface::PointerPhase;
+                let (x,y)=(event.x,event.y);
+                match event.phase {
+                    PointerPhase::Begin|PointerPhase::Context => {
                 let mut started_loop_drag = None;
                 let mut scrub = false;
                 e.update(cx, |ed, cx| {
                     let vp = if arrange { ed.arrange } else { ed.session.viewport };
                     let tick=ed.session.snap.snap(vp.start_tick+x/vp.px_per_tick).max(0);
-                    if ev.button==MouseButton::Right {
+                    if event.phase==PointerPhase::Context {
                         use crate::menu::MenuItem as I;use crate::editor::{MenuAction as M,WorkflowAction as A};
                         let tempo=ed.project().tempo_map.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
                         let meter=ed.project().time_signatures.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
@@ -1484,10 +1387,10 @@ pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
                             items.push(I::separator());
                             items.push(I::action("添加多语言读音器分段…", M::Workflow(A::Integration(crate::editor::integrations::IntegrationAction::AddSegment))));
                         }
-                        ed.show_menu(ev.position,items,window,cx);
+                        ed.show_menu(event.position,items,window,cx);
                         return;
                     }
-                    if ev.click_count >= 2 && !arrange {
+                    if event.clicks >= 2 && !arrange {
                         {
                             if let Some(segment) = ed.language_segments.at(&ed.session.track, tick) {
                                 let key = segment.key.clone();
@@ -1509,65 +1412,52 @@ pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
                         }
                     }
                     let min_loop_len = ed.project().ppq.max(1);
-                    if ev.modifiers.shift{ed.edit_playback("循环起点",cx,|s|{s.loop_start=tick;if s.loop_end<=tick{s.loop_end=tick+min_loop_len;}s.looping=true;});}
-                    else if ev.modifiers.alt{ed.edit_playback("循环终点",cx,|s|{s.loop_end=tick.max(s.loop_start+1);s.looping=true;});}
+                    if event.modifiers.shift{ed.edit_playback("循环起点",cx,|s|{s.loop_start=tick;if s.loop_end<=tick{s.loop_end=tick+min_loop_len;}s.looping=true;});}
+                    else if event.modifiers.alt{ed.edit_playback("循环终点",cx,|s|{s.loop_end=tick.max(s.loop_start+1);s.looping=true;});}
                     else { scrub = true; }
                 });
                 if let Some((drag_start, ls, le)) = started_loop_drag {
                     cx.global_mut::<RollExtraDragState>().loop_drag = Some((e.entity_id(), arrange, drag_start, ls, le));
-                    window.capture_pointer(h_down.id);
-                    cx.stop_propagation();
-                } else if scrub && crate::ruler_navigation::begin(&e, arrange, bounds, &h_down, window, cx, ev.position) {
-                    cx.stop_propagation();
-                }
-            });
-            let e_move = editor.clone();
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                if phase != DispatchPhase::Bubble { return; }
-                let next = {
-                    let Some((eid, arr, drag_start, ls, le)) = cx.try_global::<RollExtraDragState>().and_then(|s| s.loop_drag) else { return };
-                    if eid != e_move.entity_id() || arr != arrange { return; }
-                    let ed = e_move.read(cx);
-                    let vp = if arrange { ed.arrange } else { ed.session.viewport };
-                    let lx = (ev.position.x - bounds.origin.x).as_f32() as f64;
-                    let snapped = ed.session.snap.snap(vp.start_tick + lx / vp.px_per_tick).max(0);
-                    let min_step = ed.project().ppq.max(1);
-                    if drag_start {
-                        (snapped.min(le - 1).max(0), le)
-                    } else {
-                        (ls, snapped.max(ls + min_step.min(120)))
+                    return true;
+                } else if scrub { return crate::ruler_navigation::begin_pointer(&e,arrange,bounds,&h_down,event.pointer,window,cx,event.position); }
+                false
+
                     }
-                };
-                if let Some(tuple) = cx.global_mut::<RollExtraDragState>().loop_drag.as_mut() {
-                    tuple.3 = next.0;
-                    tuple.4 = next.1;
-                }
-                e_move.update(cx, |_, cx| cx.notify());
-            });
-            let e_up = editor.clone();
-            window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left { return; }
-                let matched = cx.try_global::<RollExtraDragState>()
-                    .and_then(|s| s.loop_drag)
-                    .is_some_and(|(eid, arr, _, _, _)| eid == e_up.entity_id() && arr == arrange);
-                if matched {
-                    let finished = cx.global_mut::<RollExtraDragState>().loop_drag.take();
-                    window.release_pointer();
-                    if let Some((_, _, _, ls, le)) = finished {
-                        e_up.update(cx, |ed, cx| {
-                            ed.edit_playback("拖拽循环范围", cx, |s| {
-                                s.loop_start = ls;
-                                s.loop_end = le.max(ls + 1);
-                                s.looping = true;
-                            });
-                            cx.notify();
-                        });
+                    PointerPhase::Sample => {
+                        if crate::ruler_navigation::is_active(e.entity_id(),cx) {
+                            crate::ruler_navigation::sample(&e,arrange,event.position,window,cx);
+                        } else { sample_loop_range(&e,arrange,x,cx); }
+                        true
+                    }
+                    PointerPhase::Finish => {
+                        if crate::ruler_navigation::is_active(e.entity_id(),cx) { crate::ruler_navigation::finish(&e,arrange,event.position,window,cx); }
+                        else { finish_loop_range(&e,arrange,window,cx); }
+                        true
                     }
                 }
             });
         },
     )
     .size_full()
+}
+
+fn sample_loop_range(editor:&Entity<Editor>,arrange:bool,x:f64,cx:&mut App) {
+    let Some((eid,arr,start,ls,le))=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag) else { return };
+    if eid!=editor.entity_id()||arr!=arrange { return; }
+    let ed=editor.read(cx);let vp=if arrange { ed.arrange } else { ed.session.viewport };
+    let tick=ed.session.snap.snap(vp.x_to_tick(x)).max(0);let minimum=ed.project().ppq.max(1).min(120);
+    let (ls,le)=if start { (tick.min(le-1).max(0),le) } else { (ls,tick.max(ls+minimum)) };
+    if let Some(drag)=cx.global_mut::<RollExtraDragState>().loop_drag.as_mut() { drag.3=ls;drag.4=le; }
+    editor.update(cx,|_,cx|cx.notify());
+}
+fn finish_loop_range(editor:&Entity<Editor>,arrange:bool,window:&mut Window,cx:&mut App) {
+    let matched=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|(eid,arr,_,_,_)|eid==editor.entity_id()&&arr==arrange);
+    if !matched { return; }
+    if let Some((_,_,_,start,end))=cx.global_mut::<RollExtraDragState>().loop_drag.take() {
+        editor.update(cx,|ed,cx| {
+            ed.edit_playback("拖拽循环范围",cx,|s| { s.loop_start=start;s.loop_end=end.max(start+1);s.looping=true; });cx.notify();
+        });
+    }
 }
 
 /// Scale degrees are relative to the configured root, repeated in every octave.
@@ -1608,15 +1498,39 @@ fn keyboard_pitch_at(vp: Viewport, x: f64, y: f64, width: f64, height: f64) -> O
 
 /// Clicking plays the existing short reference sine through the audio engine;
 /// it does not render the selected singer or alter notes in the project.
-pub fn keyboard(editor: Entity<Editor>) -> impl IntoElement {
-    canvas(
-        |bounds, window, cx| {
-            let pressed = window.use_keyed_state("piano-key-pressed", cx, |_, _| None::<i32>);
-            (window.insert_hitbox(bounds, HitboxBehavior::Normal), pressed)
-        },
-        move |bounds, (hitbox, pressed), window, cx| {
+#[derive(gpui::IntoElement)]
+struct PianoKeyboard { editor:Entity<Editor>,input:crate::proto_editor_surface::Input }
+pub fn keyboard(editor:Entity<Editor>)->impl IntoElement {
+    let draw=editor.clone();
+    crate::proto_editor_surface::surface(editor,"reference-keyboard","参考钢琴键盘",0.0,
+        move |input|PianoKeyboard{editor:draw.clone(),input}.into_any_element(),|_,_,_|{})
+}
+impl gpui::RenderOnce for PianoKeyboard {
+    fn render(self,_:&mut Window,cx:&mut App)->impl IntoElement {
+        let ed=self.editor.read(cx);let vp=ed.session.viewport;let th=ed.theme;
+        let revision=format!("{}:{}",ed.project().project_id,ed.document_generation);
+        let scope=format!("reference-keyboard-{:?}",self.editor.entity_id());
+        let drawing=self.editor.clone();
+        let mut root=gpui::div().relative().size_full().overflow_hidden()
+            .child(native_keyboard_paint(drawing,self.input));
+        let (lo,hi)=vp.visible_rows();
+        for black in [false,true] {
+            for midi in (lo-1).max(0)..=(hi+1).min(127) {
+                if is_black_key(midi)!=black { continue; }
+                let (y,width,height)=keyboard_key_rect(vp,midi,1.0);
+                let editor=self.editor.downgrade();
+                let key=crate::proto_performance_key::key(scope.clone(),midi as u8,note_name(midi),revision.clone(),false,
+                    move |pressed|gpui::div().size_full().bg(if pressed{with_alpha(th.accent,0.6)}else{gpui::transparent_black().into()}).into_any_element(),
+                    move |pressed,cx|{if pressed{let _=editor.update(cx,|ed,cx|{ed.audition_pitch(midi);cx.notify();});}}).momentary();
+                root=root.child(gpui::div().absolute().left(px(0.)).top(px(y as f32)).w(gpui::relative(width as f32)).h(px(height as f32)).child(key));
+            }
+        }
+        root
+    }
+}
+fn native_keyboard_paint(editor:Entity<Editor>,input:crate::proto_editor_surface::Input)->impl IntoElement {
+    canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move |bounds,hitbox,window,cx| {
             let mut texts = Texts::new();
-            let pressed_pitch = *pressed.read(cx);
             {
                 let o = bounds.origin;
                 let ed = editor.read(cx);
@@ -1636,9 +1550,6 @@ pub fn keyboard(editor: Entity<Editor>) -> impl IntoElement {
                             if scale_contains(midi, ed.integrations.scale_root, &ed.integrations.scale_intervals) {
                                 window.paint_quad(fill(b(0.0, y, key_width, height, o), with_alpha(th.accent, 0.22)));
                             }
-                            if pressed_pitch == Some(midi) {
-                                window.paint_quad(fill(b(0.0, y, key_width, height, o), with_alpha(th.accent, 0.6)));
-                            }
                             if !black {
                                 window.paint_quad(fill(b(0.0, y + height - 0.5, key_width, 0.5, o), th.separator));
                             }
@@ -1657,35 +1568,8 @@ pub fn keyboard(editor: Entity<Editor>) -> impl IntoElement {
                 window.paint_quad(fill(b(w - 1.0, 0.0, 1.0, bounds.size.height.as_f32() as f64, o), th.shade));
             }
             flush_texts(window, cx, bounds, texts);
-            let (e, h, key) = (editor.clone(), hitbox.clone(), pressed.clone());
-            window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || event.button != MouseButton::Left || !h.is_hovered(window) { return; }
-                let p = event.position - bounds.origin;
-                let pitch = keyboard_pitch_at(e.read(cx).session.viewport, p.x.as_f32() as f64, p.y.as_f32() as f64,
-                    bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
-                let Some(pitch) = pitch else { return; };
-                key.update(cx, |pressed, cx| { *pressed = Some(pitch); cx.notify(); });
-                window.capture_pointer(h.id);
-                e.update(cx, |ed, cx| {
-                    ed.audition_pitch(pitch);
-                    window.focus(&ed.focus_roll, cx);
-                    cx.notify();
-                });
-                cx.stop_propagation();
-            });
-            window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Capture || event.button != MouseButton::Left { return; }
-                pressed.update(cx, |pressed, cx| {
-                    if pressed.take().is_some() {
-                        window.release_pointer();
-                        cx.notify();
-                    }
-                });
-            });
-            install_roll_scroll(&editor, bounds, &hitbox, ScrollSurface::Keyboard, window);
-        },
-    )
-    .size_full()
+            install_roll_scroll(&editor,bounds,&hitbox,ScrollSurface::Keyboard,&input,window);
+    }).size_full()
 }
 
 /// Rect (canvas coordinates) of a note in the editor, for overlays.

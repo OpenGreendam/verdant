@@ -34,7 +34,7 @@ pub enum PromptPurpose {
     NumericValue(crate::generated::controls::NumericId, crate::generated::controls::CommandArg),
 }
 #[derive(Clone, Debug)]
-pub struct TextPrompt { pub title:String, pub purpose:PromptPurpose, pub state:TextEditState, pub base:Revision }
+pub struct TextPrompt { pub instance:String, pub title:String, pub purpose:PromptPurpose, pub state:TextEditState, pub base:Revision }
 #[derive(Clone, Debug)]
 pub struct NoteCreation { pub pointer:PointerId, pub base:Revision, pub origin_tick:i64, pub note:Note }
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -89,7 +89,7 @@ impl Editor {
     pub fn text_state_mut(&mut self)->Option<&mut TextEditState>{if let Some(p)=&mut self.text_prompt{Some(&mut p.state)}else{self.lyric.as_mut().map(|l|&mut l.state)}}
     pub fn prompt_text(&mut self,title:impl Into<String>,purpose:PromptPurpose,current:&str,window:&mut Window,cx:&mut Context<Self>){
         self.end_lyric(true,None,window,cx);if self.lyric.is_some(){return;}self.cancel_edits(verdant_session::CancelReason::Escape,window,cx);
-        self.text_prompt=Some(TextPrompt{title:title.into(),purpose,state:TextEditState::new(current),base:self.revision()});window.focus(&self.focus_lyric,cx);cx.notify();
+        self.text_prompt=Some(TextPrompt{instance:NoteId::generate().to_string(),title:title.into(),purpose,state:TextEditState::new(current),base:self.revision()});window.focus(&self.focus_lyric,cx);cx.notify();
     }
     pub fn prompt_numeric_value(
         &mut self,

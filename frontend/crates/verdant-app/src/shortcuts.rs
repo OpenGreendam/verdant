@@ -376,10 +376,10 @@ pub fn open(cx: &mut App) {
     ) { OPEN.with(|o| *o.borrow_mut() = Some(h)); }
 }
 
-impl Render for Shortcuts {
-    fn render(&mut self, window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+impl Shortcuts {
+    fn native_content(&self, window: &Window) -> gpui::AnyElement {
         let th = Theme::for_appearance(window.appearance());
-        div().id("shortcuts").size_full().overflow_y_scroll().bg(th.surface).text_color(th.text)
+        div().id("shortcuts").bg(th.surface).text_color(th.text)
             .font_family(self.font.clone()).p(px(20.)).flex().flex_col().gap(px(10.))
             .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child("键盘快捷键"))
             .child(div().text_sm().text_color(th.text_secondary)
@@ -394,7 +394,13 @@ impl Render for Shortcuts {
                     .child(div().flex().flex_col().gap(px(2.))
                         .child(row.shortcut.label)
                         .child(div().text_xs().text_color(th.text_secondary).child(row.shortcut.scope.label()))))
-            }))
+            })).into_any_element()
+    }
+}
+impl Render for Shortcuts {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let entity = cx.entity();
+        crate::proto_scroll::content("compiled-shortcuts-scroll", "键盘快捷键", move |window, cx| entity.read(cx).native_content(window))
     }
 }
 

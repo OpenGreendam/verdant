@@ -42,22 +42,10 @@ pub(crate) fn is_active(editor: EntityId, cx: &App) -> bool {
     active(cx).is_some_and(|scrub| scrub.editor == editor)
 }
 
-pub(crate) fn cancel(editor: EntityId, window: &mut Window, cx: &mut App) {
-    if let Some(scrub) = active(cx).filter(|scrub| scrub.editor == editor) {
+pub(crate) fn cancel(editor: EntityId, _: &mut Window, cx: &mut App) {
+    if active(cx).is_some_and(|scrub| scrub.editor == editor) {
         cx.global_mut::<RulerState>().scrub = None;
-        if let Contact::Mouse(id) = scrub.contact {
-            if window.captured_hitbox() == Some(id) {
-                window.release_pointer();
-            }
-        }
     }
-}
-
-pub(crate) fn begin(
-    editor: &Entity<Editor>, arrange: bool, bounds: Bounds<Pixels>, hitbox: &Hitbox,
-    window: &mut Window, cx: &mut App, position: Point<Pixels>,
-) -> bool {
-    begin_contact(editor, arrange, bounds, bounds.intersect(&hitbox.content_mask.bounds), Contact::Mouse(hitbox.id), position, window, cx)
 }
 
 fn begin_contact(
@@ -74,13 +62,8 @@ fn begin_contact(
     state.serial = state.serial.wrapping_add(1);
     let scrub = Scrub { editor: editor.entity_id(), arrange, serial: state.serial, contact, bounds, clip, position, last_frame: None };
     state.scrub = Some(scrub);
-    match contact {
-        Contact::Mouse(id) => window.capture_pointer(id),
-        Contact::Touch(_) => window.prevent_default(),
-    }
-    editor.update(cx, |ed, cx| {
-        window.focus(if arrange { &ed.focus_arrange } else { &ed.focus_roll }, cx);
-    });
+    // The admitted EditorSurface contact owns capture/touch arbitration. This
+    // state stores only the musical seek geometry and edge-scroll clock.
     apply_sample(editor, scrub, 0.0, true, cx);
     true
 }
@@ -94,55 +77,24 @@ pub(crate) fn install(editor: &Entity<Editor>, arrange: bool, bounds: Bounds<Pix
         scrub.clip = clip;
     }
 
-    let player = editor.clone();
-    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-        if !phase.capture() { return; }
-        let Some(scrub) = matching(cx, editor_id, arrange).filter(|scrub| matches!(scrub.contact, Contact::Mouse(_))) else { return };
-        if event.pressed_button != Some(MouseButton::Left) || !owns_mouse(scrub, window) {
-            cancel(editor_id, window, cx);
-            return;
-        }
-        move_to(&player, scrub, event.position, window, cx);
-        cx.stop_propagation();
-    });
-    let player = editor.clone();
-    window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-        if !phase.capture() || event.button != MouseButton::Left { return; }
-        let Some(scrub) = matching(cx, editor_id, arrange).filter(|scrub| matches!(scrub.contact, Contact::Mouse(_))) else { return };
-        if owns_mouse(scrub, window) {
-            finish_at(&player, scrub, event.position, window, cx);
-            cx.stop_propagation();
-        } else {
-            cancel(editor_id, window, cx);
-        }
-    });
-    window.on_mouse_event(move |event: &MouseExitEvent, phase, window, cx| {
-        if !phase.capture() || event.pressed_button == Some(MouseButton::Left) { return; }
-        if matching(cx, editor_id, arrange).is_some_and(|scrub| matches!(scrub.contact, Contact::Mouse(_))) {
-            cancel(editor_id, window, cx);
-        }
-    });
-    let player = editor.clone();
-    let hitbox = hitbox.clone();
-    window.on_mouse_event(move |event: &TouchDragEvent, phase, window, cx| {
-        if event.phase == TouchPhase::Started {
-            if phase.bubble() && !window.default_prevented() && hitbox.is_hovered_at(event.start_position, window)
-                && begin_contact(&player, arrange, bounds, clip, Contact::Touch(event.start_position), event.start_position, window, cx)
-            {
-                cx.stop_propagation();
-            }
-            return;
-        }
-        if !phase.capture() { return; }
-        let Some(scrub) = matching(cx, editor_id, arrange).filter(|scrub| scrub.contact == Contact::Touch(event.start_position)) else { return };
-        match event.phase {
-            TouchPhase::Moved => move_to(&player, scrub, event.position, window, cx),
-            TouchPhase::Ended => finish_at(&player, scrub, event.position, window, cx),
-            TouchPhase::Cancelled => cancel(editor_id, window, cx),
-            TouchPhase::Started => unreachable!(),
-        }
-        cx.stop_propagation();
-    });
+    // Contact admission/terminal ownership belongs to the compiled surface.
+    // This native state stores only clipping, timing and musical seek geometry.
+}
+
+pub(crate) fn begin_pointer(editor:&Entity<Editor>,arrange:bool,bounds:Bounds<Pixels>,hitbox:&Hitbox,
+    pointer:verdant_session::PointerId,window:&mut Window,cx:&mut App,position:Point<Pixels>)->bool {
+    let contact=match pointer {
+        verdant_session::PointerId::Mouse=>Contact::Mouse(hitbox.id),
+        verdant_session::PointerId::Touch(_)=>Contact::Touch(position),
+        _=>return false,
+    };
+    begin_contact(editor,arrange,bounds,bounds.intersect(&hitbox.content_mask.bounds),contact,position,window,cx)
+}
+pub(crate) fn sample(editor:&Entity<Editor>,arrange:bool,position:Point<Pixels>,window:&mut Window,cx:&mut App) {
+    if let Some(scrub)=matching(cx,editor.entity_id(),arrange) { move_to(editor,scrub,position,window,cx); }
+}
+pub(crate) fn finish(editor:&Entity<Editor>,arrange:bool,position:Point<Pixels>,window:&mut Window,cx:&mut App) {
+    if let Some(scrub)=matching(cx,editor.entity_id(),arrange) { finish_at(editor,scrub,position,window,cx); }
 }
 
 fn matching(cx: &App, editor: EntityId, arrange: bool) -> Option<Scrub> {
