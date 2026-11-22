@@ -124,7 +124,7 @@ pub(super) fn command(ed: &Editor, target: Target, action: SuiteAction, cx: &Con
     })
 }
 
-fn command_button(button: gpui::Stateful<gpui::Div>, command: SemanticCommand) -> gpui::Stateful<gpui::Div> {
+pub(super) fn command_button(button: gpui::Stateful<gpui::Div>, command: SemanticCommand) -> gpui::Stateful<gpui::Div> {
     let key_command = command.clone();
     semantic_click(button, command).on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
         if !matches!(event.keystroke.key.as_str(), "enter" | "space") { return; }
