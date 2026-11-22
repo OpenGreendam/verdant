@@ -80,7 +80,11 @@ impl NativePluginWindow {
         match action {
             ToolbarAction::Generic => { self.generic = !self.generic; cx.notify(); }
             ToolbarAction::Tools => { self.tools_open = !self.tools_open; cx.notify(); }
-            ToolbarAction::Keyboard => { self.keyboard_open = !self.keyboard_open; cx.notify(); }
+            ToolbarAction::Keyboard => {
+                self.keyboard_open = !self.keyboard_open;
+                if !self.keyboard_open { self.release_notes(cx); }
+                cx.notify();
+            }
             ToolbarAction::Fullscreen => window.toggle_fullscreen(),
             _ => {
                 let target = self.target.clone();
@@ -587,18 +591,47 @@ mod tests {
     fn toolbar_layout_toggles_cancel_the_owned_preview_before_redraw(cx: &mut TestAppContext) {
         let (_main, editor, windows) = native_windows(cx, 1);
         let native = windows[0];
+        cx.update_window(native.into(), |_, window, cx| {
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            let focus = view.read(cx).focus.clone();
+            window.focus(&focus, cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        cx.update_window(native.into(), |_, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false,
+            }), cx);
+        }).unwrap();
+        cx.run_until_parked();
+        native.update(cx, |view, _, _| assert!(view.held_notes.contains(&60))).unwrap();
         for action in [ToolbarAction::Tools, ToolbarAction::Keyboard] {
             cx.update_window(native.into(), |_, window, cx| {
                 let knob = gain_knob(window);
                 let accepted = knob.state("value").unwrap();
                 let start = hold_knob(&knob, window, cx);
                 let view = window.root::<NativePluginWindow>().flatten().unwrap();
+                if matches!(action, ToolbarAction::Keyboard) {
+                    assert!(view.read(cx).held_notes.contains(&60), "a performance note is still held before hiding its keyboard");
+                    window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                        keystroke: gpui::Keystroke::parse("s").unwrap(), is_held: false,
+                    }), cx);
+                    assert!(view.read(cx).pending_notes.contains(&62), "the second physical key is reserved before deferral");
+                }
                 let before = { let view = view.read(cx); (view.tools_open, view.keyboard_open) };
                 toolbar_command(editor.downgrade(), view.downgrade(), action)(None, window, cx);
                 let after = { let view = view.read(cx); (view.tools_open, view.keyboard_open) };
                 match action {
-                    ToolbarAction::Tools => assert_eq!(after, (!before.0, before.1)),
-                    ToolbarAction::Keyboard => assert_eq!(after, (before.0, !before.1)),
+                    ToolbarAction::Tools => {
+                        assert_eq!(after, (!before.0, before.1));
+                        assert!(view.read(cx).held_notes.contains(&60), "opening tools preserves held performance notes");
+                    }
+                    ToolbarAction::Keyboard => {
+                        assert_eq!(after, (before.0, !before.1));
+                        let view = view.read(cx);
+                        assert!(view.held_notes.is_empty());
+                        assert!(view.pending_notes.is_empty());
+                        assert!(!view.preview_started);
+                    }
                     _ => unreachable!(),
                 }
                 assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
@@ -609,6 +642,10 @@ mod tests {
             }).unwrap();
             crate::native_test_support::frames(native, cx);
         }
+        native.update(cx, |view, _, _| {
+            assert!(view.held_notes.is_empty(), "queued note work cannot restart the hidden keyboard");
+            assert!(view.pending_notes.is_empty());
+        }).unwrap();
         cx.update_window(native.into(), |_, window, cx| {
             let knob = gain_knob(window);
             let start = hold_knob(&knob, window, cx);
