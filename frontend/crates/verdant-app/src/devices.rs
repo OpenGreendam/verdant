@@ -946,6 +946,18 @@ fn eq_menu(track: DeviceTarget, slot: usize, key: InsertKey, band: usize, eq: &E
     items
 }
 
+fn eq_band_tab(ed: &Editor, target: Target, index: usize, band: dsp::Band, selected: bool, cx: &Context<Editor>) -> gpui::Stateful<gpui::Div> {
+    let th = ed.theme;
+    let command = suite::command(ed, target.clone(), suite::SuiteAction::SelectBand(index), cx);
+    suite::command_button(div().id(SharedString::from(format!("eq-band-{}-{index}", target.slot)))
+        .role(Role::Tab).aria_selected(selected).tab_index(0).aria_label(format!("频段 {}：{}", index + 1, band.kind.label()))
+        .h(gpui::rems(30.0/16.)).px(gpui::rems(8.0/16.)).flex().items_center().gap(gpui::rems(5.0/16.)).rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
+        .border_1().border_color(if selected { with_alpha(band_color(index), 0.6) } else { th.shade }).bg(th.card)
+        .when(selected, |d| d.bg(th.checked)).hover(move |s| s.bg(if selected { th.checked } else { th.hover })).active(move |s| s.bg(th.control_pressed))
+        .child(div().size(gpui::rems(9.0/16.)).rounded(gpui::rems(4.5/16.)).bg(if band.on { band_color(index) } else { with_alpha(band_color(index), 0.3) }))
+        .child(format!("{}", index + 1)), command)
+}
+
 fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let selected = selected_band(ed, key, dsp::EQ_BANDS);
@@ -1014,18 +1026,7 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: u
     });
 
     let mut bands = div().id(format!("eq-band-tabs-{slot}")).role(Role::TabList).aria_label("均衡器频段").flex().flex_wrap().flex_none().gap(gpui::rems(4.0/16.)).children((0..dsp::EQ_BANDS).filter(|&i| all_bands || eq.bands[i].on || i == selected).map(|i| {
-        let b = eq.bands[i];
-        let on = i == selected;
-        div().id(SharedString::from(format!("eq-band-{slot}-{i}"))).role(Role::Tab).aria_selected(on).tab_index(0)
-            .aria_label(format!("频段 {}：{}", i + 1, b.kind.label()))
-            .h(gpui::rems(30.0/16.)).px(gpui::rems(8.0/16.)).flex().items_center().gap(gpui::rems(5.0/16.)).rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
-            .border_1().border_color(if on { with_alpha(band_color(i), 0.6) } else { th.shade }).bg(th.card).when(on, |d| d.bg(th.checked)).hover(move |s| s.bg(if on { th.checked } else { th.hover })).active(move |s| s.bg(th.control_pressed))
-            .child(div().size(gpui::rems(9.0/16.)).rounded(gpui::rems(4.5/16.)).bg(if b.on { band_color(i) } else { with_alpha(band_color(i), 0.3) }))
-            .child(format!("{}", i + 1))
-            .on_click(cx.listener(move |ed, _, _, cx| { select_band(ed, key, i); cx.notify(); }))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") { select_band(ed, key, i); window.prevent_default(); cx.stop_propagation(); cx.notify(); }
-            }))
+        eq_band_tab(ed, target(), i, eq.bands[i], i == selected, cx)
     }));
     if let Some(next) = eq.bands.iter().position(|band| !band.on) {
         let add_target = target();
@@ -1523,6 +1524,65 @@ pub(crate) fn render_builtin_editor(ed: &Editor, editor: &Entity<Editor>, owner:
         .child(content).into_any_element()
 }
 
+#[derive(Clone, Copy)]
+enum ChainAction {
+    Bypass { slot: usize, expected_key: Option<InsertKey> },
+    Menu { slot: usize, expected_key: Option<InsertKey> },
+    AddBuiltin(&'static str),
+    Browse(usize),
+}
+
+fn chain_command(ed: &Editor, track: TrackId, action: ChainAction, cx: &Context<Editor>) -> SemanticCommand {
+    let editor = cx.weak_entity();
+    let project = ed.project().project_id.clone();
+    let generation = ed.document_generation;
+    // A project revision binds the persisted slot and chain structure without
+    // retaining or cloning any potentially large plug-in state blobs. A live
+    // host can change independently, so its optional key is checked as well.
+    let revision = ed.revision();
+    let owner = DeviceTarget::Track(track.clone());
+    let guard_track = track.clone();
+    let allowed = Rc::new(move |ed: &Editor, window: &Window| {
+        ed.project().project_id == project && ed.document_generation == generation && ed.revision() == revision
+            && ed.project().track(&guard_track).is_some() && DeviceScope::for_window(window).allows(&owner, ed)
+            && device_input_available(ed) && !ed.inserts_loading
+            && match action {
+                ChainAction::Bypass { slot, expected_key } | ChainAction::Menu { slot, expected_key } =>
+                    ed.live_insert(&guard_track, slot).map(|handle| handle.key()) == expected_key,
+                ChainAction::AddBuiltin(_) | ChainAction::Browse(_) => true,
+            }
+    });
+    let before_cancel = allowed.clone();
+    let activate = semantic_command(editor.clone(), editor.clone(), move |ed, event, window, cx| {
+        if !allowed(ed, window) || !may_begin_device_input(ed) { return; }
+        match action {
+            ChainAction::Bypass { slot, .. } => {
+                controls::dispatch(ed, CommandId::PluginBypass, CommandArg::TrackSlot(track.clone(), slot as u32), window, cx);
+            }
+            ChainAction::Menu { slot, expected_key } => {
+                use crate::editor::MenuAction as M;
+                use crate::menu::MenuItem as I;
+                let specs = ed.insert_specs(&track);
+                let Some(spec) = specs.get(slot) else { return };
+                let items = vec![
+                    I::action("打开原生插件窗口", M::OpenInsertEditor { track: track.clone(), slot, expected_key })
+                        .enabled(ed.live_insert(&track, slot).is_some_and(|h| h.has_editor() || h.spec().format == "builtin")),
+                    I::action(if spec.bypass { "启用" } else { "旁通" }, M::BypassInsert { track: track.clone(), slot, expected_key }),
+                    I::separator(),
+                    I::action("移除效果器", M::RemoveInsert { track: track.clone(), slot, expected_key }),
+                ];
+                ed.show_menu(event.map(|event| event.position()).unwrap_or_else(|| window.mouse_position()), items, window, cx);
+            }
+            ChainAction::AddBuiltin(id) => ed.add_insert(&track, "builtin", id, cx),
+            ChainAction::Browse(slot) => ed.open_plugin_browser(track.clone(), slot, cx),
+        }
+    });
+    Rc::new(move |event, window, cx| {
+        let current = editor.upgrade().is_some_and(|editor| before_cancel(editor.read(cx), window));
+        if current { activate(event, window, cx); }
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, params: Option<(InsertKey, Vec<ParamDesc>)>, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
@@ -1531,39 +1591,20 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
     let spec = &specs[slot];
     let handle = ed.live_insert(track, slot);
     let expected_key = handle.as_ref().map(|handle| handle.key());
-    let bypass_owner = owner.clone();
-    let menu_owner = owner.clone();
     let builtin = (spec.format == "builtin").then_some(spec.id.as_str());
     let on = !spec.bypass;
-    let arg = CommandArg::TrackSlot(track.clone(), slot as u32);
-    let (bypass_arg, menu_track) = (arg.clone(), track.clone());
     let keyed = verdant_service::project_audio::sidechain_source(spec).is_some();
     let title = builtin.and_then(dsp::short_label).map_or(spec.name.clone(), str::to_string);
     let header = div().flex().items_center().gap(gpui::rems(10.0/16.)).h(gpui::rems(32.0/16.))
-        .child(div().id(SharedString::from(format!("device-power-{slot}"))).role(Role::Switch).aria_label("启用效果器").aria_selected(on).cursor_pointer()
-            .child(crate::view::switch(on, th))
-            .on_click(cx.listener(move |ed, _, w, cx| {
-                if expected_key.is_none_or(|key| ed.device_target_matches(&bypass_owner, slot, key)) {
-                    controls::dispatch(ed, CommandId::PluginBypass, bypass_arg.clone(), w, cx);
-                }
-            })))
+        .child(suite::command_button(div().id(SharedString::from(format!("device-power-{slot}"))).role(Role::Switch)
+            .aria_label("启用效果器").aria_selected(on).tab_index(0).cursor_pointer().child(crate::view::switch(on, th)),
+            chain_command(ed, track.clone(), ChainAction::Bypass { slot, expected_key }, cx)))
         .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).text_color(if on { th.text } else { th.text_secondary }).child(title))
         .when(keyed, |d| d.child(div().px(gpui::rems(8.0/16.)).h(gpui::rems(22.0/16.)).flex().items_center().rounded(gpui::rems(11.0/16.)).bg(with_alpha(th.accent, 0.18)).text_xs().text_color(th.accent).child("侧链")))
-        .child(div().id(SharedString::from(format!("device-menu-{slot}"))).role(Role::Button).aria_label("效果器菜单").size(gpui::rems(28.0/16.)).rounded(gpui::rems(6.0/16.))
+        .child(suite::command_button(div().id(SharedString::from(format!("device-menu-{slot}"))).role(Role::Button).aria_label("效果器菜单").tab_index(0).size(gpui::rems(28.0/16.)).rounded(gpui::rems(6.0/16.))
             .flex().items_center().justify_center().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed)).cursor_pointer()
-            .child(svg().path(icon("menu")).size(gpui::rems(14.0/16.)).text_color(th.text))
-            .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| {
-                use crate::editor::MenuAction as M;
-                use crate::menu::MenuItem as I;
-                if expected_key.is_some_and(|key| !ed.device_target_matches(&menu_owner, slot, key)) { return; }
-                let items = vec![
-                    I::action("打开原生插件窗口", M::OpenInsertEditor { track: menu_track.clone(), slot, expected_key }).enabled(ed.live_insert(&menu_track, slot).is_some_and(|h| h.has_editor() || h.spec().format == "builtin")),
-                    I::action(if on { "旁通" } else { "启用" }, M::BypassInsert { track: menu_track.clone(), slot, expected_key }),
-                    I::separator(),
-                    I::action("移除效果器", M::RemoveInsert { track: menu_track.clone(), slot, expected_key }),
-                ];
-                ed.show_menu(ev.position(), items, w, cx);
-            })));
+            .child(svg().path(icon("menu")).size(gpui::rems(14.0/16.)).text_color(th.text)),
+            chain_command(ed, track.clone(), ChainAction::Menu { slot, expected_key }, cx)));
     let body = match params {
         Some((key, params)) if builtin.is_some() => render_builtin_editor(ed, editor, &owner, slot, key, &params, cx),
         Some((key, params)) => generic_editor(ed, editor, &owner, slot, key, &params),
@@ -1580,20 +1621,19 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
 
 fn add_card(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    let browse_track = track.clone();
-    let pill = |id: SharedString, label: &str| div().id(id).role(Role::Button).aria_label(label.to_string()).h(gpui::rems(32.0/16.)).px(gpui::rems(12.0/16.))
+    let pill = |id: SharedString, label: &str| div().id(id).role(Role::Button).aria_label(label.to_string()).tab_index(0).h(gpui::rems(32.0/16.)).px(gpui::rems(12.0/16.))
         .flex().items_center().rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked))
         .cursor_pointer().text_sm().child(label.to_string());
     let effects = dsp::EFFECT_IDS.iter().map(|&id| {
-        let t = track.clone();
-        pill(SharedString::from(format!("device-add-{id}")), dsp::short_label(id).unwrap_or(id))
-            .on_click(cx.listener(move |ed, _, _, cx| ed.add_insert(&t, "builtin", id, cx)))
+        suite::command_button(pill(SharedString::from(format!("device-add-{id}")), dsp::short_label(id).unwrap_or(id)),
+            chain_command(ed, track.clone(), ChainAction::AddBuiltin(id), cx))
     });
     div().id("device-add").flex_none().w(gpui::rems(220.0/16.)).flex().flex_col().gap(gpui::rems(8.0/16.)).p(gpui::rems(14.0/16.)).rounded(gpui::rems(12.0/16.))
         .border_1().border_color(th.shade)
         .child(div().text_sm().font_weight(FontWeight::BOLD).child("添加效果器"))
         .child(div().flex().flex_wrap().gap(gpui::rems(6.0/16.)).children(effects))
-        .child(pill("device-add-browse".into(), "浏览插件…").on_click(cx.listener(move |ed, _, _, cx| ed.open_plugin_browser(browse_track.clone(), slot, cx))))
+        .child(suite::command_button(pill("device-add-browse".into(), "浏览插件…"),
+            chain_command(ed, track.clone(), ChainAction::Browse(slot), cx)))
         .into_any_element()
 }
 
@@ -1898,7 +1938,7 @@ mod native_tests {
     // separate test lane, not simulated by directly invoking this callback.
     #[gpui::test]
     fn suite_commands_cancel_preview_before_comparison_copy_and_reset(cx: &mut TestAppContext) {
-        for action in [suite::SuiteAction::Compare(1), suite::SuiteAction::CopyComparison, suite::SuiteAction::Reset] {
+        for action in [suite::SuiteAction::Compare(1), suite::SuiteAction::CopyComparison, suite::SuiteAction::Reset, suite::SuiteAction::SelectBand(2)] {
             let window = open(cx, true);
             if matches!(action, suite::SuiteAction::Reset) {
                 window.update(cx, |host, _, cx| {
@@ -1936,6 +1976,10 @@ mod native_tests {
                             assert_eq!(values.as_ref().unwrap().iter().find(|(id, _)| id == "gain").unwrap().1, accepted_gain,
                                 "copy saves the accepted value, never the held preview");
                         }
+                        (accepted_gain, 0)
+                    }
+                    suite::SuiteAction::SelectBand(index) => {
+                        assert_eq!(selected_band(host.editor.read(cx), host.target.key, dsp::EQ_BANDS), index);
                         (accepted_gain, 0)
                     }
                     _ => unreachable!(),
@@ -2025,6 +2069,133 @@ mod native_tests {
             release_suite_knob(replacement_start, window, cx);
             assert_eq!(host.editor.read(cx).revision().get(), 1);
         }).unwrap();
+    }
+
+    struct EqTabHarness {
+        editor: Entity<Editor>, target: Target, desc: ParamDesc, tab_focus: FocusHandle,
+    }
+
+    impl Render for EqTabHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let tab = self.editor.update(cx, |ed, cx| eq_band_tab(ed, self.target.clone(), 2, EqParams::default().bands[2],
+                selected_band(ed, self.target.key, dsp::EQ_BANDS) == 2, cx).track_focus(&self.tab_focus));
+            div().size_full().flex().items_start().gap(px(20.))
+                .child(crate::proto_knob::knob(self.editor.clone(), self.target.track.clone(), self.target.slot,
+                    self.target.key, self.desc.clone(), "Gain", self.editor.read(cx).theme, 64.))
+                .child(tab)
+        }
+    }
+
+    #[gpui::test]
+    fn eq_tab_element_routes_keyboard_selection_after_retiring_focus_preview(cx: &mut TestAppContext) {
+        let main = open(cx, false);
+        let (editor, target, desc) = main.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
+        let window = cx.open_window(size(px(520.), px(220.)), |_, cx| EqTabHarness { editor, target, desc, tab_focus: cx.focus_handle() });
+        crate::native_test_support::frames(window, cx);
+        let (knob, start, accepted) = window.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| window.focus(&host.tab_focus, cx)).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "space");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            assert_eq!(selected_band(host.editor.read(cx), host.target.key, dsp::EQ_BANDS), 2,
+                "the exact EQ tab element used by eq_editor accepts keyboard activation");
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
+            assert_eq!(knob.state("value").unwrap(), accepted);
+            release_suite_knob(start, window, cx);
+            assert_eq!(host.editor.read(cx).revision().get(), 0);
+        }).unwrap();
+    }
+
+    fn persist_missing_insert(host: &Harness, cx: &mut App) {
+        host.editor.update(cx, |ed, _| {
+            let spec = verdant_plugins::InsertSpec::new("clap", "org.verdant.test-missing", "Missing plug-in", "/not-installed/test.clap");
+            ed.persistence.commit(ed.revision(), CommandBatch::single("Persist missing insert", Command::SetTrackInserts {
+                track: host.target.track.track_id().unwrap().clone(), inserts: vec![serde_json::to_value(spec).unwrap()],
+            })).unwrap();
+        });
+    }
+
+    #[gpui::test]
+    fn unloaded_device_menu_cancels_its_preview_and_preserves_another_window(cx: &mut TestAppContext) {
+        let first = open(cx, true);
+        first.update(cx, |host, _, cx| { persist_missing_insert(host, cx); cx.notify(); }).unwrap();
+        crate::native_test_support::frames(first, cx);
+        first.update(cx, |host, window, cx| {
+            let track = host.target.track.track_id().unwrap().clone();
+            let command = host.editor.update(cx, |ed, cx| chain_command(ed, track, ChainAction::Menu { slot: 0, expected_key: None }, cx));
+            let before = host.editor.read(cx).revision();
+            let (knob, start, accepted) = hold_suite_knob(window, cx);
+            command(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("idle"));
+            assert_eq!(knob.state("value").unwrap(), accepted);
+            {
+                use crate::menu::MenuCommand;
+                use crate::editor::MenuAction;
+                let ed = host.editor.read(cx);
+                assert!(ed.plugins.is_none(), "the missing plug-in path needs no fabricated live host");
+                let items = &ed.menu.as_ref().expect("the real menu command remains available for an unloaded insert").items;
+                assert!(items.iter().any(|item| item.enabled && matches!(item.command, Some(MenuCommand::Editor(MenuAction::RemoveInsert { expected_key: None, .. })))));
+                assert!(items.iter().any(|item| item.enabled && matches!(item.command, Some(MenuCommand::Editor(MenuAction::BypassInsert { expected_key: None, .. })))));
+                assert!(items.iter().any(|item| !item.enabled && matches!(item.command, Some(MenuCommand::Editor(MenuAction::OpenInsertEditor { .. })))));
+            }
+            release_suite_knob(start, window, cx);
+            assert_eq!(host.editor.read(cx).revision(), before, "opening a menu and late release cannot commit the held value");
+            host.editor.update(cx, |ed, cx| ed.close_menu(window, cx));
+        }).unwrap();
+        let (editor, target, desc) = first.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
+        let second = cx.open_window(size(px(520.), px(220.)), |_, cx| Harness {
+            editor, target, desc, show: true, outside: cx.focus_handle(), block_up: Rc::new(Cell::new(false)), with_knob: true, double: None,
+        });
+        crate::native_test_support::frames(second, cx);
+        let (knob, start, _) = second.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
+        first.update(cx, |host, window, cx| {
+            let track = host.target.track.track_id().unwrap().clone();
+            let command = host.editor.update(cx, |ed, cx| chain_command(ed, track, ChainAction::Menu { slot: 0, expected_key: None }, cx));
+            command(None, window, cx);
+            assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"));
+            assert!(host.editor.read(cx).menu.is_none(), "a rival window cannot take over an active contact");
+        }).unwrap();
+        second.update(cx, |host, window, cx| {
+            let before = host.editor.read(cx).revision();
+            release_suite_knob(start, window, cx);
+            assert_eq!(host.editor.read(cx).revision().get(), before.get() + 1);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn stale_chain_buttons_cannot_cancel_a_current_knob_or_change_the_replaced_slots(cx: &mut TestAppContext) {
+        for action in [ChainAction::Bypass { slot: 0, expected_key: None }, ChainAction::Menu { slot: 0, expected_key: None },
+            ChainAction::AddBuiltin(dsp::EQ_ID), ChainAction::Browse(1)] {
+            let window = open(cx, true);
+            let command = window.update(cx, |host, _, cx| {
+                persist_missing_insert(host, cx);
+                let track = host.target.track.track_id().unwrap().clone();
+                let command = host.editor.update(cx, |ed, cx| chain_command(ed, track.clone(), action, cx));
+                host.editor.update(cx, |ed, _| {
+                    let replacement = verdant_plugins::InsertSpec::new("clap", "org.verdant.replacement", "Replacement", "/not-installed/replacement.clap");
+                    let appended = verdant_plugins::InsertSpec::new("clap", "org.verdant.appended", "Appended", "/not-installed/appended.clap");
+                    ed.persistence.commit(ed.revision(), CommandBatch::single("Replace chain", Command::SetTrackInserts {
+                        track, inserts: vec![serde_json::to_value(replacement).unwrap(), serde_json::to_value(appended).unwrap()],
+                    })).unwrap();
+                });
+                cx.notify(); command
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                let before = host.editor.read(cx).revision();
+                let slots = host.editor.read(cx).insert_specs(host.target.track.track_id().unwrap());
+                let (knob, start, _) = hold_suite_knob(window, cx);
+                command(None, window, cx);
+                assert_eq!(knob.state("phase").unwrap(), serde_json::json!("dragging"));
+                assert!(host.editor.read(cx).menu.is_none());
+                assert_eq!(host.editor.read(cx).revision(), before);
+                assert_eq!(host.editor.read(cx).insert_specs(host.target.track.track_id().unwrap()), slots);
+                release_suite_knob(start, window, cx);
+                assert_eq!(host.editor.read(cx).revision().get(), before.get() + 1);
+            }).unwrap();
+        }
     }
 
     #[gpui::test]
