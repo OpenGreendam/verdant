@@ -132,19 +132,22 @@ pub enum MenuAction {
     SeekTick(i64),
     /// Insert-slot actions; `slot` = index inside the track's insert list.
     AddInsert { track: TrackId, format: String, id: String },
-    BypassInsert { track: TrackId, slot: usize },
-    RemoveInsert { track: TrackId, slot: usize },
-    OpenInsertEditor { track: TrackId, slot: usize },
+    BypassInsert { track: TrackId, slot: usize, expected_key: Option<verdant_plugins::InsertKey> },
+    RemoveInsert { track: TrackId, slot: usize, expected_key: Option<verdant_plugins::InsertKey> },
+    OpenInsertEditor { track: TrackId, slot: usize, expected_key: Option<verdant_plugins::InsertKey> },
     /// Route another track's signal to an insert's sidechain (`None` = off).
-    SetSidechain { track: TrackId, slot: usize, source: Option<TrackId> },
+    SetSidechain { target: crate::devices::DeviceTarget, slot: usize, expected_key: Option<verdant_plugins::InsertKey>, source: Option<TrackId> },
     AddInstrumentTrack,
     /// Make a vocal track an instrument track or back.
     MakeInstrumentTrack { track: TrackId, instrument: bool },
-    SetInstrumentPreset { track: TrackId, preset: String },
+    SetInstrumentPreset { track: TrackId, expected_key: verdant_plugins::InsertKey, preset: String },
     SetHostedInstrument { track: TrackId, format: String, id: String },
     UseBuiltinSynth { track: TrackId },
+    UseBuiltinOne { track: TrackId },
     /// Set parameters of a track insert as one undo step.
     SetInsertParams { track: TrackId, slot: usize, values: Vec<(String, f64)> },
+    /// The same atomic edit for either a track or the master-bus native editor.
+    SetDeviceParams { target: crate::devices::DeviceTarget, slot: usize, expected_key: Option<verdant_plugins::InsertKey>, values: Vec<(String, f64)> },
     RescanPlugins,
     /// Select an audio device by name (empty = system default, `None` text →
     /// silent clock is never offered here; `--silent-audio` starts it).
@@ -306,6 +309,8 @@ pub struct Editor {
     cache_restoring: bool,
 
     pub notices: VecDeque<Notice>,
+    /// Changes even when reopening the same persisted project and revision.
+    pub(crate) document_generation: u64,
     pub show_f0: bool,
     /// Last shaped lyric line and its bounds, for IME candidate placement.
     pub lyric_line: Option<gpui::ShapedLine>,
@@ -356,6 +361,7 @@ pub struct Editor {
     pub device_param_state: HashMap<verdant_plugins::InsertKey, String>,
     /// Curve/handle animations of device editors after parameter changes.
     pub device_anim: HashMap<verdant_plugins::InsertKey, crate::devices::DeviceAnim>,
+    pub(crate) native_plugin_windows: HashMap<String, gpui::WindowHandle<crate::plugin_editor::NativePluginWindow>>,
     pub param: Param,
     /// PIT lane vertical range, ± cents (VOCALOID PBS-like zoom).
     pub pit_range_cents: f64,
@@ -468,10 +474,10 @@ impl Editor {
                 this.cancel_edits(verdant_session::CancelReason::FocusLost, window, cx);
             }
         }).detach();
-        cx.on_blur(&focus_devices, window, |this: &mut Self, _, cx| this.cancel_device_drag(cx)).detach();
+        cx.on_blur(&focus_devices, window, |this: &mut Self, window, cx| this.cancel_device_drag_in(window.window_handle(), cx)).detach();
         cx.observe_window_activation(window, |this: &mut Self, window, cx| {
             if !window.is_window_active() {
-                this.menu = None;
+                this.close_menu(window, cx);
                 this.cancel_edits(verdant_session::CancelReason::FocusLost, window, cx);
             }
         })
@@ -560,6 +566,7 @@ impl Editor {
             cache_restore_gen: 0,
             cache_restoring: false,
             notices: VecDeque::new(),
+            document_generation: 0,
             show_f0: true,
             lyric_line: None,
             lyric_bounds: None,
@@ -594,6 +601,7 @@ impl Editor {
             device_band: 2,
             device_param_state: HashMap::new(),
             device_anim: HashMap::new(),
+            native_plugin_windows: HashMap::new(),
             param: Param::Pit,
             pit_range_cents: 200.0,
             lane_stroke: None,
@@ -821,9 +829,18 @@ impl Editor {
     }
 
     pub(crate) fn cancel_control_drags(&mut self, cx: &mut Context<Self>) {
+        self.cancel_legacy_control_drags(cx);
+        self.cancel_device_drag(cx);
+    }
+
+    pub(crate) fn cancel_control_drags_in(&mut self, window: gpui::AnyWindowHandle, cx: &mut Context<Self>) {
+        self.cancel_legacy_control_drags(cx);
+        self.cancel_device_drag_in(window, cx);
+    }
+
+    fn cancel_legacy_control_drags(&mut self, cx: &mut Context<Self>) {
         self.master_drag = None;
         self.numeric_preview = None;
-        self.cancel_device_drag(cx);
         let editor = cx.entity().entity_id();
         crate::ui_controls::cancel_numeric_scrub(editor, cx);
         crate::roll::cancel_extra_drag(editor, cx);
@@ -1136,6 +1153,13 @@ impl Editor {
     }
 
     fn finish_project_opened(&mut self, report: verdant_domain::RecoveryReport, window: &mut Window, cx: &mut Context<Self>) {
+        self.document_generation = self.document_generation.wrapping_add(1);
+        self.menu = None;
+        self.device_anim.clear();
+        let windows: Vec<_> = self.native_plugin_windows.drain().map(|(_, handle)| handle).collect();
+        cx.defer(move |cx| {
+            for handle in windows { let _ = handle.update(cx, |_, window, _| window.remove_window()); }
+        });
         let track = self.persistence.project().tracks.first().map(|t| t.id.clone()).unwrap_or_else(TrackId::generate);
         self.cancel_edits(verdant_session::CancelReason::ProjectChanged, window, cx);
         self.audio.stop();
@@ -1533,16 +1557,36 @@ impl Editor {
                 cx.notify();
             }
             MenuAction::AddInsert { track, format, id } => self.add_insert(&track, &format, &id, cx),
-            MenuAction::BypassInsert { track, slot } => self.toggle_insert_bypass(&track, slot, cx),
-            MenuAction::RemoveInsert { track, slot } => self.remove_insert(&track, slot, cx),
-            MenuAction::OpenInsertEditor { track, slot } => self.open_insert_editor(&track, slot, cx),
-            MenuAction::SetSidechain { track, slot, source } => self.set_insert_sidechain(&track, slot, source, cx),
+            MenuAction::BypassInsert { track, slot, expected_key } => {
+                if expected_key.is_none_or(|key| self.live_insert(&track, slot).is_some_and(|handle| handle.key() == key)) { self.toggle_insert_bypass(&track, slot, cx); }
+            }
+            MenuAction::RemoveInsert { track, slot, expected_key } => {
+                if expected_key.is_none_or(|key| self.live_insert(&track, slot).is_some_and(|handle| handle.key() == key)) { self.remove_insert(&track, slot, cx); }
+            }
+            MenuAction::OpenInsertEditor { track, slot, expected_key } => {
+                if expected_key.is_none_or(|key| self.live_insert(&track, slot).is_some_and(|handle| handle.key() == key)) { self.open_insert_editor(&track, slot, cx); }
+            }
+            MenuAction::SetSidechain { target, slot, expected_key, source } => {
+                if expected_key.is_none_or(|key| self.device_target_matches(&target, slot, key)) {
+                    self.set_device_sidechain(target, slot, source, cx);
+                }
+            }
             MenuAction::SetInsertParams { track, slot, values } => self.set_track_insert_params(track, slot, values, cx),
+            MenuAction::SetDeviceParams { target, slot, expected_key, values } => {
+                if expected_key.is_none_or(|key| self.device_target_matches(&target, slot, key)) {
+                    self.set_device_params(target, slot, values, cx);
+                }
+            }
             MenuAction::AddInstrumentTrack => self.add_instrument_track(cx),
             MenuAction::MakeInstrumentTrack { track, instrument } => self.make_instrument_track(&track, instrument, cx),
-            MenuAction::SetInstrumentPreset { track, preset } => self.set_instrument_preset(&track, &preset, cx),
+            MenuAction::SetInstrumentPreset { track, expected_key, preset } => {
+                if self.device_target_matches(&crate::devices::DeviceTarget::Track(track.clone()), crate::instrument::INSTRUMENT_SLOT, expected_key) {
+                    self.set_instrument_preset(&track, &preset, cx);
+                }
+            }
             MenuAction::SetHostedInstrument { track, format, id } => self.set_hosted_instrument(&track, &format, &id, cx),
             MenuAction::UseBuiltinSynth { track } => self.use_builtin_synth(&track, cx),
+            MenuAction::UseBuiltinOne { track } => self.use_builtin_one(&track, cx),
             MenuAction::RescanPlugins => self.rescan_plugins(cx),
             MenuAction::AddMasterInsert { format, id } => self.add_master_insert(&format, &id, cx),
             MenuAction::ChooseDevice(name) => self.choose_device(&name),
@@ -2560,7 +2604,6 @@ impl Editor {
                 drop(preparation);
                 // Queued phrases occupy time even before they have verified PCM.
                 prepared.timeline.length = prepared.timeline.length.max(planned_end);
-                project_audio::bind_native_automation(&project,&mut prepared.timeline,&bindings)?;
                 let tempo=TempoMap::new(&project.tempo_map,project.ppq).map_err(|e|e.to_string())?;let meter=verdant_domain::MeterMap::new(&project.time_signatures,project.ppq)?;
                 let mut end_tick=tempo.tick_at(prepared.timeline.length as f64/rate as f64).ceil()as i64;
                 if settings.looping{
@@ -2572,6 +2615,7 @@ impl Editor {
                     if end_tick==0{for _ in 0..4{end_tick=meter.next_bar(end_tick);}}
                     let clicks=workflow::metronome(&project,&tempo,rate,end_tick)?;prepared.timeline.length=prepared.timeline.length.max(clicks.length);prepared.timeline.metronome=Some(clicks);
                 }
+                project_audio::bind_native_automation(&project,&mut prepared.timeline,&bindings)?;
                 project_audio::extend_realtime_timeline(&mut prepared.timeline,&bindings)?;
                 Ok::<_,String>((prepared,media_previews,media_cache))
             }).await;
@@ -2811,7 +2855,12 @@ impl Editor {
         if let Some(client) = self.plugins.clone() {
             while let Some(ev) = client.try_recv_event() {
                 match ev {
-                    verdant_plugins::ClientEvent::Crashed { detail, .. } => {
+                    // Host retirement is asynchronous. A queued failure from
+                    // a replaced/removed instance must not reconfigure its
+                    // replacement or report that the current plugin crashed.
+                    verdant_plugins::ClientEvent::Crashed { insert, detail }
+                        if self.inserts.values().flatten().chain(&self.master_inserts).any(|slot|
+                            matches!(slot, verdant_plugins::InsertSlot::Live(handle) if handle.key() == insert)) => {
                         self.plugin_reconfigure_pending = true;
                         self.notice(format!("插件崩溃已旁通：{detail}"));
                         cx.notify();

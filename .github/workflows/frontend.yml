@@ -274,6 +274,7 @@ jobs:
           cargo test --offline --locked --release -p verdant-app --bin verdant proto_knob::tests
           cargo test --offline --locked --release -p verdant-app --bin verdant devices::native_tests
           cargo test --offline --locked --release -p verdant-app --bin verdant roll::native_tests
+          cargo test --offline --locked --release -p verdant-app --bin verdant pointer_boundary_tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
           if [ "$RUNNER_OS" = Windows ]; then
             cargo test --offline --locked --release -p verdant-cli windows_path_tests

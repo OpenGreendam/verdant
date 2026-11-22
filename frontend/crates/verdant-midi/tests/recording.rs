@@ -102,3 +102,33 @@ fn one_existing_insert_batch_retains_velocity_and_stable_generated_note_ids() {
     store.undo().unwrap();
     assert!(store.project().tracks[0].notes.is_empty());
 }
+
+#[test]
+fn expressive_capture_keeps_member_and_master_channels_and_persists_one_batch() {
+    let mut take=MidiTake::new(CaptureOrigin{timestamp_micros:0,timeline_tick:0},None).unwrap();
+    push(&mut take,0,&[0xe0,0,96]); // master bend +4096, before the note
+    push(&mut take,10_000,&[0x91,60,80]);
+    push(&mut take,20_000,&[0xe1,127,127]);
+    push(&mut take,30_000,&[0xd1,70]);
+    push(&mut take,40_000,&[0xa1,60,90]);
+    push(&mut take,50_000,&[0xb1,74,100]);
+    push(&mut take,60_000,&[0xe0,0,64]); // master reset during note
+    push(&mut take,70_000,&[0x81,60,0]);
+    let notes=take.finish(80_000,&TempoMap::constant(120.0)).unwrap();let expression=&notes[0].expression;
+    assert!(expression.iter().any(|e|e.channel==0&&e.offset_tick==0&&e.kind==EventKind::PitchBend{value:4096}));
+    assert!(expression.iter().any(|e|e.channel==1&&matches!(e.kind,EventKind::PolyPressure{pressure:90,..})));
+    assert!(expression.iter().any(|e|e.channel==0&&e.offset_tick>0&&e.kind==EventKind::PitchBend{value:0}));
+    let batch=notes_to_batch(TrackId::generate(),&notes,"a");
+    let Command::InsertNotes{notes,..}=&batch.commands[0]else{panic!()};
+    let saved=&notes[0].unknown["midi_expression"];
+    assert!(saved.as_array().unwrap().iter().any(|p|p["type"]=="control"&&p["controller"]==74&&p["value"]==100));
+    let serialized=serde_json::to_string(&notes[0]).unwrap();let restored:Note=serde_json::from_str(&serialized).unwrap();
+    assert_eq!(restored.unknown["midi_expression"],*saved);
+}
+#[test]
+fn malformed_expression_aborts_the_whole_take() {
+    let mut take=MidiTake::new(CaptureOrigin{timestamp_micros:0,timeline_tick:0},None).unwrap();
+    push(&mut take,0,&[0x90,60,80]);
+    assert!(take.push(verdant_midi::CapturedEvent{timestamp_micros:100,channel:0,kind:EventKind::PitchBend{value:9000}}).is_err());
+    assert!(take.finish(1000,&TempoMap::constant(120.0)).is_err());
+}

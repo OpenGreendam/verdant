@@ -149,7 +149,8 @@ impl Editor {
         self.note_creation = None;
         self.arrange_drag = None;
         self.mixer_drag = None;
-        self.cancel_control_drags(cx);
+        if matches!(reason, CancelReason::ProjectChanged) { self.cancel_control_drags(cx); }
+        else { self.cancel_control_drags_in(window.window_handle(), cx); }
         self.sync_mixer();
         self.release_roll_capture(window, cx);
         if legacy_capture.is_some() && window.captured_hitbox() == legacy_capture { window.release_pointer(); }

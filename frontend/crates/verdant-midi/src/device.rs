@@ -244,9 +244,8 @@ mod tests {
         let mut take = crate::MidiTake::new(crate::CaptureOrigin { timestamp_micros: 10_000, timeline_tick: 480 }, None).unwrap();
         for event in events { take.push(event).unwrap(); }
         let notes = take.finish(910_000, &crate::TempoMap::constant(120.0)).unwrap();
-        assert_eq!(notes, vec![crate::CapturedNote {
-            start_tick: 864, duration_tick: 960, midi_note: 69, velocity: 103, channel: 2,
-        }]);
+        assert_eq!(notes.iter().map(|n|(n.start_tick,n.duration_tick,n.midi_note,n.velocity,n.channel)).collect::<Vec<_>>(),vec![(864,960,69,103,2)]);
+        assert!(notes[0].expression.iter().any(|e|matches!(e.kind,crate::EventKind::NoteOff{..})));
     }
 
     #[test]
@@ -270,9 +269,6 @@ mod tests {
         let mut take = crate::MidiTake::new(crate::CaptureOrigin { timestamp_micros: 10_000, timeline_tick: 480 }, None).unwrap();
         for event in rx.try_iter() { take.push(event).unwrap(); }
         let notes = take.finish(910_000, &crate::TempoMap::constant(120.0)).unwrap();
-        assert_eq!(notes, vec![
-            crate::CapturedNote { start_tick: 672, duration_tick: 960, midi_note: 60, velocity: 80, channel: 0 },
-            crate::CapturedNote { start_tick: 864, duration_tick: 960, midi_note: 69, velocity: 103, channel: 2 },
-        ]);
+        assert_eq!(notes.iter().map(|n|(n.start_tick,n.duration_tick,n.midi_note,n.velocity,n.channel)).collect::<Vec<_>>(),vec![(672,960,60,80,0),(864,960,69,103,2)]);
     }
 }

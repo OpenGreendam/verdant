@@ -74,6 +74,8 @@ pub(crate) struct OwnedPointerCapture {
 }
 
 impl OwnedPointerCapture {
+    pub(crate) fn window(&self) -> AnyWindowHandle { self.window }
+
     pub(crate) fn acquire(hitbox: HitboxId, window: &mut Window, cx: &mut App) -> Self {
         if cx.try_global::<Captures>().is_none() { cx.set_global(Captures::default()); }
         let handle = window.window_handle();

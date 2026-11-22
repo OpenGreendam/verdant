@@ -19,6 +19,7 @@ mod clock;
 mod commands;
 mod curve_span;
 mod devices;
+mod plugin_editor;
 mod dialogs;
 mod disclosures;
 mod demos;
@@ -32,6 +33,7 @@ mod generated {
 mod host_pointer;
 mod index;
 mod instrument;
+mod performance;
 mod lanes;
 mod lyric_view;
 mod menu;

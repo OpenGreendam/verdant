@@ -1,0 +1,242 @@
+{
+  "schema": "verdant-native-suite-inventory/1",
+  "sample_rate": 48000,
+  "control_protocol": 5,
+  "devices": [
+    {
+      "id": "verdant.builtin.eq",
+      "kind": "effect",
+      "parameters": 601,
+      "base_parameters": 437,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "phase",
+        "resolution",
+        "b1_spectral",
+        "b1_brickwall",
+        "b2_spectral",
+        "b2_brickwall",
+        "b3_spectral",
+        "b3_brickwall",
+        "b4_spectral",
+        "b4_brickwall",
+        "b5_spectral",
+        "b5_brickwall",
+        "b6_spectral",
+        "b6_brickwall",
+        "b7_spectral",
+        "b7_brickwall",
+        "b8_spectral",
+        "b8_brickwall",
+        "b9_spectral",
+        "b9_brickwall",
+        "b10_spectral",
+        "b10_brickwall",
+        "b11_spectral",
+        "b11_brickwall",
+        "b12_spectral",
+        "b12_brickwall",
+        "b13_spectral",
+        "b13_brickwall",
+        "b14_spectral",
+        "b14_brickwall",
+        "b15_spectral",
+        "b15_brickwall",
+        "b16_spectral",
+        "b16_brickwall",
+        "b17_spectral",
+        "b17_brickwall",
+        "b18_spectral",
+        "b18_brickwall",
+        "b19_spectral",
+        "b19_brickwall",
+        "b20_spectral",
+        "b20_brickwall",
+        "b21_spectral",
+        "b21_brickwall",
+        "b22_spectral",
+        "b22_brickwall",
+        "b23_spectral",
+        "b23_brickwall",
+        "b24_spectral",
+        "b24_brickwall",
+        "b1_slope_continuous",
+        "b2_slope_continuous",
+        "b3_slope_continuous",
+        "b4_slope_continuous",
+        "b5_slope_continuous",
+        "b6_slope_continuous",
+        "b7_slope_continuous",
+        "b8_slope_continuous",
+        "b9_slope_continuous",
+        "b10_slope_continuous",
+        "b11_slope_continuous",
+        "b12_slope_continuous",
+        "b13_slope_continuous",
+        "b14_slope_continuous",
+        "b15_slope_continuous",
+        "b16_slope_continuous",
+        "b17_slope_continuous",
+        "b18_slope_continuous",
+        "b19_slope_continuous",
+        "b20_slope_continuous",
+        "b21_slope_continuous",
+        "b22_slope_continuous",
+        "b23_slope_continuous",
+        "b24_slope_continuous"
+      ]
+    },
+    {
+      "id": "verdant.builtin.compressor",
+      "kind": "effect",
+      "parameters": 228,
+      "base_parameters": 64,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "lookahead",
+        "oversampling"
+      ]
+    },
+    {
+      "id": "verdant.builtin.gate",
+      "kind": "effect",
+      "parameters": 184,
+      "base_parameters": 20,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "lookahead"
+      ]
+    },
+    {
+      "id": "verdant.builtin.deesser",
+      "kind": "effect",
+      "parameters": 181,
+      "base_parameters": 17,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "lookahead",
+        "phase"
+      ]
+    },
+    {
+      "id": "verdant.builtin.limiter",
+      "kind": "effect",
+      "parameters": 182,
+      "base_parameters": 18,
+      "modulation_parameters": 164,
+      "default_latency_samples": 144,
+      "control_only": [
+        "lookahead",
+        "true_peak",
+        "oversampling",
+        "meter_pause",
+        "meter_reset"
+      ]
+    },
+    {
+      "id": "verdant.builtin.reverb",
+      "kind": "effect",
+      "parameters": 279,
+      "base_parameters": 115,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": []
+    },
+    {
+      "id": "verdant.builtin.delay",
+      "kind": "effect",
+      "parameters": 263,
+      "base_parameters": 99,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "feedback_quality"
+      ]
+    },
+    {
+      "id": "verdant.builtin.saturation",
+      "kind": "effect",
+      "parameters": 294,
+      "base_parameters": 130,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "oversampling",
+        "phase"
+      ]
+    },
+    {
+      "id": "verdant.builtin.multiband",
+      "kind": "effect",
+      "parameters": 302,
+      "base_parameters": 138,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "phase",
+        "b1.lookahead",
+        "b2.lookahead",
+        "b3.lookahead",
+        "b4.lookahead",
+        "b5.lookahead",
+        "b6.lookahead",
+        "oversampling"
+      ]
+    },
+    {
+      "id": "verdant.builtin.filter",
+      "kind": "effect",
+      "parameters": 218,
+      "base_parameters": 54,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "oversampling"
+      ]
+    },
+    {
+      "id": "verdant.builtin.simplon",
+      "kind": "effect",
+      "parameters": 196,
+      "base_parameters": 32,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "oversampling"
+      ]
+    },
+    {
+      "id": "verdant.builtin.micro",
+      "kind": "effect",
+      "parameters": 179,
+      "base_parameters": 15,
+      "modulation_parameters": 164,
+      "default_latency_samples": 0,
+      "control_only": [
+        "oversampling"
+      ]
+    },
+    {
+      "id": "verdant.builtin.synth",
+      "kind": "instrument",
+      "parameters": 248,
+      "base_parameters": 84,
+      "modulation_parameters": 164,
+      "control_only": [
+        "high_quality"
+      ]
+    },
+    {
+      "id": "verdant.builtin.one",
+      "kind": "instrument",
+      "parameters": 187,
+      "base_parameters": 23,
+      "modulation_parameters": 164,
+      "control_only": []
+    }
+  ]
+}

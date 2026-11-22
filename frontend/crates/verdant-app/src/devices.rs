@@ -15,14 +15,14 @@
 //! preview and releases its pointer capture, without writing plug-in state.
 
 use gpui::{
-    Context, DispatchPhase, Entity, FontWeight, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent,
+    Context, DispatchPhase, Entity, Focusable, FontWeight, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, Pixels, Role, SharedString, Window, canvas, div, fill, prelude::*, px, quad, svg,
 };
 use verdant_domain::{Revision, TrackId};
 use verdant_ui_protocol::{ControlEffect, ControlGuards, GestureEvent, GesturePhase, PlannerError, plan_control, drag_normalized};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use verdant_plugins::builtin_dsp::{self as dsp, BandKind, EqParams, Placement, TableEffect};
+use verdant_plugins::builtin_dsp::{self as dsp, BandKind, EqParams, Placement};
 use verdant_plugins::{InsertKey, ParamDesc};
 
 use crate::assets::icon;
@@ -31,14 +31,48 @@ use crate::generated::controls::{self, CommandArg, CommandId};
 use crate::paint::{Texts, b, flush_texts, p, polyline};
 use crate::theme::{Theme, with_alpha};
 
+mod suite;
+mod value_entry;
+mod signal;
+pub(crate) mod workflow;
+mod modulation;
+mod analysis_tools;
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub(crate) enum DeviceTarget { Track(TrackId), Master }
+
+impl From<TrackId> for DeviceTarget {
+    fn from(track: TrackId) -> Self { Self::Track(track) }
+}
+
+impl DeviceTarget {
+    pub(crate) fn track_id(&self) -> Option<&TrackId> {
+        match self { Self::Track(track) => Some(track), Self::Master => None }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DeviceScope { SelectedTrack, NativeWindow }
+
+impl DeviceScope {
+    pub(crate) fn for_window(window: &Window) -> Self {
+        if window.root::<crate::plugin_editor::NativePluginWindow>().flatten().is_some() { Self::NativeWindow }
+        else { Self::SelectedTrack }
+    }
+
+    pub(crate) fn allows(self, owner: &DeviceTarget, editor: &Editor) -> bool {
+        self == Self::NativeWindow || matches!(owner, DeviceTarget::Track(track) if *track == editor.session.track)
+    }
+}
+
 /// Which control a drag edits.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Control { Band(usize), Handle(&'static str) }
+pub enum Control { Knob(String), Band(usize), Handle(&'static str), ParameterHandle(String) }
 
 /// A pressed or dragged control. Values preview locally and are committed
 /// to the plug-in once, on release.
 pub struct DeviceDrag {
-    track: TrackId,
+    track: DeviceTarget,
     slot: usize,
     key: InsertKey,
     control: Control,
@@ -47,6 +81,7 @@ pub struct DeviceDrag {
     capture: Option<crate::host_pointer::OwnedPointerCapture>,
     surface: crate::host_pointer::SurfaceToken,
     basis: DeviceBasis,
+    scope: DeviceScope,
     /// Normalized (0…1) start positions of the edited values.
     start: Vec<f64>,
     preview: Vec<(String, f64)>,
@@ -56,6 +91,17 @@ fn plan(phase: GesturePhase, event: GestureEvent, hit: bool, crossed: bool, rese
     plan_control(phase, event, ControlGuards {
         hit_control: hit, threshold_crossed: crossed, reset_modifier: reset, double_click: double,
     })
+}
+
+/// Keep modulation sources visible while the parameter area scrolls.
+pub(crate) fn modulation_source_bar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Option<InsertKey>) -> gpui::AnyElement {
+    key.map_or_else(|| div().into_any_element(), |key| modulation::docked_sources(ed, &Target { track: owner.clone(), slot, key }))
+}
+pub(crate) fn toggle_modulation_panel(ed: &mut Editor, owner: DeviceTarget, slot: usize, key: InsertKey, cx: &mut Context<Editor>) {
+    if !ed.device_target_matches(&owner, slot, key) { return; }
+    let target = Target { track: owner, slot, key };
+    let mut state = workflow::read_workspace(ed, &target); state.matrix_open = !state.matrix_open;
+    workflow::write_workspace(ed, &target, &state); cx.notify();
 }
 
 // ---------------------------------------------------------------------------
@@ -89,17 +135,21 @@ pub fn format_value(d: &ParamDesc, v: f64) -> String {
     if d.unit == "dB" && matches!(id, "range" | "knee") { return format!("{v:.1} dB"); }
     match d.unit.as_str() {
         "Hz" if v >= 1000.0 => format!("{:.2} kHz", v / 1000.0),
+        "Hz" if v < 10.0 => format!("{v:.2} Hz"),
         "Hz" => format!("{v:.0} Hz"),
         "dB" => format!("{v:+.1} dB"),
+        "ms" if v < 1.0 => format!("{v:.2} ms"),
         "ms" if v < 10.0 => format!("{v:.1} ms"),
         "ms" => format!("{v:.0} ms"),
         "%" => format!("{v:.0} %"),
         ":1" => format!("{v:.1}:1"),
         "" if d.id.ends_with("_q") || d.id == "q" => format!("{v:.2}"),
         "s" => format!("{v:.2} s"),
+        "st" if d.step_count == 0 => format!("{v:+.1} 半音"),
         "st" => format!("{v:+.0} 半音"),
         "ct" => format!("{v:.0} 音分"),
         "" if d.step_count == 1 => (if v >= 0.5 { "开" } else { "关" }).to_string(),
+        "" if d.step_count > 1 => format!("{v:.0}"),
         unit => format!("{v:.2} {unit}"),
     }
 }
@@ -115,38 +165,73 @@ fn device_params(ed: &Editor, key: InsertKey) -> Option<Vec<ParamDesc>> {
     Some(params)
 }
 
+fn bounded_graph_value(d: &ParamDesc, axis: Axis, start: f64, delta: f64, travel: f64, fine: bool) -> Result<f64, PlannerError> {
+    let value = axis.value(drag_normalized(start, delta, travel, fine)?).clamp(d.min, d.max);
+    // Discrete graph handles obey the same native steps as knobs.
+    Ok(from_norm(d, to_norm(d, value)))
+}
+
 fn param<'a>(params: &'a [ParamDesc], id: &str) -> Option<&'a ParamDesc> { params.iter().find(|p| p.id == id) }
+
+fn current_params(ed: &Editor, target: &Target) -> Option<Vec<ParamDesc>> {
+    if !ed.device_target_matches(&target.track, target.slot, target.key) { return None; }
+    if target.slot == crate::instrument::INSTRUMENT_SLOT {
+        let DeviceTarget::Track(track) = &target.track else { return None };
+        let params = crate::instrument::synth_params(ed.project().track(track)?)?;
+        let id = ed.project().track(track)?.instrument()?.get("id")?.as_str()?;
+        return Some(crate::instrument::synth_descs_for(id, &params));
+    }
+    let handle = ed.live_device_insert(&target.track, target.slot)?;
+    if handle.key() != target.key { return None; }
+    ed.plugin_params.get(&target.key).cloned()
+}
+
+fn write_if_current(ed: &mut Editor, target: &Target, values: Vec<(String, f64)>, cx: &mut Context<Editor>) {
+    if current_params(ed, target).is_some() {
+        ed.set_device_params(target.track.clone(), target.slot, values, cx);
+    }
+}
+
+fn target_for(ed: &Editor, owner: &DeviceTarget, slot: usize) -> Option<Target> {
+    let key = if slot == crate::instrument::INSTRUMENT_SLOT {
+        let DeviceTarget::Track(track) = owner else { return None };
+        let id = ed.project().track(track)?.instrument()?.get("id")?.as_str()?;
+        crate::instrument::instrument_key_for_generation(track, id, ed.document_generation)
+    } else { ed.live_device_insert(owner, slot)?.key() };
+    Some(Target { track: owner.clone(), slot, key })
+}
 
 // ---------------------------------------------------------------------------
 // Gesture plumbing shared by knobs and graphs
 // ---------------------------------------------------------------------------
 
 #[derive(Clone)]
-struct Target { track: TrackId, slot: usize, key: InsertKey }
+struct Target { track: DeviceTarget, slot: usize, key: InsertKey }
 
 #[derive(Clone, PartialEq)]
-struct DeviceBasis { project: String, revision: Revision, params: Vec<ParamDesc> }
+struct DeviceBasis { project: String, generation: u64, revision: Revision, params: Vec<ParamDesc> }
 
 impl Target {
     fn basis(&self, editor: &Editor) -> Option<DeviceBasis> {
-        if editor.plugin_busy.contains(&self.key) { return None; }
+        if editor.plugin_busy.contains(&self.key) || (self.slot != crate::instrument::INSTRUMENT_SLOT && editor.inserts_loading) { return None; }
         let params = editor.current_device_parameters(&self.track, self.slot, self.key)?;
-        Some(DeviceBasis { project: editor.project().project_id.clone(), revision: editor.revision(), params })
+        Some(DeviceBasis { project: editor.project().project_id.clone(), generation: editor.document_generation, revision: editor.revision(), params })
     }
 }
 
 impl Editor {
     /// Resolve the authoritative device slot, never an animated/preview value
     /// or a cache entry whose live insert was removed or replaced.
-    pub(crate) fn current_device_parameters(&self, track: &TrackId, slot: usize, key: InsertKey) -> Option<Vec<ParamDesc>> {
-        if self.session.track != *track { return None; }
-        let selected = self.project().track(track)?;
-        if slot == crate::instrument::INSTRUMENT_SLOT {
-            if key != crate::instrument::instrument_key(track) { return None; }
-            return crate::instrument::synth_params(selected).map(|params| crate::instrument::synth_descs(&params));
+    pub(crate) fn current_device_parameters(&self, target: &DeviceTarget, slot: usize, key: InsertKey) -> Option<Vec<ParamDesc>> {
+        current_params(self, &Target { track: target.clone(), slot, key })
+    }
+
+    /// Window notifications cannot cancel a capture acquired by another editor
+    /// window. Project changes still use the unconditional cancellation path.
+    pub(crate) fn cancel_device_drag_in(&mut self, window: gpui::AnyWindowHandle, cx: &mut Context<Self>) {
+        if self.device_drag.as_ref().and_then(|drag| drag.capture.as_ref()).is_some_and(|capture| capture.window() == window) {
+            self.cancel_device_drag(cx);
         }
-        if self.live_insert(track, slot)?.key() != key { return None; }
-        self.plugin_params.get(&key).cloned()
     }
 
     pub(crate) fn has_proto_pointer_contact(&self) -> bool {
@@ -184,8 +269,11 @@ fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, in
     ev: &MouseDownEvent, hitbox: gpui::HitboxId, surface: &crate::host_pointer::SurfaceToken, window: &mut Window, cx: &mut Context<Editor>) -> bool {
     if ed.device_drag.as_ref().is_some_and(|drag| !drag.surface.is_live()) { ed.cancel_device_drag(cx); }
     if ed.device_drag.is_some() || ed.session.pointer_owner().is_some() || ed.lane_stroke.is_some()
-        || ed.note_creation.is_some() || ed.mixer_drag.is_some() || ed.has_proto_pointer_contact()
+        || ed.note_creation.is_some() || ed.mixer_drag.is_some() || ed.master_drag.is_some() || ed.has_proto_pointer_contact()
+        || ed.menu.is_some() || ed.text_prompt.is_some() || ed.modal_dialog.is_some()
         || !surface.is_live() { return false; }
+    let scope = DeviceScope::for_window(window);
+    if !scope.allows(&target.track, ed) { return false; }
     let Some(basis) = target.basis(ed) else { return false; };
     let decision = match plan(GesturePhase::Idle, GestureEvent::Down, true, false, ev.modifiers.alt, ev.click_count >= 2) {
         Ok(decision) => decision,
@@ -193,12 +281,12 @@ fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, in
     };
     for effect in &decision.effects {
         match effect {
-            ControlEffect::Select => if let Control::Band(band) = control { ed.device_band = band; },
-            ControlEffect::Reset => ed.set_track_insert_params(target.track.clone(), target.slot, defaults.clone(), cx),
+            ControlEffect::Select => if let Control::Band(band) = control { select_band(ed, target.key, band); },
+            ControlEffect::Reset => write_if_current(ed, target, defaults.clone(), cx),
             ControlEffect::Begin => ed.device_drag = Some(DeviceDrag {
                 track: target.track.clone(), slot: target.slot, key: target.key, control: control.clone(),
                 phase: decision.next_phase, origin: (f64::from(ev.position.x), f64::from(ev.position.y)),
-                capture: None, surface: surface.clone(), basis: basis.clone(), start: start.clone(), preview: initial.clone(),
+                capture: None, surface: surface.clone(), basis: basis.clone(), scope, start: start.clone(), preview: initial.clone(),
             }),
             ControlEffect::Capture => {
                 let capture = crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx);
@@ -207,17 +295,24 @@ fn press(ed: &mut Editor, target: &Target, control: Control, start: Vec<f64>, in
             _ => unreachable!("validated press effect"),
         }
     }
-    if decision.consumed { window.focus(&ed.focus_devices, cx); cx.notify(); }
+    if decision.consumed {
+        let focus = window.root::<crate::plugin_editor::NativePluginWindow>().flatten()
+            .map(|view| view.read(cx).focus_handle(cx)).unwrap_or_else(|| ed.focus_devices.clone());
+        window.focus(&focus, cx);
+        cx.notify();
+    }
     decision.consumed
 }
 
 impl DeviceDrag {
     fn target_is_current(&self, editor: &Editor) -> bool {
-        self.surface.is_live() && Target { track: self.track.clone(), slot: self.slot, key: self.key }
+        self.surface.is_live() && self.scope.allows(&self.track, editor)
+            && editor.menu.is_none() && editor.text_prompt.is_none() && editor.modal_dialog.is_none()
+            && Target { track: self.track.clone(), slot: self.slot, key: self.key }
             .basis(editor).as_ref() == Some(&self.basis)
     }
     fn sample(&mut self, position: (f64, f64), fine: bool,
-        preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> Result<bool, String> {
+        preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, String>) -> Result<bool, String> {
         if !position.0.is_finite() || !position.1.is_finite() { return Err("控件坐标必须是有限值".into()); }
         let delta = (position.0 - self.origin.0, position.1 - self.origin.1);
         let decision = plan(self.phase, GestureEvent::Move, true, delta.0.hypot(delta.1) >= 3.0, false, false).map_err(|error| error.to_string())?;
@@ -231,7 +326,7 @@ impl DeviceDrag {
     }
 
     fn finish(&mut self, position: (f64, f64), fine: bool,
-        preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> Result<verdant_ui_protocol::ControlPlan, String> {
+        preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, String>) -> Result<verdant_ui_protocol::ControlPlan, String> {
         // Terminal coordinates and modifiers are sampled even when the OS
         // coalesced away all MouseMove events between press and release.
         self.sample(position, fine, preview)?;
@@ -240,7 +335,7 @@ impl DeviceDrag {
 }
 
 fn sampled(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate::host_pointer::SurfaceToken, position: (f64, f64), fine: bool, cx: &mut Context<Editor>,
-    preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> bool {
+    preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, String>) -> bool {
     let Some(drag) = ed.device_drag.as_ref().filter(|d| d.key == key && &d.control == control && d.surface.same(surface)) else { return false };
     if !drag.target_is_current(ed) {
         ed.notice("工程或参数已改变；已取消这次曲线控件修改");
@@ -260,7 +355,7 @@ fn sampled(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate::
 
 #[allow(clippy::too_many_arguments)]
 fn released(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate::host_pointer::SurfaceToken, ev: &MouseUpEvent, window: &mut Window, cx: &mut Context<Editor>,
-    preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, PlannerError>) -> bool {
+    preview: impl FnOnce(&[f64], (f64, f64), bool) -> Result<Vec<(String, f64)>, String>) -> bool {
     if !ed.device_drag.as_ref().is_some_and(|d| d.key == key && &d.control == control && d.surface.same(surface)) { return false; }
     if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
         ed.cancel_device_drag_in_window(window, cx);
@@ -282,7 +377,7 @@ fn released(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate:
     };
     for effect in decision.effects {
         match effect {
-            ControlEffect::Commit => ed.set_track_insert_params(drag.track.clone(), drag.slot, drag.preview.clone(), cx),
+            ControlEffect::Commit => write_if_current(ed, &Target { track: drag.track.clone(), slot: drag.slot, key: drag.key }, drag.preview.clone(), cx),
             ControlEffect::Release => if let Some(capture) = drag.capture.take() { capture.release(window, cx); },
             ControlEffect::Discard => {},
             _ => unreachable!("validated terminal effect"),
@@ -299,7 +394,21 @@ fn released(ed: &mut Editor, control: &Control, key: InsertKey, surface: &crate:
 /// A source-owned Proto-UI slider interaction with an Adwaita drawing slot.
 /// The host retains plugin unit conversion and the domain commit boundary.
 fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th: Theme, size: f32) -> impl IntoElement {
-    crate::proto_knob::knob(editor, target.track, target.slot, target.key, desc, label, th, size)
+    let (drop_editor, drop_target, drop_id) = (editor.clone(), target.clone(), desc.id.clone());
+    div().id(SharedString::from(format!("knob-{}-{}", target.slot, desc.id)))
+        .on_drop(move |source: &modulation::SourceDrag, window, cx| {
+            drop_editor.update(cx, |ed, cx| {
+                if DeviceScope::for_window(window).allows(&drop_target.track, ed) {
+                    modulation::drop_source(ed, &drop_target, &drop_id, source, cx);
+                }
+            });
+        })
+        .child(crate::proto_knob::knob(editor, target.track, target.slot, target.key, desc, label, th, size))
+}
+
+pub(crate) fn open_parameter_value(editor: &Entity<Editor>, owner: DeviceTarget, slot: usize,
+    key: InsertKey, desc: ParamDesc, cx: &mut gpui::App) {
+    value_entry::open(editor, Target { track: owner, slot, key }, desc, cx);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +418,48 @@ fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th
 /// A device editor's displayed values easing toward the plug-in's values
 /// after an external change (undo, a menu choice, a knob reset, automation
 /// reads). Drags and their previews are shown directly.
-pub struct DeviceAnim { from: Vec<f64>, to: Vec<f64>, start: Instant }
+pub struct DeviceAnim {
+    from: Vec<f64>,
+    to: Vec<f64>,
+    start: Instant,
+    selected_band: usize,
+    signal_waveform: bool,
+    comparison: Comparison,
+    workspace_identity: Option<String>,
+}
+
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+struct Comparison {
+    active: usize,
+    slots: [Option<Vec<(String, f64)>>; 2],
+    #[serde(skip)]
+    pending: Option<usize>,
+}
+
+impl Comparison {
+    /// A label follows the committed host snapshot, never a requested write.
+    /// A rejected/rolled-back transaction keeps the previous active group.
+    fn reconcile(&mut self, current: &[(String, f64)], busy: bool) {
+        let Some(index) = self.pending else { return };
+        if busy { return; }
+        if self.slots[index].as_deref() == Some(current) { self.active = index; }
+        self.pending = None;
+    }
+}
+
+impl DeviceAnim {
+    fn settled(target: Vec<f64>, now: Instant) -> Self {
+        Self { from: target.clone(), to: target, start: now - ANIM, selected_band: 0, signal_waveform: false, comparison: Comparison::default(), workspace_identity: None }
+    }
+}
+
+fn selected_band(ed: &Editor, key: InsertKey, count: usize) -> usize {
+    ed.device_anim.get(&key).map_or(0, |state| state.selected_band).min(count.saturating_sub(1))
+}
+
+fn select_band(ed: &mut Editor, key: InsertKey, band: usize) {
+    ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now())).selected_band = band;
+}
 
 const ANIM: Duration = Duration::from_millis(240);
 
@@ -330,15 +480,18 @@ pub fn interpolate(d: &ParamDesc, from: f64, to: f64, t: f64) -> f64 {
 }
 
 fn animate(ed: &mut Editor, key: InsertKey, params: &mut [ParamDesc], snap: bool, window: &mut Window) {
+    workflow::restore_and_reconcile(ed, key, params, snap);
     let target: Vec<f64> = params.iter().map(|p| p.value).collect();
     let now = Instant::now();
-    let settled = |target: Vec<f64>| DeviceAnim { from: target.clone(), to: target, start: now - ANIM };
-    let anim = ed.device_anim.entry(key).or_insert_with(|| settled(target.clone()));
-    if snap || anim.to.len() != target.len() { *anim = settled(target); return; }
+    let anim = ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(target.clone(), now));
+    if snap || anim.to.len() != target.len() {
+        anim.from = target.clone(); anim.to = target; anim.start = now - ANIM;
+        return;
+    }
     let mut t = now.duration_since(anim.start).as_secs_f64() / ANIM.as_secs_f64();
     if anim.to != target {
         let shown: Vec<f64> = params.iter().enumerate().map(|(i, d)| interpolate(d, anim.from[i], anim.to[i], t)).collect();
-        *anim = DeviceAnim { from: shown, to: target, start: now };
+        anim.from = shown; anim.to = target; anim.start = now;
         t = 0.0;
     }
     if t < 1.0 {
@@ -354,17 +507,18 @@ fn animate(ed: &mut Editor, key: InsertKey, params: &mut [ParamDesc], snap: bool
 /// A graph axis: value range and scale, independent of the parameter's own
 /// range (a threshold handle can sit on a level axis).
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Axis { pub min: f64, pub max: f64, pub log: bool }
+pub struct Axis { pub min: f64, pub max: f64, pub log: bool, start: f64, end: f64 }
 
 impl Axis {
-    pub const fn lin(min: f64, max: f64) -> Self { Self { min, max, log: false } }
-    pub const fn log(min: f64, max: f64) -> Self { Self { min, max, log: true } }
+    pub const fn lin(min: f64, max: f64) -> Self { Self { min, max, log: false, start: 0.0, end: 1.0 } }
+    pub const fn log(min: f64, max: f64) -> Self { Self { min, max, log: true, start: 0.0, end: 1.0 } }
+    pub const fn span(mut self, start: f64, end: f64) -> Self { self.start = start; self.end = end; self }
     pub fn norm(&self, v: f64) -> f64 {
         let n = if self.log { (v.max(self.min) / self.min).ln() / (self.max / self.min).ln() } else { (v - self.min) / (self.max - self.min) };
-        n.clamp(0.0, 1.0)
+        self.start + n.clamp(0.0, 1.0) * (self.end - self.start)
     }
     pub fn value(&self, n: f64) -> f64 {
-        let n = n.clamp(0.0, 1.0);
+        let n = ((n - self.start) / (self.end - self.start)).clamp(0.0, 1.0);
         if self.log { self.min * (self.max / self.min).powf(n) } else { self.min + n * (self.max - self.min) }
     }
 }
@@ -399,13 +553,15 @@ struct Handle {
     defaults: Vec<(String, f64)>,
 }
 
-fn handle_preview(handle: &Handle, plot: Plot, start: &[f64], (dx, dy): (f64, f64), fine: bool) -> Result<Vec<(String, f64)>, PlannerError> {
+fn handle_preview(handle: &Handle, params: &[ParamDesc], plot: Plot, start: &[f64], (dx, dy): (f64, f64), fine: bool) -> Result<Vec<(String, f64)>, String> {
     let mut values = Vec::new();
     if let Some((id, axis)) = &handle.x {
-        values.push((id.clone(), axis.value(drag_normalized(start[0], dx, plot.inner_w(), fine)?)));
+        let desc = param(params, id).ok_or_else(|| format!("曲线横轴参数已不存在：{id}"))?;
+        values.push((id.clone(), bounded_graph_value(desc, *axis, start[0], dx, plot.inner_w(), fine).map_err(|error| error.to_string())?));
     }
     if let Some((id, axis)) = &handle.y {
-        values.push((id.clone(), axis.value(drag_normalized(start[1], -dy, plot.inner_h(), fine)?)));
+        let desc = param(params, id).ok_or_else(|| format!("曲线纵轴参数已不存在：{id}"))?;
+        values.push((id.clone(), bounded_graph_value(desc, *axis, start[1], -dy, plot.inner_h(), fine).map_err(|error| error.to_string())?));
     }
     values.extend(handle.also.iter().cloned());
     Ok(values)
@@ -444,10 +600,10 @@ fn fill_under(window: &mut Window, plot: Plot, pts: &[(f64, f64)], base: f64, co
 fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &str, label: &str, th: Theme,
     painter: Painter, handles: Vec<Handle>, menu: Option<HandleMenu>, double: Option<DoubleClick>) -> gpui::Stateful<gpui::Div> {
     let key = target.key;
-    let surface_key = SharedString::from(format!("device-graph-{:?}-{}-{}-{}-{name}", editor.entity_id(), target.track, target.slot, key.0));
+    let surface_key = SharedString::from(format!("device-graph-{:?}-{:?}-{}-{}-{name}", editor.entity_id(), target.track, target.slot, key.0));
     let surface_editor = editor.downgrade();
     div().id(SharedString::from(format!("{name}-{}", target.slot))).role(Role::Image).aria_label(label.to_string())
-        .rounded(px(10.0)).bg(th.view).border_1().border_color(th.shade).overflow_hidden()
+        .rounded(gpui::rems(10.0/16.)).bg(th.view).border_1().border_color(th.shade).overflow_hidden()
         .child(canvas(move |bounds, window, cx| {
             let editor = surface_editor.clone();
             let surface = crate::host_pointer::track_surface(surface_key, window, cx, move |surface, cx| {
@@ -492,6 +648,8 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     texts.push((h.label.clone(), p(x - 3.2 * h.label.chars().count() as f64, y - 7.5, plot.o), 10.0, ink));
                 }
             }
+            let text_scale = f32::from(window.rem_size()) / 16.;
+            for text in &mut texts { text.2 *= text_scale; }
             flush_texts(window, cx, bounds, texts);
             if hovered.is_some() || dragging.is_some() { window.set_cursor_style(gpui::CursorStyle::PointingHand, &hitbox); }
 
@@ -511,7 +669,7 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     (MouseButton::Right, Some(i)) => {
                         if let Some(menu) = &menu {
                             e.update(cx, |ed, cx| {
-                                if let Control::Band(band) = hs[i].control { ed.device_band = band; }
+                                if let Control::Band(band) = hs[i].control { select_band(ed, key, band); }
                                 let items = menu(ed, i);
                                 ed.show_menu(ev.position, items, window, cx);
                             });
@@ -534,9 +692,10 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                         let n = (((x - GRAPH_PAD) / plot.inner_w()).clamp(0.0, 1.0), ((plot.h - GRAPH_PAD - y) / plot.inner_h()).clamp(0.0, 1.0));
                         if let Some((writes, select)) = double(n) {
                             e.update(cx, |ed, cx| {
-                                if target.basis(ed).is_none() || ed.has_proto_pointer_contact() || !down_surface.is_live() { return; }
-                                if let Some(band) = select { ed.device_band = band; }
-                                ed.set_track_insert_params(target.track.clone(), target.slot, writes, cx);
+                                if !DeviceScope::for_window(window).allows(&target.track, ed)
+                                    || target.basis(ed).is_none() || ed.has_proto_pointer_contact() || !down_surface.is_live() { return; }
+                                if let Some(band) = select { select_band(ed, key, band); }
+                                write_if_current(ed, &target, writes, cx);
                             });
                         } else {
                             e.update(cx, |ed, cx| { ed.notice("所有频段都已在使用；右键频段可关闭它"); cx.notify(); });
@@ -546,7 +705,7 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     _ => {}
                 }
             });
-            let (e, hs, move_surface) = (editor.clone(), handles.clone(), surface.clone());
+            let (e, hs, move_params, move_surface) = (editor.clone(), handles.clone(), params.clone(), surface.clone());
             window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
                 if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
                     // Implicit grabs can report outside coordinates without
@@ -566,18 +725,18 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) else { return false };
                     let Some(h) = hs.iter().find(|h| h.control == control) else { return false };
                     sampled(ed, &control, key, &move_surface, (f64::from(ev.position.x), f64::from(ev.position.y)), ev.modifiers.shift, cx,
-                        |start, delta, fine| handle_preview(h, plot, start, delta, fine))
+                        |start, delta, fine| handle_preview(h, &move_params, plot, start, delta, fine))
                 });
                 if consumed { cx.stop_propagation(); }
             });
-            let (e, hs, up_surface) = (editor.clone(), handles.clone(), surface.clone());
+            let (e, hs, up_params, up_surface) = (editor.clone(), handles.clone(), params.clone(), surface.clone());
             window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
                 // A child stopping bubble propagation cannot strand the owner.
                 if phase != DispatchPhase::Capture || ev.button != MouseButton::Left { return; }
                 let consumed = e.update(cx, |ed, cx| {
                     let Some(control) = ed.device_drag.as_ref().filter(|d| d.key == key).map(|d| d.control.clone()) else { return false };
                     let Some(h) = hs.iter().find(|h| h.control == control) else { return false };
-                    released(ed, &control, key, &up_surface, ev, window, cx, |start, delta, fine| handle_preview(h, plot, start, delta, fine))
+                    released(ed, &control, key, &up_surface, ev, window, cx, |start, delta, fine| handle_preview(h, &up_params, plot, start, delta, fine))
                 });
                 if consumed { cx.stop_propagation(); }
             });
@@ -596,71 +755,106 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
 // ---------------------------------------------------------------------------
 
 /// A linked toggle group writing one stepped parameter.
-fn choice(ed: &Editor, track: &TrackId, slot: usize, params: &[ParamDesc], id: &str, labels: &[&str], cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn choice(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], id: &str, labels: &[&str], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let current = param(params, id).map_or(0, |d| d.value.round() as usize);
-    div().flex().flex_none().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control).children(labels.iter().enumerate().map(|(i, label)| {
-        let (t, id_owned) = (track.clone(), id.to_string());
+    let target = target_for(ed, track, slot);
+    if labels.len() > 8 {
+        let rows: Vec<_> = labels.iter().map(|s| (*s).to_string()).collect();
+        let label = rows.get(current).cloned().unwrap_or_default();
+        let id = id.to_string();
+        return dropdown_button(format!("choice-menu-{slot}-{id}").into(), label, th, move |_| {
+            use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
+            let Some(target) = &target else { return Vec::new() };
+            rows.iter().enumerate().map(|(i, name)| I::action(name.clone(), M::SetDeviceParams {
+                target: target.track.clone(), slot: target.slot, expected_key: Some(target.key), values: vec![(id.clone(), i as f64)] }).checked(i == current)).collect()
+        }, cx).into_any_element();
+    }
+    div().flex().flex_wrap().p(gpui::rems(2.0/16.)).gap(gpui::rems(2.0/16.)).rounded(gpui::rems(8.0/16.)).bg(th.control).children(labels.iter().enumerate().map(|(i, label)| {
+        let (target, id_owned) = (target.clone(), id.to_string());
         let on = i == current;
-        div().id(SharedString::from(format!("choice-{slot}-{id}-{i}"))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string())
-            .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0)).text_sm().cursor_pointer()
+        let (key_target, key_id) = (target.clone(), id_owned.clone());
+        div().id(SharedString::from(format!("choice-{slot}-{id}-{i}"))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
+            .h(gpui::rems(26.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
             .when(on, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
             .hover(move |s| s.bg(if on { th.checked } else { th.hover }))
             .active(move |s| s.bg(th.control_pressed))
             .child(label.to_string())
-            .on_click(cx.listener(move |ed, _, _, cx| ed.set_track_insert_params(t.clone(), slot, vec![(id_owned.clone(), i as f64)], cx)))
+            .on_click(cx.listener(move |ed, _, _, cx| { if let Some(target) = &target { write_if_current(ed, target, vec![(id_owned.clone(), i as f64)], cx); } }))
+            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                    if let Some(target) = &key_target { write_if_current(ed, target, vec![(key_id.clone(), i as f64)], cx); }
+                    window.prevent_default(); cx.stop_propagation();
+                }
+            }))
     })).into_any_element()
 }
 
 /// A switch row writing a 0/1 parameter.
-fn toggle(ed: &Editor, track: &TrackId, slot: usize, params: &[ParamDesc], id: &str, label: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn toggle(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], id: &str, label: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let on = param(params, id).is_some_and(|d| d.value >= 0.5);
-    let (t, id_owned) = (track.clone(), id.to_string());
-    div().id(SharedString::from(format!("toggle-{slot}-{id}"))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on)
-        .flex().items_center().gap(px(8.0)).cursor_pointer().text_sm()
+    let (target, id_owned) = (target_for(ed, track, slot), id.to_string());
+    let (key_target, key_id) = (target.clone(), id_owned.clone());
+    div().id(SharedString::from(format!("toggle-{slot}-{id}"))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
+        .flex().items_center().gap(gpui::rems(8.0/16.)).cursor_pointer().text_sm()
         .child(label.to_string()).child(crate::view::switch(on, th))
-        .on_click(cx.listener(move |ed, _, _, cx| ed.set_track_insert_params(t.clone(), slot, vec![(id_owned.clone(), if on { 0.0 } else { 1.0 })], cx)))
+        .on_click(cx.listener(move |ed, _, _, cx| { if let Some(target) = &target { write_if_current(ed, target, vec![(id_owned.clone(), if on { 0.0 } else { 1.0 })], cx); } }))
+        .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                if let Some(target) = &key_target { write_if_current(ed, target, vec![(key_id.clone(), if on { 0.0 } else { 1.0 })], cx); }
+                window.prevent_default(); cx.stop_propagation();
+            }
+        }))
         .into_any_element()
 }
 
 /// A dropdown-looking button that opens a menu (AdwComboRow's button).
 pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
-    div().id(id).role(Role::ComboBox).aria_label(label.clone()).h(px(30.0)).px(px(10.0)).flex().items_center().gap(px(6.0))
-        .rounded(px(6.0)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
-        .child(div().max_w(px(120.0)).truncate().child(label))
-        .child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary))
+    let items = Rc::new(items);
+    let key_items = items.clone();
+    div().id(id).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
+        .rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
+        .child(div().max_w(gpui::rems(120.0/16.)).truncate().child(label))
+        .child(svg().path(icon("chevron-down")).size(gpui::rems(12.0/16.)).text_color(th.text_secondary))
         .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| { let items = items(ed); ed.show_menu(ev.position(), items, w, cx); }))
+        .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+            if matches!(event.keystroke.key.as_str(), "enter" | "space" | "down") {
+                let items = key_items(ed); ed.show_menu(window.mouse_position(), items, window, cx);
+                window.prevent_default(); cx.stop_propagation();
+            }
+        }))
         .into_any_element()
 }
 
 /// Sidechain source picker: any other track's pre-insert signal.
-fn sidechain_picker(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn sidechain_picker(ed: &Editor, target: &DeviceTarget, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    let spec = ed.insert_specs(track).get(slot).cloned();
+    let spec = ed.device_insert_specs(target).get(slot).cloned();
     let source = spec.as_ref().and_then(|s| verdant_service::project_audio::sidechain_source(s).map(str::to_string));
     let source_name = source.as_ref().and_then(|id| ed.project().tracks.iter().find(|t| t.id.as_str() == id).map(|t| t.name.clone()));
     let label = match (&source, &source_name) { (None, _) => "无".to_string(), (Some(_), Some(name)) => name.clone(), (Some(_), None) => "已移除的轨道".into() };
-    let me = track.clone();
+    let me = target.clone();
+    let expected_key = ed.live_device_insert(target, slot).map(|handle| handle.key());
     let items = move |ed: &Editor| {
         use crate::editor::MenuAction as M;
         use crate::menu::MenuItem as I;
-        let mut items = vec![I::header("侧链来源"), I::action("无（检测输入本身）", M::SetSidechain { track: me.clone(), slot, source: None }).checked(source.is_none())];
-        for t in ed.project().tracks.iter().filter(|t| t.id != me) {
+        let mut items = vec![I::header("侧链来源"), I::action("无（检测输入本身）", M::SetSidechain { target: me.clone(), slot, expected_key, source: None }).checked(source.is_none())];
+        for t in ed.project().tracks.iter().filter(|t| !matches!(&me, DeviceTarget::Track(track) if t.id == *track)) {
             let on = source.as_deref() == Some(t.id.as_str());
-            items.push(I::action(t.name.clone(), M::SetSidechain { track: me.clone(), slot, source: Some(t.id.clone()) }).checked(on));
+            items.push(I::action(t.name.clone(), M::SetSidechain { target: me.clone(), slot, expected_key, source: Some(t.id.clone()) }).checked(on));
         }
         items
     };
-    div().flex().items_center().gap(px(8.0))
-        .child(svg().path(icon("git-merge")).size(px(14.0)).text_color(th.text_secondary))
+    div().flex().items_center().gap(gpui::rems(8.0/16.))
+        .child(svg().path(icon("git-merge")).size(gpui::rems(14.0/16.)).text_color(th.text_secondary))
         .child(div().text_sm().text_color(th.text_secondary).child("侧链"))
         .child(dropdown_button(SharedString::from(format!("sidechain-{slot}")), label, th, items, cx))
         .into_any_element()
 }
 
 fn knob_row(editor: &Entity<Editor>, target: impl Fn() -> Target, params: &[ParamDesc], ids: &[&str], th: Theme, size: f32) -> gpui::Div {
-    let mut row = div().flex().flex_wrap().gap(px(4.0));
+    let mut row = div().flex().flex_wrap().gap(gpui::rems(4.0/16.));
     for id in ids {
         if let Some(d) = param(params, id) {
             let label = d.name.clone();
@@ -686,32 +880,32 @@ fn freq_grid() -> Vec<(f64, String)> {
         .map(|&f| (FREQ_AXIS.norm(f), if f >= 1000.0 { format!("{}k", f / 1000.0) } else { format!("{f}") })).collect()
 }
 
-fn eq_menu(track: TrackId, slot: usize, band: usize, eq: &EqParams) -> Vec<crate::menu::MenuItem> {
+fn eq_menu(track: DeviceTarget, slot: usize, key: InsertKey, band: usize, eq: &EqParams) -> Vec<crate::menu::MenuItem> {
     use crate::editor::MenuAction as M;
     use crate::menu::MenuItem as I;
     let b = eq.bands[band];
-    let set = |field: &str, v: f64| M::SetInsertParams { track: track.clone(), slot, values: vec![(dsp::eq_param_id(band, field), v)] };
+    let set = |field: &str, v: f64| M::SetDeviceParams { target: track.clone(), slot, expected_key: Some(key), values: vec![(dsp::eq_param_id(band, field), v)] };
     let mut items = vec![I::header(format!("频段 {}", band + 1))];
     for kind in BandKind::ALL { items.push(I::action(kind.label(), set("shape", kind.index() as f64)).checked(b.kind == kind)); }
-    if b.kind.has_slope() {
+    if b.kind.has_slope() && !eq.slope_continuous[band] {
         items.push(I::separator());
         for (i, slope) in dsp::SLOPES.iter().enumerate() { items.push(I::action(format!("{slope} dB/oct"), set("slope", i as f64)).checked(b.slope == i)); }
     }
+    items.push(I::action("连续陡度（FIR）", set("slope_continuous", if eq.slope_continuous[band] { 0. } else { 1. })).checked(eq.slope_continuous[band]));
     items.push(I::separator());
     let places = Placement::ALL.iter().map(|&pl| I::action(pl.label(), set("place", pl.index() as f64)).checked(b.place == pl)).collect();
     items.push(I::submenu("立体声位置", places));
     items.push(I::separator());
     items.push(I::action(if b.on { "关闭频段" } else { "开启频段" }, set("on", if b.on { 0.0 } else { 1.0 })));
-    let (kind, f0, q0, _) = dsp::EQ_LAYOUT[band];
-    items.push(I::action("重置频段", M::SetInsertParams { track: track.clone(), slot, values: vec![
-        (dsp::eq_param_id(band, "freq"), f0), (dsp::eq_param_id(band, "gain"), 0.0), (dsp::eq_param_id(band, "q"), q0),
-        (dsp::eq_param_id(band, "shape"), kind.index() as f64), (dsp::eq_param_id(band, "slope"), 1.0), (dsp::eq_param_id(band, "place"), 0.0)] }));
+    let prefix = format!("b{}_", band + 1);
+    let values = EqParams::default().descs().into_iter().filter(|p| p.id.starts_with(&prefix)).map(|p| (p.id, p.value)).collect();
+    items.push(I::action("重置频段", M::SetDeviceParams { target: track.clone(), slot, expected_key: Some(key), values }));
     items
 }
 
-fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    let selected = ed.device_band.min(dsp::EQ_BANDS - 1);
+    let selected = selected_band(ed, key, dsp::EQ_BANDS);
     let eq = EqParams::from_descs(params);
     let target = || Target { track: track.clone(), slot, key };
     let band = eq.bands[selected];
@@ -723,17 +917,27 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize,
         let samples = 240;
         let freq_at = |i: usize| FREQ_AXIS.value(i as f64 / samples as f64);
         let rate = verdant_plugins::SAMPLE_RATE;
+        let band_rate = rate * if eq.phase == 1 && !eq.uses_fir() { 2. } else { 1. };
         // Each band's own curve, tinted, then the stereo sum on top.
         for (i, b) in eq.bands.iter().enumerate().filter(|(_, b)| b.on) {
-            let pts: Vec<(f64, f64)> = (0..=samples).map(|k| { let f = freq_at(k); (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(dsp::band_response_db(b, f, rate)))) }).collect();
+            let pts: Vec<(f64, f64)> = (0..=samples).map(|k| { let f = freq_at(k); (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(eq.band_response_db(i, f, rate)))) }).collect();
             if i == selected { fill_under(window, plot, &pts, plot.y(0.5), with_alpha(band_color(i), 0.16)); }
             polyline(window, plot.o, pts.iter().map(|&q| Some(q)), if i == selected { 1.5 } else { 1.0 }, with_alpha(band_color(i), if i == selected { 0.85 } else { 0.4 }));
+            if eq.dynamics[i].enabled && b.kind.has_gain() {
+                let mut limit = *b;
+                limit.gain_db += eq.dynamics[i].range_db;
+                let edge: Vec<_> = (0..=samples).map(|k| (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(dsp::band_response_db_with_slope(&limit, freq_at(k), band_rate, eq.slope_continuous[i].then_some(eq.effective_slope(i))))))).collect();
+                polyline(window, plot.o, edge.iter().enumerate().map(|(k, &point)| if k % 8 < 5 { Some(point) } else { None }), 1.25, with_alpha(band_color(i), 0.65));
+            }
         }
-        let curve: Vec<(f64, f64)> = (0..=samples).map(|k| { let f = freq_at(k); (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(eq.response_db(f, rate)))) }).collect();
+        let auto_gain = eq.auto_gain_db(rate);
+        let curve: Vec<(f64, f64)> = (0..=samples).map(|k| { let f = freq_at(k); (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(eq.response_db(f, rate) + auto_gain))) }).collect();
         fill_under(window, plot, &curve, plot.y(0.5), with_alpha(th.accent, 0.10));
         polyline(window, plot.o, curve.iter().map(|&q| Some(q)), 2.25, th.accent);
     });
-    let handles: Vec<Handle> = eq.bands.iter().enumerate().map(|(i, b)| {
+    let handle_bands: Vec<usize> = eq.bands.iter().enumerate().filter(|(i, band)| band.on || *i == selected).map(|(i, _)| i).collect();
+    let handles: Vec<Handle> = handle_bands.iter().map(|&i| {
+        let b = &eq.bands[i];
         let gain = b.kind.has_gain().then(|| (dsp::eq_param_id(i, "gain"), GAIN_AXIS));
         let (kind, f0, q0, on0) = dsp::EQ_LAYOUT[i];
         Handle {
@@ -749,8 +953,8 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize,
     }).collect();
     let menu_track = track.clone();
     let menu: HandleMenu = Rc::new(move |ed, i| {
-        let params = ed.live_insert(&menu_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
-        eq_menu(menu_track.clone(), slot, i, &EqParams::from_descs(&params))
+        let params = ed.live_device_insert(&menu_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
+        eq_menu(menu_track.clone(), slot, key, handle_bands[i], &EqParams::from_descs(&params))
     });
     // Double-click empty space: bring in the first band that is off, there.
     let bands_now = eq.bands;
@@ -763,45 +967,57 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize,
         Some((writes, Some(i)))
     });
 
-    let bands = div().flex().flex_none().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control).children((0..dsp::EQ_BANDS).map(|i| {
+    let bands = div().flex().flex_wrap().flex_none().p(gpui::rems(2.0/16.)).gap(gpui::rems(2.0/16.)).rounded(gpui::rems(8.0/16.)).bg(th.control).children((0..dsp::EQ_BANDS).map(|i| {
         let b = eq.bands[i];
         let on = i == selected;
-        div().id(SharedString::from(format!("eq-band-{slot}-{i}"))).role(Role::Tab).aria_selected(on)
+        div().id(SharedString::from(format!("eq-band-{slot}-{i}"))).role(Role::Tab).aria_selected(on).tab_index(0)
             .aria_label(format!("频段 {}：{}", i + 1, b.kind.label()))
-            .h(px(26.0)).px(px(8.0)).flex().items_center().gap(px(5.0)).rounded(px(6.0)).text_sm().cursor_pointer()
+            .h(gpui::rems(26.0/16.)).px(gpui::rems(8.0/16.)).flex().items_center().gap(gpui::rems(5.0/16.)).rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
             .when(on, |d| d.bg(th.checked)).hover(move |s| s.bg(if on { th.checked } else { th.hover })).active(move |s| s.bg(th.control_pressed))
-            .child(div().size(px(9.0)).rounded(px(4.5)).bg(if b.on { band_color(i) } else { with_alpha(band_color(i), 0.3) }))
+            .child(div().size(gpui::rems(9.0/16.)).rounded(gpui::rems(4.5/16.)).bg(if b.on { band_color(i) } else { with_alpha(band_color(i), 0.3) }))
             .child(format!("{}", i + 1))
-            .on_click(cx.listener(move |ed, _, _, cx| { ed.device_band = i; cx.notify(); }))
+            .on_click(cx.listener(move |ed, _, _, cx| { select_band(ed, key, i); cx.notify(); }))
+            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
+                if matches!(event.keystroke.key.as_str(), "enter" | "space") { select_band(ed, key, i); window.prevent_default(); cx.stop_propagation(); cx.notify(); }
+            }))
     }));
     let shape_track = track.clone();
     let shape = dropdown_button(SharedString::from(format!("eq-shape-{slot}")), band.kind.label().into(), th, move |ed| {
-        let params = ed.live_insert(&shape_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
-        eq_menu(shape_track.clone(), slot, selected, &EqParams::from_descs(&params))
+        let params = ed.live_device_insert(&shape_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
+        eq_menu(shape_track.clone(), slot, key, selected, &EqParams::from_descs(&params))
     }, cx);
-    let (toggle_track, toggle_id, on) = (track.clone(), dsp::eq_param_id(selected, "on"), band.on);
-    let band_switch = div().id(SharedString::from(format!("eq-band-on-{slot}"))).role(Role::Switch).aria_label("频段开关").aria_selected(on)
-        .cursor_pointer().child(crate::view::switch(on, th))
-        .on_click(cx.listener(move |ed, _, _, cx| ed.set_track_insert_params(toggle_track.clone(), slot, vec![(toggle_id.clone(), if on { 0.0 } else { 1.0 })], cx)));
+    let band_switch = toggle(ed, track, slot, params, &dsp::eq_param_id(selected, "on"), "启用频段", cx);
     let place_labels: Vec<&str> = Placement::ALL.iter().map(|p| match p { Placement::Stereo => "立体", other => other.short() }).collect();
-    let mut knobs = div().flex().items_start().gap(px(4.0));
+    let mut knobs = div().flex().items_start().gap(gpui::rems(4.0/16.));
     for (field, label) in [("freq", "频率"), ("gain", "增益"), ("q", "Q")] {
         if field == "gain" && !band.kind.has_gain() { continue; }
         if let Some(d) = param(params, &dsp::eq_param_id(selected, field)) { knobs = knobs.child(knob(editor.clone(), target(), d.clone(), label, th, 44.0)); }
     }
-    if let Some(d) = param(params, "output") { knobs = knobs.child(div().w(px(12.0))).child(knob(editor.clone(), target(), d.clone(), "输出", th, 44.0)); }
-    let mut controls_row = div().flex().items_center().gap(px(10.0)).child(bands).child(div().flex_1()).child(shape);
-    if band.kind.has_slope() {
+    if let Some(d) = param(params, "output") { knobs = knobs.child(div().w(gpui::rems(12.0/16.))).child(knob(editor.clone(), target(), d.clone(), "输出", th, 44.0)); }
+    let mut controls_row = div().flex().flex_wrap().items_center().gap(gpui::rems(10.0/16.)).child(shape);
+    if band.kind.has_slope() && !eq.slope_continuous[selected] {
         let slope_labels: Vec<String> = dsp::SLOPES.iter().map(|s| format!("{s}")).collect();
         let refs: Vec<&str> = slope_labels.iter().map(String::as_str).collect();
         controls_row = controls_row.child(choice(ed, track, slot, params, &dsp::eq_param_id(selected, "slope"), &refs, cx));
     }
-    controls_row = controls_row.child(band_switch);
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "eq-graph", "均衡器频率响应：拖动频段点调频率和增益，右键换形状，双击空白处添加频段", th, painter, handles, Some(menu), Some(double)).h(px(220.0)).w_full())
+    controls_row = controls_row.child(band_switch)
+        .child(toggle(ed, track, slot, params, &dsp::eq_param_id(selected, "slope_continuous"), "连续陡度（FIR）", cx));
+    if eq.slope_continuous[selected] {
+        if let Some(desc) = param(params, &dsp::eq_param_id(selected, "slope_db")) {
+            let mut desc = desc.clone(); desc.min = band.kind.min_slope();
+            desc.value = eq.effective_slope(selected);
+            desc.default_value = desc.default_value.map(|value| value.clamp(desc.min, desc.max));
+            knobs = knobs.child(knob(editor.clone(), target(), desc, "陡度 dB/oct", th, 44.));
+        }
+        controls_row = controls_row.child(div().text_xs().text_color(th.text_secondary)
+            .child(format!("固定 FIR 延迟 · 该形状最低 {:.0} dB/oct", band.kind.min_slope())));
+    }
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "eq-graph", "均衡器频率响应：拖动频段点调频率和增益，右键换形状，双击空白处添加频段", th, painter, handles, Some(menu), Some(double)).h(gpui::rems(220.0/16.)).w_full())
+        .child(bands)
         .child(controls_row)
-        .child(div().flex().items_center().gap(px(12.0)).child(knobs).child(div().flex_1())
-            .child(div().flex().flex_col().gap(px(4.0)).items_end()
+        .child(div().flex().items_center().gap(gpui::rems(12.0/16.)).child(knobs).child(div().flex_1())
+            .child(div().flex().flex_col().gap(gpui::rems(4.0/16.)).items_end()
                 .child(div().text_xs().text_color(th.text_secondary).child("立体声位置"))
                 .child(choice(ed, track, slot, params, &dsp::eq_param_id(selected, "place"), &place_labels, cx))))
         .into_any_element()
@@ -816,7 +1032,7 @@ const LEVEL_FLOOR: f64 = -60.0;
 /// A static level transfer graph (input → output dBFS) with a threshold handle.
 fn transfer_graph(editor: &Entity<Editor>, target: Target, params: &[ParamDesc], name: &str, label: &str, th: Theme,
     curve: Rc<dyn Fn(&[ParamDesc], f64) -> f64>, floor: f64) -> gpui::AnyElement {
-    let axis = Axis::lin(floor, 0.0);
+    let axis = Axis::lin(floor, 12.0);
     let threshold = param(params, "threshold").map_or(-18.0, |d| d.value);
     let c = curve.clone();
     let painter: Painter = Rc::new(move |window, plot, params, texts| {
@@ -829,7 +1045,7 @@ fn transfer_graph(editor: &Entity<Editor>, target: Target, params: &[ParamDesc],
             let (k0, k1) = (plot.x(axis.norm(t - knee / 2.0)), plot.x(axis.norm(t + knee / 2.0)));
             window.paint_quad(fill(b(k0, 0.0, (k1 - k0).max(1.0), plot.h, plot.o), with_alpha(th.accent, 0.08)));
         }
-        let pts: Vec<(f64, f64)> = (0..=160).map(|i| { let x = floor + i as f64 * -floor / 160.0; (plot.x(axis.norm(x)), plot.y(axis.norm(c(params, x)))) }).collect();
+        let pts: Vec<(f64, f64)> = (0..=160).map(|i| { let x = axis.value(i as f64 / 160.0); (plot.x(axis.norm(x)), plot.y(axis.norm(c(params, x)))) }).collect();
         fill_under(window, plot, &pts, plot.h, with_alpha(th.accent, 0.10));
         polyline(window, plot.o, pts.iter().map(|&q| Some(q)), 2.25, th.accent);
         window.paint_quad(fill(b(plot.x(axis.norm(t)), 0.0, 1.0, plot.h, plot.o), with_alpha(th.accent, 0.4)));
@@ -840,43 +1056,49 @@ fn transfer_graph(editor: &Entity<Editor>, target: Target, params: &[ParamDesc],
         x: Some(("threshold".into(), axis)), y: None, color: gpui::rgb(0xffffff), label: String::new(), hollow: false, selected: false,
         also: vec![], defaults: vec![("threshold".into(), default)],
     };
-    graph(editor.clone(), target, params.to_vec(), name, label, th, painter, vec![handle], None, None).size(px(200.0)).flex_none().into_any_element()
+    graph(editor.clone(), target, params.to_vec(), name, label, th, painter, vec![handle], None, None).size(gpui::rems(200.0/16.)).flex_none().into_any_element()
 }
 
-fn comp_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn comp_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = || Target { track: track.clone(), slot, key };
     let curve: Rc<dyn Fn(&[ParamDesc], f64) -> f64> = Rc::new(|ps, x| {
         let v = |id: &str, d: f64| param(ps, id).map_or(d, |p| p.value);
-        (dsp::compressor_curve_db(v("threshold", -18.0), v("ratio", 3.0), v("knee", 6.0), x).max(x - v("range", 60.0)) + v("makeup", 0.0)).min(0.0)
+        let curve = |input| dsp::compressor_style_curve_db(v("style", 0.).round() as usize, v("threshold", -18.), v("ratio", 3.), v("knee", 6.), v("range", 60.), input);
+        let input = x + v("input", 0.);
+        let auto = if v("auto_gain", 0.) >= 0.5 { (-curve(-12.) - 12.).clamp(-24., 24.) } else { 0. };
+        let wet = v("mix", 100.) / 100.;
+        dsp::lin_to_db(dsp::db_to_lin(input) * (1. - wet) + dsp::db_to_lin(curve(input) + v("makeup", 0.) + auto) * wet) + v("output", 0.)
     });
-    div().flex().gap(px(16.0))
+    div().flex().gap(gpui::rems(16.0/16.))
         .child(transfer_graph(editor, target(), params, "comp-graph", "压缩器传输曲线：左右拖动阈值", th, curve, LEVEL_FLOOR))
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
-            .child(div().flex().items_center().gap(px(10.0)).child(choice(ed, track, slot, params, "style", &dsp::COMP_STYLES, cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
+            .child(div().flex().flex_col().items_start().gap(gpui::rems(10.0/16.)).child(choice(ed, track, slot, params, "style", &dsp::COMP_STYLES, cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
             .child(knob_row(editor, target, params, &["threshold", "ratio", "knee", "range", "makeup"], th, 42.0))
-            .child(knob_row(editor, target, params, &["attack", "release", "lookahead", "mix", "sc_hpf"], th, 42.0))
+            .child(knob_row(editor, target, params, &["attack", "release", "lookahead", "mix", "sc_hpf", "sc_lpf"], th, 42.0))
             .child(toggle(ed, track, slot, params, "sc_listen", "监听侧链", cx)))
         .into_any_element()
 }
 
-fn gate_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn gate_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = || Target { track: track.clone(), slot, key };
     let curve: Rc<dyn Fn(&[ParamDesc], f64) -> f64> = Rc::new(|ps, x| {
         let v = |id: &str, d: f64| param(ps, id).map_or(d, |p| p.value);
-        dsp::expander_curve_db(v("threshold", -40.0), v("ratio", 50.0), v("range", 40.0), x).max(-80.0)
+        let processed = dsp::gate_style_curve_db(v("style", 0.).round() as usize, v("threshold", -40.), v("ratio", 50.), v("range", 40.), v("knee", 0.), x);
+        let wet = v("mix", 100.) / 100.;
+        dsp::lin_to_db(dsp::db_to_lin(x) * (1. - wet) + dsp::db_to_lin(processed) * wet) + v("output", 0.)
     });
-    div().flex().gap(px(16.0))
+    div().flex().gap(gpui::rems(16.0/16.))
         .child(transfer_graph(editor, target(), params, "gate-graph", "门限传输曲线：左右拖动阈值", th, curve, -80.0))
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
-            .child(div().flex().items_center().gap(px(10.0)).child(toggle(ed, track, slot, params, "sc_listen", "监听侧链", cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
+            .child(div().flex().items_center().gap(gpui::rems(10.0/16.)).child(toggle(ed, track, slot, params, "sc_listen", "监听侧链", cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
             .child(knob_row(editor, target, params, &["threshold", "range", "ratio", "mix"], th, 42.0))
             .child(knob_row(editor, target, params, &["attack", "hold", "release", "lookahead", "sc_hpf", "sc_lpf"], th, 42.0)))
         .into_any_element()
 }
 
-fn deesser_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn deesser_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = || Target { track: track.clone(), slot, key };
     let level = Axis::lin(-60.0, 0.0);
@@ -902,15 +1124,15 @@ fn deesser_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: u
         x: Some(("freq".into(), FREQ_AXIS)), y: Some(("threshold".into(), level)), color: gpui::rgb(0xffffff), label: String::new(),
         hollow: false, selected: false, also: vec![], defaults: vec![("freq".into(), 6000.0), ("threshold".into(), -24.0)],
     };
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "deesser-graph", "齿音检测：左右拖动频率，上下拖动阈值", th, painter, vec![handle], None, None).h(px(150.0)).w_full())
-        .child(div().flex().items_center().gap(px(10.0)).child(choice(ed, track, slot, params, "mode", &dsp::DEESSER_MODES, cx))
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "deesser-graph", "齿音检测：左右拖动频率，上下拖动阈值", th, painter, vec![handle], None, None).h(gpui::rems(150.0/16.)).w_full())
+        .child(div().flex().items_center().gap(gpui::rems(10.0/16.)).child(choice(ed, track, slot, params, "mode", &dsp::DEESSER_MODES, cx))
             .child(toggle(ed, track, slot, params, "sc_listen", "监听", cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
         .child(knob_row(editor, target, params, &["threshold", "range", "freq", "release"], th, 42.0))
         .into_any_element()
 }
 
-fn limiter_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc]) -> gpui::AnyElement {
+fn limiter_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc]) -> gpui::AnyElement {
     let th = ed.theme;
     let target = || Target { track: track.clone(), slot, key };
     let axis = Axis::lin(-36.0, 0.0);
@@ -929,15 +1151,15 @@ fn limiter_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: u
     });
     let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
     let handle = Handle {
-        control: Control::Handle("ceiling"), at: (1.0, axis.norm(v("ceiling", -0.3))), x: None, y: Some(("ceiling".into(), Axis::lin(-12.0, 0.0))),
+        control: Control::Handle("ceiling"), at: (1.0, axis.norm(v("ceiling", -0.3))), x: None, y: Some(("ceiling".into(), axis)),
         color: gpui::rgb(0xffffff), label: String::new(), hollow: false, selected: false, also: vec![], defaults: vec![("ceiling".into(), -0.3)],
     };
     let mut handle = handle;
     // The ceiling axis covers −12…0 dB; keep the handle on the drawn line.
     handle.at.0 = 0.92;
-    div().flex().gap(px(16.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "limiter-graph", "限制器传输曲线：上下拖动输出上限", th, painter, vec![handle], None, None).size(px(180.0)).flex_none())
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
+    div().flex().gap(gpui::rems(16.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "limiter-graph", "限制器传输曲线：上下拖动输出上限", th, painter, vec![handle], None, None).size(gpui::rems(180.0/16.)).flex_none())
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
             .child(knob_row(editor, target, params, &["gain", "ceiling", "release"], th, 46.0))
             .child(knob_row(editor, target, params, &["lookahead", "link"], th, 46.0)))
         .into_any_element()
@@ -947,103 +1169,124 @@ fn limiter_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: u
 // Space and color
 // ---------------------------------------------------------------------------
 
-fn reverb_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc]) -> gpui::AnyElement {
+fn reverb_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = || Target { track: track.clone(), slot, key };
-    let decay_axis = Axis::log(0.2, 20.0);
-    // Decay over frequency: flat to the damping frequency, then shorter;
-    // the post filters' corners bound the drawn band.
-    let decay_at = |ps: &[ParamDesc], f: f64| {
-        let v = |id: &str, d: f64| param(ps, id).map_or(d, |p| p.value);
-        let (decay, damp) = (v("decay", 2.0), v("damping", 8000.0));
-        if damp >= 19_999.0 || f <= damp { decay } else { (decay * (damp / f).sqrt()).max(0.2) }
-    };
+    let decay_axis = Axis::log(0.02, 320.0);
     let painter: Painter = Rc::new(move |window, plot, params, texts| {
-        let ys: Vec<(f64, String)> = [0.5, 1.0, 2.0, 5.0, 10.0].iter().map(|&s| (decay_axis.norm(s), format!("{s} s"))).collect();
+        let ys: Vec<_> = [0.1, 1.0, 10.0, 100.0].iter().map(|&s| (decay_axis.norm(s), format!("{s} s"))).collect();
         paint_grid(window, plot, th, &freq_grid(), &ys, None, texts);
-        let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
-        let (low, high) = (v("low_cut", 120.0), v("high_cut", 12000.0));
-        let pts: Vec<(f64, f64)> = (0..=200).map(|i| { let n = i as f64 / 200.0; (plot.x(n), plot.y(decay_axis.norm(decay_at(params, FREQ_AXIS.value(n))))) }).collect();
-        let (xl, xh) = (plot.x(FREQ_AXIS.norm(low)), plot.x(FREQ_AXIS.norm(high)));
-        let inside: Vec<(f64, f64)> = pts.iter().copied().filter(|(x, _)| *x >= xl && *x <= xh).collect();
-        fill_under(window, plot, &inside, plot.h, with_alpha(th.accent, 0.14));
-        polyline(window, plot.o, pts.iter().map(|&q| Some(q)), 2.25, th.accent);
-        for x in [xl, xh] { window.paint_quad(fill(b(x, 0.0, 1.0, plot.h, plot.o), with_alpha(th.text, 0.25))); }
-        let pre = v("predelay", 10.0);
-        texts.push((format!("预延迟 {pre:.0} ms"), p(plot.w - 110.0, 6.0, plot.o), 11.0, th.text_secondary));
+        let values = suite::values(dsp::REVERB_SPECS, params);
+        let freeze = param(params, "freeze").is_some_and(|p| p.value >= 0.5);
+        let points: Vec<_> = (0..=240).map(|i| {
+            let n = i as f64 / 240.0;
+            let seconds = dsp::reverb_decay_at_frequency(&values, FREQ_AXIS.value(n), verdant_plugins::SAMPLE_RATE);
+            (plot.x(n), plot.y(decay_axis.norm(seconds)))
+        }).collect();
+        fill_under(window, plot, &points, plot.y(0.), with_alpha(th.accent, 0.12));
+        polyline(window, plot.o, points.into_iter().map(Some), 2.25, th.accent);
+        if !freeze {
+            let reference = plot.y(decay_axis.norm(dsp::reverb_effective_decay(&values)));
+            polyline(window, plot.o, (0..=80).map(|i| (i % 3 != 0).then_some((plot.x(i as f64 / 80.), reference))), 1., with_alpha(th.text_secondary, 0.6));
+        }
+        texts.push(((if freeze { "冻结 · 无限延续" } else { "反馈网络衰减估计（RT60）" }).into(), p(10., 7., plot.o), 11., th.text_secondary));
     });
+    let values = suite::values(dsp::REVERB_SPECS, params);
     let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
-    let decay = v("decay", 2.0);
-    let mk = |control: &'static str, at: (f64, f64), x: Option<(String, Axis)>, y: Option<(String, Axis)>, default: Vec<(String, f64)>, label: &str| Handle {
-        control: Control::Handle(control), at, x, y, color: gpui::rgb(0xffffff), label: label.into(), hollow: false, selected: false, also: vec![], defaults: default };
-    let damping_axis = Axis::log(1000.0, 20000.0);
-    let handles = vec![
-        mk("decay", (FREQ_AXIS.norm(400.0), decay_axis.norm(decay)), None, Some(("decay".into(), decay_axis)), vec![("decay".into(), 2.0)], ""),
-        mk("damping", (FREQ_AXIS.norm(v("damping", 8000.0)), decay_axis.norm(decay)), Some(("damping".into(), damping_axis)), None, vec![("damping".into(), 8000.0)], ""),
-        mk("low_cut", (FREQ_AXIS.norm(v("low_cut", 120.0)), 0.12), Some(("low_cut".into(), Axis::log(20.0, 1000.0))), None, vec![("low_cut".into(), 120.0)], ""),
-        mk("high_cut", (FREQ_AXIS.norm(v("high_cut", 12000.0)), 0.12), Some(("high_cut".into(), Axis::log(1000.0, 20000.0))), None, vec![("high_cut".into(), 12000.0)], ""),
-    ];
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-graph", "混响衰减随频率：上下拖动衰减时间，左右拖动阻尼与高低切", th, painter, handles, None, None).h(px(160.0)).w_full())
+    let rate = v("decay_rate", 100.) / 100.;
+    let freeze = v("freeze", 0.) >= 0.5;
+    let mut handles = Vec::new();
+    if !freeze {
+        handles.push(Handle { control: Control::Handle("decay"), at: (FREQ_AXIS.norm(400.), decay_axis.norm(v("decay", 2.) * rate)),
+            x: None, y: Some(("decay".into(), Axis::log(decay_axis.min / rate, decay_axis.max / rate))),
+            color: th.text, label: "基准".into(), hollow: false, selected: false, also: vec![], defaults: vec![("decay".into(), 2.)] });
+    }
+    let damping = v("damping", 8000.);
+    handles.push(Handle { control: Control::Handle("damping"), at: (FREQ_AXIS.norm(damping), decay_axis.norm(dsp::reverb_decay_at_frequency(&values, damping, verdant_plugins::SAMPLE_RATE))),
+        x: Some(("damping".into(), FREQ_AXIS)), y: None, color: th.text, label: "阻尼".into(), hollow: false,
+        selected: false, also: vec![], defaults: vec![("damping".into(), 8000.)] });
+    let node = selected_band(ed, key, 8);
+    for index in 0..8 {
+        let prefix = format!("decay{}", index + 1);
+        let on = v(&format!("{prefix}_on"), 0.) >= 0.5;
+        if !on && index != node { continue; }
+        let freq = v(&format!("{prefix}_freq"), 1000.);
+        handles.push(Handle { control: Control::Band(index), at: (FREQ_AXIS.norm(freq), decay_axis.norm(dsp::reverb_decay_at_frequency(&values, freq, verdant_plugins::SAMPLE_RATE))),
+            x: Some((format!("{prefix}_freq"), FREQ_AXIS)), y: None, color: band_color(index), label: (index+1).to_string(),
+            hollow: !on, selected: index == node, also: vec![(format!("{prefix}_on"), 1.)], defaults: vec![(format!("{prefix}_freq"), 1000.)] });
+    }
+    let post_axis = Axis::lin(-36., 24.);
+    let post_painter: Painter = Rc::new(move |window, plot, params, texts| {
+        let grid = [-24., -12., 0., 12.].map(|db| (post_axis.norm(db), format!("{db:+.0} dB")));
+        paint_grid(window, plot, th, &freq_grid(), &grid, Some(post_axis.norm(0.)), texts);
+        let values = suite::values(dsp::REVERB_SPECS, params);
+        let points = (0..=240).map(|i| { let n = i as f64 / 240.; Some((plot.x(n), plot.y(post_axis.norm(dsp::reverb_post_response_db(&values, FREQ_AXIS.value(n), verdant_plugins::SAMPLE_RATE))))) });
+        polyline(window, plot.o, points, 2.25, th.accent);
+        texts.push(("输出均衡".into(), p(10., 7., plot.o), 11., th.text_secondary));
+    });
+    let mut post_handles = Vec::new();
+    for (control, freq, gain, label) in [
+        ("post-low", "decay_low_freq", "post_low_gain", "低架"),
+        ("post-mid", "post_mid_freq", "post_mid_gain", "峰值"),
+        ("post-high", "decay_high_freq", "post_high_gain", "高架"),
+    ] {
+        let defaults = [freq, gain].iter().filter_map(|id| param(params, id).and_then(|p| p.default_value.map(|v| ((*id).into(), v)))).collect();
+        post_handles.push(Handle { control: Control::Handle(control), at: (FREQ_AXIS.norm(v(freq, 1000.)), post_axis.norm(v(gain, 0.))),
+            x: Some((freq.into(), FREQ_AXIS)), y: Some((gain.into(), post_axis)), color: th.accent, label: label.into(), hollow: false,
+            selected: false, also: vec![], defaults });
+    }
+    for (id, default) in [("low_cut", 120.), ("high_cut", 12000.)] {
+        post_handles.push(Handle { control: Control::Handle(id), at: (FREQ_AXIS.norm(v(id, default)), post_axis.norm(-30.)),
+            x: Some((id.into(), FREQ_AXIS)), y: None, color: th.text_secondary, label: String::new(), hollow: true,
+            selected: false, also: vec![], defaults: vec![(id.into(), default)] });
+    }
+    for index in 0..8 {
+        let prefix = format!("post{}", index + 1);
+        let on = v(&format!("{prefix}_on"), 0.) >= 0.5;
+        if !on && index != node { continue; }
+        let freq = v(&format!("{prefix}_freq"), 1000.); let gain = v(&format!("{prefix}_gain"), 0.);
+        let has_gain = v(&format!("{prefix}_shape"), 0.) < 3.;
+        post_handles.push(Handle { control: Control::Band(index), at: (FREQ_AXIS.norm(freq), post_axis.norm(if has_gain { gain } else { -12. })),
+            x: Some((format!("{prefix}_freq"), FREQ_AXIS)), y: has_gain.then(|| (format!("{prefix}_gain"), post_axis)), color: band_color(index),
+            label: (index+1).to_string(), hollow: !on, selected: index == node, also: vec![(format!("{prefix}_on"), 1.)],
+            defaults: vec![(format!("{prefix}_freq"), 1000.), (format!("{prefix}_gain"), 0.)] });
+    }
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-graph" , "混响衰减随频率：拖动基准衰减与阻尼", th, painter, handles, None, None).h(gpui::rems(180.0/16.)).w_full())
         .child(knob_row(editor, target, params, &["predelay", "decay", "size", "damping", "diffusion"], th, 42.0))
         .child(knob_row(editor, target, params, &["width", "low_cut", "high_cut", "modulation", "mix"], th, 42.0))
+        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-post", "混响输出均衡：拖动频率和增益", th, post_painter, post_handles, None, None).h(gpui::rems(170./16.)).w_full())
+        .child(knob_row(editor, target, params, &["post_low_gain", "post_mid_freq", "post_mid_gain", "post_mid_q", "post_high_gain"], th, 42.))
+        .child(suite::reverb_nodes(ed, editor, track, slot, key, params, cx))
+        .child(sidechain_picker(ed, track, slot, cx))
         .into_any_element()
 }
 
-fn delay_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
-    let th = ed.theme;
-    let target = || Target { track: track.clone(), slot, key };
-    let time_axis = Axis::lin(0.0, 2000.0);
-    let painter: Painter = Rc::new(move |window, plot, params, texts| {
-        let xs: Vec<(f64, String)> = [250.0, 500.0, 1000.0, 1500.0].iter().map(|&ms| (time_axis.norm(ms), format!("{ms:.0} ms"))).collect();
-        paint_grid(window, plot, th, &xs, &[], None, texts);
-        let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
-        let (time, fb, pingpong) = (v("time", 375.0), v("feedback", 35.0) / 100.0, v("pingpong", 0.0) >= 0.5);
-        // Dry hit, then each echo: height is its level, ping-pong alternates colour.
-        window.paint_quad(fill(b(plot.x(0.0) - 2.0, plot.y(1.0), 4.0, plot.y(0.0) - plot.y(1.0), plot.o), with_alpha(th.text, 0.35)));
-        let mut level = 1.0;
-        for n in 1..=24 {
-            let t = time * n as f64;
-            if t > 2000.0 || level < 0.01 { break; }
-            let color = if pingpong && n % 2 == 0 { gpui::rgb(0x33d17a) } else { th.accent };
-            let (x, top) = (plot.x(time_axis.norm(t)), plot.y(level));
-            window.paint_quad(quad(b(x - 3.0, top, 6.0, plot.y(0.0) - top, plot.o), px(3.0), color, px(0.0), color, gpui::BorderStyle::Solid));
-            level *= fb;
-        }
-    });
-    let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
-    let (time, fb) = (v("time", 375.0), v("feedback", 35.0));
-    let mk = |control: &'static str, at: (f64, f64), x: Option<(String, Axis)>, y: Option<(String, Axis)>, default: (String, f64)| Handle {
-        control: Control::Handle(control), at, x, y, color: gpui::rgb(0xffffff), label: String::new(), hollow: false, selected: false, also: vec![], defaults: vec![default] };
-    let mut handles = vec![mk("time", (time_axis.norm(time), 1.0), Some(("time".into(), Axis::log(1.0, 2000.0))), None, ("time".into(), 375.0))];
-    if time * 2.0 <= 2000.0 {
-        handles.push(mk("feedback", (time_axis.norm(time * 2.0), fb / 100.0), None, Some(("feedback".into(), Axis::lin(0.0, 100.0))), ("feedback".into(), 35.0)));
-    }
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "delay-graph", "回声：左右拖动第一个回声改时间，上下拖动第二个回声改反馈", th, painter, handles, None, None).h(px(140.0)).w_full())
-        .child(div().flex().items_center().gap(px(10.0)).child(toggle(ed, track, slot, params, "pingpong", "乒乓", cx)))
-        .child(knob_row(editor, target, params, &["time", "offset", "feedback", "drive", "low_cut", "high_cut", "width", "mix"], th, 42.0))
-        .into_any_element()
+fn delay_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+    suite::delay(ed, editor, track, slot, key, params, cx)
 }
 
-fn saturation_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn saturation_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = || Target { track: track.clone(), slot, key };
+    let count = param(params, "band_count").map_or(1, |p| p.value.round().clamp(1., 6.) as usize);
+    let selected = selected_band(ed, key, count);
     let painter: Painter = Rc::new(move |window, plot, params, texts| {
         let grid = vec![(0.25, String::new()), (0.5, "0".to_string()), (0.75, String::new())];
         paint_grid(window, plot, th, &grid, &grid, Some(0.5), texts);
         let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
-        let mut fx = dsp::SaturationProcessor::new(verdant_plugins::SAMPLE_RATE);
-        for id in ["drive", "style", "output"] { let _ = fx.set(id, v(id, 0.0)); }
+        let values = suite::values(dsp::SATURATION_SPECS, params);
         polyline(window, plot.o, [Some((plot.x(0.0), plot.y(0.0))), Some((plot.x(1.0), plot.y(1.0)))], 1.0, with_alpha(th.text, 0.18));
-        let pts = (0..=160).map(|i| { let x = -1.0 + i as f64 / 80.0; Some((plot.x((x + 1.0) / 2.0), plot.y(((fx.curve(x) + 1.0) / 2.0).clamp(-0.05, 1.05)))) });
+        let pts = (0..=160).map(|i| { let x = -1.0 + i as f64 / 80.0; Some((plot.x((x + 1.0) / 2.0), plot.y((((x * (1. - v("mix", 100.) / 100.) + dsp::saturation_band_curve(&values, selected, x) * v("mix", 100.) / 100.) + 1.0) / 2.0).clamp(-0.05, 1.05)))) });
         polyline(window, plot.o, pts, 2.25, th.accent);
+        texts.push((format!("频段 {} 静态特性", selected + 1), p(10., 8., plot.o), 10., th.text_secondary));
     });
-    div().flex().gap(px(16.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "saturation-graph", "饱和传输曲线", th, painter, vec![], None, None).size(px(170.0)).flex_none())
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
+    div().flex().gap(gpui::rems(16.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "saturation-graph", "饱和传输曲线", th, painter, vec![], None, None).size(gpui::rems(170.0/16.)).flex_none())
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
             .child(choice(ed, track, slot, params, "style", &dsp::SATURATION_STYLES, cx))
-            .child(knob_row(editor, target, params, &["drive", "tone", "mix", "output"], th, 46.0)))
+            .child(knob_row(editor, target, params, &["drive", "tone", "mix", "output"], th, 46.0))
+            .child(sidechain_picker(ed, track, slot, cx)))
         .into_any_element()
 }
 
@@ -1065,6 +1308,9 @@ pub(crate) fn preview_and_animate(ed: &mut Editor, key: InsertKey, params: &mut 
 pub(crate) fn synth_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let slot = crate::instrument::INSTRUMENT_SLOT;
+    let instrument_id = ed.project().track(track).and_then(|track| track.instrument()).and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str).unwrap_or(dsp::SYNTH_ID);
+    let owner = DeviceTarget::Track(track.clone());
+    let track = &owner;
     let target = || Target { track: track.clone(), slot, key };
     let (attack, decay, release) = (Axis::log(1.0, 2000.0), Axis::log(1.0, 4000.0), Axis::log(1.0, 4000.0));
     let sustain = Axis::lin(0.0, 100.0);
@@ -1088,21 +1334,26 @@ pub(crate) fn synth_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId
     let mk = |control: &'static str, at: (f64, f64), x: Option<(String, Axis)>, y: Option<(String, Axis)>, defaults: Vec<(String, f64)>| Handle {
         control: Control::Handle(control), at, x, y, color: gpui::rgb(0xffffff), label: String::new(), hollow: false, selected: false, also: vec![], defaults };
     let handles = vec![
-        mk("attack", pts[1], Some(("attack".into(), attack)), None, vec![("attack".into(), 5.0)]),
-        mk("decay", pts[2], Some(("decay".into(), decay)), Some(("sustain".into(), sustain)), vec![("decay".into(), 300.0), ("sustain".into(), 70.0)]),
-        mk("release", pts[4], Some(("release".into(), release)), None, vec![("release".into(), 250.0)]),
+        mk("attack", pts[1], Some(("attack".into(), attack.span(0.02, 0.25))), None, vec![("attack".into(), 5.0)]),
+        mk("decay", pts[2], Some(("decay".into(), decay.span(pts[1].0 + 0.02, pts[1].0 + 0.25))), Some(("sustain".into(), sustain)), vec![("decay".into(), 300.0), ("sustain".into(), 70.0)]),
+        mk("release", pts[4], Some(("release".into(), release.span(0.77, 1.0))), None, vec![("release".into(), 250.0)]),
     ];
-    let mut waves = |id: &str, label: &str| div().flex().items_center().gap(px(8.0))
-        .child(div().w(px(64.0)).text_sm().text_color(th.text_secondary).child(label.to_string()))
+    let mut waves = |id: &str, label: &str| div().flex().items_center().gap(gpui::rems(8.0/16.))
+        .child(div().w(gpui::rems(64.0/16.)).text_sm().text_color(th.text_secondary).child(label.to_string()))
         .child(choice(ed, track, slot, params, id, &dsp::WAVES, cx));
-    let (osc1, osc2) = (waves("osc1", "振荡器 1"), waves("osc2", "振荡器 2"));
-    div().flex().flex_col().gap(px(10.0))
-        .child(div().flex().gap(px(16.0))
-            .child(graph(editor.clone(), target(), params.to_vec(), "synth-adsr", "音量包络：拖动起音、衰减/延音与释音点", th, painter, handles, None, None).h(px(140.0)).flex_1())
-            .child(div().flex().flex_col().gap(px(8.0)).justify_center()
-                .child(osc1).child(osc2)))
+    let osc1 = waves("osc1", "振荡器 1");
+    let osc2 = param(params, "osc2").map(|_| waves("osc2", "振荡器 2"));
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(suite::toolbar(ed, track, slot, key, instrument_id, params, cx))
+        .child(signal::panel(ed, editor, track, slot, key, cx))
+        .child(div().flex().gap(gpui::rems(16.0/16.))
+            .child(graph(editor.clone(), target(), params.to_vec(), "synth-adsr", "音量包络：拖动起音、衰减/延音与释音点", th, painter, handles, None, None).h(gpui::rems(140.0/16.)).flex_1())
+            .child(div().flex().flex_col().gap(gpui::rems(8.0/16.)).justify_center()
+                .child(osc1).children(osc2)))
         .child(knob_row(editor, target, params, &["osc2_semi", "detune", "osc2_mix", "width", "gain"], th, 42.0))
         .child(knob_row(editor, target, params, &["attack", "decay", "sustain", "release", "cutoff", "resonance", "env_amount"], th, 42.0))
+        .child(suite::remaining(ed, editor, track, slot, key, instrument_id, params, cx))
+        .child(modulation::panel(ed, editor, track, slot, key, instrument_id, params, cx))
         .into_any_element()
 }
 
@@ -1110,82 +1361,121 @@ pub(crate) fn synth_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId
 // Device cards and the view
 // ---------------------------------------------------------------------------
 
-fn generic_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, key: InsertKey, params: &[ParamDesc]) -> gpui::AnyElement {
+pub(crate) fn generic_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc]) -> gpui::AnyElement {
     let th = ed.theme;
-    let shown: Vec<&ParamDesc> = params.iter().filter(|p| p.max > p.min).take(8).collect();
-    let mut grid = div().flex().flex_wrap().gap(px(4.0)).w(px(260.0));
+    let shown: Vec<&ParamDesc> = params.iter().filter(|p| p.max > p.min).collect();
+    let mut grid = div().flex().flex_wrap().gap(gpui::rems(8.0/16.)).w_full();
     for d in &shown {
         grid = grid.child(knob(editor.clone(), Target { track: track.clone(), slot, key }, (*d).clone(), &d.name, th, 40.0));
     }
-    let more = params.len().saturating_sub(shown.len());
-    div().flex().flex_col().gap(px(8.0)).child(grid)
+    div().flex().flex_col().gap(gpui::rems(8.0/16.)).child(grid)
         .when(params.is_empty(), |d| d.child(div().text_sm().text_color(th.text_secondary).child("此插件未提供可编辑参数")))
-        .when(more > 0, |d| d.child(div().text_xs().text_color(th.text_secondary).child(format!("另有 {more} 个参数在混音器的参数面板中"))))
         .into_any_element()
 }
 
-/// Card width for each built-in editor.
+/// Preferred window size; the contents scroll vertically at smaller sizes.
+pub(crate) fn native_editor_size(id: &str) -> (f32, f32) {
+    match id {
+        dsp::EQ_ID => (900., 760.),
+        dsp::COMPRESSOR_ID | dsp::GATE_ID => (880., 740.),
+        dsp::MULTIBAND_ID | dsp::FILTER_ID | dsp::SIMPLON_ID | dsp::SATURATION_ID => (900., 780.),
+        dsp::MICRO_ID => (720., 670.),
+        _ => (800., 720.),
+    }
+}
+
 fn card_width(id: &str) -> Option<f32> {
-    Some(match id {
-        dsp::EQ_ID => 640.0,
-        dsp::COMPRESSOR_ID => 600.0,
-        dsp::GATE_ID => 680.0,
-        dsp::DEESSER_ID | dsp::REVERB_ID | dsp::DELAY_ID => 560.0,
-        dsp::LIMITER_ID | dsp::SATURATION_ID => 480.0,
-        _ => return None,
+    dsp::EFFECT_IDS.contains(&id).then(|| match id {
+        dsp::EQ_ID | dsp::MULTIBAND_ID | dsp::FILTER_ID | dsp::SATURATION_ID => 760.,
+        dsp::COMPRESSOR_ID | dsp::GATE_ID => 740.,
+        _ => 660.,
     })
+}
+
+/// Both the bottom device chain and standalone native windows use this exact
+/// editor. There is no second parameter implementation for master inserts.
+pub(crate) fn render_builtin_editor(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget,
+    slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+    let specs = ed.device_insert_specs(owner);
+    let id = specs.get(slot).map(|spec| spec.id.as_str()).unwrap_or("");
+    let body = match id {
+        dsp::EQ_ID => eq_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::COMPRESSOR_ID => comp_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::GATE_ID => gate_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::DEESSER_ID => deesser_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::LIMITER_ID => limiter_editor(ed, editor, owner, slot, key, params),
+        dsp::REVERB_ID => reverb_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::DELAY_ID => delay_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::SATURATION_ID => saturation_editor(ed, editor, owner, slot, key, params, cx),
+        dsp::MULTIBAND_ID => suite::multiband(ed, editor, owner, slot, key, params, cx),
+        dsp::FILTER_ID | dsp::SIMPLON_ID | dsp::MICRO_ID => suite::filters(ed, editor, owner, slot, key, id, params, cx),
+        _ => return generic_editor(ed, editor, owner, slot, key, params),
+    };
+    div().flex().flex_col().gap(gpui::rems(12.0/16.)).w_full().min_w_0()
+        .child(suite::toolbar(ed, owner, slot, key, id, params, cx))
+        .when(matches!(id, dsp::EQ_ID | dsp::REVERB_ID), |d| d.child(analysis_tools::tools(ed, editor, Target { track: owner.clone(), slot, key }, id, cx)))
+        .child(signal::panel(ed, editor, owner, slot, key, cx))
+        .child(body)
+        .when(id == dsp::COMPRESSOR_ID, |d| d.child(suite::compressor_sidechain(ed, editor, owner, slot, key, params, cx)))
+        .when(id == dsp::EQ_ID, |d| d.child(suite::eq_dynamic(ed, editor, owner, slot, key, params, cx)))
+        .when(id == dsp::SATURATION_ID, |d| d.child(suite::saturation_bands(ed, editor, owner, slot, key, params, cx)))
+        .when(id == dsp::LIMITER_ID, |d| d.child(sidechain_picker(ed, owner, slot, cx)))
+        .child(suite::remaining(ed, editor, owner, slot, key, id, params, cx))
+        .child(modulation::panel(ed, editor, owner, slot, key, id, params, cx))
+        .child(div().text_xs().text_color(ed.theme.text_secondary).child("拖动调节 · Shift 微调 · 点击数值精确输入 · Alt 点击复位"))
+        .into_any_element()
 }
 
 #[allow(clippy::too_many_arguments)]
 fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usize, params: Option<(InsertKey, Vec<ParamDesc>)>, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
+    let owner = DeviceTarget::Track(track.clone());
     let specs = ed.insert_specs(track);
     let spec = &specs[slot];
     let handle = ed.live_insert(track, slot);
+    let expected_key = handle.as_ref().map(|handle| handle.key());
+    let bypass_owner = owner.clone();
+    let menu_owner = owner.clone();
     let builtin = (spec.format == "builtin").then_some(spec.id.as_str());
     let on = !spec.bypass;
     let arg = CommandArg::TrackSlot(track.clone(), slot as u32);
     let (bypass_arg, menu_track) = (arg.clone(), track.clone());
     let keyed = verdant_service::project_audio::sidechain_source(spec).is_some();
     let title = builtin.and_then(dsp::short_label).map_or(spec.name.clone(), str::to_string);
-    let header = div().flex().items_center().gap(px(10.0)).h(px(32.0))
+    let header = div().flex().items_center().gap(gpui::rems(10.0/16.)).h(gpui::rems(32.0/16.))
         .child(div().id(SharedString::from(format!("device-power-{slot}"))).role(Role::Switch).aria_label("启用效果器").aria_selected(on).cursor_pointer()
             .child(crate::view::switch(on, th))
-            .on_click(cx.listener(move |ed, _, w, cx| controls::dispatch(ed, CommandId::PluginBypass, bypass_arg.clone(), w, cx))))
+            .on_click(cx.listener(move |ed, _, w, cx| {
+                if expected_key.is_none_or(|key| ed.device_target_matches(&bypass_owner, slot, key)) {
+                    controls::dispatch(ed, CommandId::PluginBypass, bypass_arg.clone(), w, cx);
+                }
+            })))
         .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).text_color(if on { th.text } else { th.text_secondary }).child(title))
-        .when(keyed, |d| d.child(div().px(px(8.0)).h(px(22.0)).flex().items_center().rounded(px(11.0)).bg(with_alpha(th.accent, 0.18)).text_xs().text_color(th.accent).child("侧链")))
-        .child(div().id(SharedString::from(format!("device-menu-{slot}"))).role(Role::Button).aria_label("效果器菜单").size(px(28.0)).rounded(px(6.0))
+        .when(keyed, |d| d.child(div().px(gpui::rems(8.0/16.)).h(gpui::rems(22.0/16.)).flex().items_center().rounded(gpui::rems(11.0/16.)).bg(with_alpha(th.accent, 0.18)).text_xs().text_color(th.accent).child("侧链")))
+        .child(div().id(SharedString::from(format!("device-menu-{slot}"))).role(Role::Button).aria_label("效果器菜单").size(gpui::rems(28.0/16.)).rounded(gpui::rems(6.0/16.))
             .flex().items_center().justify_center().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed)).cursor_pointer()
-            .child(svg().path(icon("menu")).size(px(14.0)).text_color(th.text))
+            .child(svg().path(icon("menu")).size(gpui::rems(14.0/16.)).text_color(th.text))
             .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| {
                 use crate::editor::MenuAction as M;
                 use crate::menu::MenuItem as I;
+                if expected_key.is_some_and(|key| !ed.device_target_matches(&menu_owner, slot, key)) { return; }
                 let items = vec![
-                    I::action("打开原生插件窗口", M::OpenInsertEditor { track: menu_track.clone(), slot }).enabled(ed.live_insert(&menu_track, slot).is_some_and(|h| h.has_editor())),
-                    I::action(if on { "旁通" } else { "启用" }, M::BypassInsert { track: menu_track.clone(), slot }),
+                    I::action("打开原生插件窗口", M::OpenInsertEditor { track: menu_track.clone(), slot, expected_key }).enabled(ed.live_insert(&menu_track, slot).is_some_and(|h| h.has_editor() || h.spec().format == "builtin")),
+                    I::action(if on { "旁通" } else { "启用" }, M::BypassInsert { track: menu_track.clone(), slot, expected_key }),
                     I::separator(),
-                    I::action("移除效果器", M::RemoveInsert { track: menu_track.clone(), slot }),
+                    I::action("移除效果器", M::RemoveInsert { track: menu_track.clone(), slot, expected_key }),
                 ];
                 ed.show_menu(ev.position(), items, w, cx);
             })));
     let body = match params {
-        Some((key, params)) => match builtin {
-            Some(dsp::EQ_ID) => eq_editor(ed, editor, track, slot, key, &params, cx),
-            Some(dsp::COMPRESSOR_ID) => comp_editor(ed, editor, track, slot, key, &params, cx),
-            Some(dsp::GATE_ID) => gate_editor(ed, editor, track, slot, key, &params, cx),
-            Some(dsp::DEESSER_ID) => deesser_editor(ed, editor, track, slot, key, &params, cx),
-            Some(dsp::LIMITER_ID) => limiter_editor(ed, editor, track, slot, key, &params),
-            Some(dsp::REVERB_ID) => reverb_editor(ed, editor, track, slot, key, &params),
-            Some(dsp::DELAY_ID) => delay_editor(ed, editor, track, slot, key, &params, cx),
-            Some(dsp::SATURATION_ID) => saturation_editor(ed, editor, track, slot, key, &params, cx),
-            _ => generic_editor(ed, editor, track, slot, key, &params),
-        },
-        None => div().h(px(120.0)).flex().items_center().justify_center().text_sm().text_color(th.text_secondary)
+        Some((key, params)) if builtin.is_some() => render_builtin_editor(ed, editor, &owner, slot, key, &params, cx),
+        Some((key, params)) => generic_editor(ed, editor, &owner, slot, key, &params),
+        None => div().h(gpui::rems(120.0/16.)).flex().items_center().justify_center().text_sm().text_color(th.text_secondary)
             .child(if handle.is_some() { "正在读取参数…" } else { "插件未载入（标识与状态已保留）" }).into_any_element(),
     };
-    let width = builtin.and_then(card_width);
-    div().id(SharedString::from(format!("device-{slot}"))).flex_none().flex().flex_col().gap(px(10.0)).p(px(14.0))
-        .rounded(px(12.0)).bg(th.card).shadow_sm().when(!on, |d| d.opacity(0.72))
+    let width = builtin.and_then(card_width).or(Some(480.));
+    div().id(SharedString::from(format!("device-{slot}"))).flex_none().flex().flex_col().gap(gpui::rems(10.0/16.)).p(gpui::rems(14.0/16.))
+        .rounded(gpui::rems(12.0/16.)).bg(th.card).shadow_sm().when(!on, |d| d.opacity(0.72))
         .when_some(width, |d, w| d.w(px(w)))
         .child(header).child(body)
         .into_any_element()
@@ -1194,18 +1484,18 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
 fn add_card(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let browse_track = track.clone();
-    let pill = |id: SharedString, label: &str| div().id(id).role(Role::Button).aria_label(label.to_string()).h(px(32.0)).px(px(12.0))
-        .flex().items_center().rounded(px(6.0)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked))
+    let pill = |id: SharedString, label: &str| div().id(id).role(Role::Button).aria_label(label.to_string()).h(gpui::rems(32.0/16.)).px(gpui::rems(12.0/16.))
+        .flex().items_center().rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked))
         .cursor_pointer().text_sm().child(label.to_string());
     let effects = dsp::EFFECT_IDS.iter().map(|&id| {
         let t = track.clone();
         pill(SharedString::from(format!("device-add-{id}")), dsp::short_label(id).unwrap_or(id))
             .on_click(cx.listener(move |ed, _, _, cx| ed.add_insert(&t, "builtin", id, cx)))
     });
-    div().id("device-add").flex_none().w(px(220.0)).flex().flex_col().gap(px(8.0)).p(px(14.0)).rounded(px(12.0))
+    div().id("device-add").flex_none().w(gpui::rems(220.0/16.)).flex().flex_col().gap(gpui::rems(8.0/16.)).p(gpui::rems(14.0/16.)).rounded(gpui::rems(12.0/16.))
         .border_1().border_color(th.shade)
         .child(div().text_sm().font_weight(FontWeight::BOLD).child("添加效果器"))
-        .child(div().flex().flex_wrap().gap(px(6.0)).children(effects))
+        .child(div().flex().flex_wrap().gap(gpui::rems(6.0/16.)).children(effects))
         .child(pill("device-add-browse".into(), "浏览插件…").on_click(cx.listener(move |ed, _, _, cx| ed.open_plugin_browser(browse_track.clone(), slot, cx))))
         .into_any_element()
 }
@@ -1235,11 +1525,11 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window
     div().id("device-view").role(Role::Group).aria_label(format!("{name} 的效果器链"))
         .track_focus(&ed.focus_devices)
         .size_full().flex().flex_col().bg(th.view)
-        .child(div().h(px(40.0)).flex_none().px(px(16.0)).flex().items_center().gap(px(8.0))
-            .child(svg().path(icon("sliders-horizontal")).size(px(15.0)).text_color(th.text_secondary))
+        .child(div().h(gpui::rems(40.0/16.)).flex_none().px(gpui::rems(16.0/16.)).flex().items_center().gap(gpui::rems(8.0/16.))
+            .child(svg().path(icon("sliders-horizontal")).size(gpui::rems(15.0/16.)).text_color(th.text_secondary))
             .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))
             .child(div().text_sm().text_color(th.text_secondary).child(if empty { "· 还没有效果器".to_string() } else { format!("· {count} 个效果器，信号从左到右") })))
-        .child(div().id("device-chain").flex_1().min_h_0().overflow_x_scroll().overflow_y_scroll().flex().items_start().gap(px(12.0)).px(px(12.0)).pb(px(12.0))
+        .child(div().id("device-chain").flex_1().min_h_0().overflow_x_scroll().overflow_y_scroll().flex().items_start().gap(gpui::rems(12.0/16.)).px(gpui::rems(12.0/16.)).pb(gpui::rems(12.0/16.))
             .children(cards)
             .child(add_card(ed, &track, count, cx)))
         .into_any_element()
@@ -1267,6 +1557,8 @@ mod tests {
         assert_eq!(from_norm(&stepped, 0.4), 0.0);
         assert_eq!(from_norm(&stepped, 0.6), 1.0);
         assert_eq!(format_value(&hz, 1500.0), "1.50 kHz");
+        assert_eq!(format_value(&d(0.01, 20., "Hz"), 0.25), "0.25 Hz");
+        assert_eq!(format_value(&d(0.01, 500., "ms"), 0.05), "0.05 ms");
         assert_eq!(format_value(&db, 3.0), "+3.0 dB");
     }
 
@@ -1323,18 +1615,55 @@ mod tests {
         }
     }
 
+    #[test]
+    fn graph_drags_use_the_display_axis_then_clamp_to_the_parameter() {
+        let ceiling = d(-12., 0., "dB");
+        let level_axis = Axis::lin(-36., 0.);
+        assert!((bounded_graph_value(&ceiling, level_axis, level_axis.norm(-6.), 10., 100., false).unwrap() + 2.4).abs() < 1e-9);
+        assert_eq!(bounded_graph_value(&ceiling, level_axis, level_axis.norm(-6.), -100., 100., false).unwrap(), -12.);
+        let cutoff = d(20., 1000., "Hz");
+        assert!((bounded_graph_value(&cutoff, FREQ_AXIS, FREQ_AXIS.norm(100.), 10., 100., false).unwrap() - 199.5262315).abs() < 1e-6);
+        assert!((bounded_graph_value(&cutoff, FREQ_AXIS, FREQ_AXIS.norm(100.), 100., 100., false).unwrap() - 1000.).abs() < 1e-9);
+        let delay = d(1., 2000., "ms");
+        let timeline = Axis::lin(0., 2000.);
+        assert!((bounded_graph_value(&delay, timeline, timeline.norm(500.), 10., 100., false).unwrap() - 700.).abs() < 1e-9);
+        let attack = d(1., 2000., "ms");
+        let envelope = Axis::log(1., 2000.).span(0.02, 0.25);
+        let before = envelope.norm(100.);
+        let value = bounded_graph_value(&attack, envelope, before, 3., 100., false).unwrap();
+        assert!((envelope.norm(value) - before - 0.03).abs() < 1e-9, "a handle follows the pointer within its own envelope segment");
+    }
+
+    #[test]
+    fn comparison_waits_for_the_committed_snapshot_and_survives_rejection() {
+        let a = vec![("gain".to_string(), -3.)];
+        let b = vec![("gain".to_string(), 2.)];
+        let mut comparison = Comparison { active: 0, slots: [Some(a.clone()), Some(b.clone())], pending: Some(1) };
+        comparison.reconcile(&b, true);
+        assert_eq!(comparison.active, 0, "busy host has not confirmed the request");
+        assert_eq!(comparison.pending, Some(1));
+        comparison.reconcile(&a, false);
+        assert_eq!(comparison.active, 0, "rollback leaves A active");
+        assert_eq!(comparison.pending, None);
+        comparison.pending = Some(1);
+        comparison.reconcile(&b, false);
+        assert_eq!(comparison.active, 1);
+        assert_eq!(comparison.pending, None);
+    }
+
     fn test_drag() -> DeviceDrag {
         DeviceDrag {
-            track: "track".into(), slot: 0, key: InsertKey(1), control: Control::Handle("test"),
+            track: DeviceTarget::Track("track".into()), slot: 0, key: InsertKey(1), control: Control::Handle("test"),
             phase: GesturePhase::Armed, origin: (0.0, 0.0), capture: None,
             surface: crate::host_pointer::SurfaceToken::for_test(),
-            basis: DeviceBasis { project: "test".into(), revision: Revision::new(0).unwrap(), params: Vec::new() },
+            basis: DeviceBasis { project: "test".into(), generation: 0, revision: Revision::new(0).unwrap(), params: Vec::new() },
+            scope: DeviceScope::SelectedTrack,
             start: vec![0.5], preview: vec![("value".into(), 0.5)],
         }
     }
 
-    fn test_preview(start: &[f64], delta: (f64, f64), fine: bool) -> Result<Vec<(String, f64)>, PlannerError> {
-        Ok(vec![("value".into(), drag_normalized(start[0], -delta.1, 180.0, fine)?)])
+    fn test_preview(start: &[f64], delta: (f64, f64), fine: bool) -> Result<Vec<(String, f64)>, String> {
+        Ok(vec![("value".into(), drag_normalized(start[0], -delta.1, 180.0, fine).map_err(|error| error.to_string())?)])
     }
 
     #[test]
@@ -1403,7 +1732,8 @@ mod native_tests {
         let window = cx.open_window(size(px(520.0), px(220.0)), |window, cx| {
             let editor = cx.new(|cx| Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx));
             let track = editor.read(cx).session.track.clone();
-            let target = Target { key: crate::instrument::instrument_key(&track), track, slot: crate::instrument::INSTRUMENT_SLOT };
+            let key = crate::instrument::instrument_key_for_generation(&track, dsp::SYNTH_ID, editor.read(cx).document_generation);
+            let target = Target { key, track: DeviceTarget::Track(track), slot: crate::instrument::INSTRUMENT_SLOT };
             let desc = target.basis(editor.read(cx)).unwrap().params.into_iter().find(|desc| desc.id == "gain").unwrap();
             Harness { editor, target, desc, show: true, outside: cx.focus_handle(), block_up: Rc::new(Cell::new(false)), with_knob }
         });
@@ -1435,7 +1765,7 @@ mod native_tests {
 
     fn gain(host: &Harness, cx: &App) -> f64 {
         let editor = host.editor.read(cx);
-        let params = crate::instrument::synth_params(editor.project().track(&host.target.track).unwrap()).unwrap();
+        let params = crate::instrument::synth_params(editor.project().track(host.target.track.track_id().unwrap()).unwrap()).unwrap();
         crate::instrument::synth_descs(&params).into_iter().find(|desc| desc.id == "gain").unwrap().value
     }
 
@@ -1488,14 +1818,15 @@ mod native_tests {
 
     #[gpui::test]
     fn graph_stale_track_slot_and_value_cannot_reach_the_store(cx: &mut TestAppContext) {
-        for change in ["track", "slot", "value"] {
+        for change in ["track", "slot", "value", "generation"] {
             let window = open(cx, false);
             window.update(cx, |host, window, cx| {
                 down(host, window, cx);
-                let track = host.target.track.clone();
+                let track = host.target.track.track_id().unwrap().clone();
                 host.editor.update(cx, |editor, _| {
                     match change {
                         "track" => editor.session.track = editor.project().tracks[1].id.clone(),
+                        "generation" => editor.document_generation += 1,
                         "slot" => {
                             editor.persistence.commit(editor.revision(), CommandBatch::single("Remove instrument", Command::SetTrackInstrument {
                                 track: track.clone(), instrument: None,
@@ -1601,6 +1932,42 @@ mod native_tests {
             up(window, cx);
             assert_eq!(gain(host, cx), host.desc.max);
             assert_eq!(host.editor.read(cx).revision().get(), 1);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn graph_cancellation_follows_its_window_when_another_window_loses_focus(cx: &mut TestAppContext) {
+        let first = open(cx, false);
+        let (editor, target, desc) = first.update(cx, |host, window, cx| {
+            let focus = host.editor.read(cx).focus_devices.clone();
+            window.focus(&focus, cx);
+            (host.editor.clone(), host.target.clone(), host.desc.clone())
+        }).unwrap();
+        crate::native_test_support::frames(first, cx);
+        let second = cx.open_window(size(px(520.0), px(220.0)), |_, cx| {
+            Harness { editor, target, desc, show: true, outside: cx.focus_handle(),
+                block_up: Rc::new(Cell::new(false)), with_knob: false }
+        });
+        crate::native_test_support::frames(second, cx);
+        second.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
+        crate::native_test_support::frames(second, cx);
+        first.update(cx, |host, window, cx| {
+            // Deliver the old window's blur after a different window acquired
+            // the shared Editor's graph preview. This must not take its model.
+            window.focus(&host.outside, cx);
+        }).unwrap();
+        crate::native_test_support::frames(first, cx);
+        second.update(cx, |host, window, cx| {
+            assert!(host.editor.read(cx).device_drag.is_some());
+            assert!(window.captured_hitbox().is_some());
+            host.editor.update(cx, |ed, cx| ed.cancel_edits(verdant_session::CancelReason::FocusLost, window, cx));
+            assert!(host.editor.read(cx).device_drag.is_none());
+        }).unwrap();
+        crate::native_test_support::frames(second, cx);
+        second.update(cx, |host, window, cx| {
+            assert!(window.captured_hitbox().is_none());
+            up(window, cx);
+            assert_eq!(host.editor.read(cx).revision().get(), 0);
         }).unwrap();
     }
 }

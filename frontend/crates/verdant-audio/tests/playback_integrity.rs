@@ -195,3 +195,33 @@ fn a_seek_arriving_inside_source_render_waits_for_the_next_device_callback() {
     callback.process_f32(&mut block, 1).unwrap();
     assert!(block[32..].iter().all(|v| *v < -0.24));
 }
+
+#[test]
+fn paused_live_performance_is_resampled_without_consuming_timeline_prefetch(){
+    struct Tone { phase:f64 }
+    impl verdant_audio::Processor for Tone {
+        fn name(&self)->&str{"live tone"}
+        fn process(&mut self,l:&mut[f32],r:&mut[f32]){
+            for(a,b)in l.iter_mut().zip(r){let sample=(TAU*self.phase).sin()as f32*0.1;self.phase=(self.phase+440./48000.).fract();*a=sample;*b=sample;}
+        }
+    }
+    for rate in [44100,48000,96000] {
+        let source=speech_band_signal();
+        let(mut control,mut callback)=controlled_replay(source.clone(),rate);
+        let(_,mut reference)=controlled_replay(source,rate);
+        callback.process_f32(&mut[0.;37],1).unwrap();reference.process_f32(&mut[0.;37],1).unwrap();
+        control.pause();let position=control.position();
+        assert!(control.set_monitor(1,Some(Box::new(Tone{phase:0.}))));
+        let mut live=vec![0.;rate as usize];
+        for block in live.chunks_mut(173){callback.process_f32(block,1).unwrap();}
+        assert_eq!(control.position(),position);
+        let(mut re,mut im)=(0.,0.);let from=rate as usize/10;let to=rate as usize*9/10;
+        for(i,&sample)in live[from..to].iter().enumerate(){let angle=TAU*440.*(from+i)as f64/rate as f64;re+=sample as f64*angle.cos();im+=sample as f64*angle.sin();}
+        let amplitude=2.*re.hypot(im)/(to-from)as f64;
+        assert!((amplitude-0.1).abs()<0.001,"live pitch/rate changed at {rate}: {amplitude}");
+        control.set_monitor(1,None);control.play();
+        let mut resumed=[0.;512];let mut expected=[0.;512];
+        callback.process_f32(&mut resumed,1).unwrap();reference.process_f32(&mut expected,1).unwrap();
+        assert_eq!(resumed,expected,"paused performance consumed timeline PCM at {rate}");
+    }
+}

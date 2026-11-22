@@ -1,0 +1,18 @@
+{
+  "schema": "verdant-native-suite-export-validation/1",
+  "path": "native-suite-advanced.wav",
+  "bytes": 9209656,
+  "sha256": "44c0947ac98d9ec8f078adbe4c097026b79421ca4ff6bd0f344e0b2602b569ac",
+  "format": "IEEE Float32",
+  "sample_rate": 48000,
+  "channels": 2,
+  "frames": 1151200,
+  "duration_seconds": 23.983333333333334,
+  "nonfinite_samples": 0,
+  "peak": 0.2680390179157257,
+  "rms": 0.02218795526528575,
+  "channel_rms": [
+    0.022165609590172136,
+    0.02221027845851358
+  ]
+}

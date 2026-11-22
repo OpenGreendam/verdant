@@ -13,7 +13,6 @@ use gpui::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use verdant_domain::TrackId;
 use verdant_normalized_knob::{
     NormalizedKnob, NormalizedKnobHandle,
     native::{
@@ -28,7 +27,7 @@ use verdant_plugins::{InsertKey, ParamDesc};
 use verdant_ui_protocol::GesturePhase;
 
 use crate::{
-    devices::{format_value, from_norm, to_norm},
+    devices::{DeviceScope, DeviceTarget, format_value, from_norm, to_norm},
     editor::Editor,
     paint::{b, polyline},
     theme::Theme,
@@ -37,7 +36,9 @@ use crate::{
 #[derive(Clone)]
 struct Target {
     editor: WeakEntity<Editor>,
-    track: TrackId,
+    track: DeviceTarget,
+    scope: DeviceScope,
+    generation: u64,
     slot: usize,
     key: InsertKey,
     desc: ParamDesc,
@@ -45,12 +46,36 @@ struct Target {
 
 impl Target {
     fn current_desc(&self, editor: &Editor) -> Option<ParamDesc> {
+        if editor.document_generation != self.generation || !self.scope.allows(&self.track, editor) { return None; }
         editor.current_device_parameters(&self.track, self.slot, self.key)?
             .into_iter().find(|desc| desc.id == self.desc.id)
     }
 
+    fn effective_desc(&self, current: &ParamDesc) -> Option<ParamDesc> {
+        let mut desc = current.clone();
+        desc.min = current.min.max(self.desc.min);
+        desc.max = current.max.min(self.desc.max);
+        if !desc.min.is_finite() || !desc.max.is_finite() || desc.max <= desc.min { return None; }
+        if current.step_count > 0 {
+            // A narrowed view still uses the plug-in's physical step grid.
+            // Rebasing that grid at the visible minimum would change values.
+            let step = (current.max - current.min) / current.step_count as f64;
+            let first = ((desc.min - current.min) / step).ceil();
+            let last = ((desc.max - current.min) / step).floor();
+            if !step.is_finite() || step <= 0.0 || last <= first { return None; }
+            desc.min = current.min + first * step;
+            desc.max = current.min + last * step;
+            desc.step_count = (last - first) as i64;
+        }
+        desc.value = current.value.clamp(desc.min, desc.max);
+        desc.default_value = current.default_value.map(|value| value.clamp(desc.min, desc.max));
+        Some(desc)
+    }
+
     fn host_allows_edit(&self, editor: &Editor) -> bool {
-        !editor.plugin_busy.contains(&self.key) && editor.device_drag.is_none()
+        self.scope.allows(&self.track, editor) && editor.document_generation == self.generation
+            && !editor.plugin_busy.contains(&self.key) && editor.device_drag.is_none()
+            && (self.slot == crate::instrument::INSTRUMENT_SLOT || !editor.inserts_loading)
             && editor.menu.is_none() && editor.text_prompt.is_none() && editor.modal_dialog.is_none()
             && editor.session.pointer_owner().is_none() && editor.note_creation.is_none()
             && editor.lane_stroke.is_none() && editor.mixer_drag.is_none() && editor.master_drag.is_none()
@@ -66,11 +91,14 @@ impl Target {
         // store revision, and a new document can reuse a revision number.
         json!({
             "project": editor.project().project_id,
+            "generation": editor.document_generation,
             "revision": editor.revision().to_string(),
             "track": self.track, "slot": self.slot, "key": self.key.0,
             "parameter": desc.id, "value": desc.value,
             "min": desc.min, "max": desc.max, "steps": desc.step_count,
             "default": desc.default_value,
+            "visibleMin": self.desc.min, "visibleMax": self.desc.max,
+            "visibleSteps": self.desc.step_count,
         }).to_string()
     }
 }
@@ -163,16 +191,14 @@ fn drain(handle: &NormalizedKnobHandle, target: &Target, cx: &mut App) -> Draine
                         return false;
                     }
                     let desc = current.expect("validated live parameter and slot identity");
-                    if desc.min != target.desc.min || desc.max != target.desc.max
-                        || desc.step_count != target.desc.step_count {
+                    let Some(visible) = target.effective_desc(&desc) else {
                         editor.notice("参数范围已改变；已取消这次旋钮修改");
                         cx.notify();
                         return false;
-                    }
-                    let value = from_norm(&desc, commit.value);
-                    editor.set_track_insert_params(target.track.clone(), target.slot,
-                        vec![(target.desc.id.clone(), value)], cx);
-                    true
+                    };
+                    let value = from_norm(&visible, commit.value);
+                    editor.set_device_params(target.track.clone(), target.slot,
+                        vec![(target.desc.id.clone(), value)], cx)
                 });
                 if !matches!(accepted, Ok(true)) { cancel = true; }
             }
@@ -298,7 +324,9 @@ impl MoveGestureBinding for Binding {
         let target = self.target.borrow();
         let available = target.editor.upgrade().is_some_and(|entity| {
             let editor = entity.read(cx);
-            target.host_allows_edit(editor) && target.current_desc(editor).is_some()
+            let competing = editor.proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade)
+                .is_some_and(|contact| contact.is_active() && !Rc::ptr_eq(&contact, &self.contact));
+            !competing && target.host_allows_edit(editor) && target.current_desc(editor).is_some()
         });
         if !available { return false; }
         match state::<bool>(&self.handle, "disabled") {
@@ -408,7 +436,7 @@ struct Mount {
 #[derive(IntoElement)]
 pub(crate) struct Knob {
     editor: Entity<Editor>,
-    track: TrackId,
+    track: DeviceTarget,
     slot: usize,
     key: InsertKey,
     desc: ParamDesc,
@@ -418,21 +446,23 @@ pub(crate) struct Knob {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn knob(editor: Entity<Editor>, track: TrackId, slot: usize, key: InsertKey,
+pub(crate) fn knob(editor: Entity<Editor>, track: impl Into<DeviceTarget>, slot: usize, key: InsertKey,
     desc: ParamDesc, label: &str, theme: Theme, size: f32) -> Knob {
-    Knob { editor, track, slot, key, desc, label: label.into(), theme, size }
+    Knob { editor, track: track.into(), slot, key, desc, label: label.into(), theme, size }
 }
 
 impl RenderOnce for Knob {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let editor = self.editor.read(cx);
         let mut target = Target { editor: self.editor.downgrade(), track: self.track,
+            scope: DeviceScope::for_window(window), generation: editor.document_generation,
             slot: self.slot, key: self.key, desc: self.desc.clone() };
         let current = target.current_desc(editor);
-        let disabled = current.is_none() || !target.host_allows_edit(editor);
-        let desc = current.unwrap_or(self.desc);
-        let revision = target.revision(editor, &desc);
+        let visible = current.as_ref().and_then(|current| target.effective_desc(current));
+        let disabled = visible.is_none() || !target.host_allows_edit(editor);
+        let desc = visible.unwrap_or(self.desc);
         target.desc = desc.clone();
+        let revision = target.revision(editor, current.as_ref().unwrap_or(&desc));
         let props = json!({
             "value": to_norm(&desc, desc.value),
             "defaultValue": to_norm(&desc, desc.default_value.unwrap_or(desc.value)),
@@ -441,7 +471,7 @@ impl RenderOnce for Knob {
             "disabled": disabled,
             "revision": revision,
         });
-        let key = SharedString::from(format!("proto-knob-{}-{}-{}-{}", target.track.as_str(), self.key.0, self.slot, desc.id));
+        let key = SharedString::from(format!("proto-knob-{:?}-{}-{}-{}", target.track, self.key.0, self.slot, desc.id));
         let initial_target = target.clone();
         let initial_props = props.clone();
         let initial_label = self.label.clone();
@@ -477,7 +507,7 @@ impl RenderOnce for Knob {
             });
             Mount { root, drawing, target, lease, contact, props: initial_props, _changes: changes }
         });
-        mount.update(cx, |mount, cx| {
+        let root = mount.update(cx, |mount, cx| {
             *mount.target.borrow_mut() = target.clone();
             if mount.props != props {
                 match mount.root.update(cx, |root, cx| root.set_props(props.clone(), window, cx)) {
@@ -509,8 +539,33 @@ impl RenderOnce for Knob {
                 }
             });
             mount.root.clone()
-        })
+        });
+        let handle = root.read(cx).handle();
+        div().id(SharedString::from(format!("proto-knob-entry-{}-{}", target.key.0, target.desc.id)))
+            .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
+                match event.keystroke.key.as_str() {
+                    "enter" => open_exact_value(&handle, &target, window, cx),
+                    "backspace" => {
+                        cancel_source(&handle, &target, window, cx);
+                        match call(&handle, "begin", vec![true.into(), false.into()], window, cx) {
+                            Ok(_) => { drain(&handle, &target, cx); }
+                            Err(error) => { handle.take_events(); handle.take_failures(); report(&target, error, cx); }
+                        }
+                    }
+                    _ => return,
+                }
+                window.prevent_default();
+                cx.stop_propagation();
+            })
+            .child(root)
     }
+}
+
+fn open_exact_value(handle: &NormalizedKnobHandle, target: &Target, window: &mut Window, cx: &mut App) {
+    let Some(editor) = target.editor.upgrade() else { return };
+    if !target.host_allows_edit(editor.read(cx)) || target.current_desc(editor.read(cx)).is_none() { return; }
+    cancel_source(handle, target, window, cx);
+    crate::devices::open_parameter_value(&editor, target.track.clone(), target.slot, target.key, target.desc.clone(), cx);
 }
 
 struct Drawing {
@@ -550,13 +605,15 @@ impl Render for Drawing {
                     let target = self.target.borrow().clone();
                     cx.defer(move |cx| report(&target, error, cx));
                 }
-                return div().w(px(self.size + 26.0)).text_xs().text_color(self.theme.text_secondary)
+                return div().w(gpui::rems((self.size + 26.0) / 16.0)).text_xs().text_color(self.theme.text_secondary)
                     .child("参数暂不可用").into_any_element();
             }
         };
         let (desc, th, size, double_click) = (self.desc.clone(), self.theme, self.size, self.double_click.clone());
         let value_text = format_value(&desc, from_norm(&desc, n));
-        div().flex().flex_col().items_center().gap(px(2.0)).w(px(size + 26.0))
+        let (click_handle, click_target) = (self.handle.clone(), self.target.clone());
+        let (action_handle, action_target) = (self.handle.clone(), self.target.clone());
+        div().flex().flex_col().items_center().gap(gpui::rems(2.0 / 16.0)).w(gpui::rems((size + 26.0) / 16.0))
             .child(canvas(|bounds, window, _| window.insert_hitbox(bounds, gpui::HitboxBehavior::Normal), move |bounds, hitbox, window, _| {
                 let o = bounds.origin;
                 let side = f64::from(bounds.size.width.min(bounds.size.height));
@@ -577,9 +634,14 @@ impl Render for Drawing {
                         double_click.set(event.click_count >= 2);
                     }
                 });
-            }).size(px(size)))
+            }).size(gpui::rems(size / 16.0)))
             .child(div().text_xs().text_color(th.text_secondary).child(self.label.clone()))
-            .child(div().text_sm().text_color(th.text).whitespace_nowrap().child(value_text))
+            .child(div().id(SharedString::from(format!("knob-value-{}-{}", self.target.borrow().slot, self.desc.id)))
+                .role(gpui::Role::Button).aria_label(format!("精确输入 {}", self.desc.name)).cursor_text()
+                .text_sm().text_color(th.text).whitespace_nowrap().rounded(gpui::rems(3.0 / 16.0)).px(gpui::rems(3.0 / 16.0))
+                .hover(move |style| style.bg(th.control_pressed)).child(value_text)
+                .on_click(move |_, window, cx| open_exact_value(&click_handle, &click_target.borrow(), window, cx))
+                .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| open_exact_value(&action_handle, &action_target.borrow(), window, cx)))
             .into_any_element()
     }
 }
@@ -914,10 +976,13 @@ mod tests {
         let window = cx.open_window(size(px(300.0), px(200.0)), |window, cx| {
             let editor = cx.new(|cx| Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx));
             let track = editor.read(cx).session.track.clone();
-            let key = crate::instrument::instrument_key(&track);
-            let desc = editor.read(cx).current_device_parameters(&track, crate::instrument::INSTRUMENT_SLOT, key)
+            let generation = editor.read(cx).document_generation;
+            let key = crate::instrument::instrument_key_for_generation(&track, verdant_plugins::builtin_dsp::SYNTH_ID, generation);
+            let owner = DeviceTarget::Track(track);
+            let desc = editor.read(cx).current_device_parameters(&owner, crate::instrument::INSTRUMENT_SLOT, key)
                 .unwrap().into_iter().find(|desc| desc.id == "gain").unwrap();
-            let target = Target { editor: editor.downgrade(), track, slot: crate::instrument::INSTRUMENT_SLOT, key, desc };
+            let target = Target { editor: editor.downgrade(), track: owner, scope: DeviceScope::SelectedTrack,
+                generation, slot: crate::instrument::INSTRUMENT_SLOT, key, desc };
             ProductionHarness { editor, target, show: true }
         });
         window.update(cx, |_, window, _| window.activate_window()).unwrap();
@@ -925,7 +990,8 @@ mod tests {
         window
     }
 
-    fn instrument_gain(editor: &Editor, track: &TrackId) -> f64 {
+    fn instrument_gain(editor: &Editor, owner: &DeviceTarget) -> f64 {
+        let track = owner.track_id().expect("instrument fixture track");
         let params = crate::instrument::synth_params(editor.project().track(track).unwrap()).unwrap();
         crate::instrument::synth_descs(&params).into_iter().find(|desc| desc.id == "gain").unwrap().value
     }
@@ -1124,7 +1190,7 @@ mod tests {
             "menu" => editor.show_menu(gpui::point(px(0.0), px(0.0)), vec![], window, cx),
             "modal" => editor.open_scale_dialog(window, cx),
             "prompt" => editor.prompt_text("Go to bar", crate::editor::PromptPurpose::GoToBar, "1", window, cx),
-            "mixer" => editor.begin_mixer_drag(crate::editor::MixerControl::Fader, &target.track, 0.0, 0.5),
+            "mixer" => editor.begin_mixer_drag(crate::editor::MixerControl::Fader, target.track.track_id().unwrap(), 0.0, 0.5),
             "master" => editor.begin_master_drag(crate::editor::MixerControl::Fader, 0.0, 0.5),
             "session" => {
                 let project = editor.project().clone();
@@ -1208,9 +1274,9 @@ mod tests {
                 assert!(stale.current_desc(editor).is_none(), "cached data does not manufacture a live slot");
                 editor.session.track = editor.project().tracks[1].id.clone();
                 assert!(target.current_desc(editor).is_none(), "selection rejects the old subtree before repaint");
-                editor.session.track = target.track.clone();
+                editor.session.track = target.track.track_id().unwrap().clone();
                 editor.persistence.commit(editor.revision(), CommandBatch::single("Remove instrument", Command::SetTrackInstrument {
-                    track: target.track.clone(), instrument: None,
+                    track: target.track.track_id().unwrap().clone(), instrument: None,
                 })).unwrap();
                 assert!(target.current_desc(editor).is_none());
             });
@@ -1235,7 +1301,7 @@ mod tests {
 
     #[gpui::test]
     fn production_binding_refuses_track_slot_and_value_changes_before_props_repaint(cx: &mut TestAppContext) {
-        for change in ["track", "slot", "value"] {
+        for change in ["track", "slot", "value", "generation"] {
             let window = open_production(cx);
             window.update(cx, |host, window, cx| {
                 production_down(window, cx);
@@ -1244,16 +1310,17 @@ mod tests {
                 host.editor.update(cx, |editor, _| {
                     match change {
                         "track" => editor.session.track = editor.project().tracks[1].id.clone(),
+                        "generation" => editor.document_generation += 1,
                         "slot" => {
                             editor.persistence.commit(editor.revision(), CommandBatch::single("Remove instrument", Command::SetTrackInstrument {
-                                track: target.track.clone(), instrument: None,
+                                track: target.track.track_id().unwrap().clone(), instrument: None,
                             })).unwrap();
                         }
                         "value" => {
-                            let mut params = crate::instrument::synth_params(editor.project().track(&target.track).unwrap()).unwrap();
+                            let mut params = crate::instrument::synth_params(editor.project().track(target.track.track_id().unwrap()).unwrap()).unwrap();
                             params.set("gain", -18.0).unwrap();
                             editor.persistence.commit(editor.revision(), CommandBatch::single("External parameter change", Command::SetTrackInstrument {
-                                track: target.track.clone(), instrument: Some(crate::instrument::synth_spec(&params, "test")),
+                                track: target.track.track_id().unwrap().clone(), instrument: Some(crate::instrument::synth_spec(&params, "test")),
                             })).unwrap();
                         }
                         _ => unreachable!(),
@@ -1271,5 +1338,89 @@ mod tests {
                 }
             }).unwrap();
         }
+    }
+
+    #[gpui::test]
+    fn production_knob_preserves_visible_ranges_physical_steps_and_precise_entry(cx: &mut TestAppContext) {
+        let window = open_production(cx);
+        window.update(cx, |host, _, cx| {
+            host.target.desc.min = -12.0;
+            host.target.desc.max = 0.0;
+            cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        let (handle, initial_windows) = window.update(cx, |host, window, cx| {
+            let handle = production_handle(window);
+            close_to(state::<f64>(&handle, "value").unwrap(), 1.0 / 3.0);
+            let current = host.target.current_desc(host.editor.read(cx)).unwrap();
+            assert_eq!((current.min, current.max), (-24.0, 6.0), "authoritative plug-in ABI remains full range");
+            let mut discrete = current.clone();
+            discrete.min = 0.0; discrete.max = 10.0; discrete.step_count = 5;
+            let mut narrowed = host.target.clone();
+            narrowed.desc.min = 1.0; narrowed.desc.max = 9.0;
+            let visible = narrowed.effective_desc(&discrete).unwrap();
+            assert_eq!((visible.min, visible.max, visible.step_count), (2.0, 8.0, 3));
+            assert_eq!(from_norm(&visible, 0.5), 6.0, "retain the physical 0,2,4,6,8,10 grid");
+            production_down(window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                position: gpui::point(px(32.0), px(50.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            (handle, cx.windows().len())
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "home");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| close_to(instrument_gain(host.editor.read(cx), &host.target.track), -12.0)).unwrap();
+        cx.simulate_keystrokes(window.into(), "backspace");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            close_to(instrument_gain(host.editor.read(cx), &host.target.track), -8.0);
+            assert_eq!(phase(&handle).unwrap(), GesturePhase::Idle);
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        cx.run_until_parked();
+        window.update(cx, |_, _, cx| assert_eq!(cx.windows().len(), initial_windows + 1, "Enter opens the real value-entry window")).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_plugin_window_keeps_its_instrument_target_after_track_selection_changes(cx: &mut TestAppContext) {
+        let main = cx.open_window(size(px(1300.0), px(900.0)), |window, cx| {
+            let mut editor = Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx);
+            editor.needs_fit = false;
+            editor
+        });
+        let (editor, track, selected) = main.update(cx, |editor, _, cx| {
+            let track = editor.session.track.clone();
+            editor.session.track = editor.project().tracks[1].id.clone();
+            editor.open_builtin_instrument_editor(&track, cx);
+            (cx.entity(), track, editor.session.track.clone())
+        }).unwrap();
+        cx.run_until_parked();
+        let native = main.update(cx, |editor, _, _| *editor.native_plugin_windows.values().next().expect("production instrument window")).unwrap();
+        crate::native_test_support::frames(native, cx);
+        cx.update_window(native.into(), |_, window, cx| {
+            assert_eq!(DeviceScope::for_window(window), DeviceScope::NativeWindow);
+            let owner = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.declared_events.contains("valueCommit")
+                    && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text() == "音量")
+            }).expect("native instrument window uses the compiled gain knob");
+            let handle = NormalizedKnobHandle { owner };
+            assert!(!state::<bool>(&handle, "disabled").unwrap());
+            let accepted = state::<f64>(&handle, "value").unwrap();
+            let start = handle.owner.borrow().native_hitbox.as_ref().unwrap().bounds.center();
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                position: start, button: MouseButton::Left, ..Default::default()
+            }), cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                position: start + gpui::point(px(0.0), px(-18.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            let ed = editor.read(cx);
+            assert_eq!(ed.session.track, selected, "native editing does not redirect the docked selection");
+            assert_eq!(ed.revision().get(), 1);
+            close_to(instrument_gain(ed, &DeviceTarget::Track(track.clone())), -24.0 + (accepted + 0.1) * 30.0);
+            assert!(!ed.has_proto_pointer_contact());
+        }).unwrap();
     }
 }

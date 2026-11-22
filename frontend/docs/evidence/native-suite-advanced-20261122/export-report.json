@@ -1,0 +1,138 @@
+{
+  "schema": "verdant-render/1",
+  "job_id": "7328270a-fba3-44cf-8aa2-eb26a84b9e2b",
+  "project_id": "56166ab3-f525-5ab6-945a-46c39d2f51c0",
+  "revision": 0,
+  "project_sha256": "edf11e3abc5b395664fb0e517c50b7ce33a66b82d227231f58dd7bf8df355059",
+  "input_sha256": "2a372743b37363c6b36fe0a485f9ab8232a478cfddfc9df671cce8150b3397e9",
+  "frames": 1151200,
+  "fingerprint": "2a372743b37363c6b36fe0a485f9ab8232a478cfddfc9df671cce8150b3397e9",
+  "request_digest": "2e0613544daa671ca02a1b306339cb75efa6a4f3c4f207666cfed43109c116b8",
+  "sample_rate": 48000,
+  "audio": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "encoding": "Float32",
+    "scope": "Mix",
+    "range": "Full",
+    "effects": true
+  },
+  "range_ticks": null,
+  "seed": 1,
+  "worker_sha256": "fa27081631bb6b6836c77b9b2656cbc9d8197b0409f1881654e5a206a8519961",
+  "voices": {
+    "version": 1,
+    "default_voice": null,
+    "voices": {}
+  },
+  "media": [],
+  "effects": [
+    {
+      "instance_id": "68653b03-86b8-5a4f-9d20-5ce7efa69dd7",
+      "format": "builtin",
+      "id": "verdant.builtin.eq",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "b082edeb-59e4-50a4-9d1a-c57e7afa9368",
+      "format": "builtin",
+      "id": "verdant.builtin.compressor",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "42a9d6d4-5012-5c91-a13f-bc58dd966860",
+      "format": "builtin",
+      "id": "verdant.builtin.gate",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "14584b43-cfa9-56cd-ad61-4e868add89ba",
+      "format": "builtin",
+      "id": "verdant.builtin.deesser",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "d0471f14-5e1c-52a1-8360-cc91e44b4483",
+      "format": "builtin",
+      "id": "verdant.builtin.limiter",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "82143f2d-314a-5de8-a4d7-c1c5a43d6c93",
+      "format": "builtin",
+      "id": "verdant.builtin.reverb",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "03550f19-52c2-595a-895f-361ee1a62c71",
+      "format": "builtin",
+      "id": "verdant.builtin.delay",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "f1f99b17-aa27-56aa-9127-26699685bc34",
+      "format": "builtin",
+      "id": "verdant.builtin.saturation",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "f2e5631d-539c-5a54-aa2a-33af3a3b7c99",
+      "format": "builtin",
+      "id": "verdant.builtin.multiband",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "dd996edf-237b-582f-9fac-5216e143fbdd",
+      "format": "builtin",
+      "id": "verdant.builtin.filter",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "2d348933-07ad-532b-9b9f-53f7c998d8c9",
+      "format": "builtin",
+      "id": "verdant.builtin.simplon",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "d9794297-3e53-59af-8cf3-a14ab515aafb",
+      "format": "builtin",
+      "id": "verdant.builtin.micro",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "69898580-060b-5cd3-b3bc-1eabdd35ec9e",
+      "format": "builtin",
+      "id": "verdant.builtin.compressor",
+      "version": "",
+      "binary": null
+    },
+    {
+      "instance_id": "e55a8aed-02d8-5889-b6cc-a61dd2473ae8",
+      "format": "builtin",
+      "id": "verdant.builtin.limiter",
+      "version": "",
+      "binary": null
+    }
+  ],
+  "phrases": [],
+  "artifacts": [
+    {
+      "path": "native-suite-advanced.wav",
+      "role": "audio",
+      "bytes": 9209656,
+      "sha256": "44c0947ac98d9ec8f078adbe4c097026b79421ca4ff6bd0f344e0b2602b569ac"
+    }
+  ]
+}

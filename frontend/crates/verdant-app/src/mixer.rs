@@ -116,14 +116,14 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                         .id("master-insert-parameters")
                         .role(Role::Button)
                         .aria_label(format!("主总线插入 {}，{}，{}", slot + 1, spec.name, state))
-                        .aria_description("打开主总线插件参数")
+                        .aria_description("打开主总线插件原生界面")
                         .flex()
                         .flex_col()
                         .gap(px(2.0))
                         .child(div().text_xs().truncate().child(format!("{} · {}", slot + 1, spec.name)))
                         .child(div().text_size(px(9.0)).truncate().text_color(if warning { th.warning } else { th.text_secondary }).child(state))
                         .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
-                            ed.show_master_insert_params(slot, cx);
+                            ed.open_master_insert_editor(slot, cx);
                             cx.stop_propagation();
                         })),
                 )
@@ -292,14 +292,16 @@ fn strip(
         let runtime = ed.inserts.get(&id).and_then(|s| s.get(slot));
         let (state, warning) = insert_state(ed.inserts_loading, runtime, spec);
         let (open_track, menu_track) = (id.clone(), id.clone());
-        let native = matches!(runtime, Some(InsertSlot::Live(h)) if h.has_editor());
+        let native = matches!(runtime, Some(InsertSlot::Live(h)) if h.has_editor()
+            || (spec.format == "builtin" && verdant_plugins::builtin_dsp::has_native_editor(&spec.id)));
         let spec_bypass = spec.bypass;
+        let expected_key = ed.live_insert(&id, slot).map(|handle| handle.key());
         slots = slots.child(
             div()
                 .id(SharedString::from(format!("insert-{slot}")))
                 .role(Role::Button)
                 .aria_label(format!("插入 {}，{}，{}", slot + 1, spec.name, state))
-                .aria_description("点击打开参数；右键打开旁通、原生窗口和移除菜单")
+                .aria_description("点击打开原生界面；右键打开旁通和移除菜单")
                 .flex_none()
                 .min_h(px(38.0))
                 .px(px(6.0))
@@ -311,8 +313,8 @@ fn strip(
                 .child(div().text_xs().truncate().child(format!("{} · {}", slot + 1, spec.name)))
                 .child(div().text_size(px(9.0)).truncate().text_color(if warning { th.warning } else { th.text_secondary }).child(state))
                 .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
-                    if ed.select_track(open_track.clone(), cx) {
-                        ed.show_insert_params(open_track.clone(), slot, cx);
+                    if expected_key.is_none_or(|key| ed.live_insert(&open_track, slot).is_some_and(|handle| handle.key() == key)) && ed.select_track(open_track.clone(), cx) {
+                        ed.open_insert_editor(&open_track, slot, cx);
                     }
                     cx.stop_propagation();
                 }))
@@ -322,12 +324,12 @@ fn strip(
                         let items = vec![
                             MenuItem::action(
                                 if spec_bypass { "启用插件" } else { "旁通插件" },
-                                MenuAction::BypassInsert { track: menu_track.clone(), slot },
+                                MenuAction::BypassInsert { track: menu_track.clone(), slot, expected_key },
                             ),
-                            MenuItem::action("打开原生插件窗口", MenuAction::OpenInsertEditor { track: menu_track.clone(), slot })
+                            MenuItem::action("打开原生插件窗口", MenuAction::OpenInsertEditor { track: menu_track.clone(), slot, expected_key })
                                 .enabled(native),
                             MenuItem::separator(),
-                            MenuItem::action("移除插件", MenuAction::RemoveInsert { track: menu_track.clone(), slot }),
+                            MenuItem::action("移除插件", MenuAction::RemoveInsert { track: menu_track.clone(), slot, expected_key }),
                         ];
                         ed.show_menu(ev.position, items, window, cx);
                         cx.stop_propagation();
@@ -518,7 +520,7 @@ fn parameter_panel(ed: &Editor, cx: &mut Context<Editor>) -> Option<gpui::AnyEle
                 .child(command_button(ed, CommandId::PluginRemove, CommandArg::TrackSlot(track.clone(), *slot as u32), "移除", "remove", cx)),
         );
     if let Some(handle) = ed.live_insert(track, *slot) {
-        if handle.has_editor() {
+        if handle.has_editor() || (spec.format == "builtin" && verdant_plugins::builtin_dsp::has_native_editor(&spec.id)) {
             panel = panel.child(command_button(
                 ed,
                 CommandId::PluginOpenEditor,
@@ -620,7 +622,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 ),
         );
     if let Some(handle) = ed.live_master_insert(slot) {
-        if handle.has_editor() {
+        if handle.has_editor() || (spec.format == "builtin" && verdant_plugins::builtin_dsp::has_native_editor(&spec.id)) {
             panel = panel.child(route_button("master-native-editor", "打开原生插件窗口", false, th).flex_none().on_click(cx.listener(
                 move |ed, _: &ClickEvent, _, cx| {
                     ed.open_master_insert_editor(slot, cx);

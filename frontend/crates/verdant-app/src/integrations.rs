@@ -7,6 +7,7 @@ use verdant_midi::{CaptureOrigin,MidiCapture,MidiInputService,MidiPort,MidiTake}
 #[derive(Clone,Debug)]
 pub enum IntegrationAction {
     Menu,Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
+    MonitorPorts,Monitor(MidiPort),StopMonitoring,
     MidiPorts,MidiChannels(MidiPort),Record(MidiPort,Option<u8>),FinishRecording,CancelRecording,ImportAudio,AuthorizeAudio,Clips,SelectClip(TrackId,String),EditClip,DuplicateClip,DeleteClip,RelinkClip,
     Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),VocaloidMetadata,
     Scale,OtherTracks,ThreeLanes,AuditionSelection,Report,
@@ -18,12 +19,13 @@ pub struct Recording {
     capture:MidiCapture,take:Option<MidiTake>,track:TrackId,base:Revision,tempo:TempoMap,origin_micros:u64,origin_tick:i64,
 }
 pub struct IntegrationState {
+    pub performance:crate::performance::PerformanceState,
     pub asset_policy:AssetPolicy,pub selected_clip:Option<(TrackId,String)>,pub recording:Option<Recording>,pub media_ready:bool,pub media_cache:verdant_media::WaveformCache,pub media_previews:HashMap<String,Arc<verdant_media::WaveformPreview>>,pub media_save_generation:u64,pub media_file_jobs:usize,
     pub report:String,pub other_tracks:bool,/// Parameter lanes shown under the roll, top to bottom; `active_panel` edits.
     pub lanes:Vec<Param>,pub active_panel:usize,pub scale_root:u8,pub scale_intervals:Vec<u8>,
 }
 impl Default for IntegrationState {
-    fn default()->Self{Self{asset_policy:AssetPolicy::new(Vec::<PathBuf>::new()).expect("empty asset policy"),selected_clip:None,recording:None,media_ready:false,media_cache:verdant_media::WaveformCache::default(),media_previews:HashMap::new(),media_save_generation:0,media_file_jobs:0,
+    fn default()->Self{Self{performance:Default::default(),asset_policy:AssetPolicy::new(Vec::<PathBuf>::new()).expect("empty asset policy"),selected_clip:None,recording:None,media_ready:false,media_cache:verdant_media::WaveformCache::default(),media_previews:HashMap::new(),media_save_generation:0,media_file_jobs:0,
         report:String::new(),other_tracks:false,lanes:vec![Param::Pit],active_panel:0,scale_root:0,scale_intervals:Vec::new()}}
 }
 fn action(label:impl Into<gpui::SharedString>,command:IntegrationAction)->crate::menu::MenuItem{
@@ -33,7 +35,7 @@ impl Editor {
     pub fn integrations_menu(&mut self,window:&mut Window,cx:&mut Context<Self>){
         use IntegrationAction as A;
         let items=vec![action("轨道歌手…",A::Singers),action("导入 verdant-voice 声库…",A::InstallVoice),action("读音器…",A::Phonemizers),action("用户读音词典…",A::Dictionary),action("导入词典…",A::ImportDictionary),action("导出词典…",A::ExportDictionary),
-            action("MIDI 输入录音…",A::MidiPorts),action("完成 MIDI 录音",A::FinishRecording),action("取消 MIDI 录音",A::CancelRecording),
+            action("MIDI 实时监听…",A::MonitorPorts),action("MIDI 输入录音…",A::MidiPorts),action("完成 MIDI 录音",A::FinishRecording),action("取消 MIDI 录音",A::CancelRecording),
             action("导入音频伴奏 / 参考音…",A::ImportAudio),action("授权重新打开已保存音频…",A::AuthorizeAudio),action("音频片段…",A::Clips),action("编辑音频片段位置 / 裁剪 / 音量…",A::EditClip),action("复制音频片段",A::DuplicateClip),action("删除音频片段",A::DeleteClip),action("重新定位音源…",A::RelinkClip),action("自动化曲线…",A::Automation),
             action("导出 MIDI…",A::ScoreExport(verdant_exchange::Format::Midi)),action("导出 UST…",A::ScoreExport(verdant_exchange::Format::Ust)),action("导出 USTX…",A::ScoreExport(verdant_exchange::Format::Ustx)),action("导出 SVP…",A::ScoreExport(verdant_exchange::Format::Svp)),action("导出 VSQX…",A::ScoreExport(verdant_exchange::Format::Vsqx)),action("导出 VPR…",A::ScoreExport(verdant_exchange::Format::Vpr)),action("导出 UtaFormatix Data (.ufdata)…",A::ScoreExport(verdant_exchange::Format::Ufdata)),action("Vocaloid 歌手元数据…",A::VocaloidMetadata),action("查看导入 / 导出报告…",A::Report),
             action("音阶高亮设置…",A::Scale),action("其他轨道音符叠加开关",A::OtherTracks),action("三个参数面板开关",A::ThreeLanes),action("试听所选音高（参考正弦音）",A::AuditionSelection)];
@@ -65,6 +67,14 @@ impl Editor {
             A::EditDictionaryEntry(key,phrase)=>{let settings=verdant_backend::phonemizer::settings_from_project(self.project())?;let text=if phrase{let entry=settings.dictionary.phrases.get(&key).ok_or("词组已不存在")?;entry.lyrics.iter().zip(&entry.readings).map(|(lyric,reading)|reading_text(lyric,reading)).collect::<Vec<_>>().join(" ")}else{let entry=settings.dictionary.lyrics.get(&key).ok_or("词条已不存在")?;reading_text(&key,&entry.reading)};self.prompt_integration("编辑词条：歌词/读音，以空格分开；显式音标可保留方括号中的空格",IntegrationPrompt::Dictionary(Some((key,phrase))),&text,window,cx);}
             A::RemoveDictionaryEntry(key,phrase)=>{let mut settings=verdant_backend::phonemizer::settings_from_project(self.project())?;if phrase{settings.dictionary.phrases.remove(&key);}else{settings.dictionary.lyrics.remove(&key);}self.set_phonemizer(settings,cx)?;}
             A::ImportDictionary=>self.dictionary_file_dialog(false,window,cx)?,A::ExportDictionary=>self.dictionary_file_dialog(true,window,cx)?,
+            A::MonitorPorts=>{
+                let ports=MidiInputService::ports().map_err(|e|e.to_string())?;
+                let mut items=ports.into_iter().map(|p|action(p.name.clone(),A::Monitor(p))).collect::<Vec<_>>();
+                if items.is_empty(){items.push(crate::menu::MenuItem::disabled("没有可用的 MIDI 输入设备"));}
+                items.push(action("停止 MIDI 监听",A::StopMonitoring));self.show_menu(window.mouse_position(),items,window,cx);
+            }
+            A::Monitor(port)=>self.start_instrument_monitor(&port,cx)?,
+            A::StopMonitoring=>self.stop_instrument_monitor(cx),
             A::MidiPorts=>{let ports=MidiInputService::ports().map_err(|e|e.to_string())?;let mut items=ports.into_iter().map(|p|action(format!("{} · 选择通道…",p.name),A::MidiChannels(p))).collect::<Vec<_>>();if items.is_empty(){items.push(crate::menu::MenuItem::disabled("没有可用的 MIDI 输入设备"));}self.show_menu(window.mouse_position(),items,window,cx);}
             A::MidiChannels(port)=>{let mut items=vec![action(format!("{} · 所有通道（默认）",port.name),A::Record(port.clone(),None))];items.extend((0..16).map(|channel|action(format!("{} · 通道 {}",port.name,channel+1),A::Record(port.clone(),Some(channel)))));self.show_menu(window.mouse_position(),items,window,cx);}
             A::Record(port,channel)=>self.start_midi_recording(&port,channel,cx)?,A::FinishRecording=>self.finish_midi_recording(cx)?,A::CancelRecording=>{self.cancel_midi_recording("已取消 MIDI 录音");cx.notify();}
@@ -211,6 +221,8 @@ impl Editor {
         // tick, exactly as if the take had started at the playhead.
         let tick=self.tempo().tick_at(self.playhead_seconds()).round()as i64;let bars=self.playback_settings().count_in_bars;
         let pre_roll=if bars>0{Some(super::workflow::count_in_track(self.project(),&self.tempo(),self.audio_info.sample_rate,tick,bars)?) }else{None};
+        self.integrations.performance.capture=None;
+        let track=self.session.track.clone();self.prepare_instrument_monitor(&track);
         let capture=MidiInputService::open(port,channel,65_536).map_err(|e|e.to_string())?;
         let origin_micros=capture.timestamp_micros().saturating_add(pre_roll.as_ref().map_or(0,|clicks|(clicks.length as f64/f64::from(self.audio_info.sample_rate)*1e6).round()as u64));
         let take=MidiTake::new(CaptureOrigin{timestamp_micros:origin_micros,timeline_tick:tick},channel).map_err(|e|e.to_string())?;
@@ -221,12 +233,21 @@ impl Editor {
         self.notice(format!("正在录制 {} · {}；完成后一次写入，编辑或定位会取消本次录音",port.name,channel_label));cx.notify();Ok(())
     }
     pub fn pump_midi(&mut self,cx:&mut Context<Self>){
+        self.pump_instrument_monitor(cx);
         let Some(recording)=&mut self.integrations.recording else{return;};
-        let error=if recording.base!=self.persistence.store().revision(){Some("录音期间工程已改变，本次录音已取消".to_string())}else{let mut error=None;for _ in 0..8192{match recording.capture.try_recv(){Ok(Some(event))=>{if event.timestamp_micros>=recording.origin_micros{if let Err(reason)=recording.take.as_mut().expect("active take").push(event){error=Some(reason.to_string());break;}}},Ok(None)=>break,Err(reason)=>{error=Some(reason.to_string());break;}}}error};
-        if let Some(error)=error{self.cancel_midi_recording(&format!("MIDI 录音拒绝：{error}；未写入部分结果"));cx.notify();}
+        let mut events=Vec::new();
+        let error=if recording.base!=self.persistence.store().revision(){Some("录音期间工程已改变，本次录音已取消".to_string())}else{
+            let mut error=None;for _ in 0..8192{match recording.capture.try_recv(){
+                Ok(Some(event))=>{events.push(event);if event.timestamp_micros>=recording.origin_micros{if let Err(reason)=recording.take.as_mut().expect("active take").push(event){error=Some(reason.to_string());break;}}},
+                Ok(None)=>break,Err(reason)=>{error=Some(reason.to_string());break;}
+            }}error
+        };
+        if let Some(error)=error{self.cancel_midi_recording(&format!("MIDI 录音拒绝：{error}；未写入部分结果"));self.audio.reset_monitor();cx.notify();}
+        else{self.consume_performance_events(&events,cx);}
     }
     pub fn finish_midi_recording(&mut self,cx:&mut Context<Self>)->Result<(),String>{
         let Some(mut recording)=self.integrations.recording.take()else{return Err("当前没有 MIDI 录音".into());};
+        self.audio.reset_monitor();
         let tail=recording.capture.stop().map_err(|e|e.to_string())?;let stop=recording.capture.timestamp_micros();let mut take=recording.take.take().expect("active take");for event in tail{if event.timestamp_micros>=recording.origin_micros{take.push(event).map_err(|e|e.to_string())?;}}
         if recording.base!=self.revision(){return Err("工程已改变，录音未提交".into());}let notes=take.finish(stop,&recording.tempo).map_err(|e|e.to_string())?;if notes.is_empty(){self.notice("MIDI 录音没有音符");return Ok(());}
         let batch=verdant_midi::notes_to_batch(recording.track,&notes,"");if !self.commit(recording.base,batch,cx){return Err("MIDI 录音未提交".into());}self.notice(format!("已写入 {} 个 MIDI 音符；请选择读音器或填写歌词",notes.len()));cx.notify();Ok(())

@@ -1,0 +1,79 @@
+{
+  "schema": "verdant.native_fir_budget.v1",
+  "profile": "release",
+  "architecture": "x86_64",
+  "os": "linux",
+  "sample_rate": 48000,
+  "frames_per_tick": 32,
+  "ticks": 1500,
+  "deadline_per_tick_ms": 0.666666667,
+  "setup_excluded": true,
+  "hard_realtime_guarantee": false,
+  "measurements": [
+    {
+      "case": "linear1_write1",
+      "bands": 1,
+      "continuous_bands": 0,
+      "resolution": 1,
+      "parameter_writes_per_tick": 1,
+      "elapsed_ms": 74.146393,
+      "wall_median_ms": 0.00838,
+      "wall_p95_ms": 0.38075,
+      "wall_max_ms": 3.042225,
+      "realtime_factor": 0.074146393,
+      "output_checksum": 0.470662354
+    },
+    {
+      "case": "continuous1_write1",
+      "bands": 1,
+      "continuous_bands": 1,
+      "resolution": 1,
+      "parameter_writes_per_tick": 1,
+      "elapsed_ms": 74.62644,
+      "wall_median_ms": 0.010531,
+      "wall_p95_ms": 0.382221,
+      "wall_max_ms": 0.896949,
+      "realtime_factor": 0.07462644,
+      "output_checksum": 0.468332073
+    },
+    {
+      "case": "linear8_write8",
+      "bands": 8,
+      "continuous_bands": 0,
+      "resolution": 1,
+      "parameter_writes_per_tick": 8,
+      "elapsed_ms": 96.845112,
+      "wall_median_ms": 0.028191,
+      "wall_p95_ms": 0.400652,
+      "wall_max_ms": 0.454374,
+      "realtime_factor": 0.096845112,
+      "output_checksum": 0.474182129
+    },
+    {
+      "case": "continuous24_write8",
+      "bands": 24,
+      "continuous_bands": 24,
+      "resolution": 2,
+      "parameter_writes_per_tick": 8,
+      "elapsed_ms": 246.08082,
+      "wall_median_ms": 0.126197,
+      "wall_p95_ms": 0.520668,
+      "wall_max_ms": 1.239477,
+      "realtime_factor": 0.24608082,
+      "output_checksum": 0.468239023
+    },
+    {
+      "case": "multiband6_write8",
+      "bands": 6,
+      "continuous_bands": 0,
+      "resolution": 0,
+      "parameter_writes_per_tick": 8,
+      "elapsed_ms": 295.875495,
+      "wall_median_ms": 0.151678,
+      "wall_p95_ms": 0.420663,
+      "wall_max_ms": 0.650455,
+      "realtime_factor": 0.295875495,
+      "output_checksum": 0.506115978
+    }
+  ]
+}
