@@ -19,7 +19,7 @@ pub const WAVES: [&str; 4] = ["锯齿", "方波", "三角", "正弦"];
 /// The compact instrument has its own genuine single-oscillator surface.
 /// Hidden polyphonic-synth controls are not accepted when loading One state.
 pub const ONE_PARAM_IDS: &[&str] = &["osc1", "attack", "decay", "sustain", "release", "cutoff", "resonance", "env_amount", "gain",
-    "lfo_rate", "lfo_pitch", "lfo_filter", "filter_shape", "pulse_width", "drive", "noise", "voices", "portamento", "keytrack", "velocity"];
+    "lfo_rate", "lfo_pitch", "lfo_filter", "filter_shape", "pulse_width", "drive", "noise", "voices", "portamento", "keytrack", "velocity", "filter_character", "osc_model", "bend_range"];
 
 pub static SYNTH_SPECS: &[Spec] = &[
     Spec::new("osc1", "振荡器 1", 0.0, 3.0, 0.0, "").steps(3),
@@ -61,17 +61,63 @@ pub static SYNTH_SPECS: &[Spec] = &[
     Spec::new("portamento", "滑音", 0.0, 2000.0, 0.0, "ms"),
     Spec::new("keytrack", "滤波键盘跟踪", 0.0, 100.0, 0.0, "%"),
     Spec::new("velocity", "力度响应", 0.0, 100.0, 100.0, "%"),
+    Spec::new("filter3_enabled","滤波器 3",0.0,1.0,0.0,"").steps(1),
+    Spec::new("cutoff3","截止频率 3",20.0,20000.0,1000.0,"Hz"),
+    Spec::new("resonance3","共振 3",0.5,10.0,0.9,"Q"),
+    Spec::new("filter3_shape","滤波形状 3",0.0,3.0,0.0,"").steps(3),
+    Spec::new("filter4_enabled","滤波器 4",0.0,1.0,0.0,"").steps(1),
+    Spec::new("cutoff4","截止频率 4",20.0,20000.0,1000.0,"Hz"),
+    Spec::new("resonance4","共振 4",0.5,10.0,0.9,"Q"),
+    Spec::new("filter4_shape","滤波形状 4",0.0,3.0,0.0,"").steps(3),
+    Spec::new("filter1_pan","滤波声像 1",-100.0,100.0,0.0,"%"),
+    Spec::new("filter2_pan","滤波声像 2",-100.0,100.0,0.0,"%"),
+    Spec::new("filter3_pan","滤波声像 3",-100.0,100.0,0.0,"%"),
+    Spec::new("filter4_pan","滤波声像 4",-100.0,100.0,0.0,"%"),
+    Spec::new("filter_character","滤波性格",0.0,5.0,0.0,"").steps(5),
+    Spec::new("osc_model","振荡器模型",0.0,4.0,0.0,"").steps(4),
+    Spec::new("high_quality","高品质过采样",0.0,2.0,0.0,"").steps(2).fixed(),
+    Spec::new("mpe","MPE",0.0,1.0,0.0,"").steps(1),
+    Spec::new("bend_range","弯音范围",0.0,96.0,2.0,"st"),
+    Spec::new("mpe_range","MPE 弯音范围",0.0,96.0,48.0,"st"),
+    Spec::new("arp_on","琶音器",0.0,1.0,0.0,"").steps(1),
+    Spec::new("arp_rate","琶音速率",0.3,20.0,4.0,"Hz"),
+    Spec::new("arp_sync","琶音同步",0.0,8.0,5.0,"").steps(8),
+    Spec::new("arp_tempo","琶音备用速度",20.0,300.0,120.0,"BPM"),
+    Spec::new("arp_order","琶音顺序",0.0,4.0,0.0,"").steps(4),
+    Spec::new("arp_octaves","琶音八度",1.0,3.0,1.0,"").steps(2),
+    Spec::new("arp_gate","琶音连音",1.0,100.0,70.0,"%"),
+    Spec::new("arp_groove","琶音摇摆",-75.0,75.0,0.0,"%"),
+    Spec::new("arp_latch","琶音保持",0.0,2.0,0.0,"").steps(2),
+    Spec::new("fx_drive","效果 · 驱动",0.0,100.0,0.0,"%"),
+    Spec::new("fx_drive_style","驱动类型",0.0,3.0,0.0,"").steps(3),
+    Spec::new("fx_chorus","效果 · 合唱",0.0,100.0,0.0,"%"),
+    Spec::new("fx_chorus_rate","合唱速率",0.0,10.0,0.5,"Hz"),
+    Spec::new("fx_chorus_depth","合唱深度",0.0,20.0,6.0,"ms"),
+    Spec::new("fx_phaser","效果 · 相位",0.0,100.0,0.0,"%"),
+    Spec::new("fx_phaser_rate","相位速率",0.0,10.0,0.3,"Hz"),
+    Spec::new("fx_phaser_feedback","相位反馈",-90.0,90.0,25.0,"%"),
+    Spec::new("fx_flanger","相位/镶边",0.0,1.0,0.0,"").steps(1),
+    Spec::new("fx_delay","效果 · 延迟",0.0,100.0,0.0,"%"),
+    Spec::new("fx_delay_time","延迟时间",1.0,2000.0,300.0,"ms"),
+    Spec::new("fx_delay_feedback","延迟反馈",0.0,95.0,30.0,"%"),
+    Spec::new("fx_delay_sync","延迟同步",0.0,8.0,0.0,"").steps(8),
+    Spec::new("fx_reverb","效果 · 混响",0.0,100.0,0.0,"%"),
+    Spec::new("fx_reverb_time","混响衰减",0.1,20.0,2.0,"s"),
+    Spec::new("fx_reverb_brightness","混响亮度",0.0,100.0,50.0,"%"),
+    Spec::new("fx_compressor","效果 · 压缩",0.0,100.0,0.0,"%"),
+    Spec::new("fx_comp_threshold","压缩阈值",-60.0,0.0,-18.0,"dB"),
+    Spec::new("fx_comp_ratio","压缩比",1.0,20.0,4.0,""),
 ];
 
 /// Native controls use instrument-specific defaults/ranges. One shares the
 /// processor but never presents poly-synth controls that its loader ignores.
 pub fn instrument_specs(id: &str) -> Vec<Spec> {
-    if id != ONE_SYNTH_ID { return SYNTH_SPECS.to_vec(); }
-    SYNTH_SPECS.iter().filter(|s| ONE_PARAM_IDS.contains(&s.id)).map(|s| {
-        let mut s = *s;
-        if s.id == "voices" { s.max = 10.0; s.default = 10.0; s.steps = 9; }
-        s
-    }).collect()
+    let mut specs:Vec<Spec>=SYNTH_SPECS.iter().filter(|s|id!=ONE_SYNTH_ID||ONE_PARAM_IDS.contains(&s.id)).map(|s|{
+        let mut s=*s;if id==ONE_SYNTH_ID&&s.id=="voices"{s.max=10.;s.default=10.;s.steps=9;}s
+    }).collect();
+    let targets=specs.len();specs.extend(super::MOD_SPECS.iter().map(|s|{
+        let mut s=*s;if s.id.ends_with("_target"){s.max=(targets-1)as f64;s.steps=(targets-1)as i64;}s
+    }));specs
 }
 
 /// Starting sounds: (name, [(id, value)]). Unlisted ids keep their defaults.
@@ -105,9 +151,9 @@ pub struct SynthNote { pub start: u64, pub length: u64, pub pitch: f64, pub velo
 
 /// Validated synth settings: values in `SYNTH_SPECS` order.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SynthParams { pub values: Vec<f64> }
+pub struct SynthParams { pub values: Vec<f64>, pub modulation: super::modulation::ModParams }
 
-impl Default for SynthParams { fn default() -> Self { Self { values: table_defaults(SYNTH_SPECS) } } }
+impl Default for SynthParams { fn default() -> Self { Self { values: table_defaults(SYNTH_SPECS), modulation: Default::default() } } }
 
 impl SynthParams {
     pub fn one_defaults() -> Self {
@@ -123,7 +169,7 @@ impl SynthParams {
         let mut p = if id == ONE_SYNTH_ID { Self::one_defaults() } else { Self::default() };
         if let Some(map) = value.and_then(serde_json::Value::as_object) {
             for (key, value) in map {
-                if id == ONE_SYNTH_ID && !ONE_PARAM_IDS.contains(&key.as_str()) { continue; }
+                if id == ONE_SYNTH_ID && !ONE_PARAM_IDS.contains(&key.as_str()) && super::modulation_parameter(key).is_none() { continue; }
                 if let Some(value) = value.as_f64() {
                     if id == ONE_SYNTH_ID && key == "voices" && value > 10.0 { continue; }
                     let _ = p.set(key, value);
@@ -132,8 +178,9 @@ impl SynthParams {
         }
         p
     }
-    pub fn get(&self, id: &str) -> f64 { table_index(SYNTH_SPECS, id).map_or(0.0, |i| self.values[i]) }
+    pub fn get(&self, id: &str) -> f64 { table_index(SYNTH_SPECS, id).map_or_else(||self.modulation.get(id), |i| self.values[i]) }
     pub fn set(&mut self, id: &str, value: f64) -> Result<(), String> {
+        if super::modulation_parameter(id).is_some() { return self.modulation.set(id,value); }
         let i = table_index(SYNTH_SPECS, id).ok_or_else(|| format!("unknown synth parameter {id}"))?;
         SYNTH_SPECS[i].check(value)?;
         self.values[i] = value;
@@ -145,7 +192,7 @@ impl SynthParams {
         Self::from_json_for(SYNTH_ID, value)
     }
     pub fn to_json(&self) -> serde_json::Value {
-        serde_json::Value::Object(SYNTH_SPECS.iter().zip(&self.values).map(|(s, v)| (s.id.to_string(), serde_json::json!(v))).collect())
+        serde_json::Value::Object(SYNTH_SPECS.iter().zip(&self.values).chain(super::MOD_SPECS.iter().zip(&self.modulation.values)).map(|(s, v)| (s.id.to_string(), serde_json::json!(v))).collect())
     }
     pub fn preset(name: &str) -> Option<Self> {
         let (_, values) = SYNTH_PRESETS.iter().find(|(n, _)| *n == name)?;
@@ -176,7 +223,7 @@ fn blep(t: f64, dt: f64) -> f64 {
     else { 0.0 }
 }
 
-fn osc(wave: usize, phase: f64, dt: f64, pulse_width: f64) -> f64 {
+pub(super) fn osc(wave: usize, phase: f64, dt: f64, pulse_width: f64) -> f64 {
     // A transposed oscillator beyond Nyquist contributes no aliased pitch.
     if !(0.0..0.49).contains(&dt) { return 0.0; }
     match wave {
@@ -194,11 +241,11 @@ fn osc(wave: usize, phase: f64, dt: f64, pulse_width: f64) -> f64 {
 
 /// Zero-delay-feedback state-variable low-pass (Simper).
 #[derive(Clone, Copy, Default)]
-struct Svf { ic1: f64, ic2: f64 }
+pub(super) struct Svf { ic1: f64, ic2: f64 }
 
 impl Svf {
     #[inline]
-    fn run(&mut self, x: f64, cutoff: f64, q: f64, sample_rate: f64, shape: usize) -> f64 {
+    pub(super) fn run(&mut self, x: f64, cutoff: f64, q: f64, sample_rate: f64, shape: usize) -> f64 {
         let g = (PI * cutoff.clamp(20.0, sample_rate * 0.45) / sample_rate).tan();
         let k = 1.0 / q.max(0.3);
         let a1 = 1.0 / (1.0 + g * (g + k));
@@ -213,7 +260,8 @@ impl Svf {
 }
 
 /// Render `notes` to interleaved stereo PCM covering every note's release.
-pub fn render(params: &SynthParams, notes: &[SynthNote], sample_rate: f64) -> Vec<f32> {
+#[allow(dead_code)]
+fn render_legacy(params: &SynthParams, notes: &[SynthNote], sample_rate: f64) -> Vec<f32> {
     let release = (params.release_seconds() * sample_rate).ceil() as u64;
     let frames = notes.iter().map(|n| n.start + n.length + release).max().unwrap_or(0) as usize;
     let mut out = vec![0.0f32; frames * 2];
@@ -419,9 +467,12 @@ mod tests {
         let mut p = SynthParams::default();
         for spec in &SYNTH_SPECS[14..] { p.set(spec.id, spec.max).unwrap(); }
         assert_eq!(SynthParams::from_json(Some(&p.to_json())), p);
-        let pcm = render(&p, &[SynthNote { start: 0, length: 4096, pitch: 120.0, velocity: 1.0 }], FS);
-        assert!(pcm.iter().all(|sample| sample.is_finite()));
-        assert!(peak(&pcm) < 16.0);
+        // Exercise the maximal voice/FX controls for a bounded audio interval.
+        // Full offline draining with 95% feedback can legitimately take minutes.
+        let mut synth=super::super::RealtimeSynth::new(&p,FS);synth.note_on(0,120,120.0,1.0);
+        let (mut l,mut r)=(vec![0.0;4096],vec![0.0;4096]);synth.process(&mut l,&mut r);
+        assert!(l.iter().chain(&r).all(|sample|sample.is_finite()));assert!(peak(&l)<16.0&&peak(&r)<16.0);
+        synth.release_all();synth.process(&mut l,&mut r);assert!(l.iter().chain(&r).all(|sample|sample.is_finite()));
     }
 
     #[test]
@@ -448,7 +499,9 @@ mod tests {
             assert!(pcm.iter().zip(&reference).any(|(a, b)| (a - b).abs() > 0.001), "{id}");
         }
         let specs = instrument_specs(ONE_SYNTH_ID);
-        assert!(specs.iter().all(|spec| ONE_PARAM_IDS.contains(&spec.id)));
+        assert!(specs.iter().all(|spec| ONE_PARAM_IDS.contains(&spec.id)||super::super::modulation_parameter(spec.id).is_some()));
         assert_eq!(specs.iter().find(|spec| spec.id == "voices").unwrap().max, 10.0);
     }
 }
+
+pub use super::synth_live::{render, render_performance, SynthPerformanceNote, SynthExpression, RealtimeSynth, SYNTH_CONTROL_EVENT, SYNTH_PREVIEW_NOTE, SYNTH_PREVIEW_RELEASE, SYNTH_PREVIEW_PANIC, SYNTH_RESET_METERS};

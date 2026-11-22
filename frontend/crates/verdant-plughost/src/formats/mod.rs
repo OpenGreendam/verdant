@@ -24,6 +24,12 @@ pub struct ScanOutcome {
 
 /// One instantiated plugin — implemented once per format.
 pub trait HostedPlugin {
+    fn accepts_native_midi(&self)->bool {false}
+    fn midi_events(&mut self,_events:&[(u32,f64)])->Result<(),String>{Err("native MIDI unavailable".into())}
+
+    fn gain_reduction_db(&self)->Option<f64> {None}
+    fn meter_control(&self)->(bool,u64){(false,0)}
+    fn reset_meters(&mut self){}
     /// Stereo in-place: `out_*` initially mirrors `in_*`? No — the caller
     /// guarantees `out` buffers are sized `n` and the implementation MUST fill
     /// them completely (input is NOT pre-copied).
@@ -187,7 +193,7 @@ pub fn scan_file(path: &Path) -> Result<ScanFileReport, PluginError> {
     let sha = verdant_plugins::scan::sha256_bundle(path)?;
     let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
-    let outcome = match ext.as_str() {
+    let outcome: Result<ScanOutcome, PluginError> = match ext.as_str() {
         #[cfg(feature = "clap")]
         "clap" => clap::scan(path),
         #[cfg(feature = "vst3")]

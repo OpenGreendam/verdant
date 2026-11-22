@@ -310,3 +310,143 @@ fn admitted_dsp_and_parameter_automation_allocate_nothing_during_audio() {
         assert!(output_l.iter().chain(&output_r).all(|sample| sample.is_finite()), "{id}");
     }
 }
+
+#[test]
+fn advanced_modes_modulation_midi_and_instruments_keep_audio_allocation_free() {
+    for id in dsp::EFFECT_IDS {
+        let mut plugin=hosted(id);
+        let descs=plugin.params().unwrap();
+        for (name,value) in [("phase",2.0f64),("oversampling",3.0),("quality",3.0),("true_peak",1.0),
+            ("layout",1.0),("feedback_quality",3.0),("b4_spectral",1.0),("b4_dynamic",1.0)] {
+            if let Some(d)=descs.iter().find(|d|d.id==name) {plugin.set_param(name,value.min(d.max).max(d.min)).unwrap();}
+        }
+        let admitted=plugin.automation_params().unwrap();
+        let target=descs.iter().position(|d|matches!(d.id.as_str(),"output"|"makeup"|"gain")
+            &&admitted.iter().any(|p|p.id==d.id)).unwrap_or(0);
+        for (name,value) in [("mod1_target",target as f64),("mod1_source",1.0),("mod1_amount",1.0),
+            ("midi1_target",target as f64),("midi1_cc",1.0)] {plugin.set_param(name,value).unwrap();}
+        let mut input=[0.0;256];for (i,x) in input.iter_mut().enumerate(){*x=(i as f32*0.071).sin()*0.1;}
+        let(mut l,mut r)=([0.0;256],[0.0;256]);
+        let events=[verdant_plugins::proto::note_on(60,0,0.8),
+            verdant_plugins::proto::midi_control(2,1,64,0.3),
+            verdant_plugins::proto::midi_pitch_bend(2,128,0.2),
+            (dsp::TRANSPORT_TEMPO_EVENT,192,90.0)];
+        let (result,allocations)=measured_audio(||plugin.process_keyed(&input,&input,(&input,&input),&mut l,&mut r,&events));
+        result.unwrap();assert_eq!(allocations,(0,0),"{id}: advanced processing allocated or freed");
+        assert!(l.iter().chain(&r).all(|v|v.is_finite()),"{id}");
+    }
+    for id in [dsp::SYNTH_ID,dsp::ONE_SYNTH_ID]{
+        let mut p=if id==dsp::ONE_SYNTH_ID{dsp::SynthParams::one_defaults()}else{dsp::SynthParams::default()};
+        if id==dsp::SYNTH_ID {for(name,value)in [("high_quality",2.),("arp_on",1.),("fx_drive",20.),("fx_reverb",30.),("filter3_enabled",1.),("filter4_enabled",1.)]{p.set(name,value).unwrap();}}
+        p.set("mod1_source",1.).unwrap();p.set("mod1_amount",1.).unwrap();
+        let mut synth=dsp::RealtimeSynth::for_instrument(id,&p,48000.);
+        let(mut l,mut r)=([0.0;256],[0.0;256]);
+        let events=[verdant_plugins::proto::note_on_channel(2,60,0,0.8),verdant_plugins::proto::midi_pressure(2,96,0.5),verdant_plugins::proto::note_off_channel(2,60,192)];
+        let (ok,counts)=measured_audio(||synth.process_events(&mut l,&mut r,&events));
+        assert!(ok);assert_eq!(counts,(0,0),"{id} realtime voice/modulation/telemetry");assert!(l.iter().all(|v|v.is_finite()));
+    }
+}
+
+#[test]
+fn midi_and_modulation_change_sound_without_corrupting_base_state() {
+    let mut fx=hosted(dsp::MICRO_ID);
+    let params=fx.params().unwrap();let output=params.iter().position(|d|d.id=="output").unwrap();
+    fx.set_param("mix",0.0).unwrap();
+    for(name,value)in[("mod1_source",10.),("mod1_target",output as f64),("mod1_amount",10.),("mxy_x",100.)]{fx.set_param(name,value).unwrap();}
+    let before=fx.state().unwrap();let input=[0.1;128];let(mut l,mut r)=([0.;128],[0.;128]);
+    fx.process(&input,&input,&mut l,&mut r).unwrap();assert!(l[100]>0.1);assert_eq!(fx.state().unwrap(),before);
+    fx.set_param("mod1_amount",0.).unwrap();fx.set_param("midi1_cc",74.).unwrap();fx.set_param("midi1_target",output as f64).unwrap();
+    fx.midi_events(&[(verdant_plugins::proto::midi_control(1,74,0,0.5).0,0.5)]).unwrap();
+    assert_ne!(fx.state().unwrap(),before);
+    let saved=fx.state().unwrap();
+    assert!(fx.midi_events(&[(verdant_plugins::proto::midi_control(1,74,0,0.1).0,0.1),(u32::MAX,0.)]).is_err());
+    assert_eq!(fx.state().unwrap(),saved);
+    assert!(fx.set_param("mod1_target",9999.).is_err());
+}
+
+#[test]
+fn modulation_is_invariant_to_audio_block_partitioning() {
+    fn configured()->Box<dyn HostedPlugin>{
+        let mut fx=hosted(dsp::MICRO_ID);
+        let descs=fx.params().unwrap();let freq=descs.iter().position(|d|d.id=="freq").unwrap();
+        for(id,value)in [("mod1_source",1.),("mod1_target",freq as f64),("mod1_amount",12.),
+            ("mod2_source",3.),("mod2_target",freq as f64),("mod2_amount",-10.),
+            ("mlfo1_rate",7.3),("mfollower_attack",2.)]{fx.set_param(id,value).unwrap();}fx
+    }
+    let(mut whole,mut split)=(configured(),configured());
+    let input:Vec<f32>=(0..4001).map(|i|(i as f32*0.2).sin()*(0.1+0.1*(i as f32*0.001).sin())).collect();
+    let(mut a,mut ar,mut b,mut br)=(vec![0.;input.len()],vec![0.;input.len()],vec![0.;input.len()],vec![0.;input.len()]);
+    whole.process(&input,&input,&mut a,&mut ar).unwrap();
+    let mut at=0;for n in [1,17,225,3,512,29,100,128,7,2048,931]{if at==input.len(){break;}let end=(at+n).min(input.len());split.process(&input[at..end],&input[at..end],&mut b[at..end],&mut br[at..end]).unwrap();at=end;}
+    if at<input.len(){split.process(&input[at..],&input[at..],&mut b[at..],&mut br[at..]).unwrap();}
+    assert_eq!(a,b);assert_eq!(ar,br);assert_eq!(whole.state().unwrap(),split.state().unwrap());
+}
+
+#[test]
+fn discrete_native_state_and_raw_events_reject_fractional_steps_atomically(){
+    let mut effect=hosted(dsp::COMPRESSOR_ID);
+    let state=effect.state().unwrap();
+    for (id,value) in [("style",0.5),("mseq_length",3.25),("mseq_curve1",0.25)] {
+        assert!(effect.set_param(id,value).is_err());
+        let parameter=effect.params().unwrap().iter().position(|p|p.id==id).unwrap()as u32;
+        let mut l=[7.;64];let mut r=[8.;64];
+        assert!(effect.process_events(&[0.1;64],&[0.1;64],&mut l,&mut r,&[(parameter,0,value)]).is_err());
+        assert_eq!(l,[7.;64]);assert_eq!(r,[8.;64]);
+    }
+    assert!(effect.set_state(br#"{"threshold":-40,"style":0.5}"#).is_err());
+    assert_eq!(effect.state().unwrap(),state);
+}
+#[test]
+fn live_instrument_control_transactions_and_telemetry_are_allocation_free(){
+    for id in [dsp::SYNTH_ID,dsp::ONE_SYNTH_ID]{
+        let mut synth=dsp::RealtimeSynth::for_instrument(id,&dsp::SynthParams::default(),48000.);
+        let specs=dsp::instrument_specs(id);
+        let cutoff=specs.iter().position(|s|s.id=="cutoff").unwrap()as u32;
+        let control=dsp::SYNTH_CONTROL_EVENT|cutoff;
+        let mut left=[0.;256];let mut right=[0.;256];
+        synth.event(verdant_plugins::proto::note_on(60,0,0.8).0,0.8);
+        synth.process(&mut left,&mut right);
+        let events=[(control,0,1000.),(control,128,5000.)];
+        let(ok,heap)=measured_audio(||synth.process_events(&mut left,&mut right,&events));
+        assert!(ok);assert_eq!(heap,(0,0),"{id}");
+        assert!(left.iter().any(|v|v.abs()>1e-6));
+    }
+}
+
+#[test]
+fn linear_filter_modulation_preserves_streaming_and_audio_heap_contracts() {
+    fn configured(id:&str)->Box<dyn HostedPlugin>{
+        let mut fx=hosted(id);
+        fx.set_param("phase",2.).unwrap();
+        let target=if id==dsp::EQ_ID{
+            for(name,value)in[("b1_on",1.),("b1_shape",2.),("b1_freq",200.),("b1_slope_continuous",1.),("b1_slope_db",15.5),("resolution",2.)]{fx.set_param(name,value).unwrap();}
+            "b1_freq"
+        }else{
+            for(name,value)in[("layout",1.),("b1.low",100.),("b1.high",1800.),("b1.range",-9.)]{fx.set_param(name,value).unwrap();}
+            "b1.high"
+        };
+        let index=fx.params().unwrap().iter().position(|p|p.id==target).unwrap();
+        for(name,value)in[("mod1_target",index as f64),("mod1_source",1.),("mod1_amount",10.),("mlfo1_rate",7.3)]{fx.set_param(name,value).unwrap();}
+        fx
+    }
+    let input:Vec<f32>=(0..24000).map(|i|((i as f64*0.07).sin()*0.2)as f32).collect();
+    for id in[dsp::EQ_ID,dsp::MULTIBAND_ID]{
+        let(mut whole,mut split)=(configured(id),configured(id));
+        let(mut a,mut ar,mut b,mut br)=(vec![0.;input.len()],vec![0.;input.len()],vec![0.;input.len()],vec![0.;input.len()]);
+        let(result,heap)=measured_audio(||whole.process(&input,&input,&mut a,&mut ar));
+        result.unwrap();assert_eq!(heap,(0,0),"{id}: staged FIR setup or processing used the audio heap");
+        let(result,heap)=measured_audio(||{
+            let(mut offset,mut chunk)=(0,0);
+            while offset<input.len(){
+                let end=(offset+[1,7,113,256,31][chunk%5]).min(input.len());
+                split.process(&input[offset..end],&input[offset..end],&mut b[offset..end],&mut br[offset..end])?;
+                offset=end;chunk+=1;
+            }
+            Ok::<_,String>(())
+        });
+        result.unwrap();assert_eq!(heap,(0,0),"{id}: partial blocks allocated or retired FIR storage");
+        assert_eq!(a,b,"{id}: automation response depends on caller block sizes");
+        assert_eq!(ar,br,"{id}: right channel depends on caller block sizes");
+        assert!(a.iter().all(|v|v.is_finite())&&a.iter().any(|v|v.abs()>1e-5),"{id}: finite audible output");
+    }
+}

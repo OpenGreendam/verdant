@@ -32,6 +32,7 @@ mod generated {
 }
 mod index;
 mod instrument;
+mod performance;
 mod lanes;
 mod lyric_view;
 mod menu;

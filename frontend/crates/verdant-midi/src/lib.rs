@@ -19,7 +19,7 @@ mod take;
 
 pub use device::{CallbackRejection, MidiCapture, MidiConnection, MidiInputService, MidiPort};
 pub use event::{CapturedEvent, EventKind, parse_message};
-pub use take::{CaptureOrigin, CapturedNote, MidiTake, notes_to_batch};
+pub use take::{CaptureOrigin, CapturedNote, CapturedExpression, MidiTake, notes_to_batch};
 pub use verdant_domain::TempoMap;
 
 #[derive(Clone, Debug, thiserror::Error)]

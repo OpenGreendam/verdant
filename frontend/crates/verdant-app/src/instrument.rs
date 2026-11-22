@@ -247,7 +247,7 @@ mod tests {
         assert!(synth_params(&track).is_none());
         track.unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(), synth_spec(&params, "贝斯"));
         assert_eq!(synth_params(&track), Some(params.clone()));
-        assert_eq!(synth_descs(&params).len(), dsp::SYNTH_SPECS.len());
+        assert_eq!(synth_descs(&params).len(), dsp::SYNTH_SPECS.len()+dsp::MOD_SPECS.len());
         let key = instrument_key(&track.id);
         assert!(key.0 >> 63 == 1, "instrument keys never collide with sequential insert keys");
         assert_eq!(key, instrument_key(&track.id));
@@ -262,8 +262,9 @@ mod tests {
         track.unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(), builtin_instrument_spec(ONE_SYNTH_ID, &params, ""));
         assert_eq!(synth_params(&track), Some(params.clone()));
         let descs = synth_descs_for(ONE_SYNTH_ID, &params);
-        assert_eq!(descs.len(), dsp::ONE_PARAM_IDS.len());
-        assert!(descs.iter().all(|desc| dsp::ONE_PARAM_IDS.contains(&desc.id.as_str())));
+        assert_eq!(descs.len(), dsp::ONE_PARAM_IDS.len()+dsp::MOD_SPECS.len());
+        assert!(descs.iter().all(|desc| dsp::ONE_PARAM_IDS.contains(&desc.id.as_str())||dsp::modulation_parameter(&desc.id).is_some()));
+        assert!(!descs.iter().any(|desc|matches!(desc.id.as_str(),"osc2"|"arp_on"|"mpe"|"filter2_enabled")));
         assert!(descs.iter().all(|desc| desc.value >= desc.min && desc.value <= desc.max));
     }
 }

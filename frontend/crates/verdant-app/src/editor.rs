@@ -136,7 +136,7 @@ pub enum MenuAction {
     RemoveInsert { track: TrackId, slot: usize, expected_key: Option<verdant_plugins::InsertKey> },
     OpenInsertEditor { track: TrackId, slot: usize, expected_key: Option<verdant_plugins::InsertKey> },
     /// Route another track's signal to an insert's sidechain (`None` = off).
-    SetSidechain { track: TrackId, slot: usize, expected_key: Option<verdant_plugins::InsertKey>, source: Option<TrackId> },
+    SetSidechain { target: crate::devices::DeviceTarget, slot: usize, expected_key: Option<verdant_plugins::InsertKey>, source: Option<TrackId> },
     AddInstrumentTrack,
     /// Make a vocal track an instrument track or back.
     MakeInstrumentTrack { track: TrackId, instrument: bool },
@@ -1467,9 +1467,9 @@ impl Editor {
             MenuAction::OpenInsertEditor { track, slot, expected_key } => {
                 if expected_key.is_none_or(|key| self.live_insert(&track, slot).is_some_and(|handle| handle.key() == key)) { self.open_insert_editor(&track, slot, cx); }
             }
-            MenuAction::SetSidechain { track, slot, expected_key, source } => {
-                if expected_key.is_none_or(|key| self.device_target_matches(&crate::devices::DeviceTarget::Track(track.clone()), slot, key)) {
-                    self.set_insert_sidechain(&track, slot, source, cx);
+            MenuAction::SetSidechain { target, slot, expected_key, source } => {
+                if expected_key.is_none_or(|key| self.device_target_matches(&target, slot, key)) {
+                    self.set_device_sidechain(target, slot, source, cx);
                 }
             }
             MenuAction::SetInsertParams { track, slot, values } => self.set_track_insert_params(track, slot, values, cx),

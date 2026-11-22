@@ -122,7 +122,8 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
     // A stem keeps its sidechain sources' material: they are muted below but
     // still key the target's inserts.
     if let Some(slot)=target_slot{
-        let keys:std::collections::BTreeSet<usize>=verdant_plugins::project::read_inserts(&project.tracks[slot].unknown).iter().filter_map(project_audio::sidechain_source).filter_map(|id|project.tracks.iter().position(|t|t.id.as_str()==id)).chain([slot]).collect();
+        let mut keys:std::collections::BTreeSet<usize>=verdant_plugins::project::read_inserts(&project.tracks[slot].unknown).iter().filter_map(project_audio::sidechain_source).filter_map(|id|project.tracks.iter().position(|t|t.id.as_str()==id)).chain([slot]).collect();
+        if settings.options.effects{keys.extend(project_audio::master_insert_specs(project).iter().filter(|s|!s.bypass).filter_map(project_audio::sidechain_source).filter_map(|id|project.tracks.iter().position(|t|t.id.as_str()==id)));}
         timeline.clips.retain(|c|keys.contains(&(c.track as usize)));timeline.stereo_clips.retain(|c|keys.contains(&(c.track as usize)));
     }
     let mut sidechains=Vec::new();
@@ -153,6 +154,7 @@ fn render_one(path:&Path,project:&Project,mut timeline:verdant_audio::Timeline,p
             let handle=client.offline_insert(spec.clone()).map_err(|error|format!("主总线插件 {}：{error}",spec.name))?;
             let input_latency=maximum.checked_add(master_latency).ok_or("主总线插件节拍延迟超出范围")?;
             let schedule=project_audio::plugin_schedule(&timeline.automation.master,&document,&verdant_domain::automation::AutomationOwner::Master,&spec.instance_id,&handle,&transport_tempo,input_latency,None)?;
+            sidechains.extend(project_audio::sidechain_route(project,verdant_audio::engine::MASTER_BUS,&spec,master_chain.len(),input_latency));
             matched.insert(spec.instance_id.clone());let own=handle.plugin_latency_samples();master_latency=master_latency.checked_add(own).ok_or("主总线插件延迟超出范围")?;
             master_native.push(schedule);master_chain.push(Box::new(OfflineInsert{handle,error:errors.clone(),latency:own}));
         }

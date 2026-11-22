@@ -1,0 +1,2798 @@
+{
+  "format": "greendam-project",
+  "version": "0.1",
+  "project_id": "56166ab3-f525-5ab6-945a-46c39d2f51c0",
+  "revision": 0,
+  "ppq": 480,
+  "tempo_map": [
+    {
+      "tick": 0,
+      "micro_bpm": 120000000
+    },
+    {
+      "tick": 960,
+      "micro_bpm": 90000000
+    },
+    {
+      "tick": 1920,
+      "micro_bpm": 150000000
+    }
+  ],
+  "time_signatures": [
+    {
+      "tick": 0,
+      "numerator": 4,
+      "denominator": 4
+    }
+  ],
+  "voice_refs": {},
+  "tracks": [
+    {
+      "id": "7b550880-7adb-56a6-a969-61f6c5c26bbd",
+      "name": "01 EQ",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "d620f8dc-5745-5efd-ab6e-d9eb434756b4",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "0817c6ed-de8b-57b1-bf8f-980df8d00818",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "ffcd78ac-a3cb-5eee-9f1c-17524322110f",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "1f81dfee-40e0-5ff8-a70f-6fc81144d2c8",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 54,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "d11df548-d77b-5f90-be86-60868173ca7d",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 56,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "2b4d9fc1-3f78-5148-9fa5-92816147f764",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "c5c9daa1-6f1e-59d0-b6de-67f59975b568",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "47869f2f-324e-5359-87b1-38b6c3ab519b",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "solo": false,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.one",
+        "name": "Verdant One",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "68653b03-86b8-5a4f-9d20-5ce7efa69dd7",
+          "format": "builtin",
+          "id": "verdant.builtin.eq",
+          "name": "Verdant EQ",
+          "state_b64": "eyJiMV9vbiI6MSwiYjFfc2hhcGUiOjIsImIxX2ZyZXEiOjEyMCwiYjFfc2xvcGVfY29udGludW91cyI6MSwiYjFfc2xvcGVfZGIiOjE1LjUsInBoYXNlIjoyLCJyZXNvbHV0aW9uIjoxLCJiM19keW5hbWljIjoxLCJiM19keW5fcmFuZ2UiOi0zLCJiM19zcGVjdHJhbCI6MSwiYjNfZGVuc2l0eSI6NzUsIm1vZDFfc291cmNlIjoxNCwibW9kMV90YXJnZXQiOjI0LCJtb2QxX2Ftb3VudCI6MiwibXNlcV9zeW5jIjo1LCJtc2VxX2xlbmd0aCI6OCwibXNlcV9nbGlkZSI6MC4zLCJtc2VxX2N1cnZlMSI6MSwibWlkaTFfY2MiOjc0LCJtaWRpMV90YXJnZXQiOjI0fQ==",
+          "bypass": false
+        }
+      ]
+    },
+    {
+      "id": "aeeea0c1-e7ea-5a0d-be88-a03bf7725457",
+      "name": "02 Compressor",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "cae4c411-4289-5ff0-acee-92e7581b666e",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "8ab6a3fe-a62d-513b-8e24-54507d8615c8",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "b020ff9a-81ef-58b4-b3e0-edfc128b7787",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "29279ce2-c3ea-5ca9-8607-04b0c4b335b1",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 66,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "960e67f5-5320-5a9c-ba11-7b419fd2a175",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "7dca9d7a-7877-5372-9505-6a6aed75564b",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "5179661d-cae1-5db7-9105-de0a04fa16cb",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "ab0e7005-a7f6-5062-bdf0-44f5e4dba82c",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "b082edeb-59e4-50a4-9d1a-c57e7afa9368",
+          "format": "builtin",
+          "id": "verdant.builtin.compressor",
+          "name": "Verdant Compressor",
+          "state_b64": "eyJzdHlsZSI6OSwiYXV0b190aHJlc2hvbGQiOjEsImF1dG9fdGFyZ2V0Ijo0LCJzY19lcV9vbiI6MSwic2MxX29uIjoxLCJzYzFfZnJlcSI6MjAwLCJzYzFfZ2FpbiI6LTMsImNoYXJhY3RlciI6MiwiY2hhcmFjdGVyX2RyaXZlIjo0LCJvdmVyc2FtcGxpbmciOjIsIm1vZDFfc291cmNlIjoxNCwibW9kMV90YXJnZXQiOjIwLCJtb2QxX2Ftb3VudCI6MiwibXNlcV9zeW5jIjo1LCJtc2VxX2xlbmd0aCI6OCwibXNlcV9nbGlkZSI6MC4zLCJtc2VxX2N1cnZlMSI6MSwibWlkaTFfY2MiOjc0LCJtaWRpMV90YXJnZXQiOjIwfQ==",
+          "bypass": false,
+          "sidechain": "f0fe49e6-39de-5142-a26b-11c962fd3de9"
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "4b43e8ab-e8e0-5434-852e-c5f9f971d77d",
+      "name": "03 Gate",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "72626457-8a77-5a49-9011-d798e12e0a87",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "053ae00a-2426-53fd-bb81-d5dc5ab1bf2b",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "4f7e9a1d-84e3-5a7d-8ec8-b19fab993dc4",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "b3848a79-080a-5a27-984d-411aa7e06002",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 78,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "eef682b1-d6b8-5c5d-97bc-7820960fc8d0",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 80,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "5c0a294f-0002-5d6e-9c72-4526000c454b",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "bc376f6f-d44e-56dc-919d-6593aadc5272",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "4ae9baba-f2e6-59d1-a85b-29b832892ec0",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "42a9d6d4-5012-5c91-a13f-bc58dd966860",
+          "format": "builtin",
+          "id": "verdant.builtin.gate",
+          "name": "Verdant Gate",
+          "state_b64": "eyJzdHlsZSI6MiwiZGV0ZWN0aW9uIjoxLCJwcm9ncmFtX3JlbGVhc2UiOjEsInRocmVzaG9sZCI6LTQ4LCJtb2QxX3NvdXJjZSI6MTQsIm1vZDFfdGFyZ2V0IjoxNiwibW9kMV9hbW91bnQiOjIsIm1zZXFfc3luYyI6NSwibXNlcV9sZW5ndGgiOjgsIm1zZXFfZ2xpZGUiOjAuMywibXNlcV9jdXJ2ZTEiOjEsIm1pZGkxX2NjIjo3NCwibWlkaTFfdGFyZ2V0IjoxNn0=",
+          "bypass": false,
+          "sidechain": "f0fe49e6-39de-5142-a26b-11c962fd3de9"
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "a6fba426-826e-53d6-ad08-f78a2c66db20",
+      "name": "04 De-esser",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "15f983d0-cdf5-5a10-b532-e15f8a8315a5",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "a11e5c57-56f1-5367-aeb3-c4ace71cf6ff",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "42d03352-2006-5de0-a292-5581292e2f25",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "d603eb4b-f555-5c64-b93f-d855c3ee2e46",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 54,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "619904f0-55b5-54bb-9094-6a4aac46cf2a",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 56,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "ed64e83b-7f1f-5e5a-b16a-829e66afa6c0",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "7c9f4a01-0b9a-5461-95da-2e3992fb274a",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "630c8ef9-6a02-521e-9207-959a203c3ab7",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "14584b43-cfa9-56cd-ad61-4e868add89ba",
+          "format": "builtin",
+          "id": "verdant.builtin.deesser",
+          "name": "Verdant De-esser",
+          "state_b64": "eyJtb2RlIjoxLCJwaGFzZSI6MSwiZGV0ZWN0aW9uIjoyLCJzZW5zaXRpdml0eSI6NjAsInRyYW5zaWVudF9wcm90ZWN0IjozMCwibW9kMV9zb3VyY2UiOjE0LCJtb2QxX3RhcmdldCI6MTEsIm1vZDFfYW1vdW50IjoyLCJtc2VxX3N5bmMiOjUsIm1zZXFfbGVuZ3RoIjo4LCJtc2VxX2dsaWRlIjowLjMsIm1zZXFfY3VydmUxIjoxLCJtaWRpMV9jYyI6NzQsIm1pZGkxX3RhcmdldCI6MTF9",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "9dbfdfde-ae49-5b89-b465-98612fe38eb3",
+      "name": "05 Limiter",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "9ae47d5c-7173-523f-890d-d3f6bbeb112e",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "3d049ae2-089c-5a81-b326-f079f22a1d8f",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "13d488a5-2fe3-5c62-b5c4-dbb6751bc47c",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "efac9806-885d-5609-8909-42bd3479ee33",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 66,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "1cbbc069-8eb5-568c-aeee-21145662192c",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "21e93f6d-8876-5fba-9412-7f866c34020b",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "349db9f5-0804-553d-ad16-745aa78ac01c",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "9e2c12f5-a8bd-5e43-8955-f1514489783f",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "d0471f14-5e1c-52a1-8360-cc91e44b4483",
+          "format": "builtin",
+          "id": "verdant.builtin.limiter",
+          "name": "Verdant Limiter",
+          "state_b64": "eyJzdHlsZSI6NSwidHJ1ZV9wZWFrIjoxLCJvdmVyc2FtcGxpbmciOjIsImRpdGhlciI6MiwiZGl0aGVyX2JpdHMiOjIwLCJsb3VkbmVzc19tYXRjaCI6MSwidGFyZ2V0X2x1ZnMiOi0xOCwibW9kMV9zb3VyY2UiOjE0LCJtb2QxX3RhcmdldCI6MCwibW9kMV9hbW91bnQiOjIsIm1zZXFfc3luYyI6NSwibXNlcV9sZW5ndGgiOjgsIm1zZXFfZ2xpZGUiOjAuMywibXNlcV9jdXJ2ZTEiOjEsIm1pZGkxX2NjIjo3NCwibWlkaTFfdGFyZ2V0IjowfQ==",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "22f12ad6-cb23-5f0d-8cc2-7a780e0b3761",
+      "name": "06 Reverb",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "56e4810e-14b2-5f3e-974f-b1e814457b6f",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "dc1a8955-4e9e-5194-96ae-354df8124215",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "c4f6ea53-d879-51c5-8646-87a295dd600e",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "072e6b18-db1c-59f4-8112-fcb4abeade38",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 78,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "0b73aa6c-2422-5124-8f3d-60c45b06e2c3",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 80,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "2a28a053-b45a-548e-aa4b-d70e3ed6c66a",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "b52bcde5-64de-58fb-a5b8-b17daf4e87a7",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "e60bff95-717b-581e-9a19-141ae504d9d2",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "82143f2d-314a-5de8-a4d7-c1c5a43d6c93",
+          "format": "builtin",
+          "id": "verdant.builtin.reverb",
+          "name": "Verdant Reverb",
+          "state_b64": "eyJzdHlsZSI6MSwicm9vbSI6Mi40LCJwcmVkZWxheV9zeW5jIjozLCJkZWNheSI6MS40LCJkZWNheTFfb24iOjEsImRlY2F5MV9mcmVxIjo5MDAsImRlY2F5MV9yYXRlIjoxNTAsInBvc3QxX29uIjoxLCJwb3N0MV9mcmVxIjo0MDAwLCJwb3N0MV9nYWluIjotMywibW9kMV9zb3VyY2UiOjE0LCJtb2QxX3RhcmdldCI6OCwibW9kMV9hbW91bnQiOjIsIm1zZXFfc3luYyI6NSwibXNlcV9sZW5ndGgiOjgsIm1zZXFfZ2xpZGUiOjAuMywibXNlcV9jdXJ2ZTEiOjEsIm1pZGkxX2NjIjo3NCwibWlkaTFfdGFyZ2V0Ijo4fQ==",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "864eef9f-74eb-56a0-9b1a-f469be93a5fe",
+      "name": "07 Delay",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "ea59b99a-8ed8-5106-a299-f0cb82e23eb5",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "671b2bc4-cd8d-5bd0-8faa-03f045493a23",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "8da7071c-394c-5b8e-ab15-b960eb49da6a",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "2f57d685-eeed-5868-8caf-978d72695de3",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 54,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "8f512b94-5916-5702-9e24-dc730925d7c9",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 56,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "a5d62f7c-6af2-5d96-b8c3-189f584312cc",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "a615a2dc-1762-503e-babc-e102635de104",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "a71897b8-9648-511f-a6e2-2267c15eb9e4",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "03550f19-52c2-595a-895f-361ee1a62c71",
+          "format": "builtin",
+          "id": "verdant.builtin.delay",
+          "name": "Verdant Delay",
+          "state_b64": "eyJzeW5jIjo0LCJ0aW1lX21vZGUiOjMsInJvdXRpbmciOjIsInN5bmNfZmVlbCI6MSwiZmlsdGVyX3JvdXRpbmciOjEsImZpbHRlcjFfZnJlcSI6NDAwMCwiZmVlZGJhY2tfc3R5bGUiOjIsImZlZWRiYWNrX3F1YWxpdHkiOjIsInRhcDFfb24iOjEsInRhcDFfdGltZSI6NzUsInRhcDFfbGV2ZWwiOi05LCJmZWVkYmFjayI6MjUsIm1vZDFfc291cmNlIjoxNCwibW9kMV90YXJnZXQiOjgsIm1vZDFfYW1vdW50IjoyLCJtc2VxX3N5bmMiOjUsIm1zZXFfbGVuZ3RoIjo4LCJtc2VxX2dsaWRlIjowLjMsIm1zZXFfY3VydmUxIjoxLCJtaWRpMV9jYyI6NzQsIm1pZGkxX3RhcmdldCI6OH0=",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "d6f6deb1-c488-5495-94b3-14aa5516b0ad",
+      "name": "08 Saturation",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "bc5e4155-21b4-5b3e-aa05-5e036fe322a1",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "2dc379d1-2706-54a8-a11e-779813668207",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "3c8cb119-04c1-51fd-baae-4f536db3c221",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "7278fa16-43a1-5499-9b5b-f5111022d69e",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 66,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "c062ca18-5011-59e3-a301-a44db232836f",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "3ff38cc7-e774-532d-973f-99d7b68dcbee",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "2c735949-d9fc-54af-9f55-abbc77c9be0e",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "948625ca-ef36-5cc7-b3aa-a42d2a505815",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "f1f99b17-aa27-56aa-9127-26699685bc34",
+          "format": "builtin",
+          "id": "verdant.builtin.saturation",
+          "name": "Verdant Saturation",
+          "state_b64": "eyJiYW5kX2NvdW50IjozLCJwaGFzZSI6MSwib3ZlcnNhbXBsaW5nIjoyLCJzdHlsZSI6MjQsImNhYmluZXQiOjIsImNhYmluZXRfbWl4IjozMCwiYjFfZHJpdmUiOjMsImIyX3RvbmUiOjMsIm1vZDFfc291cmNlIjoxNCwibW9kMV90YXJnZXQiOjQsIm1vZDFfYW1vdW50IjoyLCJtc2VxX3N5bmMiOjUsIm1zZXFfbGVuZ3RoIjo4LCJtc2VxX2dsaWRlIjowLjMsIm1zZXFfY3VydmUxIjoxLCJtaWRpMV9jYyI6NzQsIm1pZGkxX3RhcmdldCI6NH0=",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "f0334242-9281-562f-9d97-bbf151e5ce43",
+      "name": "09 Multiband",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "b2614d3b-b8bf-5d58-89fd-0ba1257e5cf0",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "c54b7143-92cd-52aa-a10f-543334d85c75",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "c95c383e-56d2-59da-85a9-20690894a5e4",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "5fd4c197-049e-586d-83a3-f5890899ce50",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 78,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "f4fee194-623d-5910-b621-93d1e6cdbe4a",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 80,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "2fc68cc6-1660-5e99-b409-76d0755a2449",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "3ebca641-fcfa-5153-91ea-110c8ae08cc8",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "dadfaca5-4ed5-5957-94ee-9ae536c84190",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "f2e5631d-539c-5a54-aa2a-33af3a3b7c99",
+          "format": "builtin",
+          "id": "verdant.builtin.multiband",
+          "name": "Verdant Multiband",
+          "state_b64": "eyJwaGFzZSI6MSwibGF5b3V0IjoxLCJiMS5sb3ciOjgwLCJiMS5oaWdoIjoxMDAwLCJiMi5sb3ciOjYwMCwiYjIuaGlnaCI6MjUwMCwiYjEuc2xvcGUiOjE4LCJiMS5yYW5nZSI6LTksImIyLnJhbmdlIjozLCJiMS5zY19mcmVlIjoxLCJiMS5zY19sb3ciOjIwMCwiYjEuc2NfaGlnaCI6MjAwMCwiYjEubG9va2FoZWFkIjozLCJvdmVyc2FtcGxpbmciOjEsIm1vZDFfc291cmNlIjoxNCwibW9kMV90YXJnZXQiOjcsIm1vZDFfYW1vdW50IjoyLCJtc2VxX3N5bmMiOjUsIm1zZXFfbGVuZ3RoIjo4LCJtc2VxX2dsaWRlIjowLjMsIm1zZXFfY3VydmUxIjoxLCJtaWRpMV9jYyI6NzQsIm1pZGkxX3RhcmdldCI6N30=",
+          "bypass": false,
+          "sidechain": "f0fe49e6-39de-5142-a26b-11c962fd3de9"
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "b2f3d7aa-b850-5759-85ff-295ee541da21",
+      "name": "10 Filter",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "dcf14ea5-2f8d-528e-be76-75347f67f052",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "ff258a83-fed7-559e-9ff0-a8dcbb5f91fc",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "1631e2a3-4b7f-5fa1-9c2e-6faa790ca6f1",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "ce7a5b5e-3da6-5189-a876-d96bb8e5955a",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 54,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "3160a692-9ed1-5f32-8598-e0cb75bcc00a",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 56,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "770f7cb5-754b-5e5c-b18f-2c3bb4ed5d35",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "79d0f2f1-2ef6-5635-9b5f-684f0b6bcc45",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "b56cad43-8d17-5c83-bba2-e4f2e6a7a2b1",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "dd996edf-237b-582f-9fac-5216e143fbdd",
+          "format": "builtin",
+          "id": "verdant.builtin.filter",
+          "name": "Verdant Filter",
+          "state_b64": "eyJyb3V0aW5nIjoyLCJmMS5jaGFyYWN0ZXIiOjcsImYyLmVuYWJsZWQiOjEsImYyLmNoYXJhY3RlciI6NCwiZjMuZW5hYmxlZCI6MSwiZjMuZnJlcSI6MjAwMCwib3ZlcnNhbXBsaW5nIjoyLCJtb2QxX3NvdXJjZSI6MTQsIm1vZDFfdGFyZ2V0IjoyLCJtb2QxX2Ftb3VudCI6MiwibXNlcV9zeW5jIjo1LCJtc2VxX2xlbmd0aCI6OCwibXNlcV9nbGlkZSI6MC4zLCJtc2VxX2N1cnZlMSI6MSwibWlkaTFfY2MiOjc0LCJtaWRpMV90YXJnZXQiOjJ9",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "9bf2e9d8-dd23-519e-af1e-5fa04519092e",
+      "name": "11 Dual Filter",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "55e97b8d-8bf9-5d86-8a9d-05bd064928a0",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "d7d8138b-6da7-5223-a9a7-8c549b07aa7c",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "f5fa4f25-4115-54bc-9c5e-6669cd48f4c1",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "51f78cc7-2753-5a1c-bff1-2df1706edaeb",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 66,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "37b26d07-9e33-518d-8b07-5fb26971d602",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "06019643-2dc8-5cea-ad0f-7bc6f6c7857f",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "cfd2e843-0e31-58f7-be2c-3d2e69bc0e1d",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "70e5f39d-e35e-5786-9c26-949c8b696695",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "2d348933-07ad-532b-9b9f-53f7c998d8c9",
+          "format": "builtin",
+          "id": "verdant.builtin.simplon",
+          "name": "Verdant Dual Filter",
+          "state_b64": "eyJyb3V0aW5nIjoxLCJmMS5jaGFyYWN0ZXIiOjQsImYyLmNoYXJhY3RlciI6Mywib3ZlcnNhbXBsaW5nIjoxLCJtb2QxX3NvdXJjZSI6MTQsIm1vZDFfdGFyZ2V0IjoyLCJtb2QxX2Ftb3VudCI6MiwibXNlcV9zeW5jIjo1LCJtc2VxX2xlbmd0aCI6OCwibXNlcV9nbGlkZSI6MC4zLCJtc2VxX2N1cnZlMSI6MSwibWlkaTFfY2MiOjc0LCJtaWRpMV90YXJnZXQiOjJ9",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "eede9f42-debe-50f6-9c2b-eb5722107b43",
+      "name": "12 Micro Filter",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "7e2247e5-65b0-557e-ba99-50987c2eda05",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "7f94d659-f485-5783-bd66-4b4d20e4846f",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "42c54c94-43d3-55fa-be61-96471652cda4",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "7dafca71-aace-5b3c-ad9c-274a49d51d2d",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 78,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "7e4144af-df06-59e4-ad1a-feef9bb0ea59",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 80,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "b9abc30e-5740-5f89-b26d-2cc185b33a95",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 72,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "15bfdb88-126d-5ae9-a897-f1c413be5e6e",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 74,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "d5a63ad8-7cc2-5931-b654-5579ce4fc3f7",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 76,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 150
+        }
+      },
+      "inserts": [
+        {
+          "instance_id": "d9794297-3e53-59af-8cf3-a14ab515aafb",
+          "format": "builtin",
+          "id": "verdant.builtin.micro",
+          "name": "Verdant Micro Filter",
+          "state_b64": "eyJjaGFyYWN0ZXIiOjgsImRyaXZlIjo2LCJmcmVxIjoyNTAwLCJvdmVyc2FtcGxpbmciOjEsIm1vZDFfc291cmNlIjoxNCwibW9kMV90YXJnZXQiOjgsIm1vZDFfYW1vdW50IjoyLCJtc2VxX3N5bmMiOjUsIm1zZXFfbGVuZ3RoIjo4LCJtc2VxX2dsaWRlIjowLjMsIm1zZXFfY3VydmUxIjoxLCJtaWRpMV9jYyI6NzQsIm1pZGkxX3RhcmdldCI6OH0=",
+          "bypass": false
+        }
+      ],
+      "solo": false
+    },
+    {
+      "id": "6b89ae55-42db-5549-936e-3313e38b1edf",
+      "name": "13 Synth",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "c2df0b0d-ad3b-5786-ad6e-7cb0fbceef34",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "ebdc0bd4-0019-5c71-b32c-8f461d379aa9",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "65e99ab9-241a-5c5f-9039-ce8e98b40f7a",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "afb52293-1929-5bf1-a75c-4d2ddc3a4563",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 54,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "52cae4e0-5996-51d3-9059-2e999647f4af",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 56,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "e9e3cef8-7b5e-5cf6-af61-2a1941da2836",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 48,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "c543317a-d7d1-599d-b8e0-62524432e628",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 50,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        },
+        {
+          "id": "2b75aefd-f1f9-529d-9cf8-7be9e0d5e842",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 52,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112,
+          "midi_channel": 1,
+          "midi_expression": [
+            {
+              "offset_tick": 0,
+              "type": "pitch_bend",
+              "value": 0
+            },
+            {
+              "offset_tick": 120,
+              "type": "pitch_bend",
+              "value": 2048
+            },
+            {
+              "offset_tick": 180,
+              "type": "pressure",
+              "value": 70
+            },
+            {
+              "offset_tick": 240,
+              "type": "control",
+              "controller": 74,
+              "value": 96
+            }
+          ]
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.synth",
+        "name": "Verdant Synth",
+        "params": {
+          "gain": -16,
+          "release": 300,
+          "unison": 3,
+          "osc3_mix": 15,
+          "filter3_enabled": 1,
+          "cutoff3": 6000,
+          "filter_character": 3,
+          "high_quality": 1,
+          "mpe": 1,
+          "mpe_range": 12,
+          "arp_on": 1,
+          "arp_sync": 3,
+          "arp_order": 2,
+          "arp_octaves": 2,
+          "arp_gate": 65,
+          "fx_drive": 10,
+          "fx_chorus": 15,
+          "fx_phaser": 12,
+          "fx_delay": 10,
+          "fx_delay_sync": 3,
+          "fx_reverb": 12,
+          "fx_reverb_time": 1.2,
+          "fx_compressor": 25,
+          "mod1_source": 1,
+          "mod1_target": 9,
+          "mod1_amount": 5,
+          "mlfo1_sync": 4,
+          "mlfo1_balance": 0.2
+        }
+      },
+      "inserts": [],
+      "solo": false
+    },
+    {
+      "id": "f0fe49e6-39de-5142-a26b-11c962fd3de9",
+      "name": "14 One",
+      "monophonic": false,
+      "notes": [
+        {
+          "id": "6a3e8cac-9495-52f7-9d06-97af91de5e34",
+          "start_tick": 0,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "0b5f767e-cd2f-5b8d-b858-3608a0ca82bc",
+          "start_tick": 480,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "6e84d2da-17b5-5435-a863-f0cf0ba3faad",
+          "start_tick": 960,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "5e991090-90e7-5e1b-961b-6f2382228966",
+          "start_tick": 1440,
+          "duration_tick": 360,
+          "midi_note": 66,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        },
+        {
+          "id": "7a75f81f-bca4-5a3f-b509-854850de4203",
+          "start_tick": 1920,
+          "duration_tick": 360,
+          "midi_note": 68,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 64
+        },
+        {
+          "id": "686c13e0-4afc-553c-be47-ea76f3ce9056",
+          "start_tick": 2400,
+          "duration_tick": 360,
+          "midi_note": 60,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 80
+        },
+        {
+          "id": "597059f5-2dd9-570f-876a-d8b9f15893a4",
+          "start_tick": 2880,
+          "duration_tick": 360,
+          "midi_note": 62,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 96
+        },
+        {
+          "id": "a29b6e5c-971e-5df5-ad45-acf70eaebe0b",
+          "start_tick": 3360,
+          "duration_tick": 360,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "a",
+          "pronunciation": {
+            "pinyin": "",
+            "phonemes": [],
+            "source": "unset",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          },
+          "midi_velocity": 112
+        }
+      ],
+      "color": "#3584e4",
+      "gain_millidecibels": -18000,
+      "instrument": {
+        "format": "builtin",
+        "id": "verdant.builtin.one",
+        "name": "Verdant One",
+        "params": {
+          "gain": -16,
+          "release": 180,
+          "osc_model": 3,
+          "filter_character": 4,
+          "lfo_filter": 3,
+          "lfo_rate": 1.5
+        }
+      },
+      "inserts": [],
+      "solo": false
+    }
+  ],
+  "render_preferences": {
+    "protocol": "ogd-worker/1",
+    "route": "verdant-voice",
+    "native_seed": 10008
+  },
+  "extensions": {
+    "master_inserts": [
+      {
+        "instance_id": "69898580-060b-5cd3-b3bc-1eabdd35ec9e",
+        "format": "builtin",
+        "id": "verdant.builtin.compressor",
+        "name": "Master compressor",
+        "state_b64": "eyJzdHlsZSI6MTIsInRocmVzaG9sZCI6LTI0LCJyYXRpbyI6MiwibWl4IjozMCwic2NfZXFfb24iOjEsInNjMV9vbiI6MSwic2MxX2ZyZXEiOjE1MCwic2MxX2dhaW4iOi0zfQ==",
+        "bypass": false,
+        "sidechain": "f0fe49e6-39de-5142-a26b-11c962fd3de9"
+      },
+      {
+        "instance_id": "e55a8aed-02d8-5889-b6cc-a61dd2473ae8",
+        "format": "builtin",
+        "id": "verdant.builtin.limiter",
+        "name": "Master limiter",
+        "state_b64": "eyJ0cnVlX3BlYWsiOjEsIm92ZXJzYW1wbGluZyI6MiwiY2VpbGluZyI6LTEsInN0eWxlIjo1fQ==",
+        "bypass": false
+      }
+    ]
+  }
+}

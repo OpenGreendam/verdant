@@ -177,3 +177,75 @@ fn isolated_delay_transport_events_reach_exact_samples_without_changing_saved_te
     assert_eq!(host.get_state_b64().unwrap(), saved);
     assert_eq!(host.refresh_telemetry().unwrap().frames_total, input.len() as u64);
 }
+
+#[test]
+#[ignore = "requires a freshly built verdant-plughost in VERDANT_PLUGIN_HOST"]
+fn native_midi_loudness_and_meter_reset_cross_the_real_control_protocol() {
+    let client=client();
+    let mut fx=client.offline_insert(InsertSpec::new("builtin",dsp::MICRO_ID,"Micro","")).unwrap();
+    let descs=fx.params().unwrap();let output=descs.iter().position(|d|d.id=="output").unwrap();
+    for(id,v)in[("mix",0.),("midi1_cc",74.),("midi1_target",output as f64)]{fx.set_param(id,v).unwrap();}
+    fx.midi_events(&[(verdant_plugins::proto::midi_control(1,74,0,0.5).0,0.5)]).unwrap();
+    let descriptor=fx.params().unwrap().into_iter().find(|d|d.id=="output").unwrap();
+    assert_eq!(descriptor.value,(descriptor.min+descriptor.max)*0.5);
+    for block in 0..80 {
+        let mut l:[f32;256]=std::array::from_fn(|i|(0.1*(TAU*1000.*(block*256+i)as f64/48000.).sin())as f32);let mut r=l;
+        fx.process_offline(&mut l,&mut r).unwrap();
+    }
+    let before=fx.refresh_telemetry().unwrap();
+    assert!(before.loudness.unwrap().integrated_lufs>-100.);
+    fx.reset_meters().unwrap();
+    let reset=fx.refresh_telemetry().unwrap();
+    assert_eq!(reset.frames_total,before.frames_total,"meter reset does not fabricate new processed PCM");
+    assert_eq!(reset.loudness.unwrap().integrated_lufs,-120.);
+    assert!(reset.gain_reduction_db.is_empty());
+    let cc=verdant_plugins::proto::midi_control(1,74,0,0.25).0;
+    fx.enqueue_midi(&[(cc,0.25),(cc,0.75)]).unwrap();
+    // No background task runs: state capture itself must deliver queued MIDI.
+    let saved=fx.get_state_b64().unwrap();
+    let mapped=fx.params().unwrap().into_iter().find(|d|d.id=="output").unwrap();
+    assert_eq!(mapped.value,mapped.min+(mapped.max-mapped.min)*0.75);
+    assert!(fx.enqueue_midi(&[(cc,0.25),(cc,f64::NAN)]).is_err());
+    assert_eq!(fx.get_state_b64().unwrap(),saved);
+    fx.stop_midi();fx.flush_midi().unwrap();
+    let mut l=[0.1;256];let mut r=l;
+    fx.process_offline_events(&mut l,&mut r,&[verdant_plugins::proto::midi_control(1,74,10,0.25)]).unwrap();
+    assert!(l[9]>l[10],"sample-offset MIDI reaches the native DSP");
+}
+
+#[test]
+#[ignore = "requires a freshly built verdant-plughost in VERDANT_PLUGIN_HOST"]
+fn limiter_meter_pause_and_reset_control_the_displayed_integrated_history(){
+    let client=client();
+    let mut limiter=client.offline_insert(InsertSpec::new("builtin",dsp::LIMITER_ID,"Limiter","")).unwrap();
+    assert!(!limiter.automation_params().unwrap().iter().any(|p|p.id=="meter_pause"));
+    let render=|limiter:&mut verdant_plugins::InsertHandle,amplitude:f64|{
+        for block in 0..188{
+            let mut l:[f32;256]=std::array::from_fn(|i|(amplitude*(TAU*1000.*(block*256+i)as f64/48000.).sin())as f32);
+            let mut r=l;limiter.process_offline(&mut l,&mut r).unwrap();
+        }
+    };
+    render(&mut limiter,0.1);
+    let initial=limiter.refresh_telemetry().unwrap();
+    let integrated=initial.loudness.unwrap().integrated_lufs;assert!(integrated>-100.);
+    limiter.set_param("meter_pause",1.).unwrap();render(&mut limiter,0.01);
+    std::thread::sleep(Duration::from_millis(110));
+    let paused=limiter.refresh_telemetry().unwrap();
+    assert_eq!(paused.loudness.unwrap().integrated_lufs,integrated);
+    assert!(paused.frames_total>initial.frames_total,"paused measurement does not freeze processed audio");
+    limiter.set_param("meter_reset",1.).unwrap();
+    std::thread::sleep(Duration::from_millis(110));
+    let reset=limiter.refresh_telemetry().unwrap();
+    assert_eq!(reset.loudness.unwrap().integrated_lufs,-120.);
+    assert_eq!(reset.frames_total,paused.frames_total,"reset is visible while stopped");
+    assert_eq!(reset.captured_at,paused.captured_at,"parameter reset does not refresh the PCM timestamp");
+    limiter.set_param("meter_pause",0.).unwrap();render(&mut limiter,0.1);
+    std::thread::sleep(Duration::from_millis(110));
+    let before_rpc=limiter.refresh_telemetry().unwrap();
+    assert!(before_rpc.loudness.unwrap().integrated_lufs>-100.);
+    limiter.reset_meters().unwrap();
+    let after_rpc=limiter.refresh_telemetry().unwrap();
+    assert_eq!(after_rpc.loudness.unwrap().integrated_lufs,-120.);
+    assert_eq!(after_rpc.frames_total,before_rpc.frames_total);
+    assert_eq!(after_rpc.captured_at,before_rpc.captured_at,"RPC reset does not refresh the PCM timestamp");
+}

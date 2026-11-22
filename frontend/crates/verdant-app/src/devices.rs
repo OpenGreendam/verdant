@@ -22,7 +22,7 @@ use verdant_domain::TrackId;
 use verdant_pitch_gesture_surface::PitchGestureSurfaceHandle;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use verdant_plugins::builtin_dsp::{self as dsp, BandKind, EqParams, Placement, TableEffect};
+use verdant_plugins::builtin_dsp::{self as dsp, BandKind, EqParams, Placement};
 use verdant_plugins::{InsertKey, ParamDesc};
 
 use crate::assets::icon;
@@ -34,6 +34,9 @@ use crate::theme::{Theme, with_alpha};
 mod suite;
 mod value_entry;
 mod signal;
+pub(crate) mod workflow;
+mod modulation;
+mod analysis_tools;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DeviceTarget { Track(TrackId), Master }
@@ -77,6 +80,17 @@ fn plan(phase: &str, event: &str, hit: bool, crossed: bool, reset: bool, double:
 fn drag_normalized(start: f64, delta: f64, travel: f64, fine: bool) -> f64 {
     PitchGestureSurfaceHandle::call_data_method("dragNormalized", vec![start.into(), delta.into(), travel.into(), fine.into()])
         .ok().and_then(|v| v.as_f64()).unwrap_or(start)
+}
+
+/// Keep modulation sources visible while the parameter area scrolls.
+pub(crate) fn modulation_source_bar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Option<InsertKey>) -> gpui::AnyElement {
+    key.map_or_else(|| div().into_any_element(), |key| modulation::docked_sources(ed, &Target { track: owner.clone(), slot, key }))
+}
+pub(crate) fn toggle_modulation_panel(ed: &mut Editor, owner: DeviceTarget, slot: usize, key: InsertKey, cx: &mut Context<Editor>) {
+    if !ed.device_target_matches(&owner, slot, key) { return; }
+    let target = Target { track: owner, slot, key };
+    let mut state = workflow::read_workspace(ed, &target); state.matrix_open = !state.matrix_open;
+    workflow::write_workspace(ed, &target, &state); cx.notify();
 }
 
 // ---------------------------------------------------------------------------
@@ -176,15 +190,21 @@ fn target_for(ed: &Editor, owner: &DeviceTarget, slot: usize) -> Option<Target> 
     Some(Target { track: owner.clone(), slot, key })
 }
 
-fn step_parameter(ed: &mut Editor, target: &Target, id: &str, direction: f64, fine: bool, cx: &mut Context<Editor>) {
+fn step_parameter(ed: &mut Editor, target: &Target, visible: &ParamDesc, direction: f64, fine: bool, cx: &mut Context<Editor>) {
     let Some(params) = current_params(ed, target) else { return };
-    let Some(d) = param(&params, id) else { return };
+    let Some(current) = param(&params, &visible.id) else { return };
+    // UI ranges can be narrower than the persisted ABI (for example a
+    // continuous EQ slope has a shape-dependent minimum).
+    let mut d = current.clone();
+    d.min = d.min.max(visible.min); d.max = d.max.min(visible.max);
+    if d.max <= d.min { return; }
+    d.value = d.value.clamp(d.min, d.max);
     let value = if d.step_count > 0 {
-        (d.value + direction * (d.max - d.min) / d.step_count as f64).clamp(d.min, d.max)
+        (d.value + direction * (current.max - current.min) / current.step_count as f64).clamp(d.min, d.max)
     } else {
-        from_norm(d, to_norm(d, d.value) + direction * if fine { 0.001 } else { 0.01 })
+        from_norm(&d, to_norm(&d, d.value) + direction * if fine { 0.001 } else { 0.01 })
     };
-    write_if_current(ed, target, vec![(id.to_string(), value)], cx);
+    write_if_current(ed, target, vec![(d.id, value)], cx);
 }
 
 
@@ -296,17 +316,21 @@ fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th
     let key = target.key;
     let paint_desc = desc.clone();
     let (key_editor, key_target, key_desc) = (editor.clone(), target.clone(), desc.clone());
-    let (inc_editor, inc_target, inc_id) = (editor.clone(), target.clone(), desc.id.clone());
-    let (dec_editor, dec_target, dec_id) = (editor.clone(), target.clone(), desc.id.clone());
+    let (inc_editor, inc_target, inc_desc) = (editor.clone(), target.clone(), desc.clone());
+    let (dec_editor, dec_target, dec_desc) = (editor.clone(), target.clone(), desc.clone());
     let (entry_editor, entry_target, entry_desc) = (editor.clone(), target.clone(), desc.clone());
+    let (drop_editor, drop_target, drop_id) = (editor.clone(), target.clone(), desc.id.clone());
     div().id(SharedString::from(format!("knob-{}-{}", target.slot, desc.id))).role(Role::Slider)
-        .tab_index(0).rounded(px(6.0)).border_1().border_color(gpui::rgba(0x00000000))
+        .tab_index(0).rounded(gpui::rems(6.0/16.)).border_1().border_color(gpui::rgba(0x00000000))
         .focus(move |style| style.border_color(th.accent))
+        .on_drop(move |source: &modulation::SourceDrag, _, cx| {
+            drop_editor.update(cx, |ed, cx| modulation::drop_source(ed, &drop_target, &drop_id, source, cx));
+        })
         .aria_numeric_value(desc.value).aria_min_numeric_value(desc.min).aria_max_numeric_value(desc.max)
         .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
             let direction = match event.keystroke.key.as_str() { "up" | "right" => Some(1.0), "down" | "left" => Some(-1.0), _ => None };
             if let Some(direction) = direction {
-                key_editor.update(cx, |ed, cx| step_parameter(ed, &key_target, &key_desc.id, direction, event.keystroke.modifiers.shift, cx));
+                key_editor.update(cx, |ed, cx| step_parameter(ed, &key_target, &key_desc, direction, event.keystroke.modifiers.shift, cx));
             } else if event.keystroke.key == "enter" {
                 value_entry::open(&key_editor, key_target.clone(), key_desc.clone(), cx);
             } else if matches!(event.keystroke.key.as_str(), "home" | "end" | "backspace") {
@@ -316,13 +340,13 @@ fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th
             window.prevent_default(); cx.stop_propagation();
         })
         .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _, cx| {
-            inc_editor.update(cx, |ed, cx| step_parameter(ed, &inc_target, &inc_id, 1.0, false, cx));
+            inc_editor.update(cx, |ed, cx| step_parameter(ed, &inc_target, &inc_desc, 1.0, false, cx));
         })
         .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _, cx| {
-            dec_editor.update(cx, |ed, cx| step_parameter(ed, &dec_target, &dec_id, -1.0, false, cx));
+            dec_editor.update(cx, |ed, cx| step_parameter(ed, &dec_target, &dec_desc, -1.0, false, cx));
         })
         .aria_label(label.to_string()).aria_value(value_text.clone())
-        .flex().flex_col().items_center().gap(px(2.0)).w(px(size + 26.0))
+        .flex().flex_col().items_center().gap(gpui::rems(2.0/16.)).w(gpui::rems((size + 26.0) / 16.))
         .child(canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
             let o = bounds.origin;
             let s = f64::from(bounds.size.width.min(bounds.size.height));
@@ -362,11 +386,11 @@ fn knob(editor: Entity<Editor>, target: Target, desc: ParamDesc, label: &str, th
                 e.update(cx, |ed, cx| released(ed, &ctl, key, window, cx));
             });
             let _ = cx;
-        }).size(px(size)))
+        }).size(gpui::rems(size / 16.)))
         .child(div().text_xs().text_color(th.text_secondary).child(label.to_string()))
         .child(div().id(SharedString::from(format!("knob-value-{}-{}", entry_target.slot, entry_desc.id)))
             .role(Role::Button).aria_label(format!("精确输入 {}", entry_desc.name)).cursor_text()
-            .text_sm().text_color(th.text).whitespace_nowrap().rounded(px(3.0)).px(px(3.0))
+            .text_sm().text_color(th.text).whitespace_nowrap().rounded(gpui::rems(3.0/16.)).px(gpui::rems(3.0/16.))
             .hover(move |style| style.bg(th.control_pressed)).child(value_text)
             .on_click(move |_, _, cx| value_entry::open(&entry_editor, entry_target.clone(), entry_desc.clone(), cx)))
 }
@@ -385,12 +409,14 @@ pub struct DeviceAnim {
     selected_band: usize,
     signal_waveform: bool,
     comparison: Comparison,
+    workspace_identity: Option<String>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 struct Comparison {
     active: usize,
     slots: [Option<Vec<(String, f64)>>; 2],
+    #[serde(skip)]
     pending: Option<usize>,
 }
 
@@ -407,7 +433,7 @@ impl Comparison {
 
 impl DeviceAnim {
     fn settled(target: Vec<f64>, now: Instant) -> Self {
-        Self { from: target.clone(), to: target, start: now - ANIM, selected_band: 0, signal_waveform: false, comparison: Comparison::default() }
+        Self { from: target.clone(), to: target, start: now - ANIM, selected_band: 0, signal_waveform: false, comparison: Comparison::default(), workspace_identity: None }
     }
 }
 
@@ -438,14 +464,10 @@ pub fn interpolate(d: &ParamDesc, from: f64, to: f64, t: f64) -> f64 {
 }
 
 fn animate(ed: &mut Editor, key: InsertKey, params: &mut [ParamDesc], snap: bool, window: &mut Window) {
+    workflow::restore_and_reconcile(ed, key, params, snap);
     let target: Vec<f64> = params.iter().map(|p| p.value).collect();
-    let busy = ed.plugin_busy.contains(&key);
     let now = Instant::now();
     let anim = ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(target.clone(), now));
-    if !snap && anim.comparison.pending.is_some() {
-        let current: Vec<_> = params.iter().map(|p| (p.id.clone(), p.value)).collect();
-        anim.comparison.reconcile(&current, busy);
-    }
     if snap || anim.to.len() != target.len() {
         anim.from = target.clone(); anim.to = target; anim.start = now - ANIM;
         return;
@@ -549,7 +571,7 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
     painter: Painter, handles: Vec<Handle>, menu: Option<HandleMenu>, double: Option<DoubleClick>) -> gpui::Stateful<gpui::Div> {
     let key = target.key;
     div().id(SharedString::from(format!("{name}-{}", target.slot))).role(Role::Image).aria_label(label.to_string())
-        .rounded(px(10.0)).bg(th.view).border_1().border_color(th.shade).overflow_hidden()
+        .rounded(gpui::rems(10.0/16.)).bg(th.view).border_1().border_color(th.shade).overflow_hidden()
         .child(canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal), move |bounds, hitbox, window, cx| {
             let plot = Plot { o: bounds.origin, w: f64::from(bounds.size.width), h: f64::from(bounds.size.height) };
             let mut texts = Texts::new();
@@ -586,6 +608,8 @@ fn graph(editor: Entity<Editor>, target: Target, params: Vec<ParamDesc>, name: &
                     texts.push((h.label.clone(), p(x - 3.2 * h.label.chars().count() as f64, y - 7.5, plot.o), 10.0, ink));
                 }
             }
+            let text_scale = f32::from(window.rem_size()) / 16.;
+            for text in &mut texts { text.2 *= text_scale; }
             flush_texts(window, cx, bounds, texts);
             if hovered.is_some() || dragging.is_some() { window.set_cursor_style(gpui::CursorStyle::PointingHand, &hitbox); }
 
@@ -676,12 +700,23 @@ fn choice(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
     let th = ed.theme;
     let current = param(params, id).map_or(0, |d| d.value.round() as usize);
     let target = target_for(ed, track, slot);
-    div().flex().flex_wrap().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control).children(labels.iter().enumerate().map(|(i, label)| {
+    if labels.len() > 8 {
+        let rows: Vec<_> = labels.iter().map(|s| (*s).to_string()).collect();
+        let label = rows.get(current).cloned().unwrap_or_default();
+        let id = id.to_string();
+        return dropdown_button(format!("choice-menu-{slot}-{id}").into(), label, th, move |_| {
+            use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
+            let Some(target) = &target else { return Vec::new() };
+            rows.iter().enumerate().map(|(i, name)| I::action(name.clone(), M::SetDeviceParams {
+                target: target.track.clone(), slot: target.slot, expected_key: Some(target.key), values: vec![(id.clone(), i as f64)] }).checked(i == current)).collect()
+        }, cx).into_any_element();
+    }
+    div().flex().flex_wrap().p(gpui::rems(2.0/16.)).gap(gpui::rems(2.0/16.)).rounded(gpui::rems(8.0/16.)).bg(th.control).children(labels.iter().enumerate().map(|(i, label)| {
         let (target, id_owned) = (target.clone(), id.to_string());
         let on = i == current;
         let (key_target, key_id) = (target.clone(), id_owned.clone());
         div().id(SharedString::from(format!("choice-{slot}-{id}-{i}"))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
-            .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0)).text_sm().cursor_pointer()
+            .h(gpui::rems(26.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
             .when(on, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
             .hover(move |s| s.bg(if on { th.checked } else { th.hover }))
             .active(move |s| s.bg(th.control_pressed))
@@ -703,7 +738,7 @@ fn toggle(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
     let (target, id_owned) = (target_for(ed, track, slot), id.to_string());
     let (key_target, key_id) = (target.clone(), id_owned.clone());
     div().id(SharedString::from(format!("toggle-{slot}-{id}"))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
-        .flex().items_center().gap(px(8.0)).cursor_pointer().text_sm()
+        .flex().items_center().gap(gpui::rems(8.0/16.)).cursor_pointer().text_sm()
         .child(label.to_string()).child(crate::view::switch(on, th))
         .on_click(cx.listener(move |ed, _, _, cx| { if let Some(target) = &target { write_if_current(ed, target, vec![(id_owned.clone(), if on { 0.0 } else { 1.0 })], cx); } }))
         .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
@@ -719,10 +754,10 @@ fn toggle(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
 pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let items = Rc::new(items);
     let key_items = items.clone();
-    div().id(id).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(px(30.0)).px(px(10.0)).flex().items_center().gap(px(6.0))
-        .rounded(px(6.0)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
-        .child(div().max_w(px(120.0)).truncate().child(label))
-        .child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary))
+    div().id(id).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
+        .rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
+        .child(div().max_w(gpui::rems(120.0/16.)).truncate().child(label))
+        .child(svg().path(icon("chevron-down")).size(gpui::rems(12.0/16.)).text_color(th.text_secondary))
         .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| { let items = items(ed); ed.show_menu(ev.position(), items, w, cx); }))
         .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
             if matches!(event.keystroke.key.as_str(), "enter" | "space" | "down") {
@@ -736,34 +771,31 @@ pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, items:
 /// Sidechain source picker: any other track's pre-insert signal.
 fn sidechain_picker(ed: &Editor, target: &DeviceTarget, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    let DeviceTarget::Track(track) = target else {
-        return div().text_xs().text_color(th.text_secondary).child("检测主总线输入").into_any_element();
-    };
-    let spec = ed.insert_specs(track).get(slot).cloned();
+    let spec = ed.device_insert_specs(target).get(slot).cloned();
     let source = spec.as_ref().and_then(|s| verdant_service::project_audio::sidechain_source(s).map(str::to_string));
     let source_name = source.as_ref().and_then(|id| ed.project().tracks.iter().find(|t| t.id.as_str() == id).map(|t| t.name.clone()));
     let label = match (&source, &source_name) { (None, _) => "无".to_string(), (Some(_), Some(name)) => name.clone(), (Some(_), None) => "已移除的轨道".into() };
-    let me = track.clone();
+    let me = target.clone();
     let expected_key = ed.live_device_insert(target, slot).map(|handle| handle.key());
     let items = move |ed: &Editor| {
         use crate::editor::MenuAction as M;
         use crate::menu::MenuItem as I;
-        let mut items = vec![I::header("侧链来源"), I::action("无（检测输入本身）", M::SetSidechain { track: me.clone(), slot, expected_key, source: None }).checked(source.is_none())];
-        for t in ed.project().tracks.iter().filter(|t| t.id != me) {
+        let mut items = vec![I::header("侧链来源"), I::action("无（检测输入本身）", M::SetSidechain { target: me.clone(), slot, expected_key, source: None }).checked(source.is_none())];
+        for t in ed.project().tracks.iter().filter(|t| !matches!(&me, DeviceTarget::Track(track) if t.id == *track)) {
             let on = source.as_deref() == Some(t.id.as_str());
-            items.push(I::action(t.name.clone(), M::SetSidechain { track: me.clone(), slot, expected_key, source: Some(t.id.clone()) }).checked(on));
+            items.push(I::action(t.name.clone(), M::SetSidechain { target: me.clone(), slot, expected_key, source: Some(t.id.clone()) }).checked(on));
         }
         items
     };
-    div().flex().items_center().gap(px(8.0))
-        .child(svg().path(icon("git-merge")).size(px(14.0)).text_color(th.text_secondary))
+    div().flex().items_center().gap(gpui::rems(8.0/16.))
+        .child(svg().path(icon("git-merge")).size(gpui::rems(14.0/16.)).text_color(th.text_secondary))
         .child(div().text_sm().text_color(th.text_secondary).child("侧链"))
         .child(dropdown_button(SharedString::from(format!("sidechain-{slot}")), label, th, items, cx))
         .into_any_element()
 }
 
 fn knob_row(editor: &Entity<Editor>, target: impl Fn() -> Target, params: &[ParamDesc], ids: &[&str], th: Theme, size: f32) -> gpui::Div {
-    let mut row = div().flex().flex_wrap().gap(px(4.0));
+    let mut row = div().flex().flex_wrap().gap(gpui::rems(4.0/16.));
     for id in ids {
         if let Some(d) = param(params, id) {
             let label = d.name.clone();
@@ -796,10 +828,11 @@ fn eq_menu(track: DeviceTarget, slot: usize, key: InsertKey, band: usize, eq: &E
     let set = |field: &str, v: f64| M::SetDeviceParams { target: track.clone(), slot, expected_key: Some(key), values: vec![(dsp::eq_param_id(band, field), v)] };
     let mut items = vec![I::header(format!("频段 {}", band + 1))];
     for kind in BandKind::ALL { items.push(I::action(kind.label(), set("shape", kind.index() as f64)).checked(b.kind == kind)); }
-    if b.kind.has_slope() {
+    if b.kind.has_slope() && !eq.slope_continuous[band] {
         items.push(I::separator());
         for (i, slope) in dsp::SLOPES.iter().enumerate() { items.push(I::action(format!("{slope} dB/oct"), set("slope", i as f64)).checked(b.slope == i)); }
     }
+    items.push(I::action("连续陡度（FIR）", set("slope_continuous", if eq.slope_continuous[band] { 0. } else { 1. })).checked(eq.slope_continuous[band]));
     items.push(I::separator());
     let places = Placement::ALL.iter().map(|&pl| I::action(pl.label(), set("place", pl.index() as f64)).checked(b.place == pl)).collect();
     items.push(I::submenu("立体声位置", places));
@@ -825,15 +858,16 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: u
         let samples = 240;
         let freq_at = |i: usize| FREQ_AXIS.value(i as f64 / samples as f64);
         let rate = verdant_plugins::SAMPLE_RATE;
+        let band_rate = rate * if eq.phase == 1 && !eq.uses_fir() { 2. } else { 1. };
         // Each band's own curve, tinted, then the stereo sum on top.
         for (i, b) in eq.bands.iter().enumerate().filter(|(_, b)| b.on) {
-            let pts: Vec<(f64, f64)> = (0..=samples).map(|k| { let f = freq_at(k); (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(dsp::band_response_db(b, f, rate)))) }).collect();
+            let pts: Vec<(f64, f64)> = (0..=samples).map(|k| { let f = freq_at(k); (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(eq.band_response_db(i, f, rate)))) }).collect();
             if i == selected { fill_under(window, plot, &pts, plot.y(0.5), with_alpha(band_color(i), 0.16)); }
             polyline(window, plot.o, pts.iter().map(|&q| Some(q)), if i == selected { 1.5 } else { 1.0 }, with_alpha(band_color(i), if i == selected { 0.85 } else { 0.4 }));
             if eq.dynamics[i].enabled && b.kind.has_gain() {
                 let mut limit = *b;
                 limit.gain_db += eq.dynamics[i].range_db;
-                let edge: Vec<_> = (0..=samples).map(|k| (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(dsp::band_response_db(&limit, freq_at(k), rate))))).collect();
+                let edge: Vec<_> = (0..=samples).map(|k| (plot.x(k as f64 / samples as f64), plot.y(GAIN_AXIS.norm(dsp::band_response_db_with_slope(&limit, freq_at(k), band_rate, eq.slope_continuous[i].then_some(eq.effective_slope(i))))))).collect();
                 polyline(window, plot.o, edge.iter().enumerate().map(|(k, &point)| if k % 8 < 5 { Some(point) } else { None }), 1.25, with_alpha(band_color(i), 0.65));
             }
         }
@@ -874,14 +908,14 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: u
         Some((writes, Some(i)))
     });
 
-    let bands = div().flex().flex_wrap().flex_none().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control).children((0..dsp::EQ_BANDS).map(|i| {
+    let bands = div().flex().flex_wrap().flex_none().p(gpui::rems(2.0/16.)).gap(gpui::rems(2.0/16.)).rounded(gpui::rems(8.0/16.)).bg(th.control).children((0..dsp::EQ_BANDS).map(|i| {
         let b = eq.bands[i];
         let on = i == selected;
         div().id(SharedString::from(format!("eq-band-{slot}-{i}"))).role(Role::Tab).aria_selected(on).tab_index(0)
             .aria_label(format!("频段 {}：{}", i + 1, b.kind.label()))
-            .h(px(26.0)).px(px(8.0)).flex().items_center().gap(px(5.0)).rounded(px(6.0)).text_sm().cursor_pointer()
+            .h(gpui::rems(26.0/16.)).px(gpui::rems(8.0/16.)).flex().items_center().gap(gpui::rems(5.0/16.)).rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
             .when(on, |d| d.bg(th.checked)).hover(move |s| s.bg(if on { th.checked } else { th.hover })).active(move |s| s.bg(th.control_pressed))
-            .child(div().size(px(9.0)).rounded(px(4.5)).bg(if b.on { band_color(i) } else { with_alpha(band_color(i), 0.3) }))
+            .child(div().size(gpui::rems(9.0/16.)).rounded(gpui::rems(4.5/16.)).bg(if b.on { band_color(i) } else { with_alpha(band_color(i), 0.3) }))
             .child(format!("{}", i + 1))
             .on_click(cx.listener(move |ed, _, _, cx| { select_band(ed, key, i); cx.notify(); }))
             .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
@@ -895,25 +929,36 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: u
     }, cx);
     let band_switch = toggle(ed, track, slot, params, &dsp::eq_param_id(selected, "on"), "启用频段", cx);
     let place_labels: Vec<&str> = Placement::ALL.iter().map(|p| match p { Placement::Stereo => "立体", other => other.short() }).collect();
-    let mut knobs = div().flex().items_start().gap(px(4.0));
+    let mut knobs = div().flex().items_start().gap(gpui::rems(4.0/16.));
     for (field, label) in [("freq", "频率"), ("gain", "增益"), ("q", "Q")] {
         if field == "gain" && !band.kind.has_gain() { continue; }
         if let Some(d) = param(params, &dsp::eq_param_id(selected, field)) { knobs = knobs.child(knob(editor.clone(), target(), d.clone(), label, th, 44.0)); }
     }
-    if let Some(d) = param(params, "output") { knobs = knobs.child(div().w(px(12.0))).child(knob(editor.clone(), target(), d.clone(), "输出", th, 44.0)); }
-    let mut controls_row = div().flex().flex_wrap().items_center().gap(px(10.0)).child(shape);
-    if band.kind.has_slope() {
+    if let Some(d) = param(params, "output") { knobs = knobs.child(div().w(gpui::rems(12.0/16.))).child(knob(editor.clone(), target(), d.clone(), "输出", th, 44.0)); }
+    let mut controls_row = div().flex().flex_wrap().items_center().gap(gpui::rems(10.0/16.)).child(shape);
+    if band.kind.has_slope() && !eq.slope_continuous[selected] {
         let slope_labels: Vec<String> = dsp::SLOPES.iter().map(|s| format!("{s}")).collect();
         let refs: Vec<&str> = slope_labels.iter().map(String::as_str).collect();
         controls_row = controls_row.child(choice(ed, track, slot, params, &dsp::eq_param_id(selected, "slope"), &refs, cx));
     }
-    controls_row = controls_row.child(band_switch);
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "eq-graph", "均衡器频率响应：拖动频段点调频率和增益，右键换形状，双击空白处添加频段", th, painter, handles, Some(menu), Some(double)).h(px(220.0)).w_full())
+    controls_row = controls_row.child(band_switch)
+        .child(toggle(ed, track, slot, params, &dsp::eq_param_id(selected, "slope_continuous"), "连续陡度（FIR）", cx));
+    if eq.slope_continuous[selected] {
+        if let Some(desc) = param(params, &dsp::eq_param_id(selected, "slope_db")) {
+            let mut desc = desc.clone(); desc.min = band.kind.min_slope();
+            desc.value = eq.effective_slope(selected);
+            desc.default_value = desc.default_value.map(|value| value.clamp(desc.min, desc.max));
+            knobs = knobs.child(knob(editor.clone(), target(), desc, "陡度 dB/oct", th, 44.));
+        }
+        controls_row = controls_row.child(div().text_xs().text_color(th.text_secondary)
+            .child(format!("固定 FIR 延迟 · 该形状最低 {:.0} dB/oct", band.kind.min_slope())));
+    }
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "eq-graph", "均衡器频率响应：拖动频段点调频率和增益，右键换形状，双击空白处添加频段", th, painter, handles, Some(menu), Some(double)).h(gpui::rems(220.0/16.)).w_full())
         .child(bands)
         .child(controls_row)
-        .child(div().flex().items_center().gap(px(12.0)).child(knobs).child(div().flex_1())
-            .child(div().flex().flex_col().gap(px(4.0)).items_end()
+        .child(div().flex().items_center().gap(gpui::rems(12.0/16.)).child(knobs).child(div().flex_1())
+            .child(div().flex().flex_col().gap(gpui::rems(4.0/16.)).items_end()
                 .child(div().text_xs().text_color(th.text_secondary).child("立体声位置"))
                 .child(choice(ed, track, slot, params, &dsp::eq_param_id(selected, "place"), &place_labels, cx))))
         .into_any_element()
@@ -952,7 +997,7 @@ fn transfer_graph(editor: &Entity<Editor>, target: Target, params: &[ParamDesc],
         x: Some(("threshold".into(), axis)), y: None, color: gpui::rgb(0xffffff), label: String::new(), hollow: false, selected: false,
         also: vec![], defaults: vec![("threshold".into(), default)],
     };
-    graph(editor.clone(), target, params.to_vec(), name, label, th, painter, vec![handle], None, None).size(px(200.0)).flex_none().into_any_element()
+    graph(editor.clone(), target, params.to_vec(), name, label, th, painter, vec![handle], None, None).size(gpui::rems(200.0/16.)).flex_none().into_any_element()
 }
 
 fn comp_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
@@ -966,10 +1011,10 @@ fn comp_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot:
         let wet = v("mix", 100.) / 100.;
         dsp::lin_to_db(dsp::db_to_lin(input) * (1. - wet) + dsp::db_to_lin(curve(input) + v("makeup", 0.) + auto) * wet) + v("output", 0.)
     });
-    div().flex().gap(px(16.0))
+    div().flex().gap(gpui::rems(16.0/16.))
         .child(transfer_graph(editor, target(), params, "comp-graph", "压缩器传输曲线：左右拖动阈值", th, curve, LEVEL_FLOOR))
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
-            .child(div().flex().flex_col().items_start().gap(px(10.0)).child(choice(ed, track, slot, params, "style", &dsp::COMP_STYLES, cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
+            .child(div().flex().flex_col().items_start().gap(gpui::rems(10.0/16.)).child(choice(ed, track, slot, params, "style", &dsp::COMP_STYLES, cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
             .child(knob_row(editor, target, params, &["threshold", "ratio", "knee", "range", "makeup"], th, 42.0))
             .child(knob_row(editor, target, params, &["attack", "release", "lookahead", "mix", "sc_hpf", "sc_lpf"], th, 42.0))
             .child(toggle(ed, track, slot, params, "sc_listen", "监听侧链", cx)))
@@ -985,10 +1030,10 @@ fn gate_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot:
         let wet = v("mix", 100.) / 100.;
         dsp::lin_to_db(dsp::db_to_lin(x) * (1. - wet) + dsp::db_to_lin(processed) * wet) + v("output", 0.)
     });
-    div().flex().gap(px(16.0))
+    div().flex().gap(gpui::rems(16.0/16.))
         .child(transfer_graph(editor, target(), params, "gate-graph", "门限传输曲线：左右拖动阈值", th, curve, -80.0))
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
-            .child(div().flex().items_center().gap(px(10.0)).child(toggle(ed, track, slot, params, "sc_listen", "监听侧链", cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
+            .child(div().flex().items_center().gap(gpui::rems(10.0/16.)).child(toggle(ed, track, slot, params, "sc_listen", "监听侧链", cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
             .child(knob_row(editor, target, params, &["threshold", "range", "ratio", "mix"], th, 42.0))
             .child(knob_row(editor, target, params, &["attack", "hold", "release", "lookahead", "sc_hpf", "sc_lpf"], th, 42.0)))
         .into_any_element()
@@ -1020,9 +1065,9 @@ fn deesser_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, sl
         x: Some(("freq".into(), FREQ_AXIS)), y: Some(("threshold".into(), level)), color: gpui::rgb(0xffffff), label: String::new(),
         hollow: false, selected: false, also: vec![], defaults: vec![("freq".into(), 6000.0), ("threshold".into(), -24.0)],
     };
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "deesser-graph", "齿音检测：左右拖动频率，上下拖动阈值", th, painter, vec![handle], None, None).h(px(150.0)).w_full())
-        .child(div().flex().items_center().gap(px(10.0)).child(choice(ed, track, slot, params, "mode", &dsp::DEESSER_MODES, cx))
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "deesser-graph", "齿音检测：左右拖动频率，上下拖动阈值", th, painter, vec![handle], None, None).h(gpui::rems(150.0/16.)).w_full())
+        .child(div().flex().items_center().gap(gpui::rems(10.0/16.)).child(choice(ed, track, slot, params, "mode", &dsp::DEESSER_MODES, cx))
             .child(toggle(ed, track, slot, params, "sc_listen", "监听", cx)).child(div().flex_1()).child(sidechain_picker(ed, track, slot, cx)))
         .child(knob_row(editor, target, params, &["threshold", "range", "freq", "release"], th, 42.0))
         .into_any_element()
@@ -1053,9 +1098,9 @@ fn limiter_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, sl
     let mut handle = handle;
     // The ceiling axis covers −12…0 dB; keep the handle on the drawn line.
     handle.at.0 = 0.92;
-    div().flex().gap(px(16.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "limiter-graph", "限制器传输曲线：上下拖动输出上限", th, painter, vec![handle], None, None).size(px(180.0)).flex_none())
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
+    div().flex().gap(gpui::rems(16.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "limiter-graph", "限制器传输曲线：上下拖动输出上限", th, painter, vec![handle], None, None).size(gpui::rems(180.0/16.)).flex_none())
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
             .child(knob_row(editor, target, params, &["gain", "ceiling", "release"], th, 46.0))
             .child(knob_row(editor, target, params, &["lookahead", "link"], th, 46.0)))
         .into_any_element()
@@ -1101,6 +1146,16 @@ fn reverb_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slo
     handles.push(Handle { control: Control::Handle("damping"), at: (FREQ_AXIS.norm(damping), decay_axis.norm(dsp::reverb_decay_at_frequency(&values, damping, verdant_plugins::SAMPLE_RATE))),
         x: Some(("damping".into(), FREQ_AXIS)), y: None, color: th.text, label: "阻尼".into(), hollow: false,
         selected: false, also: vec![], defaults: vec![("damping".into(), 8000.)] });
+    let node = selected_band(ed, key, 8);
+    for index in 0..8 {
+        let prefix = format!("decay{}", index + 1);
+        let on = v(&format!("{prefix}_on"), 0.) >= 0.5;
+        if !on && index != node { continue; }
+        let freq = v(&format!("{prefix}_freq"), 1000.);
+        handles.push(Handle { control: Control::Band(index), at: (FREQ_AXIS.norm(freq), decay_axis.norm(dsp::reverb_decay_at_frequency(&values, freq, verdant_plugins::SAMPLE_RATE))),
+            x: Some((format!("{prefix}_freq"), FREQ_AXIS)), y: None, color: band_color(index), label: (index+1).to_string(),
+            hollow: !on, selected: index == node, also: vec![(format!("{prefix}_on"), 1.)], defaults: vec![(format!("{prefix}_freq"), 1000.)] });
+    }
     let post_axis = Axis::lin(-36., 24.);
     let post_painter: Painter = Rc::new(move |window, plot, params, texts| {
         let grid = [-24., -12., 0., 12.].map(|db| (post_axis.norm(db), format!("{db:+.0} dB")));
@@ -1126,12 +1181,24 @@ fn reverb_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slo
             x: Some((id.into(), FREQ_AXIS)), y: None, color: th.text_secondary, label: String::new(), hollow: true,
             selected: false, also: vec![], defaults: vec![(id.into(), default)] });
     }
-    div().flex().flex_col().gap(px(10.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-graph", "混响衰减随频率：拖动基准衰减与阻尼", th, painter, handles, None, None).h(px(180.0)).w_full())
+    for index in 0..8 {
+        let prefix = format!("post{}", index + 1);
+        let on = v(&format!("{prefix}_on"), 0.) >= 0.5;
+        if !on && index != node { continue; }
+        let freq = v(&format!("{prefix}_freq"), 1000.); let gain = v(&format!("{prefix}_gain"), 0.);
+        let has_gain = v(&format!("{prefix}_shape"), 0.) < 3.;
+        post_handles.push(Handle { control: Control::Band(index), at: (FREQ_AXIS.norm(freq), post_axis.norm(if has_gain { gain } else { -12. })),
+            x: Some((format!("{prefix}_freq"), FREQ_AXIS)), y: has_gain.then(|| (format!("{prefix}_gain"), post_axis)), color: band_color(index),
+            label: (index+1).to_string(), hollow: !on, selected: index == node, also: vec![(format!("{prefix}_on"), 1.)],
+            defaults: vec![(format!("{prefix}_freq"), 1000.), (format!("{prefix}_gain"), 0.)] });
+    }
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-graph" , "混响衰减随频率：拖动基准衰减与阻尼", th, painter, handles, None, None).h(gpui::rems(180.0/16.)).w_full())
         .child(knob_row(editor, target, params, &["predelay", "decay", "size", "damping", "diffusion"], th, 42.0))
         .child(knob_row(editor, target, params, &["width", "low_cut", "high_cut", "modulation", "mix"], th, 42.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-post", "混响输出均衡：拖动频率和增益", th, post_painter, post_handles, None, None).h(px(170.)).w_full())
+        .child(graph(editor.clone(), target(), params.to_vec(), "reverb-post", "混响输出均衡：拖动频率和增益", th, post_painter, post_handles, None, None).h(gpui::rems(170./16.)).w_full())
         .child(knob_row(editor, target, params, &["post_low_gain", "post_mid_freq", "post_mid_gain", "post_mid_q", "post_high_gain"], th, 42.))
+        .child(suite::reverb_nodes(ed, editor, track, slot, key, params, cx))
         .child(sidechain_picker(ed, track, slot, cx))
         .into_any_element()
 }
@@ -1149,17 +1216,15 @@ fn saturation_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget,
         let grid = vec![(0.25, String::new()), (0.5, "0".to_string()), (0.75, String::new())];
         paint_grid(window, plot, th, &grid, &grid, Some(0.5), texts);
         let v = |id: &str, d: f64| param(params, id).map_or(d, |p| p.value);
-        let mut fx = dsp::SaturationProcessor::new(verdant_plugins::SAMPLE_RATE);
-        for (index, spec) in dsp::SATURATION_SPECS.iter().enumerate() { fx.values[index] = v(spec.id, spec.default); }
-        fx.refresh();
+        let values = suite::values(dsp::SATURATION_SPECS, params);
         polyline(window, plot.o, [Some((plot.x(0.0), plot.y(0.0))), Some((plot.x(1.0), plot.y(1.0)))], 1.0, with_alpha(th.text, 0.18));
-        let pts = (0..=160).map(|i| { let x = -1.0 + i as f64 / 80.0; Some((plot.x((x + 1.0) / 2.0), plot.y((((x * (1. - v("mix", 100.) / 100.) + fx.band_curve(selected, x) * v("mix", 100.) / 100.) + 1.0) / 2.0).clamp(-0.05, 1.05)))) });
+        let pts = (0..=160).map(|i| { let x = -1.0 + i as f64 / 80.0; Some((plot.x((x + 1.0) / 2.0), plot.y((((x * (1. - v("mix", 100.) / 100.) + dsp::saturation_band_curve(&values, selected, x) * v("mix", 100.) / 100.) + 1.0) / 2.0).clamp(-0.05, 1.05)))) });
         polyline(window, plot.o, pts, 2.25, th.accent);
         texts.push((format!("频段 {} 静态特性", selected + 1), p(10., 8., plot.o), 10., th.text_secondary));
     });
-    div().flex().gap(px(16.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "saturation-graph", "饱和传输曲线", th, painter, vec![], None, None).size(px(170.0)).flex_none())
-        .child(div().flex_1().min_w_0().flex().flex_col().gap(px(10.0))
+    div().flex().gap(gpui::rems(16.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "saturation-graph", "饱和传输曲线", th, painter, vec![], None, None).size(gpui::rems(170.0/16.)).flex_none())
+        .child(div().flex_1().min_w_0().flex().flex_col().gap(gpui::rems(10.0/16.))
             .child(choice(ed, track, slot, params, "style", &dsp::SATURATION_STYLES, cx))
             .child(knob_row(editor, target, params, &["drive", "tone", "mix", "output"], th, 46.0))
             .child(sidechain_picker(ed, track, slot, cx)))
@@ -1214,20 +1279,22 @@ pub(crate) fn synth_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId
         mk("decay", pts[2], Some(("decay".into(), decay.span(pts[1].0 + 0.02, pts[1].0 + 0.25))), Some(("sustain".into(), sustain)), vec![("decay".into(), 300.0), ("sustain".into(), 70.0)]),
         mk("release", pts[4], Some(("release".into(), release.span(0.77, 1.0))), None, vec![("release".into(), 250.0)]),
     ];
-    let mut waves = |id: &str, label: &str| div().flex().items_center().gap(px(8.0))
-        .child(div().w(px(64.0)).text_sm().text_color(th.text_secondary).child(label.to_string()))
+    let mut waves = |id: &str, label: &str| div().flex().items_center().gap(gpui::rems(8.0/16.))
+        .child(div().w(gpui::rems(64.0/16.)).text_sm().text_color(th.text_secondary).child(label.to_string()))
         .child(choice(ed, track, slot, params, id, &dsp::WAVES, cx));
     let osc1 = waves("osc1", "振荡器 1");
     let osc2 = param(params, "osc2").map(|_| waves("osc2", "振荡器 2"));
-    div().flex().flex_col().gap(px(10.0))
+    div().flex().flex_col().gap(gpui::rems(10.0/16.))
         .child(suite::toolbar(ed, track, slot, key, instrument_id, params, cx))
-        .child(div().flex().gap(px(16.0))
-            .child(graph(editor.clone(), target(), params.to_vec(), "synth-adsr", "音量包络：拖动起音、衰减/延音与释音点", th, painter, handles, None, None).h(px(140.0)).flex_1())
-            .child(div().flex().flex_col().gap(px(8.0)).justify_center()
+        .child(signal::panel(ed, editor, track, slot, key, cx))
+        .child(div().flex().gap(gpui::rems(16.0/16.))
+            .child(graph(editor.clone(), target(), params.to_vec(), "synth-adsr", "音量包络：拖动起音、衰减/延音与释音点", th, painter, handles, None, None).h(gpui::rems(140.0/16.)).flex_1())
+            .child(div().flex().flex_col().gap(gpui::rems(8.0/16.)).justify_center()
                 .child(osc1).children(osc2)))
         .child(knob_row(editor, target, params, &["osc2_semi", "detune", "osc2_mix", "width", "gain"], th, 42.0))
         .child(knob_row(editor, target, params, &["attack", "decay", "sustain", "release", "cutoff", "resonance", "env_amount"], th, 42.0))
         .child(suite::remaining(ed, editor, track, slot, key, instrument_id, params, cx))
+        .child(modulation::panel(ed, editor, track, slot, key, instrument_id, params, cx))
         .into_any_element()
 }
 
@@ -1238,11 +1305,11 @@ pub(crate) fn synth_editor(ed: &Editor, editor: &Entity<Editor>, track: &TrackId
 pub(crate) fn generic_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: usize, key: InsertKey, params: &[ParamDesc]) -> gpui::AnyElement {
     let th = ed.theme;
     let shown: Vec<&ParamDesc> = params.iter().filter(|p| p.max > p.min).collect();
-    let mut grid = div().flex().flex_wrap().gap(px(8.0)).w_full();
+    let mut grid = div().flex().flex_wrap().gap(gpui::rems(8.0/16.)).w_full();
     for d in &shown {
         grid = grid.child(knob(editor.clone(), Target { track: track.clone(), slot, key }, (*d).clone(), &d.name, th, 40.0));
     }
-    div().flex().flex_col().gap(px(8.0)).child(grid)
+    div().flex().flex_col().gap(gpui::rems(8.0/16.)).child(grid)
         .when(params.is_empty(), |d| d.child(div().text_sm().text_color(th.text_secondary).child("此插件未提供可编辑参数")))
         .into_any_element()
 }
@@ -1285,14 +1352,17 @@ pub(crate) fn render_builtin_editor(ed: &Editor, editor: &Entity<Editor>, owner:
         dsp::FILTER_ID | dsp::SIMPLON_ID | dsp::MICRO_ID => suite::filters(ed, editor, owner, slot, key, id, params, cx),
         _ => return generic_editor(ed, editor, owner, slot, key, params),
     };
-    div().flex().flex_col().gap(px(12.0)).w_full().min_w_0()
+    div().flex().flex_col().gap(gpui::rems(12.0/16.)).w_full().min_w_0()
         .child(suite::toolbar(ed, owner, slot, key, id, params, cx))
+        .when(matches!(id, dsp::EQ_ID | dsp::REVERB_ID), |d| d.child(analysis_tools::tools(ed, editor, Target { track: owner.clone(), slot, key }, id, cx)))
         .child(signal::panel(ed, editor, owner, slot, key, cx))
         .child(body)
+        .when(id == dsp::COMPRESSOR_ID, |d| d.child(suite::compressor_sidechain(ed, editor, owner, slot, key, params, cx)))
         .when(id == dsp::EQ_ID, |d| d.child(suite::eq_dynamic(ed, editor, owner, slot, key, params, cx)))
         .when(id == dsp::SATURATION_ID, |d| d.child(suite::saturation_bands(ed, editor, owner, slot, key, params, cx)))
         .when(id == dsp::LIMITER_ID, |d| d.child(sidechain_picker(ed, owner, slot, cx)))
         .child(suite::remaining(ed, editor, owner, slot, key, id, params, cx))
+        .child(modulation::panel(ed, editor, owner, slot, key, id, params, cx))
         .child(div().text_xs().text_color(ed.theme.text_secondary).child("拖动调节 · Shift 微调 · 点击数值精确输入 · Alt 点击复位"))
         .into_any_element()
 }
@@ -1313,7 +1383,7 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
     let (bypass_arg, menu_track) = (arg.clone(), track.clone());
     let keyed = verdant_service::project_audio::sidechain_source(spec).is_some();
     let title = builtin.and_then(dsp::short_label).map_or(spec.name.clone(), str::to_string);
-    let header = div().flex().items_center().gap(px(10.0)).h(px(32.0))
+    let header = div().flex().items_center().gap(gpui::rems(10.0/16.)).h(gpui::rems(32.0/16.))
         .child(div().id(SharedString::from(format!("device-power-{slot}"))).role(Role::Switch).aria_label("启用效果器").aria_selected(on).cursor_pointer()
             .child(crate::view::switch(on, th))
             .on_click(cx.listener(move |ed, _, w, cx| {
@@ -1322,10 +1392,10 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
                 }
             })))
         .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).text_color(if on { th.text } else { th.text_secondary }).child(title))
-        .when(keyed, |d| d.child(div().px(px(8.0)).h(px(22.0)).flex().items_center().rounded(px(11.0)).bg(with_alpha(th.accent, 0.18)).text_xs().text_color(th.accent).child("侧链")))
-        .child(div().id(SharedString::from(format!("device-menu-{slot}"))).role(Role::Button).aria_label("效果器菜单").size(px(28.0)).rounded(px(6.0))
+        .when(keyed, |d| d.child(div().px(gpui::rems(8.0/16.)).h(gpui::rems(22.0/16.)).flex().items_center().rounded(gpui::rems(11.0/16.)).bg(with_alpha(th.accent, 0.18)).text_xs().text_color(th.accent).child("侧链")))
+        .child(div().id(SharedString::from(format!("device-menu-{slot}"))).role(Role::Button).aria_label("效果器菜单").size(gpui::rems(28.0/16.)).rounded(gpui::rems(6.0/16.))
             .flex().items_center().justify_center().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed)).cursor_pointer()
-            .child(svg().path(icon("menu")).size(px(14.0)).text_color(th.text))
+            .child(svg().path(icon("menu")).size(gpui::rems(14.0/16.)).text_color(th.text))
             .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| {
                 use crate::editor::MenuAction as M;
                 use crate::menu::MenuItem as I;
@@ -1341,12 +1411,12 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
     let body = match params {
         Some((key, params)) if builtin.is_some() => render_builtin_editor(ed, editor, &owner, slot, key, &params, cx),
         Some((key, params)) => generic_editor(ed, editor, &owner, slot, key, &params),
-        None => div().h(px(120.0)).flex().items_center().justify_center().text_sm().text_color(th.text_secondary)
+        None => div().h(gpui::rems(120.0/16.)).flex().items_center().justify_center().text_sm().text_color(th.text_secondary)
             .child(if handle.is_some() { "正在读取参数…" } else { "插件未载入（标识与状态已保留）" }).into_any_element(),
     };
     let width = builtin.and_then(card_width).or(Some(480.));
-    div().id(SharedString::from(format!("device-{slot}"))).flex_none().flex().flex_col().gap(px(10.0)).p(px(14.0))
-        .rounded(px(12.0)).bg(th.card).shadow_sm().when(!on, |d| d.opacity(0.72))
+    div().id(SharedString::from(format!("device-{slot}"))).flex_none().flex().flex_col().gap(gpui::rems(10.0/16.)).p(gpui::rems(14.0/16.))
+        .rounded(gpui::rems(12.0/16.)).bg(th.card).shadow_sm().when(!on, |d| d.opacity(0.72))
         .when_some(width, |d, w| d.w(px(w)))
         .child(header).child(body)
         .into_any_element()
@@ -1355,18 +1425,18 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
 fn add_card(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let browse_track = track.clone();
-    let pill = |id: SharedString, label: &str| div().id(id).role(Role::Button).aria_label(label.to_string()).h(px(32.0)).px(px(12.0))
-        .flex().items_center().rounded(px(6.0)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked))
+    let pill = |id: SharedString, label: &str| div().id(id).role(Role::Button).aria_label(label.to_string()).h(gpui::rems(32.0/16.)).px(gpui::rems(12.0/16.))
+        .flex().items_center().rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked))
         .cursor_pointer().text_sm().child(label.to_string());
     let effects = dsp::EFFECT_IDS.iter().map(|&id| {
         let t = track.clone();
         pill(SharedString::from(format!("device-add-{id}")), dsp::short_label(id).unwrap_or(id))
             .on_click(cx.listener(move |ed, _, _, cx| ed.add_insert(&t, "builtin", id, cx)))
     });
-    div().id("device-add").flex_none().w(px(220.0)).flex().flex_col().gap(px(8.0)).p(px(14.0)).rounded(px(12.0))
+    div().id("device-add").flex_none().w(gpui::rems(220.0/16.)).flex().flex_col().gap(gpui::rems(8.0/16.)).p(gpui::rems(14.0/16.)).rounded(gpui::rems(12.0/16.))
         .border_1().border_color(th.shade)
         .child(div().text_sm().font_weight(FontWeight::BOLD).child("添加效果器"))
-        .child(div().flex().flex_wrap().gap(px(6.0)).children(effects))
+        .child(div().flex().flex_wrap().gap(gpui::rems(6.0/16.)).children(effects))
         .child(pill("device-add-browse".into(), "浏览插件…").on_click(cx.listener(move |ed, _, _, cx| ed.open_plugin_browser(browse_track.clone(), slot, cx))))
         .into_any_element()
 }
@@ -1395,11 +1465,11 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window
     let empty = cards.is_empty();
     div().id("device-view").role(Role::Group).aria_label(format!("{name} 的效果器链"))
         .size_full().flex().flex_col().bg(th.view)
-        .child(div().h(px(40.0)).flex_none().px(px(16.0)).flex().items_center().gap(px(8.0))
-            .child(svg().path(icon("sliders-horizontal")).size(px(15.0)).text_color(th.text_secondary))
+        .child(div().h(gpui::rems(40.0/16.)).flex_none().px(gpui::rems(16.0/16.)).flex().items_center().gap(gpui::rems(8.0/16.))
+            .child(svg().path(icon("sliders-horizontal")).size(gpui::rems(15.0/16.)).text_color(th.text_secondary))
             .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))
             .child(div().text_sm().text_color(th.text_secondary).child(if empty { "· 还没有效果器".to_string() } else { format!("· {count} 个效果器，信号从左到右") })))
-        .child(div().id("device-chain").flex_1().min_h_0().overflow_x_scroll().overflow_y_scroll().flex().items_start().gap(px(12.0)).px(px(12.0)).pb(px(12.0))
+        .child(div().id("device-chain").flex_1().min_h_0().overflow_x_scroll().overflow_y_scroll().flex().items_start().gap(gpui::rems(12.0/16.)).px(gpui::rems(12.0/16.)).pb(gpui::rems(12.0/16.))
             .children(cards)
             .child(add_card(ed, &track, count, cx)))
         .into_any_element()

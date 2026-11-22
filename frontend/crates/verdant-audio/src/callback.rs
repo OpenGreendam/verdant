@@ -42,6 +42,11 @@ pub struct CallbackRenderer {
     primed: bool,
     adapted: bool,
     coefficients: Vec<f32>,
+    // Paused performance owns a separate conversion clock. Prepared timeline
+    // PCM remains untouched until resume, even while live notes are audible.
+    monitor_source:[f32;SOURCE_BLOCK*2],monitor_source_at:usize,
+    monitor_history:[[f32;2];TAPS],monitor_head:usize,monitor_phase:f64,
+    monitor_primed:bool,monitor_paused:bool,
 }
 
 impl CallbackRenderer {
@@ -61,6 +66,9 @@ impl CallbackRenderer {
             primed: false,
             adapted: false,
             coefficients: Vec::new(),
+            monitor_source:[0.;SOURCE_BLOCK*2],monitor_source_at:SOURCE_BLOCK,
+            monitor_history:[[0.;2];TAPS],monitor_head:0,monitor_phase:0.,
+            monitor_primed:false,monitor_paused:false,
         }
     }
 
@@ -163,12 +171,21 @@ impl CallbackRenderer {
                 self.phase = 0.0;
                 self.primed = false;
             }
-            if self.rt.explicitly_paused() {
+            let monitor=self.rt.explicitly_paused()&&self.rt.has_monitor_source();
+            if self.rt.explicitly_paused()&&!monitor {
                 // Hold the conversion clock and unread PCM so resume neither
                 // leaks old samples during pause nor skips prefetched samples.
                 self.rt.process_prepared(&mut [], 2);
                 out.fill(T::from_f32(0.0));
+                self.monitor_paused=false;
                 return Ok(());
+            }
+            if monitor{
+                if !self.monitor_paused{
+                    self.monitor_source_at=SOURCE_BLOCK;self.monitor_history.fill([0.;2]);
+                    self.monitor_head=0;self.monitor_phase=0.;self.monitor_primed=false;
+                }
+                self.swap_monitor_clock();
             }
             for frame in out.chunks_exact_mut(channels) {
                 let [left, right] = self.resampled_frame();
@@ -180,6 +197,8 @@ impl CallbackRenderer {
                     frame[2..].fill(T::from_f32(0.0));
                 }
             }
+            if monitor{self.swap_monitor_clock();}
+            self.monitor_paused=monitor;
             out[frames * channels..].fill(T::from_f32(0.0));
         } else {
             let stereo = &mut self.scratch[..frames * 2];
@@ -187,6 +206,15 @@ impl CallbackRenderer {
             convert::interleave(stereo, out, channels);
         }
         Ok(())
+    }
+
+    fn swap_monitor_clock(&mut self){
+        std::mem::swap(&mut self.source,&mut self.monitor_source);
+        std::mem::swap(&mut self.source_at,&mut self.monitor_source_at);
+        std::mem::swap(&mut self.history,&mut self.monitor_history);
+        std::mem::swap(&mut self.head,&mut self.monitor_head);
+        std::mem::swap(&mut self.phase,&mut self.monitor_phase);
+        std::mem::swap(&mut self.primed,&mut self.monitor_primed);
     }
 
     fn next_source(&mut self) -> [f32; 2] {

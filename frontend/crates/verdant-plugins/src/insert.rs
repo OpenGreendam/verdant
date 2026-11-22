@@ -109,6 +109,7 @@ pub struct InsertHandle {
     // Serialize the entire request, including writing and waiting. Locking
     // just the receiver permits concurrent callers to consume each other's replies.
     request: Mutex<()>,
+    pending_midi:Mutex<std::collections::VecDeque<(u32,f64)>>,
     crashed: Arc<AtomicBool>,
     detail: Arc<Mutex<String>>,
     processor_taken: AtomicBool,
@@ -263,6 +264,7 @@ impl InsertHandle {
             state: Arc::new(RemoteState::default()),
             in_w: app_in_w, out_r: app_out_r,
             writer: Mutex::new(writer), replies: Mutex::new(rep_rx), request: Mutex::new(()),
+            pending_midi:Mutex::new(std::collections::VecDeque::with_capacity(1024)),
             crashed, detail, processor_taken: AtomicBool::new(false), offline: false,
             has_editor: false, child, stop, reader: Some(reader), watcher: Some(watcher),
             next_req: AtomicU64::new(1), origin, control_deadline_ms,
@@ -288,8 +290,37 @@ impl InsertHandle {
         Ok(handle)
     }
 
-    fn call(&self, mut req: HostRequest, timeout: Duration) -> Result<HostMessage> {
-        let _serial = self.request.lock().unwrap();
+    /// Queue from the UI before scheduling background delivery. Every control
+    /// read/write drains earlier messages under the same request lock, so
+    /// immediate Save/Export cannot overtake a controller gesture.
+    pub fn enqueue_midi(&self,events:&[(u32,f64)])->Result<()>{
+        if events.len()>8192||events.iter().any(|&(id,value)|!proto::valid_note_event(id,value)&&proto::decode_midi(id,value).is_none()){
+            return Err(PluginError::Protocol("invalid native MIDI batch".into()));
+        }
+        let mut queue=self.pending_midi.lock().unwrap();
+        if queue.len().saturating_add(events.len())>8192{return Err(PluginError::Protocol("native MIDI queue full".into()));}
+        queue.extend(events.iter().copied());Ok(())
+    }
+    pub fn stop_midi(&self){
+        let mut queue=self.pending_midi.lock().unwrap();queue.clear();
+        for channel in 0..16{for cc in [120,123,121]{let(id,_,value)=proto::midi_control(channel,cc,0,0.);queue.push_back((id,value));}}
+    }
+    pub fn flush_midi(&self)->Result<()>{
+        let _serial=self.request.lock().unwrap();self.flush_midi_locked()
+    }
+    fn flush_midi_locked(&self)->Result<()>{
+        let messages:Vec<_>={let mut queue=self.pending_midi.lock().unwrap();queue.drain(..).collect()};
+        for chunk in messages.chunks(1024){
+            self.call_locked(HostRequest::MidiEvents{id:0,events:chunk.to_vec()},Duration::from_secs(2))?;
+        }
+        Ok(())
+    }
+    fn call(&self,req:HostRequest,timeout:Duration)->Result<HostMessage>{
+        let _serial=self.request.lock().unwrap();
+        self.flush_midi_locked()?;
+        self.call_locked(req,timeout)
+    }
+    fn call_locked(&self, mut req: HostRequest, timeout: Duration) -> Result<HostMessage> {
         if self.crashed.load(Ordering::Acquire) {
             return Err(PluginError::Host(self.detail.lock().unwrap().clone()));
         }
@@ -379,6 +410,16 @@ impl InsertHandle {
         }
     }
 
+    /// Reset measurement history while retaining the age of the captured PCM.
+    /// Control thread only: the reset uses the serialized host protocol.
+    pub fn reset_meters(&self)->Result<()> {
+        self.call(HostRequest::ResetMeters{id:0},Duration::from_secs(5))?;
+        self.telemetry_cache.lock().unwrap().requested_at=None;Ok(())
+    }
+    pub fn midi_events(&self,events:&[(u32,f64)])->Result<()>{
+        if events.len()>1024{return Err(PluginError::Protocol("MIDI batch too large".into()));}
+        self.call(HostRequest::MidiEvents{id:0,events:events.to_vec()},Duration::from_secs(5))?;Ok(())
+    }
     /// Latest measured signal, if polled. This never performs IPC, allocates a
     /// signal buffer, or waits for a background refresh. Safe for UI rendering.
     pub fn cached_telemetry(&self) -> Option<Arc<TelemetrySnapshot>> {
@@ -404,13 +445,18 @@ impl InsertHandle {
                 .ok_or_else(|| PluginError::Protocol("missing signal telemetry".into()))?)?,
             msg => return Err(PluginError::Protocol(format!("get_telemetry: {msg:?}"))),
         };
-        let snapshot = frame.analyze(Instant::now())
+        let mut snapshot = frame.analyze(Instant::now())
             .map_err(|error| PluginError::Protocol(error.to_string()))?;
         let mut cache = self.telemetry_cache.lock().unwrap();
         if let Some(previous) = cache.snapshot.as_ref().filter(|previous|
             previous.frames_total == snapshot.frames_total && previous.window_frames == snapshot.window_frames
                 && previous.sample_rate == snapshot.sample_rate) {
-            return Ok(previous.clone());
+            if previous.loudness == snapshot.loudness && previous.gain_reduction_db == snapshot.gain_reduction_db {
+                return Ok(previous.clone());
+            }
+            // Meter-only control changes are visible while stopped, without
+            // making the unchanged PCM appear to have just been processed.
+            snapshot.captured_at = previous.captured_at;
         }
         let snapshot = Arc::new(snapshot);
         cache.snapshot = Some(snapshot.clone());
@@ -536,7 +582,7 @@ fn stamp_id(req: &mut HostRequest, id: u64) {
         | HostRequest::Reconfigure { id: r, .. } | HostRequest::SetParam { id: r, .. }
         | HostRequest::SetOffline { id: r, .. }
         | HostRequest::GetParams { id: r } | HostRequest::GetAutomationParams { id: r }
-        | HostRequest::GetTelemetry { id: r }
+        | HostRequest::GetTelemetry { id: r } | HostRequest::ResetMeters { id:r } | HostRequest::MidiEvents { id:r,.. }
         | HostRequest::GetState { id: r }
         | HostRequest::SetState { id: r, .. } | HostRequest::OpenEditor { id: r, .. }
         | HostRequest::CloseEditor { id: r } | HostRequest::Shutdown { id: r } => *r = id,

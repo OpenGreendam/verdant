@@ -51,6 +51,7 @@ pub fn run_host(channel_arg: &str, output: ProtocolOutput) -> Result<()> {
         parameter_events: vec![(0, 0, 0.0); MAX_PARAM_EVENTS],
         automation: Vec::new(),
         telemetry: TelemetryCapture::default(),
+        meter_epoch:0,
         editor_title: None,
         ev_tx,
         ev_rx,
@@ -91,6 +92,7 @@ struct Session {
     /// Fixed history of successful actual I/O; FFT and display work stay in
     /// the client. It is never shared or locked from the audio callback.
     telemetry: TelemetryCapture,
+    meter_epoch:u64,
     /// Whether an editor window is currently open (for service pumping).
     editor_title: Option<String>,
     /// Format-side async events forwarded to the client.
@@ -216,7 +218,8 @@ impl Session {
                         // can queue a point. Metadata discovery never runs here.
                         let instrument = p.is_instrument();
                         for &(native_id, offset, value) in events {
-                            if instrument && verdant_plugins::proto::decode_note(native_id, value).is_some() { continue; }
+                            if (instrument||p.accepts_native_midi()) && verdant_plugins::proto::valid_note_event(native_id,value) {continue;}
+                            if p.accepts_native_midi()&&verdant_plugins::proto::decode_midi(native_id,value).is_some(){continue;}
                             if p.uses_transport_tempo() && native_id == verdant_plugins::builtin_dsp::TRANSPORT_TEMPO_EVENT {
                                 if !value.is_finite() || !(20.0..=1000.0).contains(&value) {
                                     return Err(AutomationError::ValueOutOfRange.into());
@@ -237,8 +240,12 @@ impl Session {
                 if ol.iter().chain(orr.iter()).any(|v| !v.is_finite()) {
                     return Err(PluginError::Host("plugin produced non-finite PCM".into()));
                 }
+                let(paused,epoch)=self.plugin.as_ref().map_or((false,0),|p|p.meter_control());
+                if epoch!=self.meter_epoch{self.telemetry.reset_meters();self.meter_epoch=epoch;}
+                self.telemetry.pause_meters(paused);
                 self.telemetry.capture(il, ir, ol, orr)
                     .map_err(|error| PluginError::Host(error.to_string()))?;
+                self.telemetry.record_gain_reduction(self.plugin.as_ref().and_then(|p|p.gain_reduction_db()));
             }
             let _ = self
                 .ring
@@ -389,7 +396,19 @@ impl Session {
                 },
                 None => control::reply(id, false, Some("no plugin".into()), Default::default()),
             },
+            HostRequest::ResetMeters { .. } => {
+                if let Some(plugin)=self.plugin.as_mut(){plugin.reset_meters();self.meter_epoch=plugin.meter_control().1;}
+                self.telemetry.reset_meters();control::reply(id,true,None,data)
+            }
+            HostRequest::MidiEvents { events,.. } => match self.plugin.as_mut(){
+                Some(p)=>match p.midi_events(&events){Ok(())=>control::reply(id,true,None,data),Err(e)=>control::reply(id,false,Some(e),data)},
+                None=>control::reply(id,false,Some("no plugin".into()),data),
+            },
             HostRequest::GetTelemetry { .. } => {
+                let(paused,epoch)=self.plugin.as_ref().map_or((false,0),|p|p.meter_control());
+                if epoch!=self.meter_epoch{self.telemetry.reset_meters();self.meter_epoch=epoch;}
+                self.telemetry.pause_meters(paused);
+
                 if self.plugin.is_none() { control::reply(id, false, Some("no plugin".into()), data) }
                 else {
                     match serde_json::to_value(self.telemetry.frame()) {
@@ -481,7 +500,7 @@ fn req_id(req: &HostRequest) -> u64 {
         | HostRequest::SetParam { id, .. }
         | HostRequest::GetParams { id }
         | HostRequest::GetAutomationParams { id }
-        | HostRequest::GetTelemetry { id }
+        | HostRequest::GetTelemetry { id } | HostRequest::ResetMeters { id } | HostRequest::MidiEvents { id,.. }
         | HostRequest::GetState { id }
         | HostRequest::SetState { id, .. }
         | HostRequest::OpenEditor { id, .. }

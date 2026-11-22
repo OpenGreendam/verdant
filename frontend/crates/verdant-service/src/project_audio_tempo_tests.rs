@@ -135,7 +135,8 @@ fn real_host_bindings_keep_legacy_sidechains_and_tempo_on_physical_slots() {
     let mut project=project();project.tracks.push(verdant_domain::Track::new("key source","blue"));
     let mut first=verdant_plugins::InsertSpec::new("builtin",dsp::DELAY_ID,"Delay A","");first.instance_id.clear();
     let mut second=first.clone();second.name="Delay B".into();second.extra.insert(SIDECHAIN_KEY.into(),project.tracks[1].id.to_string().into());
-    let master=verdant_plugins::InsertSpec::new("builtin",dsp::DELAY_ID,"Master Delay","");
+    let mut master=verdant_plugins::InsertSpec::new("builtin",dsp::DELAY_ID,"Master Delay","");
+    master.extra.insert(SIDECHAIN_KEY.into(),project.tracks[1].id.to_string().into());
     verdant_plugins::project::write_inserts(&mut project.tracks[0].unknown,&[first.clone(),second.clone()]);
     project.extensions.insert(verdant_domain::automation::MASTER_INSERTS_KEY.into(),serde_json::to_value([master.clone()]).unwrap());
     let a=client.insert(first).unwrap();let b=client.insert(second).unwrap();let m=client.insert(master.clone()).unwrap();
@@ -144,9 +145,12 @@ fn real_host_bindings_keep_legacy_sidechains_and_tempo_on_physical_slots() {
     let bindings=NativeBindings{tracks:vec![vec![bind(&a,0),bind(&b,1)],vec![]],master:vec![bind(&m,0)]};
     let mut timeline=Timeline::new(48_000,Vec::new());timeline.automation=verdant_backend::automation_plan::compile_automation(&project,48_000).unwrap();
     bind_native_automation(&project,&mut timeline,&bindings).unwrap();
-    assert_eq!(timeline.sidechains.len(),1);
+    assert_eq!(timeline.sidechains.len(),2);
     assert_eq!((timeline.sidechains[0].source,timeline.sidechains[0].track,timeline.sidechains[0].processor),(1,0,1));
     assert_eq!(timeline.sidechains[0].delay,a.latency_samples());
+    assert_eq!((timeline.sidechains[1].source,timeline.sidechains[1].track,timeline.sidechains[1].processor),
+        (1,verdant_audio::engine::MASTER_BUS as u16,0));
+    assert_eq!(timeline.sidechains[1].delay,a.latency_samples()+b.latency_samples());
     let first_curve=&timeline.native_automation[0][0].as_ref().unwrap().parameters[0].curve;
     let second_curve=&timeline.native_automation[0][1].as_ref().unwrap().parameters[0].curve;
     let master_curve=&timeline.master_native_automation[0].as_ref().unwrap().parameters[0].curve;

@@ -36,9 +36,40 @@ pub(crate) struct NativePluginWindow {
     binding: Binding,
     focus: FocusHandle,
     generic: bool,
+    held_notes: std::collections::BTreeSet<u8>,
+    preview_started: bool,
 }
 
 impl NativePluginWindow {
+    fn note(&mut self, note: u8, pressed: bool, cx: &mut gpui::App) {
+        let changed = if pressed { self.held_notes.insert(note) } else { self.held_notes.remove(&note) };
+        if !changed { return; }
+        let DeviceTarget::Track(track) = &self.target else { return; };
+        if !matches!(self.binding, Binding::Instrument { .. }) { return; }
+        if pressed { self.preview_started = true; }
+        let generation = self.generation; let id = self.binding.id().to_string();
+        let _ = self.editor.update(cx, |ed, cx| {
+            if ed.document_generation == generation && ed.project().track(track).and_then(|t|t.instrument()).and_then(|s|s.get("id")).and_then(serde_json::Value::as_str) == Some(id.as_str()) {
+                ed.play_instrument_key(track, note, pressed, cx);
+            }
+        });
+    }
+    fn release_notes(&mut self, cx: &mut gpui::App) {
+        let held: Vec<_> = self.held_notes.iter().copied().collect();
+        let had_preview = std::mem::take(&mut self.preview_started);
+        for key in held { self.note(key, false, cx); }
+        if had_preview && matches!(self.binding, Binding::Instrument { .. }) {
+            let DeviceTarget::Track(track) = &self.target else { return };
+            let generation = self.generation; let id = self.binding.id().to_string();
+            let _ = self.editor.update(cx, |ed, cx| {
+                if ed.document_generation == generation && ed.project().track(track).and_then(|t| t.instrument())
+                    .and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str) == Some(id.as_str()) {
+                    ed.stop_instrument_preview(track, cx);
+                }
+            });
+        }
+    }
+
     /// Only open effect windows poll their own host. IPC/FFT work runs on the
     /// background executor; the render path reads the handle's cached frame.
     fn spawn_signal_poll(&self, cx: &mut Context<Self>) {
@@ -57,10 +88,16 @@ impl NativePluginWindow {
                         None => (0..specs.len()).find(|slot| ed.live_device_insert(&view.target, *slot).is_some_and(|handle| handle.key() == *key)),
                     }?;
                     if specs[slot].id != *id { return None; }
-                    ed.live_device_insert(&view.target, slot)
+                    let handle = ed.live_device_insert(&view.target, slot)?;
+                    let reference = crate::devices::workflow::reference_handle(ed, &view.target, slot, handle.key());
+                    Some((handle, reference))
                 });
                 let handle = match next { Ok(Some(handle)) => handle, Ok(None) => continue, Err(_) => break };
-                let result = cx.background_spawn(async move { handle.refresh_telemetry() }).await;
+                let result = cx.background_spawn(async move {
+                    handle.0.refresh_telemetry()?;
+                    if let Some(reference) = handle.1 { reference.refresh_telemetry()?; }
+                    Ok::<_, verdant_plugins::PluginError>(())
+                }).await;
                 if result.is_ok() && this.update(cx, |_, cx| cx.notify()).is_err() { break; }
             }
         }).detach();
@@ -134,13 +171,30 @@ impl Editor {
                     cx.observe(&observed, |_, _, cx| cx.notify()).detach();
                     cx.observe_window_activation(window, |view: &mut NativePluginWindow, window, cx| {
                         if !window.is_window_active() {
+                            view.release_notes(cx);
                             let _ = view.editor.update(cx, |ed, cx| {
                                 ed.cancel_device_drag_in(window.window_handle(), cx);
                                 ed.close_menu(window, cx);
                             });
                         }
                     }).detach();
-                    let view = NativePluginWindow { editor: observed.downgrade(), project, generation, target, binding, focus, generic: false };
+                    cx.on_release(|view: &mut NativePluginWindow, cx| {
+                        let notes: Vec<_> = view.held_notes.iter().copied().collect();
+                        let had_preview = view.preview_started;
+                        if !had_preview && notes.is_empty() { return; }
+                        let owner = view.editor.clone(); let target = view.target.clone(); let generation = view.generation;
+                        let id = view.binding.id().to_string();
+                        cx.defer(move |cx| {
+                            let _ = owner.update(cx, |ed, cx| {
+                                let DeviceTarget::Track(track) = target else { return };
+                                if ed.document_generation != generation || ed.project().track(&track).and_then(|t| t.instrument())
+                                    .and_then(|spec| spec.get("id")).and_then(serde_json::Value::as_str) != Some(id.as_str()) { return; }
+                                for key in notes { ed.play_instrument_key(&track, key, false, cx); }
+                                if had_preview { ed.stop_instrument_preview(&track, cx); }
+                            });
+                        });
+                    }).detach();
+                    let view = NativePluginWindow { editor: observed.downgrade(), project, generation, target, binding, focus, generic: false, held_notes: Default::default(), preview_started: false };
                     view.spawn_signal_poll(cx);
                     view
                 })
@@ -163,6 +217,10 @@ impl Render for NativePluginWindow {
             window.remove_window();
             return div().into_any_element();
         };
+        let native_entity = cx.entity();
+        let note_down = native_entity.clone();
+        let note_up = native_entity.clone();
+        let instrument_window = matches!(self.binding, Binding::Instrument { .. });
         let project = &self.project;
         let generation = self.generation;
         let binding = &self.binding;
@@ -177,6 +235,8 @@ impl Render for NativePluginWindow {
                 return div().into_any_element();
             }
             let th = ed.theme;
+            let zoom = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.).clamp(0.75, 2.);
+            window.set_rem_size(px(16. * zoom as f32));
             let editor_entity = cx.entity();
             let (slot, name, bypassed, busy, body) = match binding {
                 Binding::Insert { instance, key, id } => {
@@ -200,8 +260,8 @@ impl Render for NativePluginWindow {
                             crate::devices::preview_and_animate(ed, handle.key(), &mut params, window);
                             if generic { crate::devices::generic_editor(ed, &editor_entity, target, slot, handle.key(), &params) }
                             else { crate::devices::render_builtin_editor(ed, &editor_entity, target, slot, handle.key(), &params, cx) }
-                        } else { div().p(px(24.)).child("正在读取参数…").into_any_element() }
-                    } else { div().p(px(24.)).text_color(th.warning).child("插件未运行，工程参数已保留。请在效果器链重新加载。").into_any_element() };
+                        } else { div().p(gpui::rems(24./16.)).child("正在读取参数…").into_any_element() }
+                    } else { div().p(gpui::rems(24./16.)).text_color(th.warning).child("插件未运行，工程参数已保留。请在效果器链重新加载。").into_any_element() };
                     (slot, spec.name.clone(), spec.bypass, busy, body)
                 }
                 Binding::Instrument { id } => {
@@ -215,7 +275,8 @@ impl Render for NativePluginWindow {
                     let key = crate::instrument::instrument_key_for_generation(track, id, generation);
                     let mut descs = crate::instrument::synth_descs_for(id, &params);
                     crate::devices::preview_and_animate(ed, key, &mut descs, window);
-                    let body = div().flex().flex_col().gap(px(10.))
+                    let body = div().flex().flex_col().gap(gpui::rems(10./16.))
+                        .child(performance_keyboard(&native_entity, &self.held_notes, th))
                         .child(crate::instrument::preset_button(ed, track, id, key, cx))
                         .child(crate::devices::synth_editor(ed, &editor_entity, track, key, &descs, cx)).into_any_element();
                     (crate::instrument::INSTRUMENT_SLOT, verdant_plugins::builtin_dsp::instrument_name(id).unwrap_or("Verdant Synth").into(), false, false, body)
@@ -223,21 +284,37 @@ impl Render for NativePluginWindow {
             };
             window.set_window_title(&format!("{name} — Verdant"));
             let bypass_target = target.clone();
+            let midi_target = target.clone();
             let is_insert = matches!(binding, Binding::Insert { .. });
             let expected_key = ed.live_device_insert(target, slot).map(|handle| handle.key());
+            let modulation_key = expected_key.or_else(|| if let (DeviceTarget::Track(track), Binding::Instrument { id }) = (target, binding) {
+                Some(crate::instrument::instrument_key_for_generation(track, id, generation))
+            } else { None });
+            let modulation_target = target.clone();
             let bus = match target {
                 DeviceTarget::Track(track) => ed.project().track(track).map(|track| track.name.clone()).unwrap_or_default(),
                 DeviceTarget::Master => "主总线".into(),
             };
             let button = |id: &'static str, label: &'static str| div().id(id).role(Role::Button)
                 .aria_label(label).cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
-                .bg(th.control).hover(move |s| s.bg(th.hover)).text_sm().child(label);
+                .bg(th.control).hover(move |s| s.bg(th.hover)).text_size(px(14.)).child(label);
             let mut root = div().id("builtin-native-editor").role(Role::Group)
                 .aria_label(format!("{name} 原生编辑器")).size_full().relative()
                 .bg(th.view).text_color(th.text).font_family(ed.ui_font.clone())
                 .flex().flex_col().track_focus(&focus)
-                .on_key_down(cx.listener(|ed, event: &KeyDownEvent, window, cx| {
+                .on_key_up(move |event: &gpui::KeyUpEvent, _, cx| {
+                    if instrument_window { if let Some(note) = typing_note(&event.keystroke.key) {
+                        note_up.update(cx, |view, cx| { view.note(note, false, cx); cx.notify(); });
+                    } }
+                })
+                .on_key_down(cx.listener(move |ed, event: &KeyDownEvent, window, cx| {
                     let key = event.keystroke.key.as_str();
+                    if instrument_window && ed.menu.is_none() && !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt {
+                        if let Some(note) = typing_note(key) {
+                            if !event.is_held { let entity = note_down.clone(); cx.defer(move |cx| entity.update(cx, |view, cx| { view.note(note, true, cx); cx.notify(); })); }
+                            window.prevent_default(); cx.stop_propagation(); return;
+                        }
+                    }
                     if event.keystroke.modifiers.control || event.keystroke.modifiers.platform {
                         if key == "z" {
                             if event.keystroke.modifiers.shift { ed.redo(cx); } else { ed.undo(cx); }
@@ -249,11 +326,11 @@ impl Render for NativePluginWindow {
                         cx.stop_propagation();
                     }
                 }))
-                .child(div().flex_none().h(px(56.)).px(px(16.)).flex().items_center().gap(px(10.))
+                .child(div().flex_none().min_h(px(56.)).py(px(6.)).px(px(16.)).flex().flex_wrap().items_center().gap(px(10.))
                     .bg(th.headerbar).border_b_1().border_color(th.shade)
                     .child(div().flex_1().min_w_0().flex().flex_col()
-                        .child(div().truncate().text_lg().font_weight(FontWeight::BOLD).child(name.clone()))
-                        .child(div().truncate().text_xs().text_color(th.text_secondary).child(bus)))
+                        .child(div().truncate().text_size(px(20.)).font_weight(FontWeight::BOLD).child(name.clone()))
+                        .child(div().truncate().text_size(px(12.)).text_color(th.text_secondary).child(bus)))
                     .when(is_insert, |header| header
                         .child(button("native-bypass", if bypassed { "启用" } else { "旁通" })
                             .aria_selected(bypassed).on_click(cx.listener(move |ed, _, _, cx| {
@@ -267,13 +344,43 @@ impl Render for NativePluginWindow {
                         ed.close_menu(window, cx);
                         window.remove_window();
                     }))))
+                .child(div().flex_none().px(px(16.)).py(px(6.)).flex().flex_wrap().items_center().gap(px(8.))
+                    .child(button("native-midi-input", "MIDI 输入").on_click(cx.listener(move |ed, _, window, cx| {
+                        ed.open_device_midi_input(midi_target.clone(), window, cx);
+                    })))
+                    .child(button("native-midi-stop", "停止 MIDI").on_click(cx.listener(|ed, _, _, cx| {
+                        ed.stop_instrument_monitor(cx);
+                        cx.notify();
+                    })))
+                    .child(button("native-instances", "全部实例").on_click(cx.listener(|_, _, _, cx| {
+                        let editor = cx.entity();
+                        cx.defer(move |cx| crate::devices::workflow::instances::open(editor, cx));
+                    })))
+                    .when(modulation_key.is_some() && !generic, |toolbar| toolbar
+                        .child(button("native-modulation", "调制").on_click(cx.listener(move |ed, _, _, cx| {
+                            if let Some(key) = modulation_key { crate::devices::toggle_modulation_panel(ed, modulation_target.clone(), slot, key, cx); }
+                        }))))
+                    .child(button("native-zoom-out", "−").aria_label("缩小插件界面").on_click(cx.listener(|ed, _, _, cx| {
+                        let current = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.);
+                        ed.prefs.extra.insert("plugin_ui_zoom".into(), ((current - 0.125).clamp(0.75, 2.)).into()); ed.prefs_dirty = true; cx.notify();
+                    })))
+                    .child(div().text_size(px(12.)).child(format!("{:.0}%", zoom * 100.)))
+                    .child(button("native-zoom-in", "＋").aria_label("放大插件界面").on_click(cx.listener(|ed, _, _, cx| {
+                        let current = ed.prefs.extra.get("plugin_ui_zoom").and_then(serde_json::Value::as_f64).unwrap_or(1.);
+                        ed.prefs.extra.insert("plugin_ui_zoom".into(), ((current + 0.125).clamp(0.75, 2.)).into()); ed.prefs_dirty = true; cx.notify();
+                    })))
+                    .child(button("native-zoom-reset", "100%").on_click(cx.listener(|ed, _, _, cx| {
+                        ed.prefs.extra.insert("plugin_ui_zoom".into(), 1.0.into()); ed.prefs_dirty = true; cx.notify();
+                    })))
+                    .child(button("native-fullscreen", "全屏").on_click(|_, window, _| window.toggle_fullscreen())))
+                .child(crate::devices::modulation_source_bar(ed, target, slot, if generic { None } else { modulation_key }))
                 .child(div().id("native-plugin-scroll").flex_1().min_h_0().overflow_y_scroll().overflow_x_scroll()
-                    .p(px(16.)).child(body))
-                .child(div().flex_none().px(px(16.)).py(px(6.)).text_xs().text_color(th.text_secondary)
+                    .p(gpui::rems(16./16.)).child(body))
+                .child(div().flex_none().px(px(16.)).py(px(6.)).text_size(px(12.)).text_color(th.text_secondary)
                     .child(if busy { "正在提交参数…" } else if bypassed { "效果器已旁通" } else { "拖动调节 · Shift 微调 · 点击数值精确输入 · Alt 点击复位" }));
             if let Some(notice) = ed.notices.back() {
                 root = root.child(div().id("native-notice").role(Role::Status).px(px(16.)).py(px(8.)).bg(th.card)
-                    .text_sm().child(notice.text.clone()));
+                    .max_h(px(52.)).overflow_hidden().text_size(px(14.)).child(notice.text.clone()));
             }
             if let Some(menu) = ed.menu.as_ref().filter(|menu| menu.window == window.window_handle()) {
                 root = root.child(crate::menu::context_menu_layer(ed, menu, window, cx));
@@ -281,6 +388,37 @@ impl Render for NativePluginWindow {
             root.into_any_element()
         })
     }
+}
+
+fn typing_note(key: &str) -> Option<u8> {
+    ["a", "w", "s", "e", "d", "f", "t", "g", "y", "h", "u", "j", "k"].iter().position(|&s| s == key).map(|i| 60 + i as u8)
+}
+fn performance_keyboard(view: &gpui::Entity<NativePluginWindow>, held: &std::collections::BTreeSet<u8>, th: crate::theme::Theme) -> gpui::AnyElement {
+    let mut keyboard = div().relative().h(gpui::rems(76./16.)).w_full();
+    for black_pass in [false, true] {
+        let mut white = 0usize;
+        for key in 48u8..72 {
+            let black = matches!(key % 12, 1 | 3 | 6 | 8 | 10);
+            if black == black_pass {
+                let pressed = held.contains(&key);
+                let down = view.clone(); let up = view.clone(); let outside = view.clone();
+                let label = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"][key as usize % 12];
+                keyboard = keyboard.child(div().id(format!("play-note-{key}")).role(Role::Button).aria_label(format!("{label}{}", key / 12 - 1))
+                    .absolute().top(gpui::rems(0.)).left(gpui::relative((white as f32 - if black { 0.32 } else { 0. }) / 14.))
+                    .w(gpui::relative(if black { 0.64 / 14. } else { 1. / 14. }))
+                    .h(gpui::rems(if black { 48./16. } else { 76./16. })).rounded(gpui::rems(4./16.))
+                    .border_1().border_color(th.shade).bg(if pressed { th.accent } else if black { th.control_pressed } else { th.card })
+                    .text_color(if black { th.text_secondary } else { th.text }).cursor_pointer().flex().items_end().justify_center().pb(gpui::rems(4./16.)).text_xs()
+                    .child(if black { String::new() } else { format!("{label}{}", key / 12 - 1) })
+                    .on_mouse_down(gpui::MouseButton::Left, move |_, _, cx| { down.update(cx, |view, cx| { view.note(key, true, cx); cx.notify(); }); })
+                    .on_mouse_up(gpui::MouseButton::Left, move |_, _, cx| { up.update(cx, |view, cx| { view.note(key, false, cx); cx.notify(); }); })
+                    .on_mouse_up_out(gpui::MouseButton::Left, move |_, _, cx| { outside.update(cx, |view, cx| { view.note(key, false, cx); cx.notify(); }); }));
+            }
+            if !black { white += 1; }
+        }
+    }
+    div().flex().flex_col().gap(gpui::rems(6./16.)).child(keyboard)
+        .child(div().text_xs().text_color(th.text_secondary).child("实时演奏 · 点击琴键或使用 A W S E D F T G Y H U J K")).into_any_element()
 }
 
 #[cfg(test)]

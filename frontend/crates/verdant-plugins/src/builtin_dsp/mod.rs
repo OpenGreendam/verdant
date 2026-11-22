@@ -22,11 +22,16 @@
 //! changes; new parameters are only appended.
 
 pub mod filters;
+mod spectral;
+pub mod quality;
+pub mod modulation;
+pub use modulation::{MOD_SPECS, MOD_SOURCE_LABELS, modulation_parameter};
 mod eq;
 mod dynamics;
 mod space;
 mod color;
 mod synth;
+mod synth_live;
 mod multiband;
 mod filter_fx;
 
@@ -61,7 +66,7 @@ pub const MICRO_ID: &str = "verdant.builtin.micro";
 pub const TRANSPORT_TEMPO_EVENT: u32 = 0x7fff_fffe;
 
 pub fn uses_transport_tempo(format: &str, id: &str) -> bool {
-    format == "builtin" && id == DELAY_ID
+    format == "builtin" && EFFECT_IDS.contains(&id)
 }
 
 /// Built-in effect ids other than the diagnostic gain, in browser order.
@@ -159,10 +164,19 @@ impl Spec {
     pub const fn steps(mut self, steps: i64) -> Self { self.steps = steps; self }
     pub const fn fixed(mut self) -> Self { self.automatable = false; self }
     pub const fn log(mut self) -> Self { self.log = true; self }
-    pub fn check(&self, value: f64) -> Result<(), String> {
-        if value.is_finite() && (self.min..=self.max).contains(&value) { Ok(()) }
-        else { Err(format!("{} outside {}…{}", self.id, self.min, self.max)) }
+    pub fn accepts(&self,value:f64)->bool{
+        if !value.is_finite()||!(self.min..=self.max).contains(&value){return false;}
+        if self.steps>0&&self.max>self.min{
+            let step=(value-self.min)/(self.max-self.min)*self.steps as f64;
+            if (step-step.round()).abs()>8.0*f64::EPSILON*step.abs().max(1.0){return false;}
+        }
+        true
     }
+    pub fn check(&self,value:f64)->Result<(),String>{
+        if self.accepts(value){Ok(())}
+        else{Err(format!("{} must be within {}…{} and on its native step grid",self.id,self.min,self.max))}
+    }
+
 }
 
 pub fn table_defaults(specs: &[Spec]) -> Vec<f64> { specs.iter().map(|s| s.default).collect() }
@@ -179,6 +193,7 @@ pub fn table_index(specs: &[Spec], id: &str) -> Option<usize> { specs.iter().pos
 
 /// Look a spec up by id across every built-in effect (editor formatting).
 pub fn spec_for(effect: &str, id: &str) -> Option<Spec> {
+    if let Some(spec) = modulation_parameter(id) { return Some(spec); }
     let specs: &[Spec] = match effect {
         COMPRESSOR_ID => COMP_SPECS,
         GATE_ID => GATE_SPECS,
@@ -207,6 +222,14 @@ pub trait TableEffect {
     fn set_sample_rate(&mut self, sample_rate: f64);
     fn uses_transport_tempo() -> bool { false }
     fn set_transport_tempo(&mut self, _bpm: f64) {}
+    fn trigger_note(&mut self, _velocity: f64) {}
+    fn gain_reduction_db(&self) -> Option<f64> { None }
+    /// Host output-meter controls: integration pause and monotonically changing reset epoch.
+    fn meter_control(&self) -> (bool, u64) { (false, 0) }
+    /// Control-thread reset; never resets the audio processor or its delay history.
+    fn reset_meters(&mut self) {}
+    /// Mark the admitted audio boundary before applying sample-offset events.
+    fn begin_audio(&mut self) {}
     /// Fill `out_*` from `in_*`; `key` is the routed sidechain, if any.
     fn process(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]);
     /// Processing latency in samples.
@@ -250,4 +273,20 @@ pub(crate) mod test_util {
         10.0 * s.max(1e-30).log10()
     }
     pub fn peak(x: &[f32]) -> f32 { x.iter().fold(0.0f32, |m, v| m.max(v.abs())) }
+}
+
+pub fn modulation_target_index(effect:&str,parameter:&str)->Option<usize>{
+    if modulation_parameter(parameter).is_some(){return None;}
+    if is_builtin_instrument(effect){return instrument_specs(effect).iter().position(|s|s.id==parameter);}
+    if effect==EQ_ID{return EqParams::index_of(parameter);}
+    let specs=match effect{
+        COMPRESSOR_ID=>COMP_SPECS,GATE_ID=>GATE_SPECS,DEESSER_ID=>DEESSER_SPECS,LIMITER_ID=>LIMITER_SPECS,
+        REVERB_ID=>REVERB_SPECS,DELAY_ID=>DELAY_SPECS,SATURATION_ID=>SATURATION_SPECS,MULTIBAND_ID=>MULTIBAND_SPECS,
+        FILTER_ID=>FILTER_SPECS,SIMPLON_ID=>SIMPLON_SPECS,MICRO_ID=>MICRO_SPECS,_=>return None,
+    };table_index(specs,parameter)
+}
+pub fn modulation_target_allowed(effect:&str,parameter:&str)->bool{
+    if modulation_parameter(parameter).is_some(){return false;}
+    if is_builtin_instrument(effect){return instrument_specs(effect).iter().any(|s|s.id==parameter&&s.automatable);}
+    spec_for(effect,parameter).is_some_and(|s|s.automatable)
 }

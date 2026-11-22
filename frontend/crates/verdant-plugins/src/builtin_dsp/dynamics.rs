@@ -3,6 +3,7 @@
 
 use super::filters::{db_to_lin, lin_to_db, rbj, time_coefficient, Biquad, DelayLine, Rbj, IDENTITY};
 use super::{Spec, TableEffect};
+use super::quality::{Oversampler, TruePeak, LoudnessMeter, LoudnessReading, LinearSplit};
 
 /// Longest lookahead any dynamics effect offers, in milliseconds.
 pub const MAX_LOOKAHEAD_MS: f64 = 20.0;
@@ -75,7 +76,7 @@ pub fn expander_curve_db(threshold: f64, ratio: f64, range: f64, input_db: f64) 
 // ---------------------------------------------------------------------------
 
 // The first three style indices belong to existing saved projects.
-pub const COMP_STYLES: [&str; 8] = ["干净", "平滑", "冲击", "人声", "总线", "光学", "向上", "泵动"];
+pub const COMP_STYLES: [&str; 14] = ["干净", "平滑", "冲击", "人声", "总线", "光学", "向上", "泵动", "灵活", "三段双向", "光电", "变跨导", "经典", "母带"];
 pub const DYNAMICS_CHANNEL_MODES: [&str; 3] = ["立体声", "中声道", "侧声道"];
 pub const DETECTOR_MODES: [&str; 2] = ["峰值", "RMS"];
 pub const COMP_CHARACTERS: [&str; 4] = ["关闭", "电子管", "二极管", "明亮"];
@@ -88,7 +89,7 @@ pub static COMP_SPECS: &[Spec] = &[
     Spec::new("knee", "拐点", 0.0, 24.0, 6.0, "dB"),
     Spec::new("makeup", "补偿增益", 0.0, 24.0, 0.0, "dB"),
     Spec::new("mix", "干湿比", 0.0, 100.0, 100.0, "%"),
-    Spec::new("style", "风格", 0.0, 7.0, 0.0, "").steps(7),
+    Spec::new("style", "风格", 0.0, 13.0, 0.0, "").steps(13),
     Spec::new("lookahead", "前视", 0.0, MAX_LOOKAHEAD_MS, 0.0, "ms").fixed(),
     Spec::new("range", "最大压缩", 0.0, 60.0, 60.0, "dB"),
     Spec::new("sc_hpf", "侧链高通", 20.0, 1000.0, 20.0, "Hz").log(),
@@ -105,7 +106,62 @@ pub static COMP_SPECS: &[Spec] = &[
     Spec::new("character", "染色", 0.0, 3.0, 0.0, "").steps(3),
     Spec::new("character_drive", "染色驱动", 0.0, 24.0, 0.0, "dB"),
     Spec::new("character_pre", "压缩前染色", 0.0, 1.0, 0.0, "").steps(1),
+    Spec::new("auto_threshold", "自动阈值", 0.0, 1.0, 0.0, "").steps(1),
+    Spec::new("auto_target", "目标压缩量", 0.0, 24.0, 6.0, "dB"),
+    Spec::new("oversampling", "过采样", 0.0, 5.0, 0.0, "").steps(5).fixed(),
+    Spec::new("trigger_mode", "触发源", 0.0, 2.0, 0.0, "").steps(2),
+    Spec::new("trigger_length", "触发长度", 1.0, 2000.0, 100.0, "ms").log(),
+    Spec::new("sync", "触发节拍", 0.0, 8.0, 0.0, "").steps(8),
+    Spec::new("bpm", "参考速度", 20.0, 300.0, 120.0, "BPM"),
+    Spec::new("sc_eq_on", "侧链均衡器", 0.0, 1.0, 0.0, "").steps(1),
+    Spec::new("sc1_on", "侧链 1 启用", 0.0, 1.0, 1.0, "").steps(1),
+    Spec::new("sc1_freq", "侧链 1 频率", 20.0, 20000.0, 80.0, "Hz").log(),
+    Spec::new("sc1_gain", "侧链 1 增益", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("sc1_q", "侧链 1 Q", 0.1, 12.0, 0.707, "Q").log(),
+    Spec::new("sc1_shape", "侧链 1 形状", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("sc2_on", "侧链 2 启用", 0.0, 1.0, 1.0, "").steps(1),
+    Spec::new("sc2_freq", "侧链 2 频率", 20.0, 20000.0, 250.0, "Hz").log(),
+    Spec::new("sc2_gain", "侧链 2 增益", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("sc2_q", "侧链 2 Q", 0.1, 12.0, 0.707, "Q").log(),
+    Spec::new("sc2_shape", "侧链 2 形状", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("sc3_on", "侧链 3 启用", 0.0, 1.0, 1.0, "").steps(1),
+    Spec::new("sc3_freq", "侧链 3 频率", 20.0, 20000.0, 750.0, "Hz").log(),
+    Spec::new("sc3_gain", "侧链 3 增益", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("sc3_q", "侧链 3 Q", 0.1, 12.0, 0.707, "Q").log(),
+    Spec::new("sc3_shape", "侧链 3 形状", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("sc4_on", "侧链 4 启用", 0.0, 1.0, 1.0, "").steps(1),
+    Spec::new("sc4_freq", "侧链 4 频率", 20.0, 20000.0, 2000.0, "Hz").log(),
+    Spec::new("sc4_gain", "侧链 4 增益", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("sc4_q", "侧链 4 Q", 0.1, 12.0, 0.707, "Q").log(),
+    Spec::new("sc4_shape", "侧链 4 形状", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("sc5_on", "侧链 5 启用", 0.0, 1.0, 1.0, "").steps(1),
+    Spec::new("sc5_freq", "侧链 5 频率", 20.0, 20000.0, 6000.0, "Hz").log(),
+    Spec::new("sc5_gain", "侧链 5 增益", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("sc5_q", "侧链 5 Q", 0.1, 12.0, 0.707, "Q").log(),
+    Spec::new("sc5_shape", "侧链 5 形状", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("sc6_on", "侧链 6 启用", 0.0, 1.0, 1.0, "").steps(1),
+    Spec::new("sc6_freq", "侧链 6 频率", 20.0, 20000.0, 12000.0, "Hz").log(),
+    Spec::new("sc6_gain", "侧链 6 增益", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("sc6_q", "侧链 6 Q", 0.1, 12.0, 0.707, "Q").log(),
+    Spec::new("sc6_shape", "侧链 6 形状", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("sc_channel", "侧链声道", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("auto_track", "阈值跟踪", 100.0, 5000.0, 1000.0, "ms").log(),
 ];
+
+pub fn comp_sidechain_response_db(values: &[f64], frequency: f64, sample_rate: f64) -> f64 {
+    if values.len() < COMP_SPECS.len() { return 0.0; }
+    let mut db = 0.0;
+    if values[10] > 20.5 { db += super::filters::response_db(rbj(Rbj::HighPass, values[10], std::f64::consts::FRAC_1_SQRT_2, 0.0, sample_rate), frequency, sample_rate); }
+    if values[12] < 19999.0 { db += super::filters::response_db(rbj(Rbj::LowPass, values[12], std::f64::consts::FRAC_1_SQRT_2, 0.0, sample_rate), frequency, sample_rate); }
+    if values[31] >= 0.5 {
+        for band in 0..6 {
+            let p = 32 + band * 5; if values[p] < 0.5 { continue; }
+            let shape = match values[p + 4].round() as usize { 1 => Rbj::LowShelf, 2 => Rbj::HighShelf, 3 => Rbj::HighPass, 4 => Rbj::LowPass, _ => Rbj::Bell };
+            db += super::filters::response_db(rbj(shape, values[p + 1], values[p + 3], values[p + 2], sample_rate), frequency, sample_rate);
+        }
+    }
+    db
+}
 
 /// Gain-computer shared by audio and the native transfer-curve display.
 pub fn compressor_style_curve_db(style: usize, threshold: f64, ratio: f64, knee: f64, range: f64, input_db: f64) -> f64 {
@@ -117,6 +173,16 @@ pub fn compressor_style_curve_db(style: usize, threshold: f64, ratio: f64, knee:
         4 => (ratio.min(6.0), knee.max(6.0)),
         5 => (ratio, knee.max(12.0)),
         7 => (ratio.max(6.0), knee * 0.25),
+        8 => (ratio, knee.max(3.0)),
+        9 => {
+            let down = (input_db - threshold).max(0.0) * (1.0 - 1.0 / ratio.max(1.0));
+            let up = (threshold - knee.max(6.0) - input_db).max(0.0) * (1.0 - 1.0 / ratio.sqrt().max(1.0));
+            return input_db + up.min(range.min(24.0)) - down.min(range);
+        }
+        10 => (ratio, knee.max(15.0)),
+        11 => (1.0 + (ratio - 1.0) * ((input_db - threshold + 18.0) / 36.0).clamp(0.0, 1.0), knee.max(18.0)),
+        12 => (ratio, knee.max(4.0)),
+        13 => (ratio.min(10.0), knee.max(12.0)),
         _ => (ratio, knee),
     };
     compressor_curve_db(threshold, ratio, knee, input_db).max(input_db - range)
@@ -144,89 +210,166 @@ pub struct CompProcessor {
     pub values: Vec<f64>, sample_rate: f64, attack: f64, release: f64,
     rms: [f64; 2], rms_coeff: f64, gr: [f64; 2], makeup: f64, wet: f64,
     last_out: [f64; 2], key: KeyFilter, lookahead: Lookahead, held: [usize; 2], hold_samples: usize,
+    sc_eq: [[Biquad; 2]; 6], quality: [Oversampler; 2], dry_delay: [DelayLine; 2],
+    average: f64, average_coefficient: f64, note: f64, trigger_decay: f64, beat: f64, host_tempo: Option<f64>,
+    split: [[[Biquad; 2]; 2]; 2], band_gr: [[f64; 2]; 3],
 }
 impl CompProcessor {
     pub fn new(sample_rate: f64) -> Self {
         let mut p = Self { values: super::table_defaults(COMP_SPECS), sample_rate, attack: 0.0, release: 0.0,
             rms: [0.0; 2], rms_coeff: 0.0, gr: [0.0; 2], makeup: 1.0, wet: 1.0,
-            last_out: [0.0; 2], key: KeyFilter::default(), lookahead: Lookahead::new(sample_rate), held: [0; 2], hold_samples: 0 };
+            last_out: [0.0; 2], key: KeyFilter::default(), lookahead: Lookahead::new(sample_rate), held: [0; 2], hold_samples: 0,
+            sc_eq: Default::default(), quality: [Oversampler::new(), Oversampler::new()],
+            dry_delay: [DelayLine::new(34), DelayLine::new(34)], average: 0.0, average_coefficient: 0.0,
+            note: 0.0, trigger_decay: 0.0, beat: 1.0, host_tempo: None, split: Default::default(), band_gr: [[0.0; 2]; 3] };
         p.refresh(); p
     }
-    pub fn gain_reduction_db(&self) -> f64 { if self.values[7].round() as usize == 6 { self.gr[0].max(self.gr[1]) } else { self.gr[0].min(self.gr[1]) } }
+    pub fn gain_reduction_db(&self) -> f64 {
+        if self.values[7].round() as usize == 9 { return self.band_gr.iter().flatten().copied().fold(0.0, f64::min); }
+        if self.values[7].round() as usize == 6 { self.gr[0].max(self.gr[1]) } else { self.gr[0].min(self.gr[1]) }
+    }
     pub fn curve_db(&self, input_db: f64) -> f64 {
         let v = &self.values;
         compressor_style_curve_db(v[7].round() as usize, v[0], v[1], v[4], v[9], input_db)
     }
+    pub fn effective_threshold_db(&self) -> f64 {
+        if self.values[24] < 0.5 || self.average < 1e-12 { self.values[0] } else {
+            (lin_to_db(self.average.sqrt()) - self.values[25] / (1.0 - self.values[1].max(1.01).recip())).clamp(-60.0, 0.0)
+        }
+    }
+    fn bands(&mut self, kind: usize, input: [f64; 2]) -> [[f64; 2]; 3] {
+        let mut result = [[0.0; 2]; 3];
+        for c in 0..2 {
+            result[0][c] = self.split[kind][0][c].run(input[c]);
+            let remainder = input[c] - result[0][c];
+            result[1][c] = self.split[kind][1][c].run(remainder);
+            result[2][c] = remainder - result[1][c];
+        }
+        result
+    }
 }
 impl TableEffect for CompProcessor {
     const SPECS: &'static [Spec] = COMP_SPECS;
+    fn gain_reduction_db(&self) -> Option<f64> { Some(CompProcessor::gain_reduction_db(self)) }
     fn values(&self) -> &[f64] { &self.values }
     fn values_mut(&mut self) -> &mut [f64] { &mut self.values }
     fn refresh(&mut self) {
         let v = &self.values;
         let style = v[7].round() as usize;
-        let attack = v[2] * if style == 5 { 2.0 } else { 1.0 };
-        let release = v[3] * if style == 5 { 2.5 } else if style == 7 { 0.5 } else { 1.0 };
+        let attack = v[2] * match style { 5 => 2.0, 10 => 1.5, 11 => 0.6, 13 => 0.5, _ => 1.0 };
+        let release = v[3] * match style { 5 => 2.5, 7 => 0.5, 10 => 3.0, 12 => 1.8, 13 => 1.5, _ => 1.0 };
         self.attack = time_coefficient(attack, self.sample_rate);
         self.release = time_coefficient(release, self.sample_rate);
-        self.rms_coeff = time_coefficient(10.0, self.sample_rate);
+        self.rms_coeff = time_coefficient(if style == 13 { 25.0 } else { 10.0 }, self.sample_rate);
         let compensation = if v[15] >= 0.5 { (-self.curve_db(-12.0) - 12.0).clamp(-24.0, 24.0) } else { 0.0 };
         self.makeup = db_to_lin(v[5] + compensation);
         self.wet = v[6] / 100.0;
         self.key.set(v[10], v[12], self.sample_rate);
         self.lookahead.set(v[8], self.sample_rate);
         self.hold_samples = (v[13] * 0.001 * self.sample_rate) as usize;
+        self.quality.iter_mut().for_each(|q| q.set_quality(v[26].round() as usize));
+        self.average_coefficient = time_coefficient(v[63], self.sample_rate);
+        self.trigger_decay = time_coefficient(v[28], self.sample_rate);
+        for band in 0..6 {
+            let p = 32 + band * 5;
+            let shape = match v[p + 4].round() as usize { 1 => Rbj::LowShelf, 2 => Rbj::HighShelf, 3 => Rbj::HighPass, 4 => Rbj::LowPass, _ => Rbj::Bell };
+            let coefficient = if v[p] >= 0.5 { rbj(shape, v[p + 1], v[p + 3], v[p + 2], self.sample_rate) } else { IDENTITY };
+            self.sc_eq[band].iter_mut().for_each(|f| f.set(coefficient));
+        }
+        for bank in &mut self.split { for (i, band) in bank.iter_mut().enumerate() {
+            let coeff = rbj(Rbj::LowPass, if i == 0 { 90.0 } else { 2500.0 }, 0.707, 0.0, self.sample_rate);
+            band.iter_mut().for_each(|f| f.set(coeff));
+        } }
     }
     fn set_sample_rate(&mut self, sample_rate: f64) { let values = self.values.clone(); *self = Self::new(sample_rate); self.values = values; self.refresh(); }
-    fn latency(&self) -> u32 { self.lookahead.samples as u32 }
+    fn latency(&self) -> u32 { (self.lookahead.samples + self.quality[0].latency()) as u32 }
+    fn uses_transport_tempo() -> bool { true }
+    fn set_transport_tempo(&mut self, bpm: f64) { if bpm.is_finite() && bpm >= 20.0 && bpm <= 1000.0 { self.host_tempo = Some(bpm); } }
+    fn trigger_note(&mut self, velocity: f64) { if velocity.is_finite() && velocity > 0.0 { self.note = velocity.clamp(0.0, 1.0); } }
     fn process(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) {
         let style = self.values[7].round() as usize;
         let mode = self.values[17].round() as usize;
-        let rms = self.values[18] >= 0.5 || matches!(style, 1 | 5);
+        let rms = self.values[18] >= 0.5 || matches!(style, 1 | 5 | 10 | 13);
         let listen = self.values[11] >= 0.5;
         let input = db_to_lin(self.values[19]); let output = db_to_lin(self.values[20]);
         let character = self.values[21].round() as usize;
         let drive = db_to_lin(self.values[22]); let pre = self.values[23] >= 0.5;
         let link = if mode == 0 { self.values[16] / 100.0 } else { 0.0 };
-        let auto_release = self.values[14] >= 0.5;
+        let auto_release = self.values[14] >= 0.5 || matches!(style, 8 | 10 | 11 | 12 | 13);
+        let sync = self.values[29].round() as usize;
+        let beats = [1.0, 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0][sync.min(8)];
+        let bpm = self.host_tempo.unwrap_or(self.values[30]);
+        let quality_delay = self.quality[0].latency();
         for i in 0..in_l.len() {
             let dry = [in_l[i] as f64 * input, in_r[i] as f64 * input];
             let signal = dry.map(|x| if pre { compressor_character(character, x, drive) } else { x });
             let (kl, kr) = key.map_or((signal[0], signal[1]), |(a, b)| (a[i] as f64, b[i] as f64));
             let (kl, kr) = self.key.run(kl, kr);
-            let detector = stereo_domain(kl, kr, mode);
+            let mut key_audio = [kl, kr];
+            if self.values[31] >= 0.5 { for band in &mut self.sc_eq { for c in 0..2 { key_audio[c] = band[c].run(key_audio[c]); } } }
+            match self.values[62].round() as usize {
+                1 => key_audio = [(key_audio[0] + key_audio[1]) * 0.5; 2],
+                2 => key_audio = [(key_audio[0] - key_audio[1]) * 0.5; 2],
+                3 => key_audio[1] = key_audio[0], 4 => key_audio[0] = key_audio[1], _ => {}
+            }
+            if self.values[27] >= 1.5 {
+                self.beat += bpm / (60.0 * self.sample_rate * beats);
+                if self.beat >= 1.0 { self.beat = self.beat.fract(); self.note = 1.0; }
+            }
+            if self.values[27] >= 0.5 { key_audio = [self.note; 2]; }
+            self.note *= self.trigger_decay;
+            let detector = stereo_domain(key_audio[0], key_audio[1], mode);
+            let energy = 0.5 * (detector[0] * detector[0] + detector[1] * detector[1]);
+            self.average = energy + self.average_coefficient * (self.average - energy);
+            let threshold = self.effective_threshold_db();
             let mut target = [0.0; 2];
             for c in 0..2 {
-                let mut level = if style == 2 && key.is_none() { self.last_out[c] } else { detector[c].abs() };
+                let mut level = if matches!(style, 2 | 11 | 12) && key.is_none() && self.values[27] < 0.5 { self.last_out[c] } else { detector[c].abs() };
                 if rms { self.rms[c] = level * level + self.rms_coeff * (self.rms[c] - level * level); level = self.rms[c].max(0.0).sqrt(); }
                 let db = lin_to_db(level);
-                target[c] = self.curve_db(db) - db;
-                if style == 6 && level < 1e-8 { target[c] = 0.0; }
+                target[c] = compressor_style_curve_db(style, threshold, self.values[1], self.values[4], self.values[9], db) - db;
+                if matches!(style, 6 | 9) && level < 1e-8 { target[c] = 0.0; }
             }
             let linked = if style == 6 { target[0].max(target[1]) } else { target[0].min(target[1]) };
             for c in 0..2 {
                 let target = if selected_channel(c, mode) { target[c] + (linked - target[c]) * link } else { 0.0 };
                 let engaging = if style == 6 { target > self.gr[c] } else { target < self.gr[c] };
-                if engaging {
-                    self.held[c] = self.hold_samples;
-                    self.gr[c] = target + self.attack * (self.gr[c] - target);
-                } else if self.held[c] > 0 { self.held[c] -= 1; }
-                else {
-                    let release = if auto_release { self.release.powf((1.0 + self.gr[c].abs() / 12.0).recip()) } else { self.release };
-                    self.gr[c] = target + release * (self.gr[c] - target);
-                }
+                if engaging { self.held[c] = self.hold_samples; self.gr[c] = target + self.attack * (self.gr[c] - target); }
+                else if self.held[c] > 0 { self.held[c] -= 1; }
+                else { let release = if auto_release { self.release.powf((1.0 + self.gr[c].abs() / 12.0).recip()) } else { self.release };
+                    self.gr[c] = target + release * (self.gr[c] - target); }
             }
             let (dl, dr) = self.lookahead.run(dry[0], dry[1]);
-            if listen { out_l[i] = kl as f32; out_r[i] = kr as f32; continue; }
             let mut audio = stereo_domain(dl, dr, mode);
+            let mut ttm = [0.0; 2];
+            if style == 9 {
+                let bands = self.bands(0, audio); let detection = self.bands(1, detector);
+                for b in 0..3 { for c in 0..2 {
+                    let level = detection[b][c].abs(); let db = lin_to_db(level);
+                    let target = if level < 1e-8 || !selected_channel(c, mode) { 0.0 } else {
+                        compressor_style_curve_db(9, threshold - [3.0, 0.0, 6.0][b], self.values[1], self.values[4], self.values[9], db) - db };
+                    let coefficient = if target.abs() > self.band_gr[b][c].abs() { self.attack } else { self.release };
+                    self.band_gr[b][c] = target + coefficient * (self.band_gr[b][c] - target);
+                    ttm[c] += bands[b][c] * db_to_lin(self.band_gr[b][c]);
+                } }
+            }
             for c in 0..2 {
                 let gain = if selected_channel(c, mode) { db_to_lin(self.gr[c]) * self.makeup } else { 1.0 };
-                let processed = if !selected_channel(c, mode) { audio[c] } else if pre { compressor_character(character, audio[c], drive) * gain } else { compressor_character(character, audio[c] * gain, drive) };
+                let processed_input = if style == 9 { ttm[c] * self.makeup } else { audio[c] };
+                let processed_gain = if style == 9 { 1.0 } else { gain };
+                let selected = selected_channel(c, mode);
+                let processed = self.quality[c].run(processed_input, |x| {
+                    if !selected { x } else if pre { compressor_character(character, x, drive) * processed_gain }
+                    else { compressor_character(character, x * processed_gain, drive) }
+                });
                 self.last_out[c] = (audio[c] * db_to_lin(self.gr[c])).abs();
-                audio[c] = (audio[c] * (1.0 - self.wet) + processed * self.wet) * output;
+                self.dry_delay[c].push(audio[c]);
+                let delayed = if quality_delay > 0 { self.dry_delay[c].tap(quality_delay) } else { audio[c] };
+                audio[c] = (delayed * (1.0 - self.wet) + processed * self.wet) * output;
             }
             let y = from_stereo_domain(audio, mode);
-            out_l[i] = y[0] as f32; out_r[i] = y[1] as f32;
+            if listen { out_l[i] = key_audio[0] as f32; out_r[i] = key_audio[1] as f32; }
+            else { out_l[i] = y[0] as f32; out_r[i] = y[1] as f32; }
         }
     }
 }
@@ -255,6 +398,9 @@ pub static GATE_SPECS: &[Spec] = &[
     Spec::new("stereo_link", "立体声联动", 0.0, 100.0, 100.0, "%"),
     Spec::new("channel_mode", "处理声道", 0.0, 2.0, 0.0, "").steps(2),
     Spec::new("output", "输出", -24.0, 24.0, 0.0, "dB"),
+    Spec::new("detection", "检测", 0.0, 1.0, 0.0, "").steps(1),
+    Spec::new("sc_channel", "侧链声道", 0.0, 4.0, 0.0, "").steps(4),
+    Spec::new("program_release", "自适应释放", 0.0, 100.0, 0.0, "%"),
 ];
 
 pub fn gate_style_curve_db(style: usize, threshold: f64, ratio: f64, range: f64, knee: f64, input_db: f64) -> f64 {
@@ -273,13 +419,13 @@ pub struct GateProcessor {
     pub values: Vec<f64>, sample_rate: f64, attack: f64, release: f64,
     hold_samples: usize, held: [usize; 2], open: [bool; 2], gr: [f64; 2],
     envelope: [f64; 2], envelope_attack: f64, envelope_release: f64,
-    key: KeyFilter, lookahead: Lookahead,
+    key: KeyFilter, lookahead: Lookahead, rms_energy: [f64; 2],
 }
 impl GateProcessor {
     pub fn new(sample_rate: f64) -> Self {
         let mut p = Self { values: super::table_defaults(GATE_SPECS), sample_rate, attack: 0.0, release: 0.0,
             hold_samples: 0, held: [0; 2], open: [false; 2], gr: [0.0; 2], envelope: [0.0; 2], envelope_attack: 0.0, envelope_release: 0.0,
-            key: KeyFilter::default(), lookahead: Lookahead::new(sample_rate) };
+            key: KeyFilter::default(), lookahead: Lookahead::new(sample_rate), rms_energy: [0.0; 2] };
         p.refresh(); p
     }
     pub fn gain_reduction_db(&self) -> f64 { if self.values[11].round() as usize == 4 { self.gr[0].max(self.gr[1]) } else { self.gr[0].min(self.gr[1]) } }
@@ -289,6 +435,7 @@ impl GateProcessor {
 }
 impl TableEffect for GateProcessor {
     const SPECS: &'static [Spec] = GATE_SPECS;
+    fn gain_reduction_db(&self) -> Option<f64> { Some(GateProcessor::gain_reduction_db(self)) }
     fn values(&self) -> &[f64] { &self.values }
     fn values_mut(&mut self) -> &mut [f64] { &mut self.values }
     fn refresh(&mut self) {
@@ -312,7 +459,16 @@ impl TableEffect for GateProcessor {
             let (l, r) = (in_l[i] as f64, in_r[i] as f64);
             let (kl, kr) = key.map_or((l, r), |(a, b)| (a[i] as f64, b[i] as f64));
             let (kl, kr) = self.key.run(kl, kr);
-            let detector = stereo_domain(kl, kr, mode).map(f64::abs);
+            let mut selected_key = [kl, kr];
+            match self.values[18].round() as usize {
+                1 => selected_key = [(kl + kr) * 0.5; 2], 2 => selected_key = [(kl - kr) * 0.5; 2],
+                3 => selected_key[1] = kl, 4 => selected_key[0] = kr, _ => {}
+            }
+            let mut detector = stereo_domain(selected_key[0], selected_key[1], mode).map(f64::abs);
+            if self.values[17] >= 0.5 { for c in 0..2 {
+                self.rms_energy[c] += (detector[c] * detector[c] - self.rms_energy[c]) * (1.0 - self.envelope_release);
+                detector[c] = self.rms_energy[c].max(0.0).sqrt();
+            } }
             let linked = detector[0].max(detector[1]);
             for c in 0..2 {
                 let level = detector[c] + (linked - detector[c]) * link;
@@ -327,11 +483,11 @@ impl TableEffect for GateProcessor {
                     else if style < 4 && self.open[c] { 0.0 }
                     else { self.curve_db(db) - db };
                 let opening = if style == 5 { target < self.gr[c] } else { target > self.gr[c] };
-                let coeff = if opening { self.attack } else { self.release };
+                let coeff = if opening { self.attack } else { self.release.powf((1.0 + self.values[19] * 0.01 * self.gr[c].abs() / 20.0).recip()) };
                 self.gr[c] = target + coeff * (self.gr[c] - target);
             }
             let (dl, dr) = self.lookahead.run(l, r);
-            if listen { out_l[i] = kl as f32; out_r[i] = kr as f32; continue; }
+            if listen { out_l[i] = selected_key[0] as f32; out_r[i] = selected_key[1] as f32; continue; }
             let mut audio = stereo_domain(dl, dr, mode);
             for c in 0..2 {
                 let gain = if selected_channel(c, mode) { db_to_lin(self.gr[c]) * wet + 1.0 - wet } else { 1.0 };
@@ -348,7 +504,7 @@ impl TableEffect for GateProcessor {
 
 pub const DEESSER_MODES: [&str; 2] = ["分频", "全频"];
 
-pub const DEESSER_DETECTION: [&str; 2] = ["全能", "单人声"];
+pub const DEESSER_DETECTION: [&str; 3] = ["全能", "单人声", "自适应齿音"];
 pub static DEESSER_SPECS: &[Spec] = &[
     Spec::new("threshold", "阈值", -60.0, 0.0, -24.0, "dB"),
     Spec::new("range", "最大衰减", 0.0, 24.0, 12.0, "dB"),
@@ -356,13 +512,17 @@ pub static DEESSER_SPECS: &[Spec] = &[
     Spec::new("mode", "模式", 0.0, 1.0, 0.0, "").steps(1),
     Spec::new("release", "释放", 10.0, 500.0, 60.0, "ms").log(),
     Spec::new("sc_listen", "监听侧链", 0.0, 1.0, 0.0, "").steps(1),
-    Spec::new("detection", "检测算法", 0.0, 1.0, 0.0, "").steps(1),
+    Spec::new("detection", "检测算法", 0.0, 2.0, 0.0, "").steps(2),
     Spec::new("sc_lpf", "检测上限", 4000.0, 20000.0, 20000.0, "Hz").log(),
     Spec::new("lookahead", "前视", 0.0, 15.0, 0.0, "ms").fixed(),
     Spec::new("stereo_link", "立体声联动", 0.0, 100.0, 100.0, "%"),
     Spec::new("channel_mode", "处理声道", 0.0, 2.0, 0.0, "").steps(2),
     Spec::new("mix", "干湿比", 0.0, 100.0, 100.0, "%"),
     Spec::new("attack", "启动", 0.05, 20.0, 0.5, "ms").log(),
+    Spec::new("phase", "分频相位", 0.0, 1.0, 0.0, "").steps(1).fixed(),
+    Spec::new("sensitivity", "齿音灵敏度", 0.0, 100.0, 50.0, "%"),
+    Spec::new("transient_protect", "瞬态保护", 0.0, 100.0, 0.0, "%"),
+    Spec::new("hold", "齿音保持", 0.0, 250.0, 0.0, "ms"),
 ];
 
 /// Linkwitz–Riley 24 dB/oct split per channel: the bands sum to an allpass,
@@ -391,13 +551,16 @@ impl HighBand {
 pub struct DeesserProcessor {
     pub values: Vec<f64>, sample_rate: f64, attack: f64, release: f64, gr: [f64; 2],
     split: HighBand, detect: HighBand, upper: KeyFilter, lookahead: Lookahead,
-    energy: [[f64; 2]; 2], energy_coeff: f64,
+    energy: [[f64; 2]; 2], energy_coeff: f64, linear: [LinearSplit; 2], dry_linear: [DelayLine; 2],
+    analysis: [[Biquad; 2]; 6], spectral_energy: [[f64; 2]; 6], previous_energy: [f64; 2], held: [usize; 2],
 }
 impl DeesserProcessor {
     pub fn new(sample_rate: f64) -> Self {
         let mut p = Self { values: super::table_defaults(DEESSER_SPECS), sample_rate, attack: 0.0, release: 0.0, gr: [0.0; 2],
             split: HighBand::default(), detect: HighBand::default(), upper: KeyFilter::default(), lookahead: Lookahead::new(sample_rate),
-            energy: [[0.0; 2]; 2], energy_coeff: 0.0 };
+            energy: [[0.0; 2]; 2], energy_coeff: 0.0, linear: [LinearSplit::default(), LinearSplit::default()],
+            dry_linear: [DelayLine::new(66), DelayLine::new(66)], analysis: Default::default(),
+            spectral_energy: [[0.0; 2]; 6], previous_energy: [0.0; 2], held: [0; 2] };
         p.refresh(); p
     }
     pub fn gain_reduction_db(&self) -> f64 { self.gr[0].min(self.gr[1]) }
@@ -405,6 +568,7 @@ impl DeesserProcessor {
 }
 impl TableEffect for DeesserProcessor {
     const SPECS: &'static [Spec] = DEESSER_SPECS;
+    fn gain_reduction_db(&self) -> Option<f64> { Some(DeesserProcessor::gain_reduction_db(self)) }
     fn values(&self) -> &[f64] { &self.values }
     fn values_mut(&mut self) -> &mut [f64] { &mut self.values }
     fn refresh(&mut self) {
@@ -414,9 +578,15 @@ impl TableEffect for DeesserProcessor {
         self.split.set(self.values[2], self.sample_rate); self.detect.set(self.values[2], self.sample_rate);
         self.upper.set(20.0, self.values[7].max(self.values[2]), self.sample_rate);
         self.lookahead.set(self.values[8], self.sample_rate);
+        self.linear.iter_mut().for_each(|f| f.configure(self.values[2], self.sample_rate));
+        for (b, bank) in self.analysis.iter_mut().enumerate() {
+            let frequency = self.values[2] * (self.values[7].max(self.values[2] * 1.1) / self.values[2]).powf(b as f64 / 5.0);
+            let coefficient = rbj(Rbj::BandPass, frequency, 2.5, 0.0, self.sample_rate);
+            bank.iter_mut().for_each(|f| f.set(coefficient));
+        }
     }
     fn set_sample_rate(&mut self, sample_rate: f64) { let values = self.values.clone(); *self = Self::new(sample_rate); self.values = values; self.refresh(); }
-    fn latency(&self) -> u32 { self.lookahead.samples as u32 }
+    fn latency(&self) -> u32 { (self.lookahead.samples + if self.values[13] >= 0.5 { LinearSplit::LATENCY } else { 0 }) as u32 }
     fn process(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) {
         let listen = self.values[5] >= 0.5; let wide = self.values[3] >= 0.5;
         let vocal = self.values[6] >= 0.5; let mode = self.values[10].round() as usize;
@@ -433,23 +603,43 @@ impl TableEffect for DeesserProcessor {
                 self.energy[c][1] = detector[c] * detector[c] + self.energy_coeff * (self.energy[c][1] - detector[c] * detector[c]);
                 // A vocal detector requires appreciable sibilant energy, so
                 // strong voiced low harmonics cannot trigger de-essing alone.
-                let confidence = if vocal { ((self.energy[c][0] / self.energy[c][1].max(1e-15) - 0.08) / 0.32).clamp(0.0, 1.0) } else { 1.0 };
-                target[c] = self.reduction_db(lin_to_db(high[c].abs())) * confidence;
+                let mut confidence = if vocal { ((self.energy[c][0] / self.energy[c][1].max(1e-15) - 0.08) / 0.32).clamp(0.0, 1.0) } else { 1.0 };
+                if self.values[6] >= 1.5 {
+                    let mut log_sum = 0.0; let mut sum = 0.0;
+                    for b in 0..6 {
+                        let sample = self.analysis[b][c].run(detector[c]);
+                        self.spectral_energy[b][c] = sample * sample + self.energy_coeff * (self.spectral_energy[b][c] - sample * sample);
+                        let energy = self.spectral_energy[b][c].max(1e-20); sum += energy; log_sum += energy.ln();
+                    }
+                    let flatness = ((log_sum / 6.0).exp() / (sum / 6.0).max(1e-20)).clamp(0.0, 1.0);
+                    confidence *= (flatness * (1.0 + self.values[14] * 0.06)).clamp(0.0, 1.0);
+                }
+                let rise = ((self.energy[c][1] - self.previous_energy[c]).max(0.0) / self.energy[c][1].max(1e-20) * 20.0).min(1.0);
+                confidence *= 1.0 - rise * self.values[15] * 0.01;
+                self.previous_energy[c] = self.energy[c][1];
+                target[c] = self.reduction_db(lin_to_db(if self.values[6] >= 1.5 { self.energy[c][0].sqrt() } else { high[c].abs() })) * confidence;
             }
             let linked = target[0].min(target[1]);
             for c in 0..2 {
                 let target = if selected_channel(c, mode) { target[c] + (linked - target[c]) * link } else { 0.0 };
-                let coeff = if target < self.gr[c] { self.attack } else { self.release };
-                self.gr[c] = target + coeff * (self.gr[c] - target);
+                if target < self.gr[c] {
+                    self.held[c] = (self.values[16] * 0.001 * self.sample_rate) as usize;
+                    self.gr[c] = target + self.attack * (self.gr[c] - target);
+                } else if self.held[c] > 0 { self.held[c] -= 1; }
+                else { self.gr[c] = target + self.release * (self.gr[c] - target); }
             }
             let (dl, dr) = self.lookahead.run(l, r);
             if listen { let y = from_stereo_domain(high, mode); out_l[i] = y[0] as f32; out_r[i] = y[1] as f32; continue; }
             let mut audio = stereo_domain(dl, dr, mode);
             for c in 0..2 {
                 let gain = if selected_channel(c, mode) { 1.0 + (db_to_lin(self.gr[c]) - 1.0) * wet } else { 1.0 };
-                if wide { audio[c] *= gain; }
-                else {
-                    let (low, high) = self.split.run(c, audio[c]);
+                self.dry_linear[c].push(audio[c]);
+                if self.values[13] >= 0.5 {
+                    let (low, high) = self.linear[c].run(audio[c]);
+                    let dry = self.dry_linear[c].tap(LinearSplit::LATENCY);
+                    audio[c] = if wide { dry * gain } else if wet > 0.0 && selected_channel(c, mode) { low + high * gain } else { dry };
+                } else if wide { audio[c] *= gain; }
+                else { let (low, high) = self.split.run(c, audio[c]);
                     if wet > 0.0 && selected_channel(c, mode) { audio[c] = low + high * gain; }
                 }
             }
@@ -462,18 +652,26 @@ impl TableEffect for DeesserProcessor {
 // Limiter
 // ---------------------------------------------------------------------------
 
-pub const LIMITER_STYLES: [&str; 4] = ["透明", "平滑", "冲击", "安全"];
+pub const LIMITER_STYLES: [&str; 8] = ["透明", "平滑", "冲击", "安全", "激进", "现代", "总线", "动态"];
 pub static LIMITER_SPECS: &[Spec] = &[
     Spec::new("gain", "输入增益", 0.0, 24.0, 0.0, "dB"),
     Spec::new("ceiling", "输出上限", -12.0, 0.0, -0.3, "dB"),
     Spec::new("release", "释放", 1.0, 1000.0, 50.0, "ms").log(),
     Spec::new("lookahead", "前视", 0.1, 10.0, 3.0, "ms").fixed(),
     Spec::new("link", "立体声联动", 0.0, 100.0, 100.0, "%"),
-    Spec::new("style", "风格", 0.0, 3.0, 0.0, "").steps(3),
+    Spec::new("style", "风格", 0.0, 7.0, 0.0, "").steps(7),
     Spec::new("dc_filter", "去直流", 0.0, 1.0, 0.0, "").steps(1),
     Spec::new("unity_gain", "等响比较", 0.0, 1.0, 0.0, "").steps(1),
     Spec::new("audition", "监听限制差分", 0.0, 1.0, 0.0, "").steps(1),
     Spec::new("attack", "平滑启动", 0.0, 10.0, 3.0, "ms"),
+    Spec::new("true_peak", "重建峰值保护", 0.0, 1.0, 0.0, "").steps(1).fixed(),
+    Spec::new("oversampling", "过采样", 0.0, 5.0, 0.0, "").steps(5).fixed(),
+    Spec::new("loudness_match", "响度目标", 0.0, 1.0, 0.0, "").steps(1),
+    Spec::new("target_lufs", "目标响度", -36.0, -5.0, -23.0, "LUFS"),
+    Spec::new("dither", "抖动", 0.0, 3.0, 0.0, "").steps(3),
+    Spec::new("dither_bits", "目标位深", 8.0, 24.0, 24.0, "bit").steps(16),
+    Spec::new("meter_pause", "暂停积分", 0.0, 1.0, 0.0, "").steps(1).fixed(),
+    Spec::new("meter_reset", "重置计量", 0.0, 1.0, 0.0, "").steps(1).fixed(),
 ];
 
 /// Fixed-capacity monotone queue: O(1) amortized minimum, no allocation in
@@ -492,101 +690,186 @@ impl SlidingMinimum {
     }
 }
 
-/// Brickwall lookahead limiter. Per channel: the gain each sample needs is
-/// held by a sliding minimum over the lookahead window, released
-/// exponentially, then box-averaged over the window so gain changes begin
-/// before the peak arrives. The averaged gain never exceeds what any sample
-/// in its window needs, so the delayed output stays under the ceiling.
-pub struct LimiterProcessor {
-    pub values: Vec<f64>,
-    sample_rate: f64,
-    window: usize,
-    audio: [DelayLine; 2],
-    minimum: [SlidingMinimum; 2],
-    env: [f64; 2],
-    held: [DelayLine; 2],
-    sum: [f64; 2],
-    release: f64,
-    drive: f64,
-    ceiling: f64,
-    gr_db: f64,
-    clock: u64,
-    dc: [(f64, f64); 2],
+/// One shared stereo gain engine. Quality changes its sampling rate; both
+/// the sidechain and main path are interpolated before gain computation.
+struct LimiterCore {
+    window: usize, audio: [DelayLine; 2], minimum: [SlidingMinimum; 2],
+    env: [f64; 2], held: [DelayLine; 2], sum: [f64; 2], clock: u64, gr_db: f64,
+}
+impl LimiterCore {
+    fn new(sample_rate: f64) -> Self {
+        let capacity = lookahead_samples(10.0, sample_rate.max(8000.0) * 32.0) + 2;
+        Self { window: 1, audio: [DelayLine::new(capacity), DelayLine::new(capacity)],
+            minimum: [SlidingMinimum::new(capacity), SlidingMinimum::new(capacity)], env: [1.0; 2],
+            held: [DelayLine::new(capacity), DelayLine::new(capacity)], sum: [1.0; 2], clock: 0, gr_db: 0.0 }
+    }
+    fn reset(&mut self, window: usize) {
+        self.window = window.clamp(1, self.audio[0].capacity() - 2);
+        self.clock = 0; self.gr_db = 0.0;
+        for c in 0..2 {
+            self.audio[c].clear(); self.minimum[c].clear(); self.held[c].clear();
+            for _ in 0..self.held[c].capacity() { self.held[c].push(1.0); }
+            self.env[c] = 1.0; self.sum[c] = self.window as f64;
+        }
+    }
+    fn run(&mut self, x: [f64; 2], trigger: [f64; 2], ceiling: f64, release: f64, link: f64, smooth: f64, style: usize) -> ([f64; 2], [f64; 2]) {
+        let own: [f64; 2] = std::array::from_fn(|c| (ceiling / x[c].abs().max(trigger[c].abs()).max(1e-12)).min(1.0));
+        let linked = own[0].min(own[1]); let mut y = [0.0; 2]; let mut dry = [0.0; 2];
+        for c in 0..2 {
+            let need = own[c] + (linked - own[c]) * link;
+            let hold = self.minimum[c].push(self.clock, need, self.window);
+            let release = match style {
+                5 => release.powf((0.5 + 1.5 * self.env[c]).clamp(0.5, 2.0)),
+                6 => release.powf(0.5 + 0.5 * (self.env[0] + self.env[1])),
+                7 => release.powf((1.0 + 3.0 * (hold - self.env[c]).abs()).recip()),
+                _ => release,
+            };
+            self.env[c] = if hold < self.env[c] { hold } else { hold + release * (self.env[c] - hold) };
+            self.held[c].push(self.env[c]);
+            self.sum[c] += self.env[c] - self.held[c].tap(self.window);
+            let average = (self.sum[c] / self.window as f64).clamp(0.0, 1.0);
+            let smoothing = if style == 4 { smooth * 0.15 } else { smooth };
+            let gain = self.env[c] + (average - self.env[c]) * smoothing;
+            self.audio[c].push(x[c]); dry[c] = self.audio[c].tap(self.window);
+            y[c] = (dry[c] * gain).clamp(-ceiling, ceiling);
+            if c == 0 { self.gr_db = lin_to_db(gain); } else { self.gr_db = self.gr_db.min(lin_to_db(gain)); }
+        }
+        self.clock = self.clock.wrapping_add(1);
+        (y, dry)
+    }
 }
 
+/// ISP guard using every FIR support's absolute-contribution bound. A sample
+/// waits until all 33 supports containing it have been seen, then receives
+/// their minimum gain. This conservative bound stays valid during gain
+/// changes, unlike measuring a reconstructed peak and applying a late clip.
+struct IspGuard {
+    detector: [TruePeak; 2], minimum: [SlidingMinimum; 2], audio: [DelayLine; 2], clock: u64, gain: f64,
+}
+impl IspGuard {
+    fn new() -> Self { Self { detector: [TruePeak::new(), TruePeak::new()],
+        minimum: [SlidingMinimum::new(35), SlidingMinimum::new(35)], audio: [DelayLine::new(35), DelayLine::new(35)], clock: 0, gain: 1.0 } }
+    fn reset(&mut self) {
+        self.detector.iter_mut().for_each(TruePeak::reset); self.minimum.iter_mut().for_each(SlidingMinimum::clear);
+        self.audio.iter_mut().for_each(DelayLine::clear); self.clock = 0; self.gain = 1.0;
+    }
+    fn run(&mut self, input: [f64; 2], ceiling: f64, link: f64) -> [f64; 2] {
+        let bounds = std::array::from_fn::<_, 2, _>(|c| self.detector[c].run_bounded(input[c]).1);
+        let own = bounds.map(|v| (ceiling / v.max(1e-12)).min(1.0)); let linked = own[0].min(own[1]);
+        let mut y = [0.0; 2]; self.gain = 1.0;
+        for c in 0..2 {
+            let gain = self.minimum[c].push(self.clock, own[c] + (linked - own[c]) * link, 32);
+            self.audio[c].push(input[c]); y[c] = self.audio[c].tap(32) * gain; self.gain = self.gain.min(gain);
+        }
+        self.clock += 1; y
+    }
+}
+
+pub struct LimiterProcessor {
+    pub values: Vec<f64>, sample_rate: f64, core: LimiterCore, quality: [Oversampler; 2], key_quality: [Oversampler; 2],
+    isp: IspGuard, dry_isp: [DelayLine; 2], dc: [(f64, f64); 2], release: f64, drive: f64, ceiling: f64,
+    meter: LoudnessMeter, input_meter: LoudnessMeter, target_gain_db: f64,
+    random: [u64; 2], error: [[f64; 2]; 2], last_reset: bool, last_isp: bool, meter_epoch: u64,
+}
 impl LimiterProcessor {
     pub fn new(sample_rate: f64) -> Self {
-        let capacity = lookahead_samples(10.0, sample_rate.max(8_000.0)) + 2;
-        let line = || [DelayLine::new(capacity), DelayLine::new(capacity)];
-        let mut p = Self { values: super::table_defaults(LIMITER_SPECS), sample_rate, window: 1, audio: line(),
-            minimum: [SlidingMinimum::new(capacity), SlidingMinimum::new(capacity)],
-            env: [1.0; 2], held: line(), sum: [0.0; 2], release: 0.0, drive: 1.0, ceiling: 1.0, gr_db: 0.0,
-            clock: 0, dc: [(0.0, 0.0); 2] };
-        p.refresh();
-        p.reset_window();
-        p
+        let mut p = Self { values: super::table_defaults(LIMITER_SPECS), sample_rate, core: LimiterCore::new(sample_rate),
+            quality: [Oversampler::new(), Oversampler::new()], key_quality: [Oversampler::new(), Oversampler::new()], isp: IspGuard::new(),
+            dry_isp: [DelayLine::new(35), DelayLine::new(35)], dc: [(0.0, 0.0); 2], release: 0.0, drive: 1.0, ceiling: 1.0,
+            meter: LoudnessMeter::new(sample_rate), input_meter: LoudnessMeter::new(sample_rate), target_gain_db: 0.0,
+            random: [0x4d595df4d0f33173, 0x94d049bb133111eb], error: [[0.0; 2]; 2], last_reset: false, last_isp: false, meter_epoch: 0 };
+        p.refresh(); p.core.reset(p.core.window); p
     }
-    pub fn gain_reduction_db(&self) -> f64 { self.gr_db }
-    fn reset_window(&mut self) {
-        for c in 0..2 {
-            self.audio[c].clear();
-            self.minimum[c].clear();
-            for _ in 0..self.held[c].capacity() { self.held[c].push(1.0); }
-            self.env[c] = 1.0;
-            self.sum[c] = self.window as f64;
-        }
-        self.clock = 0;
-        self.dc = [(0.0, 0.0); 2];
+    pub fn gain_reduction_db(&self) -> f64 { self.core.gr_db + if self.last_isp { lin_to_db(self.isp.gain) } else { 0.0 } }
+    pub fn loudness(&self) -> LoudnessReading { self.meter.reading() }
+    fn noise(&mut self, channel: usize) -> f64 {
+        let mut value = self.random[channel]; value ^= value << 13; value ^= value >> 7; value ^= value << 17; self.random[channel] = value;
+        (value >> 11) as f64 / (1u64 << 53) as f64
     }
 }
-
 impl TableEffect for LimiterProcessor {
     const SPECS: &'static [Spec] = LIMITER_SPECS;
+    fn gain_reduction_db(&self) -> Option<f64> { Some(LimiterProcessor::gain_reduction_db(self)) }
+    fn meter_control(&self) -> (bool, u64) { (self.values[16] >= 0.5, self.meter_epoch) }
+    fn reset_meters(&mut self) {
+        self.meter.reset(); self.input_meter.reset();
+        self.meter_epoch = self.meter_epoch.wrapping_add(1);
+        // Preserve target-gain smoothing and all signal-path history.
+    }
     fn values(&self) -> &[f64] { &self.values }
     fn values_mut(&mut self) -> &mut [f64] { &mut self.values }
     fn refresh(&mut self) {
-        let v = &self.values;
-        self.drive = db_to_lin(v[0]);
-        self.ceiling = db_to_lin(v[1]);
-        let release_scale = match v[5].round() as usize { 1 => 2.0, 2 => 0.5, 3 => 3.0, _ => 1.0 };
-        self.release = time_coefficient(v[2] * release_scale, self.sample_rate);
-        let window = lookahead_samples(v[3], self.sample_rate).clamp(1, self.audio[0].capacity() - 2);
-        if window != self.window { self.window = window; self.reset_window(); }
+        let v = &self.values; self.drive = db_to_lin(v[0]); self.ceiling = db_to_lin(v[1]);
+        let isp = v[10] >= 0.5;
+        let quality = (v[11].round() as usize).max(if isp { 2 } else { 0 });
+        let factor = 1usize << quality.min(5);
+        let rate = self.sample_rate * factor as f64;
+        let release_scale = match v[5].round() as usize { 1 => 2.0, 2 => 0.5, 3 => 3.0, 4 => 0.2, 5 => 1.2, 6 => 1.8, 7 => 0.7, _ => 1.0 };
+        self.release = time_coefficient(v[2] * release_scale, rate);
+        let window = lookahead_samples(v[3], self.sample_rate).max(1) * factor;
+        if self.core.window != window || self.quality[0].factor() != factor || isp != self.last_isp {
+            self.core.reset(window); self.isp.reset(); self.dry_isp.iter_mut().for_each(DelayLine::clear);
+        }
+        self.quality.iter_mut().chain(&mut self.key_quality).for_each(|q| q.set_quality(quality));
+        self.last_isp = isp;
+        self.meter.set_paused(v[16] >= 0.5); self.input_meter.set_paused(v[16] >= 0.5);
+        let reset = v[17] >= 0.5;
+        if reset && !self.last_reset { self.reset_meters(); }
+        self.last_reset = reset;
     }
-    fn set_sample_rate(&mut self, sample_rate: f64) { *self = Self { values: self.values.clone(), ..Self::new(sample_rate) }; self.refresh(); self.reset_window(); }
-    fn latency(&self) -> u32 { self.window as u32 }
+    fn set_sample_rate(&mut self, sample_rate: f64) {
+        let values = self.values.clone(); let epoch = self.meter_epoch;
+        *self = Self::new(sample_rate); self.values = values; self.refresh();
+        self.meter_epoch = epoch.wrapping_add(1);
+    }
+    fn latency(&self) -> u32 { (self.core.window / self.quality[0].factor() + self.quality[0].latency() + if self.last_isp { 32 } else { 0 }) as u32 }
     fn process(&mut self, in_l: &[f32], in_r: &[f32], key: Option<(&[f32], &[f32])>, out_l: &mut [f32], out_r: &mut [f32]) {
-        let link = self.values[4] / 100.0;
-        let w = self.window;
-        let dc_filter = self.values[6] >= 0.5;
-        let unity = if self.values[7] >= 0.5 { self.drive.recip() } else { 1.0 };
-        let audition = self.values[8] >= 0.5;
-        let smooth = (self.values[9] * 0.001 * self.sample_rate / w as f64).clamp(0.0, 1.0);
+        let link = self.values[4] / 100.0; let style = self.values[5].round() as usize;
+        let factor = self.quality[0].factor(); let rate = self.sample_rate * factor as f64;
+        let smooth = (self.values[9] * 0.001 * rate / self.core.window as f64).clamp(0.0, 1.0);
         let dc_coeff = (-std::f64::consts::TAU * 5.0 / self.sample_rate).exp();
+        let dither = self.values[14].round() as usize; let quantum = 2f64.powf(1.0 - self.values[15].round());
+        let ceiling = if dither > 0 { (self.ceiling - 8.0 * quantum).max(0.01) } else { self.ceiling };
+        let tracking = time_coefficient(1000.0, self.sample_rate);
         for i in 0..in_l.len() {
-            let mut x = [in_l[i] as f64 * self.drive, in_r[i] as f64 * self.drive];
-            if dc_filter { for c in 0..2 { let previous = self.dc[c]; let filtered = x[c] - previous.0 + dc_coeff * previous.1; self.dc[c] = (x[c], filtered); x[c] = filtered; } }
-            let trigger = key.map_or([0.0; 2], |(a, b)| [a[i] as f64 * self.drive, b[i] as f64 * self.drive]);
-            let own: [f64; 2] = std::array::from_fn(|c| (self.ceiling / x[c].abs().max(trigger[c].abs()).max(1e-12)).min(1.0));
-            let linked = own[0].min(own[1]);
-            let mut y = [0.0; 2];
-            for c in 0..2 {
-                let need = own[c] + (linked - own[c]) * link;
-                let hold = self.minimum[c].push(self.clock, need, w);
-                self.env[c] = if hold < self.env[c] { hold } else { hold + self.release * (self.env[c] - hold) };
-                self.held[c].push(self.env[c]);
-                self.sum[c] += self.env[c] - self.held[c].tap(w);
-                let average = (self.sum[c] / w as f64).clamp(0.0, 1.0);
-                let gain = self.env[c] + (average - self.env[c]) * smooth;
-                self.audio[c].push(x[c]);
-                let dry = self.audio[c].tap(w);
-                let limited = (dry * gain).clamp(-self.ceiling, self.ceiling);
-                y[c] = (if audition { dry - limited } else { limited }) * unity;
-                if c == 0 { self.gr_db = lin_to_db(gain); } else { self.gr_db = self.gr_db.min(lin_to_db(gain)); }
+            let raw = [in_l[i] as f64, in_r[i] as f64];
+            self.input_meter.push(raw[0], raw[1]);
+            let measured = self.input_meter.reading().short_term_lufs;
+            let desired = if self.values[12] >= 0.5 && measured > -70.0 { (self.values[13] - measured).clamp(-24.0, 24.0) } else { 0.0 };
+            self.target_gain_db = desired + tracking * (self.target_gain_db - desired);
+            let drive = self.drive * db_to_lin(self.target_gain_db);
+            let mut x = raw.map(|x| x * drive);
+            if self.values[6] >= 0.5 { for c in 0..2 { let previous = self.dc[c]; let filtered = x[c] - previous.0 + dc_coeff * previous.1; self.dc[c] = (x[c], filtered); x[c] = filtered; } }
+            let trigger = key.map_or([0.0; 2], |(l, r)| [l[i] as f64 * drive, r[i] as f64 * drive]);
+            let mut audio_high = [[0.0; 32]; 2]; let mut key_high = [[0.0; 32]; 2]; let mut dry_high = [[0.0; 32]; 2];
+            for c in 0..2 { self.quality[c].upsample(x[c], &mut audio_high[c]); self.key_quality[c].upsample(trigger[c], &mut key_high[c]); }
+            for sample in 0..factor {
+                let (processed, dry) = self.core.run([audio_high[0][sample], audio_high[1][sample]], [key_high[0][sample], key_high[1][sample]], ceiling, self.release, link, smooth, style);
+                for c in 0..2 { audio_high[c][sample] = processed[c]; dry_high[c][sample] = dry[c]; }
             }
-            out_l[i] = y[0] as f32;
-            out_r[i] = y[1] as f32;
-            self.clock = self.clock.wrapping_add(1);
+            let mut result = [0.0; 2];
+            // Use a separate decimator history for the difference signal:
+            // key interpolation and key decimation do not share histories.
+            let mut dry = [0.0; 2];
+            for c in 0..2 { result[c] = self.quality[c].downsample(&audio_high[c]).clamp(-ceiling, ceiling); dry[c] = self.key_quality[c].downsample(&dry_high[c]); }
+            if self.last_isp {
+                result = self.isp.run(result, ceiling, link);
+                for c in 0..2 { self.dry_isp[c].push(dry[c]); dry[c] = self.dry_isp[c].tap(32); }
+            }
+            for c in 0..2 {
+                if dither > 0 {
+                    let noise = (self.noise(c) - self.noise(c)) * quantum;
+                    let feedback = match dither { 2 => 0.85 * self.error[c][0], 3 => 1.5 * self.error[c][0] - 0.5 * self.error[c][1], _ => 0.0 };
+                    let shaped = result[c] + feedback;
+                    let quantized = ((shaped + noise) / quantum).round() * quantum;
+                    self.error[c] = [(shaped - quantized).clamp(-2.0 * quantum, 2.0 * quantum), self.error[c][0]];
+                    result[c] = quantized;
+                }
+                if self.values[8] >= 0.5 { result[c] = dry[c] - result[c]; }
+                if self.values[7] >= 0.5 { result[c] /= drive; }
+            }
+            self.meter.push(result[0], result[1]);
+            out_l[i] = result[0] as f32; out_r[i] = result[1] as f32;
         }
     }
 }
@@ -600,6 +883,40 @@ mod tests {
         let (mut l, mut r) = (vec![0.0; x.len()], vec![0.0; x.len()]);
         fx.process(x, x, key.map(|k| (k, k)), &mut l, &mut r);
         l
+    }
+
+    #[test]
+    fn limiter_meter_pause_and_reset_epoch_preserve_audio_history() {
+        let mut p = LimiterProcessor::new(FS);
+        assert_eq!(p.meter_control(), (false, 0));
+        assert!(!LIMITER_SPECS[16].automatable && !LIMITER_SPECS[17].automatable);
+        let tone = sine(1000.0, 0.1, 48_000);
+        run(&mut p, &tone, None);
+        let first = p.loudness();
+        assert!(first.integrated_lufs > -30.0 && first.integrated_lufs < -10.0);
+        p.set("meter_pause", 1.0).unwrap();
+        run(&mut p, &sine(1000.0, 0.01, 48_000), None);
+        assert_eq!(p.loudness().integrated_lufs, first.integrated_lufs);
+        assert!(p.loudness().momentary_lufs < first.momentary_lufs - 15.0);
+        assert_eq!(p.meter_control(), (true, 0));
+        p.set("meter_reset", 1.0).unwrap();
+        assert_eq!(p.meter_control(), (true, 1));
+        assert_eq!(p.loudness().integrated_lufs, -120.0);
+        p.set("meter_reset", 1.0).unwrap();
+        p.set("meter_reset", 0.0).unwrap();
+        assert_eq!(p.meter_control(), (true, 1), "only a rising edge resets");
+        p.set("meter_reset", 1.0).unwrap();
+        assert_eq!(p.meter_control(), (true, 2));
+        p.set("meter_pause", 0.0).unwrap();
+        run(&mut p, &tone, None);
+        assert!(p.loudness().integrated_lufs > -30.0);
+        let retained = (p.core.clock, p.core.env, p.core.window, p.target_gain_db);
+        p.reset_meters();
+        assert_eq!(p.meter_control(), (false, 3));
+        assert_eq!(p.loudness(), LoudnessReading::default());
+        assert_eq!((p.core.clock, p.core.env, p.core.window, p.target_gain_db), retained);
+        p.set_sample_rate(96_000.0);
+        assert_eq!(p.meter_control(), (false, 4));
     }
 
     #[test]
@@ -798,4 +1115,96 @@ mod tests {
             assert_eq!(queue.push(i as u64, value, 17), expected);
         }
     }
+    #[test]
+    fn advanced_compressor_eq_auto_threshold_and_note_trigger_are_functional() {
+        let x = sine(1000.0, 0.5, 24000);
+        let mut filtered = CompProcessor::new(FS);
+        for (id, value) in [("sc_eq_on", 1.0), ("sc3_freq", 1000.0), ("sc3_gain", -24.0), ("sc3_q", 0.5)] { filtered.set(id, value).unwrap(); }
+        let plain = run(&mut CompProcessor::new(FS), &x, None); let eq = run(&mut filtered, &x, None);
+        assert!(rms_db(&eq[12000..]) > rms_db(&plain[12000..]) + 5.0);
+        let mut automatic = CompProcessor::new(FS);
+        automatic.set("auto_threshold", 1.0).unwrap(); automatic.set("auto_track", 100.0).unwrap();
+        run(&mut automatic, &x, None);
+        let loud = automatic.effective_threshold_db();
+        let quiet = sine(1000.0, 0.05, 48000); run(&mut automatic, &quiet, None);
+        assert!(automatic.effective_threshold_db() < loud - 15.0);
+        let mut midi = CompProcessor::new(FS); midi.set("trigger_mode", 1.0).unwrap(); midi.set("attack", 0.1).unwrap();
+        let quiet = sine(220.0, 0.01, 2400);
+        let untouched = run(&mut midi, &quiet, None);
+        assert!((rms_db(&untouched) - rms_db(&quiet)).abs() < 0.01);
+        midi.trigger_note(1.0); let ducked = run(&mut midi, &quiet, None);
+        assert!(rms_db(&ducked[240..]) < rms_db(&quiet[240..]) - 6.0);
+        let mut fingerprints = Vec::new();
+        for style in 0..COMP_STYLES.len() {
+            let mut p = CompProcessor::new(FS); p.set("style", style as f64).unwrap();
+            let y = run(&mut p, &x[..6000], None); assert!(y.iter().all(|x| x.is_finite()));
+            fingerprints.push(rms_db(&y[3000..]));
+        }
+        assert!(fingerprints.windows(2).filter(|v| (v[0]-v[1]).abs() > 0.001).count() >= 10);
+    }
+
+    #[test]
+    fn linear_deesser_dry_path_and_adaptive_detection_are_partition_invariant() {
+        let x = sine(9500.0, 0.7, 12000);
+        let make = || { let mut p = DeesserProcessor::new(FS); p.set("phase", 1.0).unwrap(); p.set("detection", 2.0).unwrap(); p };
+        let mut whole = make(); let y = run(&mut whole, &x, None); let mut chunks = make();
+        let z: Vec<_> = x.chunks(173).flat_map(|block| run(&mut chunks, block, None)).collect();
+        assert_eq!(y, z); assert_eq!(whole.latency(), 64);
+        let mut dry = make(); dry.set("mix", 0.0).unwrap(); let y = run(&mut dry, &x, None);
+        assert_eq!(&y[64..], &x[..x.len()-64]);
+    }
+
+    #[test]
+    fn true_peak_limiter_protects_reconstruction_at_all_quality_settings() {
+        for quality in [0, 1, 3, 5] {
+            let mut p = LimiterProcessor::new(FS);
+            for (id, value) in [("true_peak", 1.0), ("oversampling", quality as f64), ("gain", 12.0), ("ceiling", -1.0), ("lookahead", 0.1)] { p.set(id, value).unwrap(); }
+            let x: Vec<_> = (0..3000).map(|n| (0.8 * (std::f64::consts::TAU * 12000.0 * n as f64 / FS + 0.7).sin()) as f32).collect();
+            let y = run(&mut p, &x, None); let mut meter = TruePeak::new();
+            let peak = y.iter().map(|v| meter.run(*v as f64)).fold(0.0, f64::max);
+            assert!(peak <= db_to_lin(-1.0) + 1e-6, "quality {quality}, peak {peak}");
+            assert_eq!(p.latency(), 5 + 64);
+        }
+        for style in 0..LIMITER_STYLES.len() {
+            let mut p = LimiterProcessor::new(FS); p.set("style", style as f64).unwrap(); p.set("gain", 18.0).unwrap();
+            let y = run(&mut p, &sine(500.0, 0.7, 3000), None);
+            assert!(y.iter().all(|v| v.is_finite() && (*v as f64).abs() <= db_to_lin(-0.3) + 1e-6));
+        }
+    }
+
+    #[test]
+    fn dither_is_deterministic_quantized_and_not_a_dc_offset() {
+        for mode in 1..=3 {
+            let mut p = LimiterProcessor::new(FS); p.set("dither", mode as f64).unwrap(); p.set("dither_bits", 16.0).unwrap();
+            let y = run(&mut p, &[0.0; 12000], None);
+            assert!(y.iter().any(|v| *v != 0.0)); let q = 2f64.powi(-15);
+            assert!(y.iter().all(|v| ((*v as f64 / q).round() - *v as f64 / q).abs() < 1e-10));
+            assert!(y.iter().map(|v| *v as f64).sum::<f64>().abs() / (y.len() as f64) < q * 0.1);
+        }
+    }
+
+
+    #[test]
+    fn gate_expert_detector_routing_rms_and_program_release_change_measured_audio() {
+        let input=sine(220.0,0.1,24000);let key=sine(1000.0,0.04,24000);
+        let negative:Vec<f32>=key.iter().map(|v|-v).collect();
+        let configure=||{let mut gate=GateProcessor::new(FS);for(id,v)in[("threshold",-29.0),("hold",0.0),("release",5.0)]{gate.set(id,v).unwrap();}gate};
+        let mut peak=configure();let a=run(&mut peak,&input,Some(&key));
+        let mut rms=configure();rms.set("detection",1.0).unwrap();let b=run(&mut rms,&input,Some(&key));
+        assert!(rms_db(&a[12000..])-rms_db(&b[12000..])>30.0);
+        let mut mid=configure();mid.set("sc_channel",1.0).unwrap();mid.set("sc_listen",1.0).unwrap();
+        let(mut l,mut r)=(vec![0.0;24000],vec![0.0;24000]);
+        mid.process(&input,&input,Some((&key,&negative)),&mut l,&mut r);
+        assert!(l.iter().chain(&r).all(|v|*v==0.0));
+        let mut side=configure();side.set("sc_channel",2.0).unwrap();side.set("sc_listen",1.0).unwrap();
+        side.process(&input,&input,Some((&key,&negative)),&mut l,&mut r);
+        assert_eq!(l,key);assert_eq!(r,key);
+        let mut falling=vec![0.8;24000];falling[12000..].fill(0.0);
+        let mut fixed=configure();fixed.set("release",40.0).unwrap();
+        let normal=run(&mut fixed,&input,Some(&falling));
+        let mut adaptive=configure();adaptive.set("release",40.0).unwrap();adaptive.set("program_release",100.0).unwrap();
+        let slower=run(&mut adaptive,&input,Some(&falling));
+        assert!(rms_db(&slower[18000..20000])-rms_db(&normal[18000..20000])>3.0);
+    }
+
 }

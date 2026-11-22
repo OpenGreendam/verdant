@@ -13,20 +13,29 @@ fn snapshot(params: &[ParamDesc]) -> Vec<(String, f64)> {
 }
 
 fn switch_comparison(ed: &mut Editor, target: &Target, index: usize, cx: &mut Context<Editor>) {
-    if ed.plugin_busy.contains(&target.key) { return; }
+    if ed.plugin_busy.contains(&target.key)
+        || (target.slot != crate::instrument::INSTRUMENT_SLOT && ed.inserts_loading) { return; }
     let Some(params) = current_params(ed, target) else { return };
     let current = snapshot(&params);
     let state = ed.device_anim.entry(target.key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now()));
-    if state.comparison.pending.is_some() { return; }
+    if state.comparison.pending.is_some() || state.comparison.active == index { return; }
     let active = state.comparison.active;
-    if active == index { return; }
+    let saved = state.comparison.slots[index].clone().unwrap_or_else(|| current.clone());
+    let next = match workflow::comparison_values(&params, &saved) {
+        Ok(next) => next,
+        Err(error) => { ed.notice(format!("无法恢复比较组：{error}")); cx.notify(); return; }
+    };
+    let state = ed.device_anim.get_mut(&target.key).unwrap();
     state.comparison.slots[active] = Some(current.clone());
-    let next = state.comparison.slots[index].get_or_insert(current.clone()).clone();
+    state.comparison.slots[index] = Some(next.clone());
     if next == current { state.comparison.active = index; }
     else {
         state.comparison.pending = Some(index);
-        write_if_current(ed, target, next, cx);
+        if !ed.set_device_params(target.track.clone(), target.slot, next, cx) {
+            if let Some(state) = ed.device_anim.get_mut(&target.key) { state.comparison.pending = None; }
+        }
     }
+    workflow::save_comparison(ed, target);
     cx.notify();
 }
 
@@ -39,6 +48,7 @@ fn copy_comparison(ed: &mut Editor, target: &Target, cx: &mut Context<Editor>) {
     let values = snapshot(&params);
     state.comparison.slots[active] = Some(values.clone());
     state.comparison.slots[1 - active] = Some(values);
+    workflow::save_comparison(ed, target);
     cx.notify();
 }
 
@@ -47,7 +57,7 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
     let target = Target { track: owner.clone(), slot, key };
     let comparison = ed.device_anim.get(&key).map(|s| s.comparison.clone()).unwrap_or_default();
     let busy = ed.plugin_busy.contains(&key) || comparison.pending.is_some();
-    let mut compare = div().flex().items_center().gap(px(3.0));
+    let mut compare = div().flex().items_center().gap(gpui::rems(3.0/16.));
     for index in 0..2 {
         let label = if index == 0 { "A" } else { "B" };
         let selected = comparison.active == index;
@@ -77,6 +87,8 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
     let preset_params = params.to_vec();
     let preset_owner = owner.clone();
     let effect = effect.to_string();
+    let library_effect = effect.clone();
+    let wet_lock = workflow::read_workspace(ed, &target).wet_lock;
     let preset = dropdown_button(format!("device-presets-{slot}").into(), "预设".into(), th, move |_| {
         use crate::editor::MenuAction as M;
         use crate::menu::MenuItem as I;
@@ -86,14 +98,33 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
             for &(id, value) in overrides {
                 if let Some(entry) = values.iter_mut().find(|(key, _)| key == id) { entry.1 = value; }
             }
+            if wet_lock {
+                if let Some(mix) = param(&preset_params, "mix") {
+                    if let Some(value) = values.iter_mut().find(|(id, _)| id == "mix") { value.1 = mix.value; }
+                }
+            }
             rows.push(I::action(name, M::SetDeviceParams { target: preset_owner.clone(), slot, expected_key: Some(key), values }));
         }
         rows
     }, cx);
+    let library_target = target.clone();
+    let lock_target = target.clone();
     let reset_target = target.clone();
     let key_defaults = defaults.clone();
-    div().flex().flex_wrap().items_center().gap(px(8.0)).pb(px(8.0)).border_b_1().border_color(th.shade)
-        .child(preset).child(compare).child(div().flex_1())
+    div().flex().flex_wrap().items_center().gap(gpui::rems(8.0/16.)).pb(gpui::rems(8.0/16.)).border_b_1().border_color(th.shade)
+        .child(preset)
+        .child(crate::ui_controls::selectable_button(format!("device-library-{slot}"), "预设库", false, th).tab_index(0)
+            .on_click(cx.listener(move |_, _, _, cx| {
+                let editor = cx.entity(); let target = library_target.clone(); let effect = library_effect.clone();
+                cx.defer(move |cx| workflow::library::open(editor, target, effect, cx));
+            })))
+        .when(param(params, "mix").is_some(), |row| row.child(crate::ui_controls::selectable_button(format!("wet-lock-{slot}"), "锁定干湿", wet_lock, th)
+            .role(Role::Switch).aria_selected(wet_lock).tab_index(0)
+            .on_click(cx.listener(move |ed, _, _, cx| {
+                let mut state = workflow::read_workspace(ed, &lock_target); state.wet_lock = !state.wet_lock;
+                workflow::write_workspace(ed, &lock_target, &state); cx.notify();
+            }))))
+        .child(compare).child(div().flex_1())
         .child(crate::ui_controls::selectable_button(format!("device-reset-{slot}"), "重置", false, th).tab_index(0)
             .on_click(cx.listener(move |ed, _, _, cx| write_if_current(ed, &reset_target, defaults.clone(), cx)))
             .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
@@ -166,7 +197,7 @@ fn presets(effect: &str) -> Vec<Preset> {
 pub(super) fn remaining(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
     effect: &str, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let covered = covered_ids(effect);
-    let missing: Vec<&ParamDesc> = params.iter().filter(|p| p.max > p.min && !covered.contains(&p.id.as_str()) && !is_banded(effect, &p.id)).collect();
+    let missing: Vec<&ParamDesc> = params.iter().filter(|p| p.max > p.min && !covered.contains(&p.id.as_str()) && !is_banded(effect, &p.id) && dsp::modulation_parameter(&p.id).is_none()).collect();
     let th = ed.theme;
     if missing.is_empty() { return div().into_any_element(); }
     let mut groups: Vec<(&str, Vec<&ParamDesc>)> = Vec::new();
@@ -175,10 +206,10 @@ pub(super) fn remaining(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarg
         if let Some((_, controls)) = groups.iter_mut().find(|(name, _)| *name == label) { controls.push(d); }
         else { groups.push((label, vec![d])); }
     }
-    div().flex().flex_col().gap(px(12.0)).children(groups.into_iter().map(|(label, descriptors)| {
-        let mut controls = div().flex().flex_wrap().items_start().gap(px(12.));
+    div().flex().flex_col().gap(gpui::rems(12.0/16.)).children(groups.into_iter().map(|(label, descriptors)| {
+        let mut controls = div().flex().flex_wrap().items_start().gap(gpui::rems(12./16.));
         for d in descriptors { controls = controls.child(control(ed, editor, owner, slot, key, effect, params, d, cx)); }
-        div().flex().flex_col().gap(px(10.0)).pt(px(10.0)).border_t_1().border_color(th.shade)
+        div().flex().flex_col().gap(gpui::rems(10.0/16.)).pt(gpui::rems(10.0/16.)).border_t_1().border_color(th.shade)
             .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(th.text_secondary).child(label))
             .child(controls)
     })).into_any_element()
@@ -189,8 +220,16 @@ fn remaining_group(effect: &str, id: &str) -> &'static str {
         if id.starts_with("osc3") { return "振荡器 3"; }
         if id.starts_with("osc4") { return "振荡器 4"; }
         if id.starts_with("lfo") { return "低频振荡调制"; }
-        if id.starts_with("filter") || matches!(id, "cutoff2" | "resonance2") { return if effect == dsp::ONE_SYNTH_ID { "滤波器" } else { "双滤波器" }; }
-        if matches!(id, "noise" | "pulse_width" | "drive" | "unison" | "unison_detune") { return "音色与齐奏"; }
+        if id.starts_with("filter") || id.starts_with("cutoff") || id.starts_with("resonance") { return "滤波器与路由"; }
+        if id.starts_with("fx_drive") { return "效果 · 驱动"; }
+        if id.starts_with("fx_chorus") { return "效果 · 合唱"; }
+        if id.starts_with("fx_phaser") || id == "fx_flanger" { return "效果 · 相位与镶边"; }
+        if id.starts_with("fx_delay") { return "效果 · 延迟"; }
+        if id.starts_with("fx_reverb") { return "效果 · 混响"; }
+        if id.starts_with("fx_comp") { return "效果 · 压缩"; }
+        if id.starts_with("arp_") { return "琶音器"; }
+        if matches!(id, "mpe" | "mpe_range" | "bend_range") { return "MIDI 与 MPE"; }
+        if matches!(id, "noise" | "pulse_width" | "drive" | "unison" | "unison_detune" | "osc_model" | "high_quality") { return "音色与齐奏"; }
         return "演奏";
     }
     if effect == dsp::REVERB_ID && id.starts_with("decay_") { return "衰减塑形"; }
@@ -223,6 +262,8 @@ fn covered_ids(effect: &str) -> &'static [&'static str] {
 
 fn is_banded(effect: &str, id: &str) -> bool {
     match effect {
+        dsp::COMPRESSOR_ID => id.strip_prefix("sc").and_then(|s| s.split_once('_')).is_some_and(|(n,_)| n.parse::<usize>().is_ok()),
+        dsp::REVERB_ID => ["decay", "post"].iter().any(|prefix| id.strip_prefix(prefix).and_then(|s| s.split_once('_')).is_some_and(|(n,_)| n.parse::<usize>().is_ok())),
         dsp::EQ_ID => id.strip_prefix('b').and_then(|s| s.split_once('_')).is_some_and(|(n, _)| n.parse::<usize>().is_ok()),
         dsp::MULTIBAND_ID => id.strip_prefix('b').and_then(|s| s.split_once('.')).is_some_and(|(n, _)| n.parse::<usize>().is_ok()),
         dsp::SATURATION_ID => id.strip_prefix('b').and_then(|s| s.split_once('_')).is_some_and(|(n, _)| n.parse::<usize>().is_ok()),
@@ -234,16 +275,46 @@ fn is_banded(effect: &str, id: &str) -> bool {
 
 fn enum_labels(effect: &str, id: &str) -> Option<&'static [&'static str]> {
     Some(match id {
+        "filter_shape" | "filter2_shape" | "filter3_shape" | "filter4_shape" if matches!(effect, dsp::SYNTH_ID | dsp::ONE_SYNTH_ID) =>
+            &["低通", "高通", "带通", "陷波"],
+        "filter_routing" if matches!(effect, dsp::SYNTH_ID | dsp::ONE_SYNTH_ID) => &["串联", "并联"],
+        "filter_character" if matches!(effect, dsp::SYNTH_ID | dsp::ONE_SYNTH_ID) => &["纯净", "柔和饱和", "谐波", "温和压缩", "硬削波", "不对称"],
+        "osc_model" => &["经典", "柔和", "三次谐波", "倍频", "振幅塑形"],
+        "high_quality" => &["关闭", "2×", "4×"],
+        "arp_order" => &["上行", "下行", "往返", "按键顺序", "随机"],
+        "arp_latch" => &["关闭", "保持", "叠加保持"],
+        "arp_sync" | "fx_delay_sync" => &["自由", "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1 小节", "2 小节"],
+        "fx_drive_style" => &["柔和饱和", "柔和削波", "正弦折叠", "硬削波"],
+        "fx_flanger" => &["相位", "镶边"],
+        "sc_channel" => &["立体声", "Mid", "Side", "左", "右"],
+        id if effect == dsp::SATURATION_ID && id.starts_with('b') && id.ends_with("_channel") => &["双声道", "左 / Mid", "右 / Side"],
         "channel_mode" if effect == dsp::SATURATION_ID => &["L / R", "Mid / Side"],
         "channel_mode" => &dsp::DYNAMICS_CHANNEL_MODES,
         "detection" if effect == dsp::DEESSER_ID => &dsp::DEESSER_DETECTION,
         "detection" => &dsp::DETECTOR_MODES,
-        "character" => &dsp::COMP_CHARACTERS,
+        "character" if !matches!(effect, dsp::FILTER_ID | dsp::SIMPLON_ID | dsp::MICRO_ID) => &dsp::COMP_CHARACTERS,
         "style" if effect == dsp::GATE_ID => &dsp::GATE_STYLES,
         "style" if effect == dsp::LIMITER_ID => &dsp::LIMITER_STYLES,
         "style" if effect == dsp::REVERB_ID => &dsp::REVERB_STYLES,
         "sync" if effect == dsp::DELAY_ID => &dsp::DELAY_SYNC,
-        "oversampling" => &["关闭", "2×", "4×", "8×"],
+        "oversampling" | "feedback_quality" => &dsp::quality::QUALITY_NAMES,
+        "time_mode" => &["平滑", "磁带", "伸缩", "反向"],
+        "routing" if effect == dsp::DELAY_ID => &["立体声", "M/S", "交叉", "串联"],
+        "sync_feel" => &["直拍", "附点", "三连音"],
+        "phase" if effect == dsp::EQ_ID => &["零延迟", "自然相位", "线性相位"],
+        "phase" if effect == dsp::MULTIBAND_ID => &["动态相位", "最小相位", "线性相位"],
+        "phase" => &["最小相位", "线性相位"],
+        "resolution" => &["低", "中", "高"],
+        "layout" if effect == dsp::MULTIBAND_ID => &["相邻频段", "悬空频段"],
+        "predelay_sync" | "gate_sync" => &dsp::DELAY_SYNC,
+        "trigger_mode" => &["音频", "MIDI", "节拍"],
+        "sync" if effect == dsp::COMPRESSOR_ID => &dsp::DELAY_SYNC,
+        "dither" => &["关闭", "TPDF", "柔和整形", "强整形"],
+        "cabinet" => &["关闭", "开背音箱", "封闭 4×12", "贝斯箱体", "收音机"],
+        id if id.ends_with(".character") || (id == "character" && matches!(effect, dsp::FILTER_ID | dsp::SIMPLON_ID | dsp::MICRO_ID)) => &dsp::FILTER_CHARACTERS,
+        id if effect == dsp::MULTIBAND_ID && id.ends_with(".sc_source") => &["自动", "内部", "外部"],
+        id if effect == dsp::MULTIBAND_ID && id.ends_with(".place") => &["立体声", "Mid", "Side", "左", "右"],
+        id if effect == dsp::COMPRESSOR_ID && id.starts_with("sc") && id.ends_with("_shape") => &["峰值", "低架", "高架", "低切", "高切"],
         "osc3" | "osc4" | "lfo_wave" => &dsp::WAVES,
         "filter_shape" | "filter2_shape" => &dsp::FILTER_SHAPES,
         "filter_routing" => &dsp::FILTER_ROUTINGS,
@@ -258,18 +329,18 @@ fn control(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usi
     effect: &str, params: &[ParamDesc], d: &ParamDesc, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     if let Some(labels) = enum_labels(effect, &d.id).filter(|labels| labels.len() == d.step_count as usize + 1 && d.min == 0.0) {
-        return div().flex().flex_col().gap(px(5.0)).child(div().text_xs().text_color(th.text_secondary).child(d.name.clone()))
+        return div().flex().flex_col().gap(gpui::rems(5.0/16.)).child(div().text_xs().text_color(th.text_secondary).child(d.name.clone()))
             .child(choice(ed, owner, slot, params, &d.id, labels, cx)).into_any_element();
     }
     if d.step_count == 1 && d.min == 0.0 && d.max == 1.0 {
-        return div().py(px(6.0)).child(toggle(ed, owner, slot, params, &d.id, &d.name, cx)).into_any_element();
+        return div().py(gpui::rems(6.0/16.)).child(toggle(ed, owner, slot, params, &d.id, &d.name, cx)).into_any_element();
     }
     knob(editor.clone(), Target { track: owner.clone(), slot, key }, d.clone(), &d.name, th, 42.0).into_any_element()
 }
 
 fn band_tabs(ed: &Editor, key: InsertKey, slot: usize, count: usize, selected: usize, prefix: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    div().flex().flex_wrap().gap(px(4.0)).children((0..count).map(|index| {
+    div().flex().flex_wrap().gap(gpui::rems(4.0/16.)).children((0..count).map(|index| {
         let label = format!("{prefix} {}", index + 1);
         crate::ui_controls::selectable_button(format!("band-tab-{slot}-{index}"), label, index == selected, th)
             .role(Role::Tab).tab_index(0).border_color(with_alpha(band_color(index), 0.8))
@@ -282,20 +353,54 @@ fn band_tabs(ed: &Editor, key: InsertKey, slot: usize, count: usize, selected: u
     })).into_any_element()
 }
 
+pub(super) fn compressor_sidechain(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
+    params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+    let th = ed.theme; let selected = selected_band(ed, key, 6); let axis = Axis::lin(-36., 24.);
+    let painter: Painter = Rc::new(move |window, plot, params, texts| {
+        let values = values(dsp::COMP_SPECS, params);
+        let grid = [-24., -12., 0., 12.].map(|v| (axis.norm(v), format!("{v:+.0} dB")));
+        paint_grid(window, plot, th, &freq_grid(), &grid, Some(axis.norm(0.)), texts);
+        polyline(window, plot.o, (0..=240).map(|i| {
+            let n = i as f64 / 240.; Some((plot.x(n), plot.y(axis.norm(dsp::comp_sidechain_response_db(&values, FREQ_AXIS.value(n), verdant_plugins::SAMPLE_RATE)))))
+        }), 2., th.accent);
+        texts.push(("侧链 EQ · 检测路径".into(), p(10.,5.,plot.o), 11., th.text_secondary));
+    });
+    let mut handles = Vec::new();
+    for i in 0..6 {
+        let prefix = format!("sc{}", i + 1); let on = param(params, &format!("{prefix}_on")).is_some_and(|p|p.value>=0.5);
+        if !on && i != selected { continue; }
+        let freq = param(params, &format!("{prefix}_freq")).map_or(1000.,|p|p.value);
+        let gain = param(params, &format!("{prefix}_gain")).map_or(0.,|p|p.value);
+        let has_gain = param(params, &format!("{prefix}_shape")).is_none_or(|p|p.value<3.);
+        handles.push(Handle { control: Control::Band(i), at:(FREQ_AXIS.norm(freq),axis.norm(if has_gain {gain}else{-6.})),
+            x:Some((format!("{prefix}_freq"),FREQ_AXIS)), y:has_gain.then(||(format!("{prefix}_gain"),axis)),color:band_color(i),label:(i+1).to_string(),
+            hollow:!on,selected:i==selected,also:vec![(format!("{prefix}_on"),1.)],defaults:vec![(format!("{prefix}_gain"),0.)] });
+    }
+    let prefix = format!("sc{}", selected+1);
+    let ids:Vec<_>=["freq","gain","q"].map(|s|format!("{prefix}_{s}")).into_iter().collect();let refs:Vec<_>=ids.iter().map(String::as_str).collect();
+    div().flex().flex_col().gap(gpui::rems(8./16.))
+        .child(graph(editor.clone(),Target{track:owner.clone(),slot,key},params.to_vec(),"comp-sidechain-eq","压缩器六段侧链均衡",th,painter,handles,None,None).w_full().h(gpui::rems(160./16.)))
+        .child(band_tabs(ed,key,slot,6,selected,"侧链频段",cx))
+        .child(div().flex().flex_wrap().items_center().gap(gpui::rems(8./16.))
+            .child(toggle(ed,owner,slot,params,&format!("{prefix}_on"),"启用",cx))
+            .child(choice(ed,owner,slot,params,&format!("{prefix}_shape"),&["峰值","低架","高架","低切","高切"],cx))
+            .child(knob_row(editor,||Target{track:owner.clone(),slot,key},params,&refs,th,38.))).into_any_element()
+}
+
 pub(super) fn eq_dynamic(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
     params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let selected = selected_band(ed, key, dsp::EQ_BANDS);
     let prefix = format!("b{}_", selected + 1);
-    let extras: Vec<&ParamDesc> = params.iter().filter(|p| p.id.starts_with(&prefix) && !["on", "freq", "gain", "q", "shape", "slope", "place"].contains(&&p.id[prefix.len()..])).collect();
+    let extras: Vec<&ParamDesc> = params.iter().filter(|p| p.id.starts_with(&prefix) && !["on", "freq", "gain", "q", "shape", "slope", "place", "slope_continuous", "slope_db"].contains(&&p.id[prefix.len()..])).collect();
     let solo = param(params, "solo").is_some_and(|p| p.value.round() as usize == selected + 1);
     let target = Target { track: owner.clone(), slot, key };
-    let mut rows = div().flex().flex_wrap().items_center().gap(px(8.0))
+    let mut rows = div().flex().flex_wrap().items_center().gap(gpui::rems(8.0/16.))
         .child(crate::ui_controls::selectable_button(format!("eq-solo-{slot}"), "独听频段", solo, th)
             .on_click(cx.listener(move |ed, _, _, cx| write_if_current(ed, &target, vec![("solo".into(), if solo { 0. } else { selected as f64 + 1. })], cx))));
     for d in extras { rows = rows.child(control(ed, editor, owner, slot, key, dsp::EQ_ID, params, d, cx)); }
-    div().flex().flex_col().gap(px(8.0))
-        .child(div().flex().flex_wrap().items_center().gap(px(10.))
+    div().flex().flex_col().gap(gpui::rems(8.0/16.))
+        .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
             .child(div().text_xs().text_color(th.text_secondary).child(format!("频段 {} · 动态处理", selected + 1)))
             .child(sidechain_picker(ed, owner, slot, cx)))
         .child(rows).into_any_element()
@@ -323,14 +428,25 @@ pub(super) fn multiband(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarg
         }
         texts.push(("分频器频率响应".into(), p(10., 6., plot.o), 11., th.text_secondary));
     });
-    let handles = (1..count).filter_map(|index| {
+    let mut handles: Vec<Handle> = (1..count).filter_map(|index| {
         let id = format!("xover{index}");
         let d = param(params, &id)?;
         Some(Handle { control: Control::ParameterHandle(id.clone()), at: (FREQ_AXIS.norm(d.value), axis.norm(-6.)), x: Some((id.clone(), FREQ_AXIS)), y: None,
             color: band_color(index - 1), label: format!("{index}"), hollow: false, selected: false, also: vec![], defaults: vec![(id, d.default_value.unwrap_or(d.value))] })
     }).collect();
+    if param(params, "layout").is_some_and(|p| p.value >= 0.5) {
+        handles.clear();
+        for field in ["low", "high"] {
+            let id = format!("b{}.{field}", selected + 1);
+            if let Some(d) = param(params, &id) {
+                handles.push(Handle { control: Control::ParameterHandle(id.clone()), at: (FREQ_AXIS.norm(d.value), axis.norm(-6.)), x: Some((id.clone(), FREQ_AXIS)), y: None,
+                    color: band_color(selected), label: if field == "low" { "低".into() } else { "高".into() }, hollow: false, selected: true,
+                    also: vec![], defaults: vec![(id, d.default_value.unwrap_or(d.value))] });
+            }
+        }
+    }
     let prefix = format!("b{}.", selected + 1);
-    let mut controls = div().flex().flex_wrap().items_center().gap(px(8.0));
+    let mut controls = div().flex().flex_wrap().items_center().gap(gpui::rems(8.0/16.));
     for d in params.iter().filter(|p| p.id.starts_with(&prefix)) {
         let item = if d.id.ends_with(".mode") { choice(ed, owner, slot, params, &d.id, &dsp::MULTIBAND_MODES, cx) }
             else { control(ed, editor, owner, slot, key, dsp::MULTIBAND_ID, params, d, cx) };
@@ -338,13 +454,13 @@ pub(super) fn multiband(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarg
     }
     let cross_ids: Vec<String> = (1..count).map(|i| format!("xover{i}")).collect();
     let cross_refs: Vec<&str> = cross_ids.iter().map(String::as_str).collect();
-    div().flex().flex_col().gap(px(12.0))
-        .child(graph(editor.clone(), target(), params.to_vec(), "multiband-graph", "多段分频响应，拖动节点调整分频点", th, painter, handles, None, None).w_full().h(px(225.)))
-        .child(div().flex().flex_wrap().items_center().gap(px(10.)).child(band_tabs(ed, key, slot, count, selected, "频段", cx)).child(sidechain_picker(ed, owner, slot, cx)))
+    div().flex().flex_col().gap(gpui::rems(12.0/16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "multiband-graph", "多段分频响应，拖动节点调整分频点", th, painter, handles, None, None).w_full().h(gpui::rems(225./16.)))
+        .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.)).child(band_tabs(ed, key, slot, count, selected, "频段", cx)).child(sidechain_picker(ed, owner, slot, cx)))
         .child(controls)
-        .child(div().pt(px(8.)).border_t_1().border_color(th.shade).flex().flex_col().gap(px(8.))
+        .child(div().pt(gpui::rems(8./16.)).border_t_1().border_color(th.shade).flex().flex_col().gap(gpui::rems(8./16.))
             .child(knob_row(editor, target, params, &cross_refs, th, 40.))
-            .child(div().flex().flex_wrap().items_center().gap(px(10.)).child(knob_row(editor, target, params, &["band_count", "mix", "output"], th, 42.))
+            .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.)).child(knob_row(editor, target, params, &["band_count", "mix", "output"], th, 42.))
                 .child(toggle(ed, owner, slot, params, "sc_listen", "监听侧链", cx))))
         .into_any_element()
 }
@@ -380,8 +496,8 @@ pub(super) fn filters(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget
             color: band_color(index), label: format!("{}", index + 1), hollow: !on, selected: index == selected,
             also: if !on { vec![(format!("f{}.enabled", index + 1), 1.)] } else { vec![] }, defaults: vec![(id, d.default_value.unwrap_or(d.value))] })
     }).collect();
-    let mut main = div().flex().flex_col().gap(px(12.))
-        .child(graph(editor.clone(), target(), params.to_vec(), "filter-graph", "滤波器频响，拖动节点调整截止频率", th, painter, handles, None, None).w_full().h(px(225.)));
+    let mut main = div().flex().flex_col().gap(gpui::rems(12./16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "filter-graph", "滤波器频响，拖动节点调整截止频率", th, painter, handles, None, None).w_full().h(gpui::rems(225./16.)));
     if micro {
         main = main.child(choice(ed, owner, slot, params, "shape", &dsp::FILTER_SHAPES[..2], cx))
             .child(knob_row(editor, target, params, &["freq", "resonance", "drive", "mix", "output"], th, 46.));
@@ -389,18 +505,26 @@ pub(super) fn filters(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget
         let prefix = format!("f{}.", selected + 1);
         let ids: Vec<String> = ["freq", "resonance", "drive"].map(|field| format!("{prefix}{field}")).into_iter().collect();
         let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
-        main = main.child(div().flex().flex_wrap().items_center().gap(px(10.))
+        main = main.child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
                 .child(band_tabs(ed, key, slot, count, selected, "滤波器", cx))
                 .child(choice(ed, owner, slot, params, "routing", &dsp::FILTER_ROUTINGS, cx)))
-            .child(div().flex().flex_wrap().items_center().gap(px(10.))
+            .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
                 .child(toggle(ed, owner, slot, params, &format!("{prefix}enabled"), "启用", cx))
                 .child(choice(ed, owner, slot, params, &format!("{prefix}shape"), &dsp::FILTER_SHAPES, cx))
                 .child(choice(ed, owner, slot, params, &format!("{prefix}slope"), &dsp::FILTER_SLOPES, cx)))
             .child(knob_row(editor, target, params, &refs, th, 46.))
             .child(knob_row(editor, target, params, &["lfo_rate", "lfo_depth", "mix", "output"], th, 42.));
     }
-    main.child(div().pt(px(8.)).border_t_1().border_color(th.shade).flex().flex_col().gap(px(8.))
-        .child(div().flex().flex_wrap().items_center().gap(px(10.))
+    if !micro {
+        let prefix = format!("f{}.", selected + 1);
+        let mut extras = div().flex().flex_wrap().gap(gpui::rems(8./16.));
+        for d in params.iter().filter(|p| p.id.starts_with(&prefix) && !["enabled", "freq", "resonance", "drive", "shape", "slope"].contains(&&p.id[prefix.len()..])) {
+            extras = extras.child(control(ed, editor, owner, slot, key, effect, params, d, cx));
+        }
+        main = main.child(extras);
+    }
+    main.child(div().pt(gpui::rems(8./16.)).border_t_1().border_color(th.shade).flex().flex_col().gap(gpui::rems(8./16.))
+        .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
             .child(div().text_xs().text_color(th.text_secondary).child("输入包络调制"))
             .child(sidechain_picker(ed, owner, slot, cx)))
         .child(knob_row(editor, target, params, &["env_depth", "env_attack", "env_release"], th, 42.)))
@@ -415,11 +539,8 @@ pub(super) fn saturation_bands(ed: &Editor, editor: &Entity<Editor>, owner: &Dev
     let target = || Target { track: owner.clone(), slot, key };
     let axis = Axis::lin(-24., 36.);
     let painter: Painter = Rc::new(move |window, plot, params, texts| {
-        let values = values(dsp::SATURATION_SPECS, params);
-        let mut fx = dsp::SaturationProcessor::new(verdant_plugins::SAMPLE_RATE);
-        fx.values = values;
-        fx.refresh();
-        let cross = fx.crossover_frequencies();
+        let mut cross: [f64; 5] = std::array::from_fn(|index| param(params, &format!("split{}", index+1)).map_or(dsp::SATURATION_SPECS[6+index].default, |p|p.value));
+        cross.sort_by(f64::total_cmp);
         let grid = [-12., 0., 12., 24.].map(|db| (axis.norm(db), format!("{db:+.0} dB")));
         paint_grid(window, plot, th, &freq_grid(), &grid, Some(axis.norm(0.)), texts);
         for band in 0..count {
@@ -450,16 +571,34 @@ pub(super) fn saturation_bands(ed: &Editor, editor: &Entity<Editor>, owner: &Dev
     handles.push(Handle { control: Control::Band(selected), at: (FREQ_AXIS.norm((low * high).sqrt()), axis.norm(drive)), x: None,
         y: Some((drive_id.clone(), axis)), color: band_color(selected), label: (selected + 1).to_string(), hollow: false, selected: true, also: vec![], defaults: vec![(drive_id, 0.)] });
     let prefix = format!("b{}_", selected + 1);
-    let mut band_controls = div().flex().flex_wrap().items_center().gap(px(10.));
+    let mut band_controls = div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.));
     for d in params.iter().filter(|p| p.id.starts_with(&prefix)) {
         let item = if d.id.ends_with("_style") { choice(ed, owner, slot, params, &d.id, &dsp::SATURATION_BAND_STYLES, cx) }
             else { control(ed, editor, owner, slot, key, dsp::SATURATION_ID, params, d, cx) };
         band_controls = band_controls.child(item);
     }
-    div().flex().flex_col().gap(px(10.))
-        .child(graph(editor.clone(), target(), params.to_vec(), "saturation-bands", "频段驱动：左右拖动分频点，上下拖动当前频段的驱动", th, painter, handles, None, None).w_full().h(px(160.)))
+    div().flex().flex_col().gap(gpui::rems(10./16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "saturation-bands", "频段驱动：左右拖动分频点，上下拖动当前频段的驱动", th, painter, handles, None, None).w_full().h(gpui::rems(160./16.)))
         .child(band_tabs(ed, key, slot, count, selected, "频段", cx))
         .child(band_controls).into_any_element()
+}
+
+pub(super) fn reverb_nodes(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
+    params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
+    let selected = selected_band(ed, key, 8); let th = ed.theme;
+    let mut result = div().flex().flex_col().gap(gpui::rems(10./16.))
+        .child(band_tabs(ed, key, slot, 8, selected, "EQ 节点", cx));
+    for (family, label, gain, shapes) in [("decay", "衰减塑形", "rate", &["峰值", "低架", "高架"][..]), ("post", "输出均衡", "gain", &["峰值", "低架", "高架", "低切", "高切"][..])] {
+        let prefix = format!("{family}{}", selected + 1);
+        let ids: Vec<_> = ["freq", gain, "q"].map(|s| format!("{prefix}_{s}")).into_iter().collect();
+        let refs: Vec<_> = ids.iter().map(String::as_str).collect();
+        result = result.child(div().flex().flex_wrap().items_center().gap(gpui::rems(8./16.))
+            .child(div().text_sm().child(label))
+            .child(toggle(ed, owner, slot, params, &format!("{prefix}_on"), "启用", cx))
+            .child(choice(ed, owner, slot, params, &format!("{prefix}_shape"), shapes, cx))
+            .child(knob_row(editor, || Target { track: owner.clone(), slot, key }, params, &refs, th, 40.)));
+    }
+    result.into_any_element()
 }
 
 pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
@@ -473,12 +612,12 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
     let bpm = tempo.bpm_at(tempo.tick_at(ed.playhead_seconds()).round() as i64);
     let painter: Painter = Rc::new(move |window, plot, params, texts| {
         let values = values(dsp::DELAY_SPECS, params);
-        let base = dsp::delay_time_ms(&values, Some(bpm));
+        let base = dsp::delay_effective_time_ms(&values, Some(bpm), verdant_plugins::SAMPLE_RATE);
+        let channel_times = dsp::delay_target_times_ms(&values, Some(bpm), verdant_plugins::SAMPLE_RATE);
         let grid = [25., 50., 75., 100., 125., 150.].map(|percent| (time_axis.norm(percent), format!("{:.0} ms", base * percent / 100.)));
         let levels = [-48., -24., 0.].map(|db| (level_axis.norm(db), format!("{db:.0} dB")));
         paint_grid(window, plot, th, &grid, &levels, Some(level_axis.norm(0.)), texts);
         let v = |id: &str, default: f64| param(params, id).map_or(default, |p| p.value);
-        let offset = v("offset", 0.) / 100.;
         for tap in 0..=dsp::DELAY_TAPS {
             let prefix = if tap == 0 { "main".to_string() } else { format!("tap{tap}") };
             let on = v(&format!("{prefix}_on"), if tap == 0 { 1. } else { 0. }) >= 0.5;
@@ -488,14 +627,15 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             let pan = v(&format!("{prefix}_pan"), 0.) / 100.;
             // Channel positions and pan gains match the processor's static taps.
             // Modulation/feedback are intentionally not presented as measured audio.
-            for (channel, time_scale, gain) in [(0, 1. + offset, 1. - pan.max(0.)), (1, 1. - offset, 1. + pan.min(0.))] {
+            for (channel, time_scale, gain) in [(0, channel_times[0] / base, 1. - pan.max(0.)), (1, channel_times[1] / base, 1. + pan.min(0.))] {
                 let color = with_alpha(band_color(channel), if on { 0.75 } else { 0.3 });
                 let x = plot.x(time_axis.norm(percent * time_scale)) + if channel == 0 { -1.5 } else { 1.5 };
                 let y = plot.y(level_axis.norm(level + 20. * gain.max(1e-6).log10()));
                 window.paint_quad(fill(b(x - 1.5, y, 3., (plot.y(0.) - y).max(1.), plot.o), color));
             }
         }
-        texts.push((format!("静态抽头 · 基准 {base:.1} ms · {bpm:.1} BPM"), p(10., 6., plot.o), 11., th.text_secondary));
+        let mode_label = if v("time_mode", 0.) >= 2.5 { "反向窗口跨度" } else { "静态抽头目标" };
+        texts.push((format!("{mode_label} · L {:.1} / R {:.1} ms · {bpm:.1} BPM", channel_times[0], channel_times[1]), p(10., 6., plot.o), 11., th.text_secondary));
     });
     let v = |id: &str, default: f64| param(params, id).map_or(default, |p| p.value);
     let handles = (0..=dsp::DELAY_TAPS).map(|tap| {
@@ -511,7 +651,7 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             label: if tap == 0 { "主".into() } else { tap.to_string() }, hollow: !on, selected: tap == selected,
             also: if on { vec![] } else { vec![(on_id, 1.)] }, defaults }
     }).collect();
-    let tabs = div().flex().flex_wrap().gap(px(4.)).children((0..=dsp::DELAY_TAPS).map(|tap| {
+    let tabs = div().flex().flex_wrap().gap(gpui::rems(4./16.)).children((0..=dsp::DELAY_TAPS).map(|tap| {
         crate::ui_controls::selectable_button(format!("delay-tap-{slot}-{tap}"), if tap == 0 { "主".to_string() } else { tap.to_string() }, selected == tap, th)
             .role(Role::Tab).tab_index(0).aria_label(if tap == 0 { "主抽头".to_string() } else { format!("抽头 {tap}") })
             .on_click(cx.listener(move |ed, _, _, cx| { select_band(ed, key, tap); cx.notify(); }))
@@ -522,14 +662,14 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
     let prefix = if selected == 0 { "main".to_string() } else { format!("tap{selected}") };
     let ids: Vec<String> = ["time", "level", "pan"].map(|field| format!("{prefix}_{field}")).into_iter().collect();
     let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
-    div().flex().flex_col().gap(px(10.))
-        .child(graph(editor.clone(), target(), params.to_vec(), "delay-taps", "延迟抽头：左右拖动时间，上下拖动电平", th, painter, handles, None, None).w_full().h(px(225.)))
+    div().flex().flex_col().gap(gpui::rems(10./16.))
+        .child(graph(editor.clone(), target(), params.to_vec(), "delay-taps", "延迟抽头：左右拖动时间，上下拖动电平", th, painter, handles, None, None).w_full().h(gpui::rems(225./16.)))
         .child(tabs)
-        .child(div().flex().flex_wrap().items_center().gap(px(12.))
+        .child(div().flex().flex_wrap().items_center().gap(gpui::rems(12./16.))
             .child(toggle(ed, owner, slot, params, &format!("{prefix}_on"), "启用抽头", cx))
             .child(knob_row(editor, target, params, &refs, th, 44.)))
         .child(choice(ed, owner, slot, params, "sync", &dsp::DELAY_SYNC, cx))
-        .child(div().flex().flex_wrap().items_center().gap(px(12.))
+        .child(div().flex().flex_wrap().items_center().gap(gpui::rems(12./16.))
             .child(toggle(ed, owner, slot, params, "pingpong", "乒乓", cx))
             .child(sidechain_picker(ed, owner, slot, cx)))
         .child(knob_row(editor, target, params, &["time", "offset", "feedback", "drive", "low_cut", "high_cut", "width", "mix"], th, 42.))
