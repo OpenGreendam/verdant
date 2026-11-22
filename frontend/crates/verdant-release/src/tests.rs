@@ -1,5 +1,5 @@
 //! Synthetic bytes only. No voice, runtime library, bank or recording fixtures.
-use std::{collections::BTreeMap, fs, io::{Cursor, Write}, path::Path};
+use std::{collections::BTreeMap, fs, io::{Cursor, Write}, path::Path, process::Command};
 use sha2::{Digest, Sha256};
 use crate::{archive, files, policy, source};
 
@@ -106,6 +106,108 @@ fn source_offer_requires_exact_membership_bytes_modes_and_external_selection() {
     entries.push(("verdant-source/extra.rs", b"undeclared source"));
     fs::write(&path, tar(&entries)).unwrap();
     assert!(audit(root.path()).is_err());
+}
+
+const NATIVE_VALIDATION_FILES: &[&str] = &[
+    "tools/a11y/README.md", "tools/a11y/observe-atspi.py", "tools/a11y/run-isolated.py",
+    "tools/native-input/README.md", "tools/native-input/ci.py", "tools/native-input/probe.py",
+    "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py",
+    "tools/native-input/test_ci.py", "tools/native-input/test_probe.py",
+];
+
+fn git(root: &Path, arguments: &[&str]) {
+    let output = Command::new("git").arg("-C").arg(root)
+        .args(["-c", "user.name=Release fixture", "-c", "user.email=release-fixture@example.invalid",
+            "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false"])
+        .args(arguments).output().unwrap();
+    assert!(output.status.success(), "git {arguments:?}: {}", String::from_utf8_lossy(&output.stderr));
+}
+
+fn source_repository() -> tempfile::TempDir {
+    let root = tempfile::tempdir().unwrap();
+    git(root.path(), &["init", "--quiet"]);
+    for path in source::REQUIRED.iter().chain(NATIVE_VALIDATION_FILES.iter()) {
+        let destination = root.path().join(path);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        files::write_new(&destination, format!("synthetic public source: {path}\n").as_bytes(), false).unwrap();
+    }
+    git(root.path(), &["add", "."]);
+    git(root.path(), &["commit", "--quiet", "-m", "Synthetic public verification sources"]);
+    root
+}
+
+#[test]
+fn selected_native_validation_sources_survive_the_real_source_archive_guard() {
+    let root = source_repository();
+    let additional_docs = ["frontend/proto-ui/README.md", "frontend/proto-ui/VALIDATION-COMPLETION-2026-11-22.md",
+        "frontend/proto-ui/NATIVE-INPUT-2026-11-22.json"];
+    for path in additional_docs {
+        files::write_new(&root.path().join(path), b"synthetic validation documentation\n", false).unwrap();
+    }
+    git(root.path(), &["add", "."]);
+    git(root.path(), &["commit", "--quiet", "-m", "Synthetic validation documentation"]);
+    let selection = source::select(root.path()).unwrap();
+    for path in NATIVE_VALIDATION_FILES.iter().copied().chain(additional_docs) {
+        let selected = selection.files.iter().find(|file| file.path == path).unwrap();
+        let content = fs::read(root.path().join(path)).unwrap();
+        assert_eq!(selected.sha256, hex::encode(Sha256::digest(&content)), "{path}");
+        assert_eq!(selected.bytes, content.len() as u64, "{path}");
+    }
+    let proof = tempfile::tempdir().unwrap();
+    let selection_path = proof.path().join("selection.json");
+    files::write_new_json(&selection_path, &selection).unwrap();
+    let sha256 = files::digest(&selection_path).unwrap();
+    assert_eq!(source::load(root.path(), &selection_path, &sha256).unwrap(), selection);
+    let output = tempfile::tempdir().unwrap();
+    source::create(root.path(), &selection_path, &sha256, &selection, &output.path().join("source.tar.gz"), 0).unwrap();
+    let report = archive::check(output.path(), None, Some(&selection.source_commit), Some(&sha256), false, false).unwrap();
+    assert_eq!(report["verified_source_offers"], 1);
+}
+
+#[test]
+fn unreviewed_python_paths_still_fail_source_selection_and_embedded_proofs() {
+    for path in ["tools/a11y/unreviewed.py", "tools/a11y/nested/observe-atspi.py",
+        "tools/a11y-copy/observe-atspi.py", "tools/native-input/unreviewed.py",
+        "tools/native-input/nested/probe.py", "tools/native-input-copy/probe.py",
+        "tools/unreviewed.py", "backend/worker.py"] {
+        let root = source_repository();
+        let mut selection = source::select(root.path()).unwrap();
+        let content = b"synthetic unreviewed Python\n";
+        selection.files.push(source::SelectedFile { path: path.into(), bytes: content.len() as u64,
+            sha256: hex::encode(Sha256::digest(content)), mode: 0o644, git_blob: "b".repeat(40) });
+        let error = source::validate(&selection).unwrap_err().to_string();
+        assert!(error.contains("unapproved corresponding-source input") && error.contains(path), "{error}");
+        files::write_new(&root.path().join(path), content, false).unwrap();
+        git(root.path(), &["add", "."]);
+        git(root.path(), &["commit", "--quiet", "-m", "Synthetic unreviewed Python"]);
+        let error = source::select(root.path()).unwrap_err().to_string();
+        assert!(error.contains("unclassified public source input") && error.contains(path), "{error}");
+    }
+}
+
+#[test]
+fn validation_sources_and_new_documents_must_match_committed_selection() {
+    let root = source_repository();
+    let selection = source::select(root.path()).unwrap();
+    let proof = tempfile::tempdir().unwrap();
+    let selection_path = proof.path().join("selection.json");
+    files::write_new_json(&selection_path, &selection).unwrap();
+    let sha256 = files::digest(&selection_path).unwrap();
+    let script = root.path().join("tools/native-input/probe.py");
+    let original = fs::read(&script).unwrap();
+    fs::write(&script, b"changed after source selection\n").unwrap();
+    let error = source::load(root.path(), &selection_path, &sha256).unwrap_err().to_string();
+    assert!(error.contains("selected source differs from its committed blob") && error.contains("probe.py"), "{error}");
+    fs::write(script, original).unwrap();
+    let doc = "frontend/proto-ui/VALIDATION-COMPLETION-2026-11-22.md";
+    files::write_new(&root.path().join(doc), b"synthetic validation documentation\n", false).unwrap();
+    let error = source::select(root.path()).unwrap_err().to_string();
+    assert!(error.contains("untracked public source must be committed") && error.contains(doc), "{error}");
+    git(root.path(), &["add", "."]);
+    git(root.path(), &["commit", "--quiet", "-m", "Synthetic new corresponding-source document"]);
+    assert!(source::select(root.path()).unwrap().files.iter().any(|file| file.path == doc));
+    let error = source::load(root.path(), &selection_path, &sha256).unwrap_err().to_string();
+    assert!(error.contains("selected-source membership, modes, ancestry or bytes changed"), "{error}");
 }
 
 fn bundle_policy() -> policy::Policy {
