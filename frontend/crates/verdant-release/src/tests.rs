@@ -108,11 +108,13 @@ fn source_offer_requires_exact_membership_bytes_modes_and_external_selection() {
     assert!(audit(root.path()).is_err());
 }
 
-const NATIVE_VALIDATION_FILES: &[&str] = &[
+const PUBLIC_TOOL_SOURCE_FILES: &[&str] = &[
     "tools/a11y/README.md", "tools/a11y/observe-atspi.py", "tools/a11y/run-isolated.py",
     "tools/native-input/README.md", "tools/native-input/ci.py", "tools/native-input/probe.py",
     "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py",
     "tools/native-input/test_ci.py", "tools/native-input/test_probe.py",
+    "frontend/scripts/generate-agent-skills.py",
+    "frontend/scripts/generate-factory-presets.py", "frontend/scripts/verify-ffp-corpus.py",
 ];
 
 fn git(root: &Path, arguments: &[&str]) {
@@ -126,7 +128,7 @@ fn git(root: &Path, arguments: &[&str]) {
 fn source_repository() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     git(root.path(), &["init", "--quiet"]);
-    for path in source::REQUIRED.iter().chain(NATIVE_VALIDATION_FILES.iter()) {
+    for path in source::REQUIRED.iter().chain(PUBLIC_TOOL_SOURCE_FILES.iter()) {
         let destination = root.path().join(path);
         fs::create_dir_all(destination.parent().unwrap()).unwrap();
         files::write_new(&destination, format!("synthetic public source: {path}\n").as_bytes(), false).unwrap();
@@ -137,7 +139,7 @@ fn source_repository() -> tempfile::TempDir {
 }
 
 #[test]
-fn selected_native_validation_sources_survive_the_real_source_archive_guard() {
+fn selected_public_tool_sources_survive_the_real_source_archive_guard() {
     let root = source_repository();
     let additional_docs = ["frontend/proto-ui/README.md", "frontend/proto-ui/VALIDATION-COMPLETION-2026-11-22.md",
         "frontend/proto-ui/NATIVE-INPUT-2026-11-22.json"];
@@ -147,7 +149,7 @@ fn selected_native_validation_sources_survive_the_real_source_archive_guard() {
     git(root.path(), &["add", "."]);
     git(root.path(), &["commit", "--quiet", "-m", "Synthetic validation documentation"]);
     let selection = source::select(root.path()).unwrap();
-    for path in NATIVE_VALIDATION_FILES.iter().copied().chain(additional_docs) {
+    for path in PUBLIC_TOOL_SOURCE_FILES.iter().copied().chain(additional_docs) {
         let selected = selection.files.iter().find(|file| file.path == path).unwrap();
         let content = fs::read(root.path().join(path)).unwrap();
         assert_eq!(selected.sha256, hex::encode(Sha256::digest(&content)), "{path}");
@@ -169,7 +171,9 @@ fn unreviewed_python_paths_still_fail_source_selection_and_embedded_proofs() {
     for path in ["tools/a11y/unreviewed.py", "tools/a11y/nested/observe-atspi.py",
         "tools/a11y-copy/observe-atspi.py", "tools/native-input/unreviewed.py",
         "tools/native-input/nested/probe.py", "tools/native-input-copy/probe.py",
-        "tools/unreviewed.py", "backend/worker.py"] {
+        "tools/unreviewed.py", "backend/worker.py", "frontend/scripts/unreviewed.py",
+        "frontend/scripts/nested/generate-agent-skills.py", "frontend/scripts-copy/generate-factory-presets.py",
+        "frontend/verify-ffp-corpus.py"] {
         let root = source_repository();
         let mut selection = source::select(root.path()).unwrap();
         let content = b"synthetic unreviewed Python\n";
