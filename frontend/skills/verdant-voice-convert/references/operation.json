@@ -1,0 +1,27 @@
+{
+  "op": "voice.convert",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "destination": {
+        "type": "string"
+      },
+      "source": {
+        "type": "string"
+      },
+      "source_model": {
+        "type": "string"
+      },
+      "source_token": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "source",
+      "destination",
+      "source_token",
+      "source_model"
+    ],
+    "type": "object"
+  }
+}

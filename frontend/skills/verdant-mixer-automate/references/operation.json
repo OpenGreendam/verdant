@@ -1,0 +1,168 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "mixer.automate",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "lane": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "points": {
+            "items": {
+              "properties": {
+                "interpolation": {
+                  "enum": [
+                    "step",
+                    "linear"
+                  ]
+                },
+                "tick": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "tick",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "target": {
+            "description": "Gain automation uses millidecibels; pan uses permille. Plugin values use the native descriptor units. Instrument parameters are edited through plugin.set; insert automation targets track/master effects.",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "track_gain",
+                      "track_pan"
+                    ]
+                  },
+                  "track_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "track_id"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "master_gain",
+                      "master_pan"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "instance_id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "plugin_parameter"
+                  },
+                  "owner": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "master"
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "track"
+                          },
+                          "track_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "track_id"
+                        ],
+                        "type": "object"
+                      }
+                    ],
+                    "type": "object"
+                  },
+                  "parameter_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "owner",
+                  "instance_id",
+                  "parameter_id"
+                ],
+                "type": "object"
+              }
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "target",
+          "points"
+        ],
+        "type": "object"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "lane"
+    ],
+    "type": "object"
+  }
+}

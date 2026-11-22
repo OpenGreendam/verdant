@@ -8,7 +8,7 @@ use verdant_domain::{Project, TrackId};
 use verdant_media::{AssetPolicy, MediaImporter};
 use verdant_plugins::{PluginClient, PluginClientOpts};
 use verdant_service::{
-    audio::{AudioScope, ExportOptions, RenderSettings, WavEncoding, render_outputs},
+    audio::{AudioScope, ExportOptions, ExportRange, RenderSettings, WavEncoding, render_outputs},
     media::project_policy,
     project_audio::PhraseSource,
     render::{RenderError, RenderSession},
@@ -151,6 +151,7 @@ pub fn dispatch(op: &str, mut params: Value, progress: &mut dyn FnMut(Value)) ->
     let options = ExportOptions {
         scope, sample_rate: input.sample_rate.unwrap_or(48_000), channels: input.channels.unwrap_or(2),
         encoding: input.encoding.unwrap_or_default(), effects: input.effects.unwrap_or(true),
+        range: if range_ticks.is_some(){ExportRange::Selection}else{ExportRange::Full},
         ..ExportOptions::default()
     };
     if ![44_100, 48_000, 88_200, 96_000, 192_000].contains(&options.sample_rate) || !matches!(options.channels, 1 | 2) {
@@ -165,6 +166,22 @@ pub fn dispatch(op: &str, mut params: Value, progress: &mut dyn FnMut(Value)) ->
                 .with_details(json!({"duration_seconds":duration,"max_duration_seconds":limit})));
         }
     }
+    // Preflight uses the same media authorization and fingerprints as export.
+    // project_root belongs to the synthesis worker, not to imported audio.
+    let policy = AssetPolicy::new(input.asset_roots.clone()).and_then(|policy| project_policy(&project_path, policy))
+        .map_err(|e| CliError::new("MISSING_ASSET", e.to_string()))?;
+    let media_pins = media_pins(&project, &policy)?;
+    let effects = effect_pins(&project, options.effects)?;
+    let plughost = if options.effects { verdant_plugins::resolve_plughost(input.plughost.as_deref()) } else { None };
+    if !effects.is_empty() && plughost.is_none() {
+        return Err(CliError::new("UNSUPPORTED_CAPABILITY", "enabled effects require verdant-plughost; pass plughost or install the matching application package"));
+    }
+    let plughost_pin = plughost.as_deref().map(|path| artifact(path, "plughost")).transpose()?;
+    let output_duration = if let Some((start,end))=range_ticks {
+        let tempo=verdant_domain::TempoMap::new(&project.tempo_map,project.ppq)
+            .map_err(|e|CliError::new("INVALID_PROJECT",e.to_string()))?;
+        tempo.seconds_at(end as f64)-tempo.seconds_at(start as f64)
+    } else { duration };
     let timeout = input.worker.timeout()?;
     let worker_workspace = tempfile::tempdir().map_err(io_error)?;
     let config = input.worker.config(worker_workspace.path())?;
@@ -177,7 +194,11 @@ pub fn dispatch(op: &str, mut params: Value, progress: &mut dyn FnMut(Value)) ->
     let plans = native.plan(&project, false, &tracks);
     let worker = native.capabilities().clone();
     if op == "render.plan" {
-        return Ok(json!({"project_id":project.project_id,"revision":project.revision,"duration_seconds":duration,"plans":plans,"worker":worker}));
+        return Ok(json!({"project_id":project.project_id,"revision":project.revision,
+            "duration_seconds":output_duration,"processing_timeline_seconds":duration,
+            "range_ticks":range_ticks,"sample_rate":options.sample_rate,"processing_sample_rate":options.sample_rate,
+            "media":media_pins,"effects":effects,"plughost":plughost_pin,"plans":plans,"worker":worker,
+            "tail_policy":if range_ticks.is_some(){"explicit range excludes audio beyond its end"}else{"up to 10 seconds per active track chain followed by up to 10 seconds for the master chain"}}));
     }
 
     let output = destination(input.output.as_deref().ok_or_else(|| invalid("output is required"))?)?;
@@ -197,12 +218,6 @@ pub fn dispatch(op: &str, mut params: Value, progress: &mut dyn FnMut(Value)) ->
     let overwrite = input.overwrite.unwrap_or(false);
     let seed = input.seed.unwrap_or(1);
     let project_digest = digest(&project)?;
-    let policy = AssetPolicy::new(input.asset_roots).and_then(|policy| project_policy(&project_path, policy))
-        .map_err(|e| CliError::new("MISSING_ASSET", e.to_string()))?;
-    let media_pins = media_pins(&project, &policy)?;
-    let effects = effect_pins(&project, options.effects)?;
-    let plughost = if options.effects { verdant_plugins::resolve_plughost(input.plughost.as_deref()) } else { None };
-    let plughost_pin = plughost.as_deref().map(|path| artifact(path, "plughost")).transpose()?;
     let pin = digest(&json!({"project_sha256":project_digest,"worker_sha256":worker_sha,"worker":worker,
         "plans":plans,"seed":seed,"audio":options,"track":input.track,"range":range_ticks,
         "media":media_pins,"effects":effects,"plughost":plughost_pin}))?;
@@ -252,7 +267,7 @@ pub fn dispatch(op: &str, mut params: Value, progress: &mut dyn FnMut(Value)) ->
         let mut result = json!({"schema":"verdant-render/1","job_id":context.id,"project_id":project.project_id,
             "revision":project.revision,"project_sha256":project_digest,"input_sha256":pin,"frames":rendered.frames,
             "fingerprint":context.fingerprint,"request_digest":context.request_digest,
-            "sample_rate":settings.options.sample_rate,"audio":settings.options,"range_ticks":range_ticks,"seed":seed,
+            "sample_rate":settings.options.sample_rate,"processing_sample_rate":settings.options.sample_rate,"audio":settings.options,"range_ticks":range_ticks,"seed":seed,
             "worker_sha256":worker_sha,"voices":worker.voices,"media":media_pins,"effects":effects,"phrases":phrase_pins,
             "artifacts":artifacts});
         publish_report(&report, &result, overwrite)?;
@@ -290,7 +305,7 @@ fn duration_upper_bound(project: &Project, selected: Option<&TrackId>, range: Op
         let note_end = track.notes.iter().map(|note| note.end_tick()).max().unwrap_or(0);
         let mut track_end = tempo.seconds_at(note_end as f64);
         for clip in verdant_media::read_clips(track).map_err(|e| CliError::new("INVALID_PROJECT", e.to_string()))? {
-            track_end = track_end.max(tempo.seconds_at(clip.start_tick as f64) + clip.duration_frames as f64 / f64::from(clip.source.sample_rate));
+            track_end = track_end.max(clip.end_seconds(&tempo));
         }
         if effects && track_end > 0.0 && read_inserts(&track.unknown).iter().any(|effect| !effect.bypass) {
             track_end += tail;
@@ -300,7 +315,9 @@ fn duration_upper_bound(project: &Project, selected: Option<&TrackId>, range: Op
     if effects && end > 0.0 && verdant_service::project_audio::master_insert_specs(project).iter().any(|effect| !effect.bypass) {
         end += tail;
     }
-    if let Some((_, range_end)) = range { end = end.max(tempo.seconds_at(range_end as f64)); }
+    // Explicit ranges process from project zero to their end for correct
+    // effect history; later source material and tails are never rendered.
+    if let Some((_, range_end)) = range { end = tempo.seconds_at(range_end as f64); }
     if !end.is_finite() { return Err(CliError::new("INVALID_PROJECT", "timeline duration is not finite")); }
     Ok(end)
 }
@@ -429,4 +446,24 @@ fn render_error(error: RenderError) -> CliError {
     let mut result = CliError::new(error.code, error.message);
     result.details = error.details;
     result
+}
+
+#[cfg(test)]
+mod range_tests{
+    use super::*;
+    #[test]
+    fn explicit_range_cost_stops_at_its_end_and_ignores_later_tails(){
+        let mut project=Project::new_empty();
+        // A later audio region must not make a short explicit range appear
+        // to require rendering the rest of the document.
+        let track=&mut project.tracks[0];
+        let source=verdant_media::AudioSource{path:"source.wav".into(),sha256:"a".repeat(64),byte_len:100,
+            sample_rate:48_000,channels:2,frames:48_000*120};
+        let clip=verdant_media::AudioClip::new(source,track.id.clone(),0);
+        track.unknown.insert(verdant_media::AUDIO_CLIPS_KEY.into(),verdant_media::clips_value(track.id.clone(),&[clip]).unwrap().unwrap());
+        let tempo=verdant_domain::TempoMap::new(&project.tempo_map,project.ppq).unwrap();
+        let end=project.ppq as i64*4;
+        assert_eq!(duration_upper_bound(&project,None,Some((end/2,end)),true).unwrap(),tempo.seconds_at(end as f64));
+        assert_eq!(duration_upper_bound(&project,None,None,false).unwrap(),120.);
+    }
 }

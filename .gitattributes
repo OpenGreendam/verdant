@@ -17,3 +17,6 @@ frontend/proto-ui/generated/** -text
 # Embedded test fixtures are consumed byte-exact by include_bytes!/include_str!
 # assertions, so CRLF checkout conversion would break them too.
 frontend/crates/*/tests/fixtures/** -text
+
+# Offline Agent Skills manifests verify the raw LF payload on every platform.
+frontend/skills/** text eol=lf

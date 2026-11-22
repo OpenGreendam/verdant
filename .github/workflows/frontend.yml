@@ -74,8 +74,21 @@ jobs:
         env:
           VERDANT_VOICE_BANK_SHA256: e2415c3917dd102861ce8043b0c0daf497b18a0903f7255f314baf72cb73bbc1
         run: |
-          cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
-          cargo test --offline --locked --release -p verdant-app --bin verdant theme::tests
+          # Check filesystem and launcher portability before the full GUI build.
+          cargo test --offline --locked --release -p verdant-agent-skills -p verdant-launcher
+          cargo test --offline --locked --release -p verdant-cli --test entrypoints
+          # Exercise real shared-memory attachment before the full GUI build.
+          cargo test --offline --locked --release -p verdant-plugins --lib shm::tests
+          cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-launcher -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
+          cargo test --offline --locked --release -p verdant-cli --test native_studio
+          cargo test --offline --locked --release -p verdant-media --test advanced_edits
+          cargo test --offline --locked --release -p verdant-service audio_edit::
+          cargo test --offline --locked --release -p verdant-service studio::tests
+          cargo test --offline --locked --release -p verdant-plughost factory_library_is_complete_distinct_and_audible
+          host="$PWD/target/release/verdant-plughost"
+          if [ "$RUNNER_OS" = Windows ]; then host="$host.exe"; fi
+          VERDANT_PLUGIN_HOST="$host" cargo test --offline --locked --release -p verdant-plugins --test builtin_signal export_hosts_process_at_each_admitted_rate -- --ignored
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui theme::tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
           if [ "$RUNNER_OS" = Windows ]; then
             cargo test --offline --locked --release -p verdant-cli windows_path_tests

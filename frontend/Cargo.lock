@@ -6187,6 +6187,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "verdant-agent-skills"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "libc",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
 name = "verdant-app"
 version = "0.1.0"
 dependencies = [
@@ -6252,10 +6265,12 @@ dependencies = [
  "tempfile",
  "url",
  "uuid",
+ "verdant-agent-skills",
  "verdant-backend",
  "verdant-domain",
  "verdant-exchange",
  "verdant-import",
+ "verdant-launcher",
  "verdant-media",
  "verdant-plugins",
  "verdant-service",
@@ -6307,6 +6322,13 @@ dependencies = [
  "sha2",
  "thiserror 2.0.21",
  "verdant-domain",
+]
+
+[[package]]
+name = "verdant-launcher"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]
@@ -6391,6 +6413,7 @@ dependencies = [
  "tar",
  "tempfile",
  "toml 0.8.23",
+ "verdant-agent-skills",
  "verdant-voice-format",
  "zip 6.0.0",
 ]

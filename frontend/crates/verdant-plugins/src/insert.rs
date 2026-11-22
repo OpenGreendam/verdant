@@ -114,6 +114,7 @@ pub struct InsertHandle {
     detail: Arc<Mutex<String>>,
     processor_taken: AtomicBool,
     offline: bool,
+    sample_rate: f64,
     has_editor: bool,
     child: Arc<Mutex<Child>>,
     stop: Arc<AtomicBool>,
@@ -139,7 +140,30 @@ impl InsertHandle {
         events_tx: Sender<ClientEvent>,
     ) -> Result<Self> {
         if sample_rate != crate::SAMPLE_RATE {
-            return Err(PluginError::Host("plugin processing requires 48 kHz".into()));
+            return Err(PluginError::Host("live plugin processing requires the engine rate".into()));
+        }
+        Self::spawn_at_rate(key,spec,desc,plughost,sample_rate,events_tx)
+    }
+
+    pub(crate) fn spawn_offline(
+        key:InsertKey,spec:InsertSpec,desc:PluginDesc,plughost:&std::path::Path,
+        sample_rate:f64,events_tx:Sender<ClientEvent>,
+    )->Result<Self>{
+        let mut handle=Self::spawn_at_rate(key,spec,desc,plughost,sample_rate,events_tx)?;
+        handle.make_offline()?;
+        Ok(handle)
+    }
+
+    fn spawn_at_rate(
+        key: InsertKey,
+        spec: InsertSpec,
+        desc: PluginDesc,
+        plughost: &std::path::Path,
+        sample_rate: f64,
+        events_tx: Sender<ClientEvent>,
+    ) -> Result<Self> {
+        if !crate::supported_sample_rate(sample_rate) {
+            return Err(PluginError::Host("unsupported plugin processing sample rate".into()));
         }
         let chan = Channel::create(crate::shm::DSP_QUANTUM_FRAMES)?;
         let mut cmd = Command::new(plughost);
@@ -265,7 +289,7 @@ impl InsertHandle {
             in_w: app_in_w, out_r: app_out_r,
             writer: Mutex::new(writer), replies: Mutex::new(rep_rx), request: Mutex::new(()),
             pending_midi:Mutex::new(std::collections::VecDeque::with_capacity(1024)),
-            crashed, detail, processor_taken: AtomicBool::new(false), offline: false,
+            crashed, detail, processor_taken: AtomicBool::new(false), offline: false, sample_rate,
             has_editor: false, child, stop, reader: Some(reader), watcher: Some(watcher),
             next_req: AtomicU64::new(1), origin, control_deadline_ms,
             telemetry_cache: Mutex::new(TelemetryCache::default()),
@@ -381,15 +405,25 @@ impl InsertHandle {
 
     pub fn set_bypass(&self, on: bool) { self.state.bypass.store(on, Ordering::Release); }
     pub fn bypassed(&self) -> bool { self.state.bypass.load(Ordering::Acquire) }
+    pub fn sample_rate(&self)->f64 { self.sample_rate }
     pub fn plugin_latency_samples(&self) -> u32 { self.ring.plugin_latency() }
     pub fn transport_latency_samples(&self) -> u32 {
-        if self.offline { 0 } else { crate::shm::TRANSPORT_LATENCY_FRAMES as u32 }
+        if self.offline { 0 } else { self.state.transport_latency_samples() }
+    }
+    /// Control side only, while the engine is held on a changed device token.
+    pub fn configure_callback_source_frames(&self,frames:u32)->Result<()>{
+        if self.offline{return Ok(());}
+        if !self.state.configure_callback_source_frames(frames){
+            return Err(PluginError::Host("callback source burst exceeds the native transport budget".into()));
+        }
+        Ok(())
     }
     pub fn latency_samples(&self) -> u32 {
         self.plugin_latency_samples().saturating_add(self.transport_latency_samples())
     }
     pub fn xruns(&self) -> u64 { self.state.xruns.load(Ordering::Relaxed) }
     pub fn automation_faulted(&self) -> bool { self.state.automation_fault.load(Ordering::Acquire) }
+    pub fn automation_fault_detail(&self)->Option<String>{self.state.fault_detail()}
     pub fn status(&self) -> InsertStatus {
         if self.crashed.load(Ordering::Acquire) || self.ring.status() != STATUS_OK {
             InsertStatus::Crashed { detail: self.detail.lock().unwrap().clone() }
@@ -502,7 +536,7 @@ impl InsertHandle {
     }
     /// Device changes never call this: source and inserts always run at 48 kHz.
     pub fn reconfigure(&self, sample_rate: f64, max_frames: u32) -> Result<()> {
-        if sample_rate != crate::SAMPLE_RATE || max_frames != self.ring.max_frames() as u32 {
+        if sample_rate != self.sample_rate || max_frames != self.ring.max_frames() as u32 {
             return Err(PluginError::Host("live insert rate/block quantum is fixed".into()));
         }
         self.call(HostRequest::Reconfigure { id: 0, sample_rate, max_frames }, Duration::from_secs(10))?;

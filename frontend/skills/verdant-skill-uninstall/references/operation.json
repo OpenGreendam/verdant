@@ -1,0 +1,67 @@
+{
+  "op": "skill.uninstall",
+  "params": {
+    "additionalProperties": false,
+    "oneOf": [
+      {
+        "not": {
+          "required": [
+            "all"
+          ]
+        },
+        "required": [
+          "name"
+        ]
+      },
+      {
+        "not": {
+          "required": [
+            "name"
+          ]
+        },
+        "properties": {
+          "all": {
+            "const": true
+          }
+        },
+        "required": [
+          "all"
+        ]
+      }
+    ],
+    "properties": {
+      "agent": {
+        "enum": [
+          "generic",
+          "codex",
+          "claude"
+        ]
+      },
+      "all": {
+        "type": "boolean"
+      },
+      "dest": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "name": {
+        "maxLength": 64,
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+        "type": "string"
+      },
+      "project_root": {
+        "type": "string"
+      },
+      "scope": {
+        "enum": [
+          "project",
+          "user",
+          "global"
+        ]
+      }
+    },
+    "type": "object"
+  }
+}

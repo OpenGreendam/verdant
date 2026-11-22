@@ -1,0 +1,11 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "plugin.list",
+  "params": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  }
+}

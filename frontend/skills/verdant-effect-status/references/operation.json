@@ -1,0 +1,30 @@
+{
+  "op": "effect.status",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "instance_id": {
+        "type": "string"
+      },
+      "owner": {
+        "type": "object"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  }
+}

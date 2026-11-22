@@ -1,0 +1,9 @@
+{
+  "op": "capabilities",
+  "params": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  }
+}

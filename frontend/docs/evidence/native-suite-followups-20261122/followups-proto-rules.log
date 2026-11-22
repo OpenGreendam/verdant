@@ -1,0 +1,6 @@
+ok the workspace-shaped artifact set is admitted
+ok a generated crate that pins gpui is rejected
+ok a generated crate that declares gpui twice is rejected
+ok a bundled native SDK that pins gpui is rejected
+ok provenance that reports a pinned gpui is rejected
+all workspace GPUI rule cases passed.

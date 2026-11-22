@@ -207,12 +207,12 @@ fn instrument_host()->Option<Arc<verdant_plugins::PluginClient>>{INSTRUMENT_HOST
 const INSTRUMENT_TAIL_SECONDS:f64=2.0;
 
 /// Render notes through a hosted CLAP/VST3/AU instrument, offline, at the
-/// host's rate, resampled to `rate`. Interleaved stereo.
+/// requested render rate. Interleaved stereo; no hidden fixed-rate DSP stage.
 pub fn render_hosted(client:&verdant_plugins::PluginClient,spec:&serde_json::Value,notes:&[verdant_plugins::builtin_dsp::SynthNote],rate:u32)->Result<Vec<f32>,String>{
     use verdant_plugins::proto::{note_off,note_on};
     let insert:verdant_plugins::InsertSpec=serde_json::from_value(spec.clone()).map_err(|e|format!("乐器设置无效：{e}"))?;
-    let mut handle=client.offline_insert(insert).map_err(|e|e.to_string())?;
-    let host_rate=client.sample_rate();let scale=host_rate/rate as f64;
+    let mut handle=client.offline_insert_at_rate(insert,f64::from(rate)).map_err(|e|e.to_string())?;
+    let host_rate=handle.sample_rate();let scale=host_rate/rate as f64;
     // Every on/off at its host-rate frame; offs sort before ons at one frame.
     let mut events:Vec<(u64,bool,u8,f64)>=Vec::with_capacity(notes.len()*2);
     for n in notes{
@@ -345,7 +345,11 @@ pub fn render_instrument(track:&verdant_domain::Track,index:usize,tempo:&TempoMa
         if map.len()>=64||retained.saturating_add(bytes)>CACHE_BYTES{map.clear();}
         if bytes<=CACHE_BYTES{map.insert(key,pcm.clone());}pcm
     }};
-    Ok(Some(StereoClip{start:first,samples,gain:1.0,pan:0.0,track:index as u16}))
+    // Instrument bypass has no dry audio input. Silence the generator while
+    // retaining its authored span/release, so a bypassed-only export is a
+    // correctly sized silent file and re-enabling restores the same state.
+    let gain=if spec.get("bypass").and_then(serde_json::Value::as_bool)==Some(true){0.0}else{1.0};
+    Ok(Some(StereoClip{start:first,samples,gain,pan:0.0,track:index as u16}))
 }
 
 /// `InsertSpec.extra` key naming the track whose pre-insert, pre-fader

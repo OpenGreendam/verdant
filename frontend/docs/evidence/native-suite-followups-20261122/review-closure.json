@@ -1,0 +1,160 @@
+{
+  "schema": "verdant-review-closure/1",
+  "reviewed_at_utc": "2026-11-22T10:50:12.711525+00:00",
+  "scope": "Only the three findings from native_followup_review; no general re-review, Cargo invocation, or repository edits.",
+  "binary": {
+    "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+    "sha256": "f772de3b18ccbe8e5dcdd39ff0ae24cb825684f19de8a315d7c7cb96accb4f7f"
+  },
+  "findings": [
+    {
+      "id": "instrument-bypass",
+      "severity": "P2",
+      "original": "Instrument plugin.bypass committed successfully but exports remained audible and byte-identical.",
+      "fix": "Shared render_instrument retains samples and span but sets gain=0 while bypassed. Live monitor admission checks bypass separately, retires existing voices, and preserves editor parameter access.",
+      "static_review": "passed",
+      "runtime_review": "passed",
+      "project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-instrument-c21qzaup/bypass.verp",
+      "initial_revision": 3,
+      "final_revision": 4,
+      "original_enabled": {
+        "frames": 24000,
+        "channels": 2,
+        "sample_rate": 48000,
+        "sample_peak": 0.3951170742511749,
+        "pcm_sha256": "29dbcc03ac49496cea071845a873c4ae684ad68883d047ee6c408ff26e814e23",
+        "sha256": "93f982dabf2c212fbf3498ee0876f6c00d05f80acdccffb3cd243c9220d6a618"
+      },
+      "fixed_bypassed": {
+        "frames": 24000,
+        "channels": 2,
+        "sample_rate": 48000,
+        "sample_peak": 0.0,
+        "pcm_sha256": "ea0787f65f73b0013d03b359490e3125211b28ad5c1502ffb1544c0ded4192f5",
+        "sha256": "01d0b4f3df61bf7d1b1740498820a2ec521d47b45dbb73204ed8e5381faadf79"
+      },
+      "reenabled": {
+        "frames": 24000,
+        "channels": 2,
+        "sample_rate": 48000,
+        "sample_peak": 0.3951170742511749,
+        "pcm_sha256": "29dbcc03ac49496cea071845a873c4ae684ad68883d047ee6c408ff26e814e23",
+        "sha256": "93f982dabf2c212fbf3498ee0876f6c00d05f80acdccffb3cd243c9220d6a618"
+      },
+      "passed": true,
+      "status": "closed"
+    },
+    {
+      "id": "portable-cross-project-clipboard",
+      "severity": "P2",
+      "original": "Relative media/source.wav copied into another project kept the wrong directory base; paste succeeded but media.verify failed.",
+      "fix": "Copy resolves and verifies the source once through the authorized importer; clipboard carries canonical source path. Paste verifies authorization and fingerprint again. Metadata-only introduction of unknown sources is rejected.",
+      "static_review": "passed",
+      "runtime_review": "passed",
+      "source_project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/source/source.verp",
+      "destination_project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/destination/closure-target.verp",
+      "copied_source_path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/source/media/source.wav",
+      "unauthorized_paste": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_ARGUMENT",
+          "message": "audio asset is outside the explicitly authorized locations",
+          "retryable": false
+        },
+        "revision_unchanged": true
+      },
+      "authorized_paste_revision": 1,
+      "media_verified": true,
+      "source_sha256_unchanged": "412837eea718c66c05f7fcc06229dd496637965ce8281ab63ca9701358ff92f5",
+      "passed": true,
+      "status": "closed"
+    },
+    {
+      "id": "bounce-publication-transaction",
+      "severity": "P2",
+      "original": "WAV was exposed before final GUI revision check or before a failing CLI journal commit/save, without a usable publication receipt.",
+      "fix": "Background stage_audio_assets writes/syncs private files. GUI checks document_generation/project ID/revision and publishes plus commits within one UI turn without await. CLI publication errors include created_assets and not_started; commit/save failures retain assets with not_confirmed or confirmed_in_journal and recovery instructions.",
+      "static_review": "passed",
+      "runtime_review": "not_reexecuted_by_reviewer; parent reports three targeted service tests passed",
+      "tests_read": [
+        "stale_bounce_staging_cleans_private_files_without_publishing_final_output",
+        "publication_receipt_retains_complete_assets_and_never_clobbers_a_racing_file"
+      ],
+      "passed": true,
+      "limitations": [
+        "No GUI timing race or disk failure was injected by reviewer. Retention on ambiguous commit/save failure is intentional to protect journal references."
+      ],
+      "status": "closed"
+    }
+  ],
+  "closure_status": "closed",
+  "related_fix_regression": {
+    "description": "Bounce decoded cache originally omitted verified_sources, causing CopyRange in the same batch to index a missing source and panic.",
+    "fix": "Bounce now stores the verified pending source together with decoded PCM; clipboard/paste use fallible lookups.",
+    "status": "closed",
+    "static_review": "passed",
+    "runtime_review": "passed",
+    "worker_exit_code": 0,
+    "worker_survived_followup_request": true,
+    "dry_run": true,
+    "project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/source/source.verp",
+    "request": {
+      "protocol": "verdant-cli/1",
+      "request_id": "closure-bounce-copy",
+      "op": "clip.edit",
+      "params": {
+        "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/source/source.verp",
+        "expect_revision": 0,
+        "dry_run": true,
+        "asset_roots": [
+          "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/source"
+        ],
+        "edit": {
+          "operation": "batch",
+          "edits": [
+            {
+              "operation": "bounce",
+              "clips": [
+                {
+                  "track": "7fd77490-e221-4d09-9bd4-11b9eeac456f",
+                  "id": "f4216741-1480-4a31-9a36-5893442220d4"
+                }
+              ],
+              "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/review-clipboard-ubam0lff/source/closure-pending-copy.wav",
+              "sample_rate": 48000,
+              "replace": true
+            },
+            {
+              "operation": "copy_range",
+              "tracks": [
+                "7fd77490-e221-4d09-9bd4-11b9eeac456f"
+              ],
+              "start_tick": 0,
+              "end_tick": 1920
+            }
+          ]
+        }
+      }
+    },
+    "result_summary": {
+      "pending_asset_count": 1,
+      "clipboard_clip_count": 1,
+      "pending_source_fingerprint_matches": true,
+      "final_output_absent": true,
+      "project_sha256_unchanged": "2fa2eba79f5e6741198017a3db58824fb8fb02051104943087c05e6052eb1272",
+      "source_sha256_unchanged": "412837eea718c66c05f7fcc06229dd496637965ce8281ab63ca9701358ff92f5",
+      "directory_members_unchanged": true
+    },
+    "targeted_test_added_by_audio_agent": "bounce_then_copy_range_keeps_verified_pending_source_in_one_atomic_plan"
+  },
+  "remaining_findings": [],
+  "followup_binary": {
+    "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+    "sha256": "c7b9b96b2adad9441d5675f104b6273a3d0786584e071aa90d4d1f49bebe98ac"
+  },
+  "verification_limits": [
+    "This reviewer ran no Cargo commands and made no repository source edits.",
+    "Instrument and clipboard original reproductions were rerun against the immediately preceding full workspace build; the related cache regression was rerun against the final rebuilt debug CLI.",
+    "Bounce stale-publication closure was statically reviewed; targeted service tests were reported passed by the parent/audio agent. No GUI timing race or disk fault was injected by this reviewer."
+  ]
+}

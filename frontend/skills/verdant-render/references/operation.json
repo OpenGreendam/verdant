@@ -1,0 +1,120 @@
+{
+  "op": "render",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "asset_roots": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "channels": {
+        "enum": [
+          1,
+          2
+        ]
+      },
+      "effects": {
+        "type": "boolean"
+      },
+      "encoding": {
+        "enum": [
+          "Float32",
+          "Pcm16",
+          "Pcm24"
+        ]
+      },
+      "end_tick": {
+        "type": "integer"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "idempotency_key": {
+        "type": "string"
+      },
+      "idempotency_scope": {
+        "type": "string"
+      },
+      "max_duration_seconds": {
+        "type": "integer"
+      },
+      "onnxruntime_library": {
+        "type": "string"
+      },
+      "output": {
+        "type": "string"
+      },
+      "overwrite": {
+        "type": "boolean"
+      },
+      "path": {
+        "type": "string"
+      },
+      "plughost": {
+        "type": "string"
+      },
+      "project_root": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "report": {
+        "type": "string"
+      },
+      "sample_rate": {
+        "enum": [
+          44100,
+          48000,
+          88200,
+          96000,
+          192000
+        ]
+      },
+      "scope": {
+        "enum": [
+          "Mix",
+          "ActiveTrack",
+          "Stems"
+        ]
+      },
+      "seed": {
+        "type": "integer"
+      },
+      "start_tick": {
+        "type": "integer"
+      },
+      "timeout_seconds": {
+        "type": "integer"
+      },
+      "track": {
+        "type": "string"
+      },
+      "voice_package": {
+        "type": "string"
+      },
+      "voice_registry": {
+        "type": "string"
+      },
+      "worker": {
+        "type": "string"
+      },
+      "workspace": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "output"
+    ],
+    "type": "object"
+  }
+}

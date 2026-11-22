@@ -41,7 +41,8 @@ impl Target {
     pub(crate) fn data_dir(self) -> &'static str { if self.mac() { "Verdant.app/Contents/Resources/share/verdant" } else { "share/verdant" } }
     pub(crate) fn docs_dir(self) -> &'static str { if self.mac() { "Verdant.app/Contents/Resources/share/doc/verdant" } else { "share/doc/verdant" } }
     pub(crate) fn program_path(self, program: &str) -> String {
-        let directory = if !self.windows() && !self.mac() && matches!(program, "verdant" | "verdant-plughost") { "libexec/verdant" } else { self.executable_dir() };
+        if program == "verdant-launcher" { return format!("{program}{}", self.extension()); }
+        let directory = if !self.windows() && !self.mac() && matches!(program, "verdant-gui" | "verdant-plughost") { "libexec/verdant" } else { self.executable_dir() };
         format!("{directory}/{program}{}", self.extension())
     }
     pub(crate) fn library_path(self, name: &str) -> String {
@@ -78,6 +79,24 @@ impl Target {
     pub(crate) fn admit(self, file: &Path, library: bool) -> Result<()> {
         let mut file = files::regular(file)?;
         self.admit_reader(&mut file, library)
+    }
+
+    pub(crate) fn admit_program(self, path: &Path, program: &str) -> Result<()> {
+        self.admit_program_reader(&mut files::regular(path)?, program)
+    }
+
+    pub(crate) fn admit_program_reader(self, file: &mut (impl Read + Seek), program: &str) -> Result<()> {
+        file.seek(SeekFrom::Start(0))?;
+        self.admit_reader(file, false)?;
+        if self.windows() {
+            file.seek(SeekFrom::Start(60))?;
+            let mut offset = [0u8; 4]; file.read_exact(&mut offset)?;
+            file.seek(SeekFrom::Start(u32::from_le_bytes(offset) as u64 + 24 + 68))?;
+            let mut subsystem = [0u8; 2]; file.read_exact(&mut subsystem)?;
+            let expected = if matches!(program, "verdant-gui" | "verdant-launcher") { 2 } else { 3 };
+            ensure!(u16::from_le_bytes(subsystem) == expected, "wrong Windows GUI/console subsystem for {program}");
+        }
+        Ok(())
     }
 
     pub(crate) fn admit_reader(self, file: &mut (impl Read + Seek), library: bool) -> Result<()> {

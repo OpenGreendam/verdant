@@ -2,7 +2,7 @@
 Type=Application
 Name=Verdant
 Comment=Edit singing projects and exchange scores
-Exec=verdant %f
+Exec=verdant gui %f
 TryExec=verdant
 Terminal=false
 Categories=AudioVideo;Audio;Music;

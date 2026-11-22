@@ -1,0 +1,17 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "preset.show",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "op": "voice.import-originals",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "model": {
+        "type": "string"
+      },
+      "registry": {
+        "type": "string"
+      },
+      "token": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "token",
+      "model"
+    ],
+    "type": "object"
+  }
+}

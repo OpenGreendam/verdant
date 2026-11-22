@@ -110,7 +110,7 @@ impl Audit<'_> {
             ensure!(size <= if depth == 0 { MAX_ARCHIVE } else { MAX_NESTED }, "nested archive size exceeds verification limit");
         }
         let keep_json = name.ends_with("RELEASE-ASSETS.json") || name.ends_with("SOURCE-SELECTION.json")
-            || name.ends_with("BUNDLE-POLICY.json") || name.ends_with("bundled-voice/manifest.json") || name.ends_with(".sha256");
+            || name.ends_with("BUNDLE-POLICY.json") || name.ends_with("bundled-voice/manifest.json") || name.ends_with("/skills/manifest.json") || name.ends_with(".sha256");
         ensure!(!keep_json || size <= files::MAX_JSON, "admission JSON/checksum exceeds verification limit");
         let mut json_bytes = keep_json.then(|| prefix.clone());
         let mut native_header = is_native.then(|| prefix.clone());
@@ -126,7 +126,7 @@ impl Audit<'_> {
             remaining -= count as u64; hash.update(&buffer[..count]);
             if let Some(bytes) = &mut json_bytes { bytes.extend_from_slice(&buffer[..count]); }
             if let Some(header) = &mut native_header {
-                let take = count.min(65_562usize.saturating_sub(header.len()));
+                let take = count.min(65_792usize.saturating_sub(header.len()));
                 header.extend_from_slice(&buffer[..take]);
             }
             if let Some(spool) = &mut spool { spool.write_all(&buffer[..count])?; }
@@ -325,13 +325,21 @@ impl Audit<'_> {
             let program = manifest.programs.iter().find(|program| program.name == *name).context("required native program is missing")?;
             ensure!(program.path == expected && program.role == *role && admitted.insert(expected.clone()), "native program role/path changed");
             let observed = inventory.files.get(&expected).context("native program bytes missing")?;
-            ensure!(observed.entry.sha256 == program.sha256, "native program digest mismatch");
+            ensure!(observed.entry.sha256 == program.sha256 && observed.entry.mode == 0o755, "native program digest/executable permission mismatch");
             let native = observed.native.as_deref().context("program is not a compiled native executable")?;
-            target.admit_reader(&mut Cursor::new(native), false)?;
-            if matches!(*role, "gpui" | "worker") {
+            target.admit_program_reader(&mut Cursor::new(native), name)?;
+            if matches!(*role, "gpui" | "worker" | "cli" | "launcher") {
                 let features = program.runtime_features.as_ref().context("app/worker runtime identity probe missing")?;
                 ensure!(features["schema"] == "verdant-runtime-features/1" && features["role"] == *role && features["version"] == manifest.version
                     && features["voice_package"] == json!({"name":"verdant-voice","version":manifest.version}), "app/worker probe identity differs from package");
+                if *role == "cli" {
+                    ensure!(features["headless"] == true && features["default_command"] == "help"
+                        && features["workflow_worker"]["protocol"] == "verdant-cli/1"
+                        && features["workflow_worker"]["max_active_requests"] == 1, "CLI default/worker contract changed");
+                }
+                if *role == "launcher" {
+                    ensure!(features["gui_executable"] == "verdant-gui" && features["headless_probe"] == true, "launcher contract changed");
+                }
                 if *role == "worker" {
                     let pin = features.get("bundled_voice_policy_sha256");
                     if let Some(bundle) = &manifest.bundle {
@@ -366,6 +374,7 @@ impl Audit<'_> {
         for required in ["LICENSE", "NOTICE.md", "RELEASE.md"] {
             ensure!(inventory.files.contains_key(&format!("{}/{required}", target.docs_dir())), "package omits current license/notice/release policy");
         }
+        self.skills(&manifest, target, &inventory)?;
         self.bundle(&manifest, target, &inventory, &mut admitted)?;
         for observed in inventory.files.values() {
             ensure!(!(policy::forbidden_name(&observed.entry.path, true) || observed.native.is_some()) || admitted.contains(&observed.entry.path),
@@ -373,6 +382,32 @@ impl Audit<'_> {
         }
         self.budget.0.borrow_mut().packages += 1;
         Ok(Proof::Package { name: manifest.name, windows: target.windows() })
+    }
+
+    fn skills(&self, manifest: &Manifest, target: Target, inventory: &Inventory) -> Result<()> {
+        let receipt = &manifest.agent_skills;
+        ensure!(receipt.directory == format!("{}/skills", target.data_dir())
+            && receipt.version == manifest.version && files::valid_sha(&receipt.manifest_sha256),
+            "offline Agent Skills receipt identity/path changed");
+        let prefix = format!("{}/", receipt.directory);
+        let declaration = inventory.files.get(&format!("{prefix}manifest.json")).context("offline Agent Skills manifest missing")?;
+        ensure!(declaration.entry.sha256 == receipt.manifest_sha256, "Agent Skills manifest checksum differs from package receipt");
+        let skills = verdant_agent_skills::parse_manifest(declaration.json.as_deref().context("Agent Skills manifest bytes missing")?)?;
+        ensure!(skills.version == receipt.version && skills.skills.len() == receipt.skills, "Agent Skills version/count mismatch");
+        let mut expected = BTreeSet::from([format!("{prefix}manifest.json")]);
+        for skill in &skills.skills {
+            for file in &skill.files {
+                let path = format!("{prefix}{}/{}", skill.name, file.path);
+                let observed = inventory.files.get(&path).context("offline Agent Skills payload missing")?;
+                ensure!(expected.insert(path.clone()) && observed.entry.sha256 == file.sha256
+                    && observed.entry.bytes <= verdant_agent_skills::MAX_FILE_BYTES as u64
+                    && observed.entry.mode == if file.executable { 0o755 } else { 0o644 }
+                    && observed.native.is_none() && observed.nested.is_none(), "Agent Skills payload/hash/mode mismatch: {path}");
+            }
+        }
+        ensure!(inventory.files.keys().filter(|path| path.starts_with(&prefix)).count() == expected.len(),
+            "offline Agent Skills payload contains unindexed members");
+        Ok(())
     }
 
     fn bundle(&self, manifest: &Manifest, target: Target, inventory: &Inventory, admitted: &mut BTreeSet<String>) -> Result<()> {

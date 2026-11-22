@@ -1,0 +1,15 @@
+{
+  "op": "effect.catalog",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "cache_dir": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "cache_dir"
+    ],
+    "type": "object"
+  }
+}

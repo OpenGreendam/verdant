@@ -12,6 +12,11 @@
 //! - https://github.com/willosof/rew2fabfilter (MIT), log-frequency and Q encoding.
 //! - https://github.com/phierceweb/logicxkit (Apache-2.0),
 //!   src/logicxkit/data/translate/FabF_FQ4p.json: measured current shape/slope enums.
+//! - https://www.fabfilter.com/help/pro-c/using/styleandcharacter:
+//!   named character modes, drive meaning and pre/post routing.
+//! - https://www.fabfilter.com/help/pro-c/using/dynamicscontrols: 0..72 dB knee.
+//! - https://www.fabfilter.com/help/pro-r/using/maincontrols:
+//!   width percentage and input-triggered ducking range.
 //! Older Q1-derived slope enums in some writers are not valid for current Q4.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -315,15 +320,25 @@ fn translate_comp(mut p: Parameters, device: &str, version: u32) -> Result<FabFi
         let value = flag(take(&mut p,source,0.0),source)? as u8 as f64; t.set(target,value,source);
     }
     t.set("mix",100.0*take(&mut p,"Mix",1.0),"Mix");
+    // Current named FC3p fields use physical dB and the documented mode order.
+    // Validate enums separately: future encodings must not silently round.
+    match uint(take(&mut p,"Character",0.0),"Character",3) {
+        Ok(mode) => { t.set("character",mode as f64,"Character"); }
+        Err(error) => t.unsupported("Character",&error),
+    }
+    match uint(take(&mut p,"Character Routing",1.0),"Character Routing",1) {
+        Ok(mode) => { t.set("character_pre",(mode==0) as u8 as f64,"Character Routing"); }
+        Err(error) => t.unsupported("Character Routing",&error),
+    }
+    t.set("character_drive",take(&mut p,"Character Drive",0.0),"Character Drive");
     for source in ["Ratio","Attack","Release","Stereo Link"] {
         let value = required(&mut p,source)?;
         t.unsupported(source,&format!("归一化值 {value} 到物理量的转换尚未验证；保留原生默认值"));
     }
-    for source in ["Hold","Lookahead","Character","Character Drive","Character Routing","Side Chain Input","Side Chain Level",
+    for source in ["Hold","Lookahead","Side Chain Input","Side Chain Level",
         "Stereo Link Mode","Input Level","Output Level","Input Pan","Output Pan","Wet Gain","Wet Pan","Dry Pan","Bypass",
         "Audition Triggering","Host Trigger Offset"] {
-        let default = if source=="Character Routing"{1.0}else{0.0};
-        t.neutral(&mut p,source,default,"该增益/时间/路由映射尚未验证");
+        t.neutral(&mut p,source,0.0,"该增益/时间/路由映射尚未验证");
     }
     t.neutral(&mut p,"Dry Gain",-1.0,"独立干声增益尚无经过验证的映射");
     for source in ["Maximum Lookahead","Host Trigger Sync","Host Trigger Length","Stereo Link Center","Stereo Link Surrounds",
@@ -374,10 +389,13 @@ fn translate_reverb(mut p: Parameters,device:&str,version:u32)->Result<FabFilter
     for(source,target)in[("Distance","distance"),("Thickness","thickness")] {
         t.set(target,100.0*required(&mut p,source)?,source);
     }
-    for source in["Space","Brightness","Character","Stereo Width"] {
+    t.set("ducking",take(&mut p,"Ducking",0.0),"Ducking");
+    t.set("width",100.0*required(&mut p,"Stereo Width")?,"Stereo Width");
+    t.warn("Stereo Width","保留宽度百分比；原厂内部声道互馈与 Verdant 的独立宽度算法不保证相同");
+    for source in["Space","Brightness","Character"] {
         let v=required(&mut p,source)?;t.unsupported(source,&format!("归一化值 {v} 的房间/音色模型映射未验证"));
     }
-    for source in["Predelay","Predelay Offset","Predelay Sync","Auto Gate Offset","Auto Gate Sync","Ducking","Input Level",
+    for source in["Predelay","Predelay Offset","Predelay Sync","Auto Gate Offset","Auto Gate Sync","Input Level",
         "Output Level","Input Pan","Output Pan","Bypass"] {
         t.neutral(&mut p,source,0.0,"时间、音量或路由转换尚未验证");
     }
@@ -649,6 +667,48 @@ mod tests {
         assert!(import_fabfilter_preset(&bytes,dsp::MULTIBAND_ID).is_err());
         bytes[8..12].copy_from_slice(&149u32.to_le_bytes());
         assert!(inspect_fabfilter_preset(&bytes,dsp::MULTIBAND_ID).is_err());
+    }
+
+    #[test]
+    fn c3_preserves_character_mode_signed_drive_and_routing_without_guessing() {
+        let header="Style=0\nThreshold=-20\nKnee=72\nRange=40\nRatio=0.56\nAttack=0.1\nRelease=0.3\nStereo Link=0.4\n";
+        for drive in [-24.0,-12.0,0.0,12.0,24.0] {
+            for route in [0,1] {
+                let fields=format!("{header}Character=2\nCharacter Drive={drive}\nCharacter Routing={route}\n");
+                let bytes=text_family("FC3p",2,&fields,&["Side Chain"]);
+                let report=inspect_fabfilter_preset(&bytes,dsp::COMPRESSOR_ID).unwrap();
+                assert_eq!(value(&report,"knee"),72.0);
+                assert_eq!(value(&report,"character"),2.0);
+                assert_eq!(value(&report,"character_drive"),drive);
+                assert_eq!(value(&report,"character_pre"),(route==0) as u8 as f64);
+                assert!(!report.unsupported.iter().any(|s|s.starts_with("Character")));
+                assert!(report.unsupported.iter().any(|s|s.starts_with("Ratio")));
+                assert!(import_fabfilter_preset(&bytes,dsp::COMPRESSOR_ID).is_err());
+            }
+        }
+        let fields=format!("{header}Character=9\nCharacter Drive=99\nCharacter Routing=0.5\n");
+        let report=inspect_fabfilter_preset(&text_family("FC3p",2,&fields,&["Side Chain"]),dsp::COMPRESSOR_ID).unwrap();
+        for (id,source) in [("character","Character"),("character_drive","Character Drive"),("character_pre","Character Routing")] {
+            assert_eq!(value(&report,id),dsp::spec_for(dsp::COMPRESSOR_ID,id).unwrap().default);
+            assert!(report.unsupported.iter().any(|s|s.starts_with(&format!("{source}："))));
+        }
+    }
+
+    #[test]
+    fn r2_preserves_ducking_db_and_width_ratio_and_rejects_out_of_range_values() {
+        let header="Mix=30\nAuto Gate=250\nStyle=2\nDistance=0.25\nThickness=-0.5\nSpace=0.5\nBrightness=0.5\nCharacter=0.3\n";
+        let fields=format!("{header}Stereo Width=1.2\nDucking=18\n");
+        let report=inspect_fabfilter_preset(&text_family("FR2p",6,&fields,&["Decay","Post"]),dsp::REVERB_ID).unwrap();
+        assert_eq!(value(&report,"width"),120.0);
+        assert_eq!(value(&report,"ducking"),18.0);
+        assert!(!report.unsupported.iter().any(|s|s.starts_with("Stereo Width")||s.starts_with("Ducking")));
+        assert!(report.warnings.iter().any(|s|s.starts_with("Stereo Width")));
+        let fields=format!("{header}Stereo Width=2\nDucking=-1\n");
+        let report=inspect_fabfilter_preset(&text_family("FR2p",6,&fields,&["Decay","Post"]),dsp::REVERB_ID).unwrap();
+        assert_eq!(value(&report,"width"),dsp::spec_for(dsp::REVERB_ID,"width").unwrap().default);
+        assert_eq!(value(&report,"ducking"),dsp::spec_for(dsp::REVERB_ID,"ducking").unwrap().default);
+        assert!(report.unsupported.iter().any(|s|s.starts_with("Stereo Width")));
+        assert!(report.unsupported.iter().any(|s|s.starts_with("Ducking")));
     }
 
 }

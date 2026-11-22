@@ -13,6 +13,15 @@ const TAPS: usize = 32;
 const PHASES: usize = 512;
 const SOURCE_BLOCK: usize = 128;
 
+/// Conservative engine frames requested during one physical callback:
+/// rate conversion plus one prefetch block and the initial filter lookahead.
+/// The bound also covers a renderer that previously used a different rate.
+pub fn source_callback_frame_bound(source_rate:u32,device_rate:u32,device_frames:usize)->usize{
+    assert!(source_rate>0&&device_rate>0&&device_frames>0&&device_frames<=MAX_BLOCK);
+    ((device_frames as u64*source_rate as u64).div_ceil(device_rate as u64) as usize)
+        .saturating_add(SOURCE_BLOCK+TAPS/2)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CallbackBufferError {
     pub frames: usize,
@@ -32,6 +41,7 @@ pub struct CallbackRenderer {
     rt: RtState,
     sample_rate: u32,
     device_rate: u32,
+    callback_frame_bound: usize,
     scratch: Vec<f32>,
     source: [f32; SOURCE_BLOCK * 2],
     source_at: usize,
@@ -56,6 +66,7 @@ impl CallbackRenderer {
             rt,
             sample_rate,
             device_rate: sample_rate,
+            callback_frame_bound: MAX_BLOCK,
             scratch: vec![0.0; MAX_BLOCK * 2],
             source: [0.0; SOURCE_BLOCK * 2],
             source_at: SOURCE_BLOCK,
@@ -70,6 +81,14 @@ impl CallbackRenderer {
             monitor_history:[[0.;2];TAPS],monitor_head:0,monitor_phase:0.,
             monitor_primed:false,monitor_paused:false,
         }
+    }
+
+    /// The physical driver must honor this negotiated whole-callback bound.
+    /// Configure only while its previous callback owner has been retired.
+    pub fn set_callback_frame_bound(&mut self, frames:usize)->Result<(),DeviceError>{
+        if frames==0||frames>MAX_BLOCK{return Err(DeviceError::new(DeviceErrorKind::UnsupportedConfig,
+            format!("callback bound must be within 1..={MAX_BLOCK} frames")));}
+        self.callback_frame_bound=frames;Ok(())
     }
 
     pub fn validate_device_rate(rate: u32) -> Result<(), DeviceError> {
@@ -139,9 +158,9 @@ impl CallbackRenderer {
             return Ok(());
         }
         let frames = out.len().div_ceil(channels);
-        if frames > MAX_BLOCK {
+        if frames > self.callback_frame_bound {
             out.fill(0.0);
-            return Err(CallbackBufferError { frames, max_frames: MAX_BLOCK });
+            return Err(CallbackBufferError { frames, max_frames: self.callback_frame_bound });
         }
         self.rt.process(out, channels);
         Ok(())
@@ -155,9 +174,9 @@ impl CallbackRenderer {
             return Ok(());
         }
         let requested = out.len().div_ceil(channels);
-        if requested > MAX_BLOCK {
+        if requested > self.callback_frame_bound {
             out.fill(T::from_f32(0.0));
-            return Err(CallbackBufferError { frames: requested, max_frames: MAX_BLOCK });
+            return Err(CallbackBufferError { frames: requested, max_frames: self.callback_frame_bound });
         }
         let frames = out.len() / channels;
         if self.adapted {
@@ -170,6 +189,12 @@ impl CallbackRenderer {
                 self.head = 0;
                 self.phase = 0.0;
                 self.primed = false;
+            }
+            if !self.rt.callback_budget_ready(){
+                // Preserve the conversion phase and prefetched PCM while a
+                // new device budget awaits its matching PDC/timeline receipt.
+                self.rt.process_prepared(&mut [],2);
+                out.fill(T::from_f32(0.0));return Ok(());
             }
             let monitor=self.rt.explicitly_paused()&&self.rt.has_monitor_source();
             if self.rt.explicitly_paused()&&!monitor {

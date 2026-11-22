@@ -18,7 +18,7 @@
 //! Protocol — `in_seq`/`out_seq` count completed blocks (0 at init):
 //! - RT writer: fill `in_slot[n % RING_SLOTS]`, publish `in_seq`, wake host.
 //! - Host: drain complete input quanta in order, publish corresponding output.
-//! - RT reader consumes output 37 quanta later. The delay covers an entire
+//! - RT reader consumes output after a negotiated number of quanta (at most 37). The delay covers an entire
 //!   8192-frame device callback at >=44.1 kHz, source prefetch, and partial DSP
 //!   alignment at the fixed 48 kHz processing rate. A callback never
 //!   depends on DSP for audio it submitted during that same callback.
@@ -191,7 +191,7 @@ impl Ring {
             return Err(PluginError::Shm("bad ring magic/version".into()));
         }
         let max = h.max_frames.load(Ordering::Relaxed) as usize;
-        if max == 0 || max > MAX_BLOCK_FRAMES || ring_len(max) != len {
+        if max == 0 || max > MAX_BLOCK_FRAMES || !imp::mapping_len_matches(ring_len(max), len)? {
             return Err(PluginError::Shm("ring size mismatch".into()));
         }
         Ok(ring)
@@ -613,6 +613,15 @@ impl Channel {
 }
 
 #[cfg(unix)]
+fn posix_shm_name(id: uuid::Uuid) -> std::ffi::CString {
+    use base64::Engine as _;
+    // Darwin permits 31 name bytes, excluding NUL. Unpadded URL-safe base64
+    // retains all 16 UUID bytes in a 27-byte name, with no interior slash.
+    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(id.as_bytes());
+    std::ffi::CString::new(format!("/vdt-{token}")).expect("base64 UUID has no NUL")
+}
+
+#[cfg(unix)]
 mod imp {
     use super::*;
 
@@ -629,9 +638,23 @@ mod imp {
         Ok(Ring { ptr, len: ring_len(max_frames), imp })
     }
 
+    pub fn page_rounded_len(len: usize) -> Result<usize> {
+        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+        let page_size = usize::try_from(page_size).ok().filter(|size| *size != 0)
+            .ok_or_else(|| PluginError::Shm("invalid system page size".into()))?;
+        len.checked_add(page_size - 1)
+            .map(|len| len / page_size * page_size)
+            .ok_or_else(|| PluginError::Shm("mapping length overflow".into()))
+    }
+
+    pub fn mapping_len_matches(logical_len: usize, mapped_len: usize) -> Result<bool> {
+        // Darwin's shm ftruncate stores the page-rounded allocation size, and
+        // fstat returns that size. Accept only that padding or the exact length.
+        Ok(mapped_len == logical_len || mapped_len == page_rounded_len(logical_len)?)
+    }
+
     pub fn map_new(len: usize) -> Result<(*mut u8, RingImp)> {
-        let name = format!("/verdant-ph-{}", uuid::Uuid::new_v4().as_simple());
-        let cname = std::ffi::CString::new(name).unwrap();
+        let cname = posix_shm_name(uuid::Uuid::new_v4());
         unsafe {
             let fd = libc::shm_open(
                 cname.as_ptr(),
@@ -670,6 +693,7 @@ mod imp {
         let ShmConn::Fd(fd) = conn else {
             return Err(PluginError::Shm("unix ring attach needs an fd".into()));
         };
+        let max_len = page_rounded_len(ring_len(MAX_BLOCK_FRAMES))?;
         let fd = unsafe { libc::fcntl(*fd, libc::F_DUPFD_CLOEXEC, 0) };
         if fd < 0 { return Err(io::Error::last_os_error().into()); }
         unsafe {
@@ -679,7 +703,7 @@ mod imp {
                 return Err(PluginError::Shm(io::Error::last_os_error().to_string()));
             }
             let len = st.st_size as usize;
-            if len < HEADER_SIZE || len > ring_len(MAX_BLOCK_FRAMES) {
+            if len < HEADER_SIZE || len > max_len {
                 libc::close(fd);
                 return Err(PluginError::Shm("invalid mapping length".into()));
             }
@@ -909,6 +933,10 @@ mod imp {
         Ok(Ring { ptr, len: ring_len(max_frames), imp })
     }
 
+    pub fn mapping_len_matches(logical_len: usize, mapped_len: usize) -> Result<bool> {
+        Ok(mapped_len == logical_len)
+    }
+
     fn name(tag: &str) -> String {
         format!("Local\\verdant-ph-{tag}-{}", uuid::Uuid::new_v4().as_simple())
     }
@@ -1132,6 +1160,20 @@ pub(crate) fn channel(max_frames: usize) -> Result<Channel> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    #[test]
+    fn posix_shm_name_fits_darwin_and_preserves_uuid() {
+        use base64::Engine as _;
+        for byte in [0, 0xff, 0xfb] {
+            let id = uuid::Uuid::from_bytes([byte; 16]);
+            let name = posix_shm_name(id);
+            assert!(name.as_bytes().len() <= 31, "Darwin PSHMNAMLEN includes the leading slash");
+            let token = name.to_str().unwrap().strip_prefix("/vdt-").unwrap();
+            assert!(token.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')));
+            assert_eq!(base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(token).unwrap(), id.as_bytes());
+        }
+    }
+
     #[test]
     fn header_layout() {
         assert_eq!(std::mem::size_of::<RingHeader>(), HEADER_SIZE);
@@ -1254,6 +1296,74 @@ mod tests {
             ring.header().magic.store(0, Ordering::Relaxed);
             assert!(Ring::attach(&ShmConn::Fd(ring.imp)).is_err());
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn attach_accepts_page_padded_rings_including_max_capacity() {
+        for max_frames in [64, MAX_BLOCK_FRAMES] {
+            let logical_len = ring_len(max_frames);
+            let padded_len = imp::page_rounded_len(logical_len).unwrap();
+            assert!(padded_len > logical_len);
+            // Use a fresh allocation: Darwin permits only one ftruncate per
+            // shm object. Linux now exercises the same padded fstat length.
+            let (ptr, imp) = imp::map_new(padded_len).unwrap();
+            let ring = Ring { ptr, len: padded_len, imp };
+            ring.init(max_frames);
+            let attached = Ring::attach(&ShmConn::Fd(ring.imp)).unwrap();
+            assert_eq!(attached.len, padded_len);
+            assert_eq!(attached.max_frames(), max_frames);
+
+            let (left, right) = (vec![0.25; max_frames], vec![-0.5; max_frames]);
+            ring.write_input(0, &left, &right).unwrap();
+            let (mut read_left, mut read_right) = (vec![0.0; max_frames], vec![0.0; max_frames]);
+            assert_eq!(attached.read_input(0, &mut read_left, &mut read_right).unwrap(), max_frames);
+            assert_eq!((&read_left, &read_right), (&left, &right));
+            attached.write_output(0, &read_left, &read_right).unwrap();
+            read_left.fill(0.0);
+            read_right.fill(0.0);
+            assert!(ring.read_output(0, &mut read_left, &mut read_right).unwrap());
+            assert_eq!((&read_left, &read_right), (&left, &right));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn attach_rejects_short_oversized_and_malformed_mappings() {
+        let page_size = imp::page_rounded_len(1).unwrap();
+        let logical_len = ring_len(64);
+        let padded_len = imp::page_rounded_len(logical_len).unwrap();
+        assert!(!imp::mapping_len_matches(logical_len, logical_len - 1).unwrap());
+        assert!(!imp::mapping_len_matches(logical_len, logical_len + 1).unwrap());
+        for (len, max_frames, magic, version) in [
+            // Physically shorter even when Darwin rounds ftruncate upward.
+            (padded_len - page_size, 64, MAGIC, RING_VERSION),
+            (padded_len + page_size, 64, MAGIC, RING_VERSION),
+            (imp::page_rounded_len(ring_len(MAX_BLOCK_FRAMES)).unwrap() + page_size,
+                MAX_BLOCK_FRAMES, MAGIC, RING_VERSION),
+            (padded_len, 0, MAGIC, RING_VERSION),
+            (padded_len, MAX_BLOCK_FRAMES + 1, MAGIC, RING_VERSION),
+            (padded_len, 64, 0, RING_VERSION),
+            (padded_len, 64, MAGIC, RING_VERSION + 1),
+        ] {
+            let (ptr, imp) = imp::map_new(len).unwrap();
+            let ring = Ring { ptr, len, imp };
+            // Only the header is safe to initialize in a truncated mapping.
+            let header = ring.header();
+            header.magic.store(magic, Ordering::Relaxed);
+            header.version.store(version, Ordering::Relaxed);
+            header.max_frames.store(max_frames as u32, Ordering::Relaxed);
+            assert!(Ring::attach(&ShmConn::Fd(ring.imp)).is_err(),
+                "accepted len={len}, max_frames={max_frames}, magic={magic}, version={version}");
+        }
+        // An empty descriptor must be rejected before touching its header.
+        let name = posix_shm_name(uuid::Uuid::new_v4());
+        let fd = unsafe { libc::shm_open(name.as_ptr(), libc::O_RDWR | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC, 0o600) };
+        assert!(fd >= 0);
+        unsafe { libc::shm_unlink(name.as_ptr()); }
+        let result = Ring::attach(&ShmConn::Fd(fd));
+        unsafe { libc::close(fd); }
+        assert!(result.is_err());
     }
 
     #[test]

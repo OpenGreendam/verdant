@@ -1,0 +1,27 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "preset.list",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "category": {
+        "type": "string"
+      },
+      "device": {
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      },
+      "tags": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

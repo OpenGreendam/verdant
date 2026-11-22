@@ -1,0 +1,119 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "clip.set-properties",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "asset_paths": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "asset_roots": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "clips": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "track": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "track",
+            "id"
+          ],
+          "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "properties": {
+        "additionalProperties": false,
+        "properties": {
+          "fade_in_ms": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "fade_out_ms": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "fade_shape": {
+            "enum": [
+              "linear",
+              "equal_power"
+            ]
+          },
+          "gain_db": {
+            "maximum": 36,
+            "minimum": -120,
+            "type": "number"
+          },
+          "muted": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 512,
+            "type": "string"
+          },
+          "pan": {
+            "maximum": 1,
+            "minimum": -1,
+            "type": "number"
+          },
+          "playback_rate": {
+            "maximum": 16,
+            "minimum": 0.0625,
+            "type": "number"
+          },
+          "preserve_pitch": {
+            "type": "boolean"
+          },
+          "reversed": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "clips",
+      "properties"
+    ],
+    "type": "object"
+  }
+}

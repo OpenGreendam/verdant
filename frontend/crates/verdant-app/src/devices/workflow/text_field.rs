@@ -3,7 +3,7 @@ use super::*;
 use gpui::{App, AppContext, Bounds, ElementInputHandler, EntityInputHandler, FocusHandle, Point, Render, TextRun, UTF16Selection, point, size};
 use std::ops::Range;
 
-pub(super) struct TextField {
+pub(in crate::devices) struct TextField {
     pub text: verdant_session::TextEditState,
     pub focus: FocusHandle,
     label: String,
@@ -92,9 +92,15 @@ fn paint(entity: &Entity<TextField>, bounds: Bounds<Pixels>, window: &mut Window
     let cursor = line.x_for_index(state.cursor());
     let offset = (cursor - bounds.size.width + px(20.)).max(px(0.));
     let origin = point(bounds.left() + px(8.) - offset, bounds.top() + px(8.));
-    if !state.selection.is_empty() {
+    if focus.is_focused(window) && !state.selection.is_empty() {
         let start = line.x_for_index(state.selection.start); let end = line.x_for_index(state.selection.end);
         window.paint_quad(fill(Bounds::new(point(origin.x + start, origin.y), size(end - start, px(20.))), with_alpha(th.accent, 0.3)));
+    }
+    if state.text.is_empty() {
+        let placeholder: SharedString = view.label.clone().into();
+        let run = TextRun { len: placeholder.len(), font: window.text_style().font(), color: th.text_secondary.into(), background_color: None, underline: None, strikethrough: None };
+        let hint = window.text_system().shape_line(placeholder, px(14.), &[run], None);
+        let _ = hint.paint(origin, px(20.), gpui::TextAlign::Left, None, window, cx);
     }
     let _ = line.paint(origin, px(20.), gpui::TextAlign::Left, None, window, cx);
     if focus.is_focused(window) && state.selection.is_empty() {

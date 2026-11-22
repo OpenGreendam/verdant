@@ -1,0 +1,29 @@
+{
+  "example": {
+    "notes": [
+      {
+        "duration_tick": 960,
+        "id": "NEW_UNIQUE_NOTE_ID",
+        "lyric": "la",
+        "midi_note": 60,
+        "start_tick": 0
+      }
+    ],
+    "op": "insert_notes",
+    "track": "INSPECTED_TRACK_ID"
+  },
+  "fields": [
+    "track",
+    "notes"
+  ],
+  "identity": "Inspect stable IDs. New track/note IDs must be unique; preserve unknown fields when replacing existing records.",
+  "op": "insert_notes",
+  "units": {
+    "curve_tick": "Note-relative ticks; preserve the source note's duration and other fields.",
+    "detune_millicents": "Cents multiplied by 1000; 100 cents is 100000.",
+    "gain_millidecibels": "dB multiplied by 1000; -6 dB is -6000.",
+    "micro_bpm": "BPM multiplied by 1000000; 120 BPM is 120000000. null removes a nonzero tempo event.",
+    "pan_permille": "-1000 left through 0 center to 1000 right.",
+    "tick": "Project ticks; read project.ppq. One quarter note is ppq ticks."
+  }
+}

@@ -24,9 +24,9 @@ struct Region { start: i64, end: i64, kind: RegionKind }
 #[derive(Clone)]
 enum AuthoredTarget{Part(String),Audio(String)}
 #[derive(Clone)]
-struct AuthoredRegion{start:i64,end:i64,target:AuthoredTarget,label:String,muted:bool,fades:Option<AudioFades>}
+struct AuthoredRegion{start:i64,end:i64,target:AuthoredTarget,label:String,muted:bool,fades:Option<AudioFades>,clip:Option<std::sync::Arc<verdant_media::AudioClip>>}
 #[derive(Clone,Copy)]
-struct AudioFades{duration:u64,fade_in:u64,fade_out:u64,rate:u32}
+struct AudioFades{duration:u64,fade_in:u64,fade_out:u64,rate:f64}
 struct TrackPaintIndex {
     authored:Vec<AuthoredRegion>,
     low: i32,
@@ -55,8 +55,13 @@ impl ArrangeCache {
             for track in &project.tracks {
                 let (low, high, end) = track.notes.iter().fold((127, 0, 0), |(low, high, end), n| (low.min(n.midi_note), high.max(n.midi_note), end.max(n.end_tick())));
                 let mut authored=Vec::new();
-                if let Some(parts)=&parts{for part in parts.instances.iter().filter(|part|part.track==track.id){let linked=parts.instances.iter().filter(|other|other.content_id==part.content_id).count()>1;authored.push(AuthoredRegion{start:part.start_tick,end:part.start_tick+part.duration_tick,target:AuthoredTarget::Part(part.id.clone()),label:format!("{}{}",if linked{"↔ "}else{""},part.name),muted:part.muted,fades:None});}}
-                if let(Ok(clips),Some(tempo))=(verdant_media::read_clips(track),&tempo){for clip in clips{let end=tempo.tick_at(tempo.seconds_at(clip.start_tick as f64)+clip.duration_frames as f64/clip.source.sample_rate as f64).ceil()as i64;let name=std::path::Path::new(&clip.source.path).file_name().unwrap_or_default().to_string_lossy();authored.push(AuthoredRegion{start:clip.start_tick,end,target:AuthoredTarget::Audio(clip.id.to_string()),label:format!("♫ {name}"),muted:clip.muted,fades:Some(AudioFades{duration:clip.duration_frames,fade_in:clip.fade_in_frames,fade_out:clip.fade_out_frames,rate:clip.source.sample_rate})});}}
+                if let Some(parts)=&parts{for part in parts.instances.iter().filter(|part|part.track==track.id){let linked=parts.instances.iter().filter(|other|other.content_id==part.content_id).count()>1;authored.push(AuthoredRegion{start:part.start_tick,end:part.start_tick+part.duration_tick,target:AuthoredTarget::Part(part.id.clone()),label:format!("{}{}",if linked{"↔ "}else{""},part.name),muted:part.muted,fades:None,clip:None});}}
+                if let(Ok(clips),Some(tempo))=(verdant_media::read_clips(track),&tempo){for clip in clips{
+                    let end=clip.end_tick(tempo).ceil()as i64;
+                    let name=if clip.name.is_empty(){std::path::Path::new(&clip.source.path).file_name().unwrap_or_default().to_string_lossy().into_owned()}else{clip.name.clone()};
+                    let badge=format!("{}{}",if clip.reversed{" ↶"}else{""},if clip.playback_rate!=1.{format!(" · {:.2}×",clip.playback_rate)}else{String::new()});
+                    authored.push(AuthoredRegion{start:clip.start_tick,end,target:AuthoredTarget::Audio(clip.id.to_string()),label:format!("♫ {name}{badge}"),muted:clip.muted,fades:Some(AudioFades{duration:clip.duration_frames,fade_in:clip.fade_in_frames,fade_out:clip.fade_out_frames,rate:clip.source.sample_rate as f64*clip.playback_rate}),clip:Some(std::sync::Arc::new(clip))});
+                }}
                 self.tracks.insert(track.id.clone(), TrackPaintIndex { authored,low, high, start: track.notes.first().map(|n| n.start_tick).unwrap_or(0), end,
                     regions: Vec::new(), prefix_ends: Vec::new(), blocked_labels: Vec::new() });
             }
@@ -179,13 +184,15 @@ pub fn region_lanes(editor: Entity<Editor>) -> impl IntoElement {
         });
         window.insert_hitbox(bounds, HitboxBehavior::Normal)
     }, move |bounds, hitbox, window, cx| {
-        let mut texts = Texts::new(); paint_regions(&editor, bounds, window, cx, &mut texts); flush_texts(window, cx, bounds, texts);
+        let mut texts = Texts::new(); let mut labels = Vec::new();
+        paint_regions(&editor, bounds, window, cx, &mut texts, &mut labels); flush_texts(window, cx, bounds, texts);
+        for (clip_bounds, label) in labels { flush_texts(window, cx, clip_bounds, label); }
         let (e, h) = (editor.clone(), hitbox.clone());
         window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble || !h.is_hovered(window) { return; }
             let local = ev.position - bounds.origin;
             e.update(cx, |ed, cx| {
-                if region_down(ed,local.x.as_f32()as f64,local.y.as_f32()as f64,ev.button,ev.click_count,ev.modifiers.control,PointerId::Mouse,ev.position,window,cx){window.capture_pointer(h.id);cx.stop_propagation();}
+                if region_down(ed,local.x.as_f32()as f64,local.y.as_f32()as f64,ev.button,ev.click_count,ev.modifiers.control,ev.modifiers.shift,ev.modifiers.alt,PointerId::Mouse,ev.position,window,cx){window.capture_pointer(h.id);cx.stop_propagation();}
             });
         });
         let e=editor.clone();
@@ -196,10 +203,10 @@ pub fn region_lanes(editor: Entity<Editor>) -> impl IntoElement {
         window.on_mouse_event(move|ev:&TouchDragEvent,phase,window,cx|{
             if phase!=DispatchPhase::Bubble{return;}let p=ev.position-bounds.origin;
             e.update(cx,|ed,cx|match ev.phase{
-                TouchPhase::Started if h.is_hovered_at(ev.start_position,window)=>{let start=ev.start_position-bounds.origin;if region_down(ed,start.x.as_f32()as f64,start.y.as_f32()as f64,MouseButton::Left,1,false,PointerId::Touch(0),ev.start_position,window,cx){window.capture_pointer(h.id);window.prevent_default();}},
+                TouchPhase::Started if h.is_hovered_at(ev.start_position,window)=>{let start=ev.start_position-bounds.origin;if region_down(ed,start.x.as_f32()as f64,start.y.as_f32()as f64,MouseButton::Left,1,false,false,false,PointerId::Touch(0),ev.start_position,window,cx){window.capture_pointer(h.id);window.prevent_default();}},
                 TouchPhase::Moved=>region_moved(ed,PointerId::Touch(0),p.x.as_f32()as f64,p.y.as_f32()as f64,false,cx),
                 TouchPhase::Ended=>region_up(ed,PointerId::Touch(0),window,cx),
-                TouchPhase::Cancelled if ed.arrange_drag.as_ref().is_some_and(|drag|drag.pointer==PointerId::Touch(0))=>{ed.arrange_drag=None;window.release_pointer();cx.notify();},_=>{}
+                TouchPhase::Cancelled if ed.arrange_drag.as_ref().is_some_and(|drag|drag.pointer==PointerId::Touch(0))||ed.integrations.audio_edit.range_drag.as_ref().is_some_and(|drag|drag.pointer==PointerId::Touch(0))=>{ed.arrange_drag=None;ed.integrations.audio_edit.range_drag=None;window.release_pointer();cx.notify();},_=>{}
             });
         });
         install_timeline_scroll(&editor, bounds, &hitbox, window);
@@ -238,49 +245,26 @@ pub(crate) fn install_timeline_scroll(editor: &Entity<Editor>, bounds: Bounds<Pi
 #[derive(Clone, Copy)]
 enum AudioRegionEdit { SplitPlayhead, Split(i64), Join, Duplicate, Mute }
 
-fn edit_audio_region(ed: &mut Editor, edit: AudioRegionEdit, cx: &mut Context<Editor>) {
-    let result = (|| -> Result<(), String> {
-        if ed.arrange_drag.is_some() { return Err("先完成当前片段拖动".into()); }
-        let clip = ed.selected_audio_clip()?;
-        let mut clips = verdant_media::read_clips(ed.project().track(&clip.track).ok_or("音频轨道不存在")?).map_err(|e|e.to_string())?;
-        let index = clips.iter().position(|other| other.id == clip.id).ok_or("音频片段不存在")?;
-        let tempo = ed.tempo();
-        let playhead = tempo.tick_at(ed.playhead_seconds()).round() as i64;
-        let (label, selected) = match edit {
-            AudioRegionEdit::SplitPlayhead | AudioRegionEdit::Split(_) => {
-                let tick = if let AudioRegionEdit::Split(tick) = edit { tick } else { playhead };
-                let (left, right) = clip.split_at_tick(tick, &tempo).map_err(|e|e.to_string())?;
-                let id = right.id.to_string(); clips[index] = left; clips.push(right);
-                ("分割音频片段", id)
-            }
-            AudioRegionEdit::Join => {
-                let right = clips.iter().enumerate().filter(|(_, other)| other.id != clip.id && other.start_tick >= clip.start_tick)
-                    .min_by_key(|(_, other)| other.start_tick).map(|(i, _)|i).ok_or("右侧没有音频片段")?;
-                let joined = clip.join_right(&clips[right], &tempo).map_err(|e|e.to_string())?;
-                clips[index] = joined; clips.remove(right);
-                ("连接音频片段", clip.id.to_string())
-            }
-            AudioRegionEdit::Duplicate => {
-                let copy = clip.duplicate_at_tick(playhead).map_err(|e|e.to_string())?;
-                let id = copy.id.to_string(); clips.push(copy);
-                ("复制音频片段", id)
-            }
-            AudioRegionEdit::Mute => {
-                clips[index].muted = !clip.muted;
-                ("音频片段静音", clip.id.to_string())
-            }
-        };
-        let value = verdant_media::clips_value(clip.track.clone(), &clips).map_err(|e|e.to_string())?;
-        let command = Command::SetTrackData { track: clip.track.clone(), key: verdant_media::AUDIO_CLIPS_KEY.into(), value };
-        if !ed.commit(ed.revision(), CommandBatch::single(label, command), cx) { return Err("音频片段未提交".into()); }
-        ed.integrations.selected_clip = Some((clip.track, selected));
-        Ok(())
-    })();
-    if let Err(error) = result { ed.notice(error); }
-    cx.notify();
+fn edit_audio_region(ed:&mut Editor,edit:AudioRegionEdit,cx:&mut Context<Editor>){
+    use verdant_service::audio_edit::{AudioEdit,AudioClipRef,AudioClipProperties};
+    let result=(||->Result<(),String>{
+        if ed.arrange_drag.is_some(){return Err("先完成当前片段拖动".into());}
+        let clip=ed.selected_audio_clip()?;let clips=ed.audio_selection();let tick=ed.tempo().tick_at(ed.playhead_seconds());
+        let operation=match edit{
+            AudioRegionEdit::SplitPlayhead=>if let Some(range)=ed.integrations.audio_edit.range.clone(){AudioEdit::SplitRange{tracks:range.tracks,start_tick:range.start_tick,end_tick:range.end_tick}}else{AudioEdit::Split{clips,tick}},
+            AudioRegionEdit::Split(tick)=>AudioEdit::Split{clips:vec![AudioClipRef::from(&clip)],tick:tick as f64},
+            AudioRegionEdit::Join=>{
+                let mut selected=clips;
+                if selected.len()==1{let others=verdant_media::read_clips(ed.project().track(&clip.track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;let right=others.iter().filter(|other|other.id!=clip.id&&other.tick()>=clip.tick()).min_by(|a,b|a.tick().total_cmp(&b.tick())).ok_or("右侧没有片段")?;selected.push(AudioClipRef::from(right));}
+                AudioEdit::Join{clips:selected}
+            },
+            AudioRegionEdit::Duplicate=>AudioEdit::Duplicate{clips,at_tick:tick,target_track:None},
+            AudioRegionEdit::Mute=>AudioEdit::SetProperties{clips,properties:AudioClipProperties{muted:Some(!clip.muted),..Default::default()}},
+        };ed.apply_audio_edit(operation,cx)
+    })();if let Err(error)=result{ed.notice(error);}cx.notify();
 }
 
-fn paint_regions(editor: &Entity<Editor>, bounds: Bounds<Pixels>, window: &mut Window, cx: &App, texts: &mut Texts) {
+fn paint_regions(editor: &Entity<Editor>, bounds: Bounds<Pixels>, window: &mut Window, cx: &App, texts: &mut Texts, labels: &mut Vec<(Bounds<Pixels>, Texts)>) {
     let ed = editor.read(cx);
     let (th, vp, o) = (ed.theme, ed.arrange, bounds.origin);
     let (w, height) = (bounds.size.width.as_f32() as f64, bounds.size.height.as_f32() as f64);
@@ -363,45 +347,82 @@ fn paint_regions(editor: &Entity<Editor>, bounds: Bounds<Pixels>, window: &mut W
             }
             let has_parts=index.authored.iter().any(|region|matches!(region.target,AuthoredTarget::Part(_)));
             for region in &index.authored{
-                let mut start=region.start;let mut end=region.end;let mut row_y=y;
-                if let Some(drag)=ed.arrange_drag.as_ref().filter(|drag|drag.target.same(&region.target)&&drag.source_track==track.id){start=drag.start;end=drag.end;if let Some(row)=ed.project().tracks.iter().position(|track|track.id==drag.destination_track){row_y=row as f64*ed.arrange_track_height;}}
-                let left=vp.tick_to_x(start as f64).max(0.);let right=vp.tick_to_x(end as f64).min(w);if right<=left{continue;}
-                let(part,selected)=match &region.target{AuthoredTarget::Part(id)=>(true,ed.selected_part.as_ref()==Some(id)),AuthoredTarget::Audio(id)=>(false,ed.integrations.selected_clip.as_ref().is_some_and(|(t,c)|t==&track.id&&c==id))};
+                let mut start=region.clip.as_ref().map_or(region.start as f64,|clip|clip.tick());
+                let mut end=region.clip.as_ref().map_or(region.end as f64,|clip|clip.end_tick(&tempo));
+                let mut row_y=y;
+                let(part,selected)=match &region.target{
+                    AuthoredTarget::Part(id)=>(true,ed.selected_part.as_ref()==Some(id)),
+                    AuthoredTarget::Audio(id)=>(false,ed.integrations.audio_edit.selected.iter().any(|reference|reference.track==track.id&&reference.id.to_string()==*id)
+                        ||ed.integrations.selected_clip.as_ref().is_some_and(|(t,c)|t==&track.id&&c==id))
+                };
+                if let Some(drag)=&ed.arrange_drag{
+                    let primary=drag.target.same(&region.target)&&drag.source_track==track.id;
+                    let grouped=!part&&selected&&drag.mode==RegionDragMode::Move&&matches!(drag.target,AuthoredTarget::Audio(_));
+                    if primary||grouped{
+                        if grouped{let delta=drag.audio.as_ref().map_or((drag.start-drag.original_start)as f64,|audio|audio.delta);start+=delta;end=region.clip.as_ref().map_or(end+delta,|clip|tempo.tick_at(tempo.seconds_at(start)+clip.duration_seconds()));}
+                        else if let Some(audio)=&drag.audio{start=audio.start;end=audio.end;}
+                        else{start=drag.start as f64;end=drag.end as f64;}
+                        let origin=ed.project().tracks.iter().position(|track|track.id==drag.source_track).unwrap_or(0)as isize;
+                        let destination=ed.project().tracks.iter().position(|track|track.id==drag.destination_track).unwrap_or(0)as isize;
+                        row_y+=(destination-origin)as f64*ed.arrange_track_height;
+                    }
+                }
+                let left=vp.tick_to_x(start).max(0.);let right=vp.tick_to_x(end).min(w);if right<=left{continue;}
                 let top=row_y+if part||!has_parts{3.}else{27.};let body=if part{21.}else if has_parts{(ed.arrange_track_height-30.).max(8.)}else{ed.arrange_track_height-6.};
-                let background=with_alpha(color,if region.muted{0.16}else{0.72});window.paint_quad(quad(b(left,top,(right-left).max(2.),body,o),px(3.),background,px(if selected{2.}else{1.}),if selected{th.text}else{color},BorderStyle::Solid));
-                if let AuthoredTarget::Audio(id)=&region.target{if let Some(preview)=ed.integrations.media_previews.get(id){
-                    let trimming=ed.arrange_drag.as_ref().is_some_and(|drag|drag.target.same(&region.target)&&matches!(drag.mode,RegionDragMode::Left|RegionDragMode::Right));
-                    if !trimming&&preview.frame_count>0&&preview.bins>0&&body>18.{
-                        let start_seconds=tempo.seconds_at(start as f64);let middle=top+14.+(body-16.)*0.5;let amplitude=(body-18.)*0.45;
-                        for pixel in left.floor()as i64..right.ceil()as i64{
-                            let elapsed=tempo.seconds_at(vp.x_to_tick(pixel as f64))-start_seconds;if elapsed<0.{continue;}
-                            let frame=preview.start_frame+(elapsed*f64::from(preview.sample_rate)).round()as u64;if frame>=preview.start_frame+preview.frame_count{continue;}
-                            let bin=(((frame-preview.start_frame)as usize)*preview.bins/(preview.frame_count as usize)).min(preview.bins-1);
-                            let mut peak=0f32;for channel in 0..preview.channels as usize{let p=preview.peaks[bin*preview.channels as usize+channel];peak=peak.max(p.min.abs()).max(p.max.abs());}
-                            let peak=(f64::from(peak)).min(1.);window.paint_quad(fill(b(pixel as f64,middle-peak*amplitude,1.,(peak*amplitude*2.).max(1.),o),with_alpha(th.text,if region.muted{0.2}else{0.65})));
+                let background=with_alpha(color,if region.muted{0.16}else{0.72});
+                window.paint_quad(quad(b(left,top,(right-left).max(2.),body,o),px(4.),background,px(if selected{2.}else{1.}),if selected{th.text}else{color},BorderStyle::Solid));
+                if let (AuthoredTarget::Audio(id),Some(clip))=(&region.target,&region.clip){
+                    if let Some(preview)=ed.integrations.media_previews.get(id){
+                        let trimming=ed.arrange_drag.as_ref().is_some_and(|drag|drag.target.same(&region.target)&&matches!(drag.mode,RegionDragMode::Left|RegionDragMode::Right));
+                        if !trimming&&preview.frame_count>0&&preview.bins>0&&body>21.{
+                            let seconds=tempo.seconds_at(start);let channels=preview.channels as usize;
+                            let lane_height=(body-17.)/channels as f64;
+                            for pixel in left.floor()as i64..right.ceil()as i64{
+                                let elapsed=tempo.seconds_at(vp.x_to_tick(pixel as f64))-seconds;if elapsed<0.{continue;}
+                                let playback_frame=(elapsed*clip.source.sample_rate as f64*clip.playback_rate).round()as u64;
+                                if playback_frame>=preview.frame_count{continue;}
+                                let source_frame=if clip.reversed{preview.frame_count-1-playback_frame}else{playback_frame};
+                                let bin=((source_frame as usize)*preview.bins/preview.frame_count as usize).min(preview.bins-1);
+                                let gain=clip.gain*clip.envelope_gain(playback_frame as f64);
+                                for channel in 0..channels{
+                                    let peak=preview.peaks[bin*channels+channel];let middle=top+15.+lane_height*(channel as f64+0.5);let amplitude=(lane_height*0.44).max(1.);
+                                    let min=(peak.min*gain).clamp(-1.,1.)as f64;let max=(peak.max*gain).clamp(-1.,1.)as f64;
+                                    window.paint_quad(fill(b(pixel as f64,middle-max*amplitude,1.,((max-min)*amplitude).max(1.),o),with_alpha(th.text,if region.muted{0.2}else{0.72})));
+                                }
+                            }
+                            if channels==2{window.paint_quad(fill(b(left,top+15.+lane_height,right-left,1.,o),with_alpha(th.text,0.12)));}
                         }
                     }
-                }}
-                if let Some(mut fades)=region.fades{
+                    let mut envelope=clip.as_ref().clone();
                     if let Some(drag)=ed.arrange_drag.as_ref().filter(|drag|drag.target.same(&region.target)){
-                        if drag.mode==RegionDragMode::FadeIn{fades.fade_in=drag.fade_frames;}
-                        if drag.mode==RegionDragMode::FadeOut{fades.fade_out=drag.fade_frames;}
+                        if drag.mode==RegionDragMode::FadeIn{envelope.fade_window=None;envelope.fade_in_frames=drag.fade_frames;}
+                        if drag.mode==RegionDragMode::FadeOut{envelope.fade_window=None;envelope.fade_out_frames=drag.fade_frames;}
                     }
-                    let seconds=tempo.seconds_at(start as f64);
-                    let fade_x=|frame:u64|vp.tick_to_x(tempo.tick_at(seconds+frame as f64/fades.rate as f64));
-                    let in_x=fade_x(fades.fade_in);let out_x=fade_x(fades.duration-fades.fade_out);
-                    if fades.fade_in>0||fades.fade_out>0{for pixel in left.floor()as i64..right.ceil()as i64{
-                        if pixel as f64>in_x&&((pixel+1)as f64)<out_x{continue;}
-                        let frame=((tempo.seconds_at(vp.x_to_tick(pixel as f64))-seconds)*fades.rate as f64).max(0.);
-                        let fade_in=if fades.fade_in>0{(frame/fades.fade_in.saturating_sub(1).max(1)as f64).clamp(0.,1.)}else{1.};
-                        let fade_out=if fades.fade_out>0{((fades.duration as f64-1.-frame)/fades.fade_out.saturating_sub(1).max(1)as f64).clamp(0.,1.)}else{1.};
-                        let gain=fade_in*fade_out;
-                        if gain<1.{window.paint_quad(fill(b(pixel as f64,top+3.+(1.-gain)*(body-6.),1.,1.,o),th.text));}
-                    }}
-                    if selected{for x in [in_x,out_x]{window.paint_quad(fill(b(x-3.,top+2.,6.,6.,o),th.text));}}
+                    let seconds=tempo.seconds_at(start);let rate=clip.source.sample_rate as f64*clip.playback_rate;
+                    if envelope.fade_in_frames>0||envelope.fade_out_frames>0||envelope.fade_window.is_some(){
+                        for pixel in left.floor()as i64..right.ceil()as i64{
+                            let frame=((tempo.seconds_at(vp.x_to_tick(pixel as f64))-seconds)*rate).max(0.);
+                            let gain=envelope.envelope_gain(frame)as f64;
+                            if gain<1.{window.paint_quad(fill(b(pixel as f64,top+3.+(1.-gain)*(body-6.),1.,1.,o),th.text));}
+                        }
+                    }
+                    if selected{
+                        let fade_x=|frame:u64|vp.tick_to_x(tempo.tick_at(seconds+frame as f64/rate));
+                        for x in [fade_x(envelope.fade_in_frames),fade_x(envelope.duration_frames-envelope.fade_out_frames)]{
+                            window.paint_quad(fill(b(x-3.,top+2.,6.,6.,o),th.text));
+                        }
+                    }
                 }
-                if right-left>22.{texts.push((region.label.clone(),gpui::point(o.x+px(left as f32+4.),o.y+px(top as f32+2.)),10.,th.text));}
+                if right-left>22.{labels.push((b(left+2.,top,(right-left-4.).max(0.),body,o),vec![(region.label.clone(),gpui::point(o.x+px(left as f32+5.),o.y+px(top as f32+2.)),10.,th.text)]));}
             }
+            if let Some(range)=ed.integrations.audio_edit.range.as_ref().filter(|range|range.tracks.contains(&track.id)){
+                let left=vp.tick_to_x(range.start_tick).max(0.);let right=vp.tick_to_x(range.end_tick).min(w);
+                if right>left{
+                    window.paint_quad(fill(b(left,y,right-left,ed.arrange_track_height,o),with_alpha(th.accent,0.14)));
+                    for x in [left,right-1.]{window.paint_quad(fill(b(x,y,1.,ed.arrange_track_height,o),th.accent));}
+                }
+            }
+
         }
     });
 }
@@ -463,7 +484,7 @@ pub(crate) fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut 
     })();
     match result{
         Ok(id)=>{
-            ed.integrations.selected_clip=None;ed.session.selection.clear();ed.selected_part=Some(id.clone());
+            ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;ed.session.selection.clear();ed.selected_part=Some(id.clone());
             if let Some(part)=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(&id).cloned()){
                 ed.bottom=Bottom::Editor;let vp=&mut ed.session.viewport;
                 let target=(part.start_tick as f64-vp.width*0.1/vp.px_per_tick).max(0.);let dx=(target-vp.start_tick)*vp.px_per_tick;vp.pan_px(dx,0.);
@@ -476,37 +497,54 @@ pub(crate) fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut 
 
 impl AuthoredTarget{fn same(&self,other:&Self)->bool{match(self,other){(Self::Part(a),Self::Part(b))|(Self::Audio(a),Self::Audio(b))=>a==b,_=>false}}}
 #[derive(Clone,Copy,PartialEq)]enum RegionDragMode{Move,Left,Right,FadeIn,FadeOut}
-pub struct RegionDrag{pointer:PointerId,press:(f64,f64),armed:bool,base:Revision,target:AuthoredTarget,source_track:TrackId,destination_track:TrackId,mode:RegionDragMode,origin_tick:i64,original_start:i64,original_end:i64,start:i64,end:i64,min_left:i64,max_right:i64,audio_seconds:Option<f64>,fade_frames:u64,original_fade_frames:u64}
+struct AudioDragGeometry{
+    original_start:f64,original_end:f64,start:f64,end:f64,delta:f64,
+    seconds:f64,rate:f64,before:u64,after:u64,duration:u64,group_min_start:f64,
+    destination_rows:(usize,usize),
+}
+pub struct RegionDrag{origin_raw:f64,audio:Option<AudioDragGeometry>,pointer:PointerId,press:(f64,f64),armed:bool,base:Revision,target:AuthoredTarget,source_track:TrackId,destination_track:TrackId,mode:RegionDragMode,origin_tick:i64,original_start:i64,original_end:i64,start:i64,end:i64,min_left:i64,max_right:i64,audio_seconds:Option<f64>,fade_frames:u64,original_fade_frames:u64}
 fn authored_hit(ed:&Editor,track:&TrackId,tick:f64,row_y:f64)->Option<AuthoredTarget>{
     let index=ed.arrange_cache.tracks.get(track)?;let has_parts=index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_)));
     index.authored.iter().rev().find(|region|tick>=region.start as f64&&tick<region.end as f64&&match region.target{AuthoredTarget::Part(_)=>row_y<27.,AuthoredTarget::Audio(_)=>!has_parts||row_y>=27.}).map(|region|region.target.clone())
 }
-fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
+fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,extend_selection:bool,unsnapped:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
     let row=(y/ed.arrange_track_height).floor()as usize;let Some(track)=ed.project().tracks.get(row).map(|t|t.id.clone())else{return false;};
     if !matches!(button,MouseButton::Left|MouseButton::Right)||!ed.select_track(track.clone(),cx){return false;}
     let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);window.focus(&ed.focus_arrange,cx);
-    let Some(target)=hit else{if button==MouseButton::Right{lane_menu(ed,track,tick,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}cx.notify();return false;};
-    use crate::editor::WorkflowAction as A;use crate::editor::integrations::IntegrationAction as IA;use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
+    if ed.integrations.audio_edit.range_tool&&button==MouseButton::Left{
+        let tick=if unsnapped{tick.max(0.)}else{arrange_snap(ed,tick).max(0)as f64};
+        ed.integrations.audio_edit.range_drag=Some(crate::editor::integrations::audio_edit_ui::RangeDrag{pointer,anchor_tick:tick,anchor_track:row});
+        ed.select_audio_range(crate::editor::integrations::audio_edit_ui::AudioRange{tracks:vec![track],start_tick:tick,end_tick:tick});
+        cx.notify();return true;
+    }
+    let Some(target)=hit else{if button==MouseButton::Right{lane_menu(ed,track,tick,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}else{ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;ed.run_menu_action(crate::editor::MenuAction::SeekTick(tick.max(0.).round()as i64),window,cx);}cx.notify();return false;};
+    use crate::editor::WorkflowAction as A;use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
     let(start,end,min_left,max_right,audio_seconds)=match &target{
         AuthoredTarget::Part(id)=>{
-            ed.integrations.selected_clip=None;
+            ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;
             ed.run_workflow(A::SelectPart(id.clone()),window,cx);let Ok(parts)=verdant_domain::parts::Parts::load(ed.project())else{return false;};let Some(part)=parts.instance(id)else{return false;};
             (part.start_tick,part.start_tick+part.duration_tick,(part.start_tick-part.source_offset_tick).max(0),i64::MAX,None)
         }
         AuthoredTarget::Audio(id)=>{
-            ed.integrations.selected_clip=Some((track.clone(),id.clone()));let Ok(clip)=ed.selected_audio_clip()else{return false;};let tempo=ed.tempo();let start_seconds=tempo.seconds_at(clip.start_tick as f64);let duration=clip.duration_frames as f64/clip.source.sample_rate as f64;
-            (clip.start_tick,tempo.tick_at(start_seconds+duration).ceil()as i64,tempo.tick_at((start_seconds-clip.source_offset_frames as f64/clip.source.sample_rate as f64).max(0.)).ceil()as i64,tempo.tick_at(start_seconds+(clip.source.frames-clip.source_offset_frames)as f64/clip.source.sample_rate as f64).floor()as i64,Some(duration))
+            ed.integrations.selected_clip=Some((track.clone(),id.clone()));let Ok(clip)=ed.selected_audio_clip()else{return false;};
+            ed.select_audio_clip(&clip,extend_selection,true);
+            if extend_selection&&button==MouseButton::Left{cx.notify();return false;}
+            let tempo=ed.tempo();let start_seconds=clip.start_seconds(&tempo);let duration=clip.duration_seconds();let rate=clip.source.sample_rate as f64*clip.playback_rate;
+            let before=if clip.reversed{clip.source.frames-clip.source_offset_frames-clip.duration_frames}else{clip.source_offset_frames};
+            let after=if clip.reversed{clip.source_offset_frames}else{clip.source.frames-clip.source_offset_frames-clip.duration_frames};
+            (clip.start_tick,clip.end_tick(&tempo).ceil()as i64,tempo.tick_at((start_seconds-before as f64/rate).max(0.)).ceil()as i64,tempo.tick_at(start_seconds+duration+after as f64/rate).floor()as i64,Some(duration))
         }
     };
     if button==MouseButton::Right{
         let items=match &target{AuthoredTarget::Part(id)=>{let muted=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(id).map(|p|p.muted)).unwrap_or(false);vec![
             I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("精确位置…",M::Workflow(A::MovePart)),I::action("精确裁剪…",M::Workflow(A::TrimPart)),I::separator(),
             I::action("在此分割",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制片段",M::Workflow(A::DuplicatePart(true))),I::action("独立复制片段",M::Workflow(A::DuplicatePart(false))),I::action("取消片段链接",M::Workflow(A::UnlinkPart)),I::separator(),
-            I::action("静音",M::Workflow(A::MutePart)).checked(muted),I::action("删除片段",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>vec![I::action("位置 / 裁剪 / 音量…",M::Workflow(A::Integration(IA::EditClip))),I::action("重新定位音源…",M::Workflow(A::Integration(IA::RelinkClip))),I::separator(),I::action("复制音频片段",M::Workflow(A::Integration(IA::DuplicateClip))),I::action("删除音频片段",M::Workflow(A::Integration(IA::DeleteClip)))]};ed.show_menu(position,items,window,cx);return false;
+            I::action("静音",M::Workflow(A::MutePart)).checked(muted),I::action("删除片段",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>ed.audio_menu_items()};ed.show_menu(position,items,window,cx);return false;
     }
     if split_at_click && matches!(target,AuthoredTarget::Audio(_)) {
         edit_audio_region(ed,AudioRegionEdit::Split(arrange_snap(ed,tick)),cx);return false;
     }
+    if clicks>=2&&matches!(target,AuthoredTarget::Audio(_)){let items=ed.audio_menu_items();ed.show_menu(position,items,window,cx);return false;}
     if clicks>=2{ed.bottom=Bottom::Editor;let target=(start as f64-ed.session.viewport.width*0.1/ed.session.viewport.px_per_tick).max(0.);let dx=(target-ed.session.viewport.start_tick)*ed.session.viewport.px_per_tick;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);cx.notify();return false;}
     let mut mode=if (x-ed.arrange.tick_to_x(start as f64)).abs()<7.{RegionDragMode::Left}else if(x-ed.arrange.tick_to_x(end as f64)).abs()<7.{RegionDragMode::Right}else{RegionDragMode::Move};
     let mut fade_frames=0;
@@ -514,7 +552,7 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
         if let Ok(clip)=ed.selected_audio_clip(){
             let has_parts=ed.arrange_cache.tracks.get(&track).is_some_and(|index|index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_))));
             let top=row as f64*ed.arrange_track_height+if has_parts{27.}else{3.};
-            let tempo=ed.tempo();let seconds=tempo.seconds_at(start as f64);let rate=clip.source.sample_rate as f64;
+            let tempo=ed.tempo();let seconds=tempo.seconds_at(start as f64);let rate=clip.source.sample_rate as f64*clip.playback_rate;
             let fade_in_x=ed.arrange.tick_to_x(tempo.tick_at(seconds+clip.fade_in_frames as f64/rate));
             let fade_out_x=ed.arrange.tick_to_x(tempo.tick_at(seconds+(clip.duration_frames-clip.fade_out_frames)as f64/rate));
             if y>=top&&y<top+10.{
@@ -523,16 +561,76 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
             }
         }
     }
-    ed.arrange_drag=Some(RegionDrag{pointer,press:(x,y),armed:false,base:ed.revision(),target,source_track:track.clone(),destination_track:track,mode,origin_tick:arrange_snap(ed,tick),original_start:start,original_end:end,start,end,min_left,max_right,audio_seconds,fade_frames,original_fade_frames:fade_frames});cx.notify();true
+    let audio=if matches!(target,AuthoredTarget::Audio(_)){
+        ed.selected_audio_clip().ok().map(|clip|{
+            let tempo=ed.tempo();let seconds=clip.start_seconds(&tempo);let rate=clip.source.sample_rate as f64*clip.playback_rate;
+            let selected=ed.audio_selection();let(mut min_row,mut max_row,mut minimum)=(row,row,clip.tick());
+            for(index,track)in ed.project().tracks.iter().enumerate(){
+                if let Ok(clips)=verdant_media::read_clips(track){for candidate in clips{
+                    if selected.iter().any(|reference|reference.track==track.id&&reference.id==candidate.id){
+                        min_row=min_row.min(index);max_row=max_row.max(index);minimum=minimum.min(candidate.tick());
+                    }
+                }}
+            }
+            AudioDragGeometry{original_start:clip.tick(),original_end:clip.end_tick(&tempo),
+                start:clip.tick(),end:clip.end_tick(&tempo),delta:0.,seconds,rate,
+                before:if clip.reversed{clip.source.frames-clip.source_offset_frames-clip.duration_frames}else{clip.source_offset_frames},
+                after:if clip.reversed{clip.source_offset_frames}else{clip.source.frames-clip.source_offset_frames-clip.duration_frames},
+                duration:clip.duration_frames,group_min_start:minimum,
+                destination_rows:(row-min_row,row+ed.project().tracks.len()-1-max_row)}
+        })
+    }else{None};
+    ed.arrange_drag=Some(RegionDrag{origin_raw:tick,audio,pointer,press:(x,y),armed:false,base:ed.revision(),target,source_track:track.clone(),destination_track:track,mode,origin_tick:arrange_snap(ed,tick),original_start:start,original_end:end,start,end,min_left,max_right,audio_seconds,fade_frames,original_fade_frames:fade_frames});cx.notify();true
 }
 fn region_moved(ed:&mut Editor,pointer:PointerId,x:f64,y:f64,unsnapped:bool,cx:&mut Context<Editor>){
+    if let Some(drag)=ed.integrations.audio_edit.range_drag.clone().filter(|drag|drag.pointer==pointer){
+        let tick=if unsnapped{ed.arrange.x_to_tick(x).max(0.)}else{arrange_snap(ed,ed.arrange.x_to_tick(x)).max(0)as f64};
+        let row=((y.max(0.)/ed.arrange_track_height).floor()as usize).min(ed.project().tracks.len().saturating_sub(1));
+        let tracks=ed.project().tracks[drag.anchor_track.min(row)..=drag.anchor_track.max(row)].iter().map(|track|track.id.clone()).collect();
+        ed.select_audio_range(crate::editor::integrations::audio_edit_ui::AudioRange{tracks,start_tick:drag.anchor_tick.min(tick),end_tick:drag.anchor_tick.max(tick)});
+        cx.notify();return;
+    }
+
     // A press only becomes a drag after DRAG_THRESHOLD px, so a click selects.
     let Some(drag)=ed.arrange_drag.as_mut().filter(|drag|drag.pointer==pointer)else{return;};
     if !drag.armed{if !crossed_drag_threshold(drag.press,(x,y)){return;}drag.armed=true;}
-    let tick=ed.arrange.x_to_tick(x);let at=if unsnapped{tick.round()as i64}else{arrange_snap(ed,tick)};let tempo=ed.tempo();let destination=ed.project().tracks.get((y.max(0.)/ed.arrange_track_height).floor()as usize).map(|t|t.id.clone());
+    let tick=ed.arrange.x_to_tick(x);let at=if unsnapped{tick.round()as i64}else{arrange_snap(ed,tick)};let tempo=ed.tempo();
+    let mut destination_row=(y.max(0.)/ed.arrange_track_height).floor()as usize;
+    if let Some(audio)=ed.arrange_drag.as_ref().and_then(|drag|drag.audio.as_ref()){
+        destination_row=destination_row.clamp(audio.destination_rows.0,audio.destination_rows.1);
+    }
+    let destination=ed.project().tracks.get(destination_row).map(|t|t.id.clone());
     let fades=ed.arrange_drag.as_ref().and_then(|drag|ed.arrange_cache.tracks.get(&drag.source_track)
         .and_then(|index|index.authored.iter().find(|region|region.target.same(&drag.target))).and_then(|region|region.fades));
     let Some(drag)=ed.arrange_drag.as_mut().filter(|drag|drag.pointer==pointer)else{return;};let delta=at.saturating_sub(drag.origin_tick);
+    if let Some(audio)=&mut drag.audio{
+        let delta=if unsnapped{tick-drag.origin_raw}else{delta as f64};
+        match drag.mode{
+            RegionDragMode::Move=>{
+                audio.delta=delta.max(-audio.group_min_start);
+                audio.start=audio.original_start+audio.delta;
+                audio.end=tempo.tick_at(tempo.seconds_at(audio.start)+audio.duration as f64/audio.rate);
+                if let Some(destination)=destination{drag.destination_track=destination;}
+            }
+            RegionDragMode::Left=>{
+                let frames=((tempo.seconds_at((audio.original_start+delta).max(0.))-audio.seconds)*audio.rate).round()
+                    .clamp(-(audio.before as f64),(audio.duration-1)as f64)
+                    .max((-audio.seconds*audio.rate).ceil());
+                audio.start=tempo.tick_at(audio.seconds+frames/audio.rate);
+            }
+            RegionDragMode::Right=>{
+                let frames=((tempo.seconds_at((audio.original_end+delta).max(0.))-audio.seconds)*audio.rate).round()
+                    .clamp(1.,(audio.duration+audio.after)as f64);
+                audio.end=tempo.tick_at(audio.seconds+frames/audio.rate);
+            }
+            RegionDragMode::FadeIn|RegionDragMode::FadeOut=>{
+                let frame=((tempo.seconds_at(tick)-audio.seconds)*audio.rate).round().clamp(0.,audio.duration as f64)as u64;
+                drag.fade_frames=if drag.mode==RegionDragMode::FadeIn{frame}else{audio.duration-frame};
+            }
+        }
+        drag.start=audio.start.floor()as i64;drag.end=audio.end.ceil()as i64;
+        cx.notify();return;
+    }
     match drag.mode{
         RegionDragMode::Move=>{drag.start=drag.original_start.saturating_add(delta).max(0);drag.end=if let Some(seconds)=drag.audio_seconds{tempo.tick_at(tempo.seconds_at(drag.start as f64)+seconds).ceil()as i64}else{drag.start+drag.original_end-drag.original_start};if let Some(destination)=destination{drag.destination_track=destination;}},
         RegionDragMode::Left=>{drag.start=drag.original_start.saturating_add(delta).clamp(drag.min_left,drag.original_end-1);},
@@ -544,23 +642,55 @@ fn region_moved(ed:&mut Editor,pointer:PointerId,x:f64,y:f64,unsnapped:bool,cx:&
     }cx.notify();
 }
 fn region_up(ed:&mut Editor,pointer:PointerId,window:&mut Window,cx:&mut Context<Editor>){
+    if ed.integrations.audio_edit.range_drag.as_ref().is_some_and(|drag|drag.pointer==pointer){
+        ed.integrations.audio_edit.range_drag=None;window.release_pointer();cx.notify();return;
+    }
+
     if !ed.arrange_drag.as_ref().is_some_and(|drag|drag.pointer==pointer){return;}let drag=ed.arrange_drag.take().unwrap();window.release_pointer();
+    if !drag.armed {
+        if matches!(drag.target,AuthoredTarget::Audio(_)) {
+            if let Ok(clip)=ed.selected_audio_clip(){ed.select_audio_clip(&clip,false,false);}
+        }
+        cx.notify();return;
+    }
     if drag.base!=ed.revision(){ed.notice("片段拖动期间工程已改变，未写入预览");cx.notify();return;}
-    if drag.start==drag.original_start&&drag.end==drag.original_end&&drag.source_track==drag.destination_track&&drag.fade_frames==drag.original_fade_frames{cx.notify();return;}
+    if drag.start==drag.original_start&&drag.end==drag.original_end&&drag.source_track==drag.destination_track&&drag.fade_frames==drag.original_fade_frames&&drag.audio.as_ref().is_none_or(|audio|audio.start==audio.original_start&&audio.end==audio.original_end){cx.notify();return;}
     let result=(||->Result<(),String>{match drag.target{
         AuthoredTarget::Part(id)=>{let mut parts=verdant_domain::parts::Parts::load(ed.project())?;let part=parts.instances.iter_mut().find(|part|part.id==id).ok_or("片段已不存在")?;if drag.mode==RegionDragMode::Left{part.source_offset_tick+=drag.start-drag.original_start;}part.start_tick=drag.start;part.duration_tick=drag.end-drag.start;part.track=drag.destination_track.clone();parts.validate(ed.project())?;if !ed.commit(drag.base,CommandBatch::single("拖动片段",parts.command()),cx){return Err("片段未提交".into());}}
         AuthoredTarget::Audio(id)=>{
-            let source=ed.project().track(&drag.source_track).ok_or("音频轨道不存在")?;let mut source_clips=verdant_media::read_clips(source).map_err(|e|e.to_string())?;let index=source_clips.iter().position(|c|c.id.to_string()==id).ok_or("音频片段不存在")?;let mut clip=source_clips.remove(index);let tempo=ed.tempo();
-            if drag.mode==RegionDragMode::Left{let frames=((tempo.seconds_at(drag.start as f64)-tempo.seconds_at(drag.original_start as f64))*clip.source.sample_rate as f64).round()as i64;let offset=clip.source_offset_frames as i128+frames as i128;let duration=clip.duration_frames as i128-frames as i128;if offset<0||duration<1{return Err("音源裁剪超出范围".into());}clip.source_offset_frames=offset as u64;clip.duration_frames=duration as u64;}
-            else if drag.mode==RegionDragMode::Right{clip.duration_frames=((tempo.seconds_at(drag.end as f64)-tempo.seconds_at(drag.original_start as f64))*clip.source.sample_rate as f64).round()as u64;}
-            else if drag.mode==RegionDragMode::FadeIn{clip.fade_in_frames=drag.fade_frames;}
-            else if drag.mode==RegionDragMode::FadeOut{clip.fade_out_frames=drag.fade_frames;}
-            clip.fade_in_frames=clip.fade_in_frames.min(clip.duration_frames);clip.fade_out_frames=clip.fade_out_frames.min(clip.duration_frames);
-            clip.start_tick=drag.start;clip.track=drag.destination_track.clone();clip.validate().map_err(|e|e.to_string())?;let mut commands=Vec::new();
-            if drag.destination_track==drag.source_track{source_clips.push(clip.clone());commands.push(Command::SetTrackData{track:drag.source_track.clone(),key:verdant_media::AUDIO_CLIPS_KEY.into(),value:verdant_media::clips_value(drag.source_track.clone(),&source_clips).map_err(|e|e.to_string())?});}
-            else{let mut destination=verdant_media::read_clips(ed.project().track(&drag.destination_track).ok_or("目标轨道不存在")?).map_err(|e|e.to_string())?;destination.push(clip.clone());commands.push(Command::SetTrackData{track:drag.source_track.clone(),key:verdant_media::AUDIO_CLIPS_KEY.into(),value:verdant_media::clips_value(drag.source_track.clone(),&source_clips).map_err(|e|e.to_string())?});commands.push(Command::SetTrackData{track:drag.destination_track.clone(),key:verdant_media::AUDIO_CLIPS_KEY.into(),value:verdant_media::clips_value(drag.destination_track.clone(),&destination).map_err(|e|e.to_string())?});}
-            if !ed.commit(drag.base,CommandBatch{label:"拖动音频片段".into(),commands},cx){return Err("音频片段未提交".into());}ed.integrations.selected_clip=Some((clip.track,clip.id.to_string()));
+            use verdant_service::audio_edit::{AudioEdit,AudioClipRef,AudioClipProperties};
+            let clip=verdant_media::read_clips(ed.project().track(&drag.source_track).ok_or("音频轨道不存在")?).map_err(|e|e.to_string())?.into_iter().find(|clip|clip.id.to_string()==id).ok_or("音频片段不存在")?;
+            let reference=AudioClipRef::from(&clip);let tempo=ed.tempo();let rate=clip.source.sample_rate as f64*clip.playback_rate;
+            let operation=match drag.mode{
+                RegionDragMode::Move=>{
+                    let source=ed.project().tracks.iter().position(|track|track.id==drag.source_track).ok_or("源轨道不存在")?as i32;
+                    let destination=ed.project().tracks.iter().position(|track|track.id==drag.destination_track).ok_or("目标轨道不存在")?as i32;
+                    AudioEdit::Move{clips:ed.audio_selection(),delta_ticks:drag.audio.as_ref().map_or((drag.start-drag.original_start)as f64,|audio|audio.delta),track_offset:destination-source}
+                },
+                RegionDragMode::Left=>{
+                    let start=drag.audio.as_ref().map_or(drag.start as f64,|audio|audio.start);
+                    let frames=((tempo.seconds_at(start)-clip.start_seconds(&tempo))*rate).round()as i128;
+                    let offset=clip.source_offset_frames as i128+if clip.reversed{0}else{frames};
+                    let duration=clip.duration_frames as i128-frames;
+                    if offset<0||duration<1{return Err("音源裁剪超出范围".into());}
+                    let start=tempo.tick_at(clip.start_seconds(&tempo)+frames as f64/rate);
+                    AudioEdit::Trim{clip:reference,source_offset_frames:offset as u64,duration_frames:duration as u64,start_tick:Some(start)}
+                },
+                RegionDragMode::Right=>{
+                    let end=drag.audio.as_ref().map_or(drag.end as f64,|audio|audio.end);
+                    let duration=((tempo.seconds_at(end)-clip.start_seconds(&tempo))*rate).round()as i128;
+                    let offset=clip.source_offset_frames as i128+if clip.reversed{clip.duration_frames as i128-duration}else{0};
+                    if offset<0||duration<1{return Err("音源裁剪超出范围".into());}
+                    AudioEdit::Trim{clip:reference,source_offset_frames:offset as u64,duration_frames:duration as u64,start_tick:None}
+                },
+                RegionDragMode::FadeIn|RegionDragMode::FadeOut=>{
+                    let mut properties=AudioClipProperties::default();let milliseconds=drag.fade_frames as f64/rate*1000.;
+                    if drag.mode==RegionDragMode::FadeIn{properties.fade_in_ms=Some(milliseconds);}else{properties.fade_out_ms=Some(milliseconds);}
+                    AudioEdit::SetProperties{clips:vec![reference],properties}
+                },
+            };ed.apply_audio_edit(operation,cx)?;
         }
+
     }ed.select_track(drag.destination_track,cx);Ok(())})();if let Err(error)=result{ed.notice(error);}cx.notify();
 }
 

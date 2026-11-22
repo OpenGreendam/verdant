@@ -3,17 +3,66 @@
 //! separately owned offline handle may wait for audio.
 
 use crate::shm::{Ring, Wake, DSP_QUANTUM_FRAMES, MAX_BLOCK_FRAMES,
-    TRANSPORT_LATENCY_FRAMES, TRANSPORT_QUANTA, STATUS_OK};
+    TRANSPORT_LATENCY_FRAMES, STATUS_OK};
 use crate::proto::{validate_event_quanta, ParamEvent, MAX_PARAM_EVENTS};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
 #[derive(Default)]
 pub struct RemoteState {
     pub bypass: AtomicBool,
+    transport_frames: AtomicU32,
     pub xruns: AtomicU64,
     /// Latched for the UI/control thread; callback never sends a channel event.
     pub automation_fault: AtomicBool,
+    fault_kind: AtomicU32,
+    fault_sequence: AtomicU64,
+    fault_input_sequence: AtomicU64,
+    fault_output_sequence: AtomicU64,
+    fault_event_count: AtomicU64,
+    fault_status: AtomicU32,
+}
+/// Entire physical callbacks may run before the child process gets CPU.
+/// Account for a partial native quantum retained from the previous callback.
+pub fn transport_latency_for_source_burst(source_frames:u32)->Option<u32>{
+    if source_frames==0{return None;}
+    let quantum=DSP_QUANTUM_FRAMES as u32;
+    let frames=source_frames.checked_add(quantum-1)?.div_ceil(quantum).checked_mul(quantum)?;
+    (frames<=TRANSPORT_LATENCY_FRAMES as u32).then_some(frames)
+}
+
+impl RemoteState {
+    pub fn transport_latency_samples(&self)->u32{
+        let frames=self.transport_frames.load(Ordering::Acquire);
+        if frames==0{TRANSPORT_LATENCY_FRAMES as u32}else{frames}
+    }
+    /// Called only behind the engine's device-budget barrier, before matching
+    /// PDC is installed. Host ownership, DSP state and ring sequences survive.
+    pub fn configure_callback_source_frames(&self,frames:u32)->bool{
+        let Some(latency)=transport_latency_for_source_burst(frames)else{return false;};
+        self.transport_frames.store(latency,Ordering::Release);true
+    }
+    // One callback owns the writer. Publish the kind last so the control
+    // thread sees an immutable, coherent first-failure snapshot.
+    fn record_fault(&self,kind:u32,sequence:u64,ring:&Ring,event_count:usize) {
+        if self.fault_kind.load(Ordering::Relaxed)!=0{return;}
+        self.fault_sequence.store(sequence,Ordering::Relaxed);
+        self.fault_input_sequence.store(ring.in_seq(),Ordering::Relaxed);
+        self.fault_output_sequence.store(ring.out_seq(),Ordering::Relaxed);
+        self.fault_event_count.store(event_count as u64,Ordering::Relaxed);
+        self.fault_status.store(ring.status(),Ordering::Relaxed);
+        self.fault_kind.store(kind,Ordering::Release);
+    }
+    /// Control-thread diagnostic; formatting never occurs in the callback.
+    pub fn fault_detail(&self)->Option<String>{
+        let kind=self.fault_kind.load(Ordering::Acquire);
+        let reason=match kind{1=>"invalid callback or event admission",2=>"host unavailable",
+            3=>"native input queue unavailable",_=>return None};
+        Some(format!("{reason}; quantum={}, input={}, output={}, events={}, host_status={}",
+            self.fault_sequence.load(Ordering::Relaxed),self.fault_input_sequence.load(Ordering::Relaxed),
+            self.fault_output_sequence.load(Ordering::Relaxed),self.fault_event_count.load(Ordering::Relaxed),
+            self.fault_status.load(Ordering::Relaxed)))
+    }
 }
 
 /// The engine retires processors on its control thread. The handle retains
@@ -26,6 +75,8 @@ pub struct RemoteInsert {
     state: Arc<RemoteState>,
     name: String,
     seq: u64,
+    transport_quanta: u64,
+    warm_until: u64,
     at: usize,
     input: [Vec<f32>; 2],
     key: [Vec<f32>; 2],
@@ -40,8 +91,9 @@ impl RemoteInsert {
     pub fn new(ring: Arc<Ring>, in_w: Wake, out_r: Wake, state: Arc<RemoteState>, name: String) -> Self {
         let frames = ring.max_frames();
         assert_eq!(frames, DSP_QUANTUM_FRAMES, "RT ring must use the native DSP quantum");
+        let transport_quanta=u64::from(state.transport_latency_samples())/DSP_QUANTUM_FRAMES as u64;
         Self {
-            ring, in_w, _out_r: out_r, state, name, seq: 0, at: 0,
+            ring, in_w, _out_r: out_r, state, name, seq: 0, transport_quanta,warm_until:transport_quanta,at: 0,
             input: [vec![0.0; frames], vec![0.0; frames]],
             key: [vec![0.0; frames], vec![0.0; frames]],
             keyed: false,
@@ -52,7 +104,7 @@ impl RemoteInsert {
     }
 
     pub fn state(&self) -> &Arc<RemoteState> { &self.state }
-    pub fn transport_latency_samples(&self) -> u32 { TRANSPORT_LATENCY_FRAMES as u32 }
+    pub fn transport_latency_samples(&self) -> u32 { self.transport_quanta as u32*DSP_QUANTUM_FRAMES as u32 }
     pub fn latency_samples(&self) -> u32 {
         self.ring.plugin_latency().saturating_add(self.transport_latency_samples())
     }
@@ -76,24 +128,32 @@ impl RemoteInsert {
         if frames != right.len() || frames > MAX_BLOCK_FRAMES
             || key.is_some_and(|(kl, kr)| kl.len() != frames || kr.len() != frames)
             || validate_event_quanta(events, frames, self.ring.max_frames(), self.at, self.event_count).is_err() {
+            self.state.record_fault(1,self.seq,&self.ring,events.len());
             self.state.automation_fault.store(true, Ordering::Release);
             self.state.xruns.fetch_add(1, Ordering::Relaxed);
             return false;
         }
         if frames == 0 { return true; }
         if self.ring.status() != STATUS_OK {
+            self.state.record_fault(2,self.seq,&self.ring,events.len());
             self.state.xruns.fetch_add(1, Ordering::Relaxed);
             if !events.is_empty() { self.state.automation_fault.store(true, Ordering::Release); }
             return false;
         }
         let quantum = self.ring.max_frames();
+        let transport_quanta=u64::from(self.state.transport_latency_samples())/quantum as u64;
+        if transport_quanta!=self.transport_quanta{
+            self.transport_quanta=transport_quanta;
+            self.warm_until=self.seq.saturating_add(transport_quanta);
+            self.output[0].fill(0.);self.output[1].fill(0.);self.output_ready=true;
+        }
         let mut offset = 0;
         let mut next_event = 0;
         let mut accepted = true;
         while offset < frames {
-            if self.at == 0 && self.seq >= TRANSPORT_QUANTA {
+            if self.at == 0 && self.seq >= self.warm_until {
                 let [ol, orr] = &mut self.output;
-                self.output_ready = self.ring.try_read_output(self.seq - TRANSPORT_QUANTA, ol, orr);
+                self.output_ready = self.ring.try_read_output(self.seq - self.transport_quanta, ol, orr);
                 if !self.output_ready { self.state.xruns.fetch_add(1, Ordering::Relaxed); }
             }
             let n = (quantum - self.at).min(frames - offset);
@@ -120,9 +180,15 @@ impl RemoteInsert {
                 self.key[0][range.clone()].fill(0.0);
                 self.key[1][range.clone()].fill(0.0);
             }
-            if !self.state.bypass.load(Ordering::Acquire) && self.output_ready {
-                left[src.clone()].copy_from_slice(&self.output[0][range.clone()]);
-                right[src].copy_from_slice(&self.output[1][range]);
+            if !self.state.bypass.load(Ordering::Acquire) {
+                if self.output_ready {
+                    left[src.clone()].copy_from_slice(&self.output[0][range.clone()]);
+                    right[src].copy_from_slice(&self.output[1][range]);
+                } else {
+                    // An underrun is a wet-path gap, never an unsolicited
+                    // unprocessed signal at a different PDC position.
+                    left[src.clone()].fill(0.);right[src].fill(0.);
+                }
             }
             // Bypass still advances native DSP and automation time.
             self.at += n;
@@ -139,6 +205,7 @@ impl RemoteInsert {
                 } else {
                     self.state.xruns.fetch_add(1, Ordering::Relaxed);
                     if !quantum_events.is_empty() {
+                        self.state.record_fault(3,self.seq,&self.ring,quantum_events.len());
                         self.state.automation_fault.store(true, Ordering::Release);
                         accepted = false;
                     }
@@ -328,5 +395,164 @@ mod tests {
         }
         assert_eq!(ri.latency_samples(), TRANSPORT_LATENCY_FRAMES as u32);
         assert_eq!(ri.xruns(), 0);
+    }
+
+    #[test]
+    fn negotiated_pipeline_covers_frozen_child_bursts_and_partial_quanta(){
+        for (device_frames,device_rate,expected) in [(480,48_000,1024),(1024,48_000,1536),(1024,44_100,1536),(8192,44_100,9472)]{
+            let burst=verdant_audio::callback::source_callback_frame_bound(48_000,device_rate,device_frames);
+            assert_eq!(transport_latency_for_source_burst(burst as u32),Some(expected));
+            let(mut processor,ring)=event_processor();
+            assert!(processor.state.configure_callback_source_frames(burst as u32));
+            let mut il=[0.;DSP_QUANTUM_FRAMES];let mut ir=il;
+            let(mut done,mut frame)=(0,0usize);
+            for call in 0..16{
+                let n=if call%3==0{burst}else if call%3==1{17}else{burst-1};
+                let mut l=(frame..frame+n).map(|i|(i+1)as f32).collect::<Vec<_>>();let mut r=l.iter().map(|x|-x).collect::<Vec<_>>();
+                // The child receives no CPU until this entire physical burst
+                // has returned, including all engine resampler sub-blocks.
+                for (l,r) in l.chunks_mut(128).zip(r.chunks_mut(128)){processor.process(l,r);}
+                for i in 0..n{
+                    let expected=if frame+i<expected as usize{0.}else{2.*(frame+i+1-expected as usize)as f32};
+                    assert_eq!(l[i],expected,"rate={device_rate} burst={burst} call={call} sample={i}");
+                    assert_eq!(r[i],-expected);
+                }
+                while done<ring.in_seq(){
+                    ring.read_input(done,&mut il,&mut ir).unwrap();
+                    for x in il.iter_mut().chain(&mut ir){*x*=2.;}
+                    ring.write_output(done,&il,&ir).unwrap();done+=1;
+                }
+                frame+=n;
+            }
+            assert_eq!(processor.xruns(),0);
+            assert_eq!(processor.transport_latency_samples(),expected);
+        }
+        assert_eq!(transport_latency_for_source_burst(0),None);
+        assert_eq!(transport_latency_for_source_burst(u32::MAX),None);
+    }
+
+    #[test]
+    fn retained_processor_rebudgets_without_resetting_host_sequence_or_events(){
+        let(mut processor,ring)=event_processor();
+        let owner=processor.state.clone();
+        let mut il=[0.;DSP_QUANTUM_FRAMES];let mut ir=il;let mut event_buffer=vec![(0,0,0.);MAX_PARAM_EVENTS];
+        let(mut done,mut frame)=(0,0usize);let mut received=Vec::new();
+        for (stage,burst) in [624,1168,624].into_iter().enumerate(){
+            assert!(owner.configure_callback_source_frames(burst));
+            let latency=transport_latency_for_source_burst(burst).unwrap()as usize;
+            let start=frame;
+            for call in 0..24{
+                // An odd fragment boundary survives budget handoff.
+                let n=if call==23{273}else{256};
+                let mut l=(frame..frame+n).map(|i|(i+1)as f32).collect::<Vec<_>>();let mut r=l.clone();
+                let event=(7,0,(stage*24+call)as f64);
+                assert!(processor.process_events(&mut l,&mut r,&[event]));
+                if frame>=start+latency+256{
+                    for (i,value) in l.iter().enumerate(){assert_eq!(*value,(frame+i+1-latency)as f32);}
+                }
+                while done<ring.in_seq(){
+                    let(_,count)=ring.read_input_events(done,&mut il,&mut ir,&mut event_buffer).unwrap();
+                    for &(id,offset,value) in &event_buffer[..count]{received.push((done*256+u64::from(offset),id,value));}
+                    ring.write_output(done,&il,&ir).unwrap();done+=1;
+                }
+                frame+=n;
+            }
+            assert!(Arc::ptr_eq(&owner,processor.state()));
+        }
+        assert!(processor.process_events(&mut [0.;256],&mut [0.;256],&[]));
+        while done<ring.in_seq(){
+            let(_,count)=ring.read_input_events(done,&mut il,&mut ir,&mut event_buffer).unwrap();
+            for &(id,offset,value)in &event_buffer[..count]{received.push((done*256+u64::from(offset),id,value));}
+            done+=1;
+        }
+        assert_eq!(received.len(),72);
+        let mut position=0;
+        for (index,(sample,id,value))in received.iter().enumerate(){
+            assert_eq!((*sample,*id,*value),(position,7,index as f64));
+            position+=if index%24==23{273}else{256};
+        }
+        assert_eq!(processor.xruns(),0);
+    }
+
+    #[test]
+    fn input_backlog_diagnostic_preserves_the_rejected_event_evidence(){
+        let(mut processor,ring)=event_processor();
+        for _ in 0..crate::shm::RING_SLOTS{
+            assert!(processor.process_events(&mut [0.;256],&mut [0.;256],&[(1,0,0.5)]));
+        }
+        assert!(!processor.process_events(&mut [0.;256],&mut [0.;256],&[(1,0,0.5)]));
+        let detail=processor.state.fault_detail().unwrap();
+        assert!(detail.contains("native input queue unavailable"),"{detail}");
+        assert!(detail.contains("input=64, output=0, events=1, host_status=0"),"{detail}");
+        assert_eq!(ring.in_seq(),64);
+        assert!(processor.state.automation_fault.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn changed_transport_budget_keeps_short_and_long_chains_phase_aligned(){
+        let(mut short,short_ring)=event_processor();
+        let(mut long_a,a_ring)=event_processor();let(mut long_b,b_ring)=event_processor();
+        let rings=[short_ring,a_ring,b_ring];let mut done=[0u64;3];
+        let mut input=[0.;256];let mut right=[0.;256];let mut absolute=0usize;
+        for source_burst in [624,1168,624]{
+            for processor in [&short,&long_a,&long_b]{assert!(processor.state.configure_callback_source_frames(source_burst));}
+            let latency=transport_latency_for_source_burst(source_burst).unwrap()as usize;
+            let mut pad=DelayPad::new(latency as u32);
+            let stage_start=absolute;
+            for _ in 0..24{
+                let n=480;
+                let source=(absolute..absolute+n).map(|i|(i+1)as f32).collect::<Vec<_>>();
+                let(mut sl,mut sr,mut ll,mut lr)=(source.clone(),source.clone(),source.clone(),source);
+                short.process(&mut sl,&mut sr);pad.process(&mut sl,&mut sr);
+                long_a.process(&mut ll,&mut lr);long_b.process(&mut ll,&mut lr);
+                if absolute>=stage_start+latency*2+512{
+                    for i in 0..n{
+                        let expected=(absolute+i+1-latency*2)as f32;
+                        assert_eq!(sl[i],expected);assert_eq!(ll[i],expected);
+                        assert_eq!(sr[i],lr[i]);
+                    }
+                }
+                for (ring,done) in rings.iter().zip(&mut done){
+                    while *done<ring.in_seq(){
+                        ring.read_input(*done,&mut input,&mut right).unwrap();
+                        ring.write_output(*done,&input,&right).unwrap();*done+=1;
+                    }
+                }
+                absolute+=n;
+            }
+        }
+        assert_eq!((short.xruns(),long_a.xruns(),long_b.xruns()),(0,0,0));
+    }
+
+    #[test]
+    fn missing_wet_output_never_leaks_unprocessed_unaligned_dry_audio(){
+        let(mut processor,ring)=event_processor();
+        assert!(processor.state.configure_callback_source_frames(624));
+        let(mut done,mut il,mut ir)=(0,[0.;256],[0.;256]);
+        for call in 0..10{
+            let(mut l,mut r)=([0.8;256],[0.5;256]);
+            assert!(processor.process_events(&mut l,&mut r,&[]));
+            if call>=4{assert_eq!(l,[0.2;256]);assert_eq!(r,[0.125;256]);}
+            while done<ring.in_seq(){
+                ring.read_input(done,&mut il,&mut ir).unwrap();
+                for x in il.iter_mut().chain(&mut ir){*x*=0.25;}
+                ring.write_output(done,&il,&ir).unwrap();done+=1;
+            }
+        }
+        assert_eq!(processor.xruns(),0);
+        // The child now misses two wet deadlines after previously valid PCM.
+        // Already published audio keeps its position; later gaps stay silent.
+        for call in 0..6{
+            let(mut l,mut r)=([0.8;256],[0.5;256]);
+            assert!(processor.process_events(&mut l,&mut r,&[]));
+            if call<4{assert_eq!(l,[0.2;256]);assert_eq!(r,[0.125;256]);}
+            else{assert_eq!(l,[0.;256]);assert_eq!(r,[0.;256]);}
+        }
+        assert_eq!(processor.xruns(),2);
+        assert!(!processor.state.automation_fault.load(Ordering::Acquire));
+        processor.set_bypass(true);
+        let(mut l,mut r)=([0.8;256],[0.5;256]);
+        processor.process(&mut l,&mut r);
+        assert_eq!(l,[0.8;256]);assert_eq!(r,[0.5;256]);
     }
 }

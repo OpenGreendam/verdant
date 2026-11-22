@@ -1,0 +1,45 @@
+   Compiling verdant-audio v0.1.0 (/tank/shared/projects/opengreendam/verdant-plugin-suite-20261122/frontend/crates/verdant-audio)
+warning: method `use_source_clock` is never used
+   --> crates/verdant-audio/src/callback.rs:113:19
+    |
+ 62 | impl CallbackRenderer {
+    | --------------------- method in this implementation
+...
+113 |     pub(crate) fn use_source_clock(&mut self) {
+    |                   ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling verdant-plugins v0.1.0 (/tank/shared/projects/opengreendam/verdant-plugin-suite-20261122/frontend/crates/verdant-plugins)
+warning: `verdant-audio` (lib) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 7.43s
+     Running unittests src/lib.rs (/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/deps/verdant_plugins-042ba94c7a4e676c)
+
+running 7 tests
+test builtin_dsp::eq::fit::tests::eq_fitting_uses_the_processing_sample_rate ... ok
+EQ joint fit: 6 bands RMS 0.06098 dB max 0.20041 dB
+White IR bandwidth-normalized levels: [-0.4189396970242033, -0.30167225694557565, 0.11784716856423993, -0.1978122883970097, -0.08628854219766321, 0.040232875414014824]
+test builtin_dsp::space::ir_fit::tests::white_ir_has_no_artificial_octave_bandwidth_tilt ... ok
+Noisy IR: RT 1.2027s, r2 0.999977, span 29.70 dB, noise -52.76 dBFS, model 0.376%
+test builtin_dsp::space::ir_fit::tests::ir_measurement_rejects_tail_noise_without_biasing_rt60 ... ok
+Rendered fitted FDN: target 0.85s, measured 0.8581541362439472s, r2 0.9996238349591021
+test builtin_dsp::space::ir_fit::tests::ir_fitted_reverb_has_the_measured_decay_in_rendered_pcm ... ok
+EQ match: RMS 0.03489258332655398 dB, removed 9.151826049199581 dB, 1400 Hz 2.799663011509678, 40 Hz -0.009667838543634788, 16000 Hz -0.006593556307242473
+test builtin_dsp::eq::fit::tests::eq_match_range_amount_and_level_removal_are_measurable ... ok
+test builtin_dsp::space::ir_fit::tests::ir_early_reflection_density_distinguishes_sparse_arrivals ... ok
+EQ held-out PCM errors: [0.04499601087293627, 0.010636344505753034, 0.025255650143965976, 0.02130722674780774, 0.022852930370587356, 0.050552136281934626, 0.094034014203839, 0.0914885547668769, 0.11704737545770255, 0.04375482209065422]
+test builtin_dsp::eq::fit::tests::eq_joint_fit_reproduces_shelves_and_overlapping_bells_in_real_pcm ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.44s
+
+     Running tests/builtin_signal.rs (/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/deps/builtin_signal-9b5a8adf6e721d49)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/plugin_browser.rs (/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/deps/plugin_browser-c3a6e870c428230c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s

@@ -1,0 +1,17 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "analysis.audio",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "source": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "source"
+    ],
+    "type": "object"
+  }
+}

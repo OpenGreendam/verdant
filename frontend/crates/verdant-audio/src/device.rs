@@ -104,6 +104,16 @@ pub struct OutputInfo {
     pub buffer_frames: Option<u32>,
 }
 
+impl OutputInfo {
+    /// An unknown backend retains the global worst-case callback admission.
+    pub fn callback_frame_bound(&self)->usize{
+        match self.kind {
+            OutputKind::SilentClock{..}=>(self.sample_rate as usize/100).clamp(1,MAX_BLOCK),
+            OutputKind::Device{..}=>self.buffer_frames.map_or(MAX_BLOCK,|frames|frames as usize),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum DeviceStatus {
     Starting,
@@ -333,6 +343,7 @@ impl Drop for CallbackLease {
 struct FaultSignal {
     fatal: AtomicU8,
     oversized_frames: AtomicU64,
+    admitted_frames: AtomicU64,
     xruns: AtomicU64,
     notices: AtomicU8,
 }
@@ -365,6 +376,7 @@ impl FaultSignal {
 
     fn buffer_error(&self, error: CallbackBufferError) {
         self.oversized_frames.store(error.frames as u64, Ordering::Relaxed);
+        self.admitted_frames.store(error.max_frames as u64, Ordering::Relaxed);
         self.fatal.store(7, Ordering::Release);
     }
 
@@ -372,7 +384,7 @@ impl FaultSignal {
         let message = match self.fatal.swap(0, Ordering::AcqRel) {
             0 => return None,
             7 => return Some(DeviceError::new(DeviceErrorKind::UnsupportedConfig,
-                format!("physical callback has {} frames; the admitted maximum is {MAX_BLOCK}", self.oversized_frames.load(Ordering::Relaxed)))),
+                format!("physical callback has {} frames; the admitted maximum is {}", self.oversized_frames.load(Ordering::Relaxed),self.admitted_frames.load(Ordering::Relaxed)))),
             1 => "output device is no longer available",
             3 => "output stream was invalidated",
             4 => "audio host is unavailable",
@@ -484,6 +496,15 @@ impl Worker {
             self.renderer = Some(renderer);
             return Err(error);
         }
+        let bound=prepared.info.callback_frame_bound();
+        if let Err(error)=renderer.set_callback_frame_bound(bound){
+            self.renderer=Some(renderer);return Err(error);
+        }
+        let burst=crate::callback::source_callback_frame_bound(prepared.info.sample_rate,prepared.info.device_sample_rate,bound);
+        // The old callback owner has been retired. Publish before driver.play,
+        // including fallback/recovery, so a larger device cannot outrun an old
+        // smaller hosted-processor pipeline before the UI sees its event.
+        self.shared.publish_callback_budget(burst as u32);
         let (returned, receiver) = rtrb::RingBuffer::new(1);
         let fault = Arc::new(FaultSignal::default());
         let lease = CallbackLease { renderer: Some(renderer), returned, fault: fault.clone() };

@@ -1,0 +1,2306 @@
+{
+  "schema": "verdant-agent-skills/1",
+  "version": "0.1.0",
+  "skills": [
+    {
+      "name": "verdant",
+      "description": "Use when an AI Agent needs to operate Verdant end to end, choose atomic skills, install the offline bundle, or use the CLI and workflow worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0639ead0bb609e58fba60d91679caa1504323a45cd32359e0e7fa9c634399459"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "41bafe3e1841cf2b9c0fbbc3f29eab0c7bb21c49e4540dc6f9c836158b1741de"
+        }
+      ]
+    },
+    {
+      "name": "verdant-analysis-audio",
+      "description": "Use when an AI Agent needs to measure sample peak, RMS, DC offset and clipped samples. Performs analysis.audio through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "09186bd56ffc4be32225342ff9703e8aad57eb5f0fbd6bc9769d17df3051d00a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "9f606a34c46ebf68566aa7747c6645159d59523d4edb2edc83346a54e18b33e5"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "733d719825937bc0be7e34904b1bef7d7ad603f73f9bba1af5f621a54bbe2a38"
+        }
+      ]
+    },
+    {
+      "name": "verdant-analysis-eq-fit",
+      "description": "Use when an AI Agent needs to fit a measured or drawn target response with native EQ bands. Performs analysis.eq-fit through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "f1d415589337481a04b89957fa8526f1561fdf30dc74a47f848f3adbee1b2188"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "e199a1aababff8cbd9aa4a47cc8fe702fde62448a4c1ca0b53c095d0c6000e96"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "7008228bcce010a948d0eb3326aeb10dc1fe170de91001f575d18fde627451af"
+        }
+      ]
+    },
+    {
+      "name": "verdant-analysis-eq-match",
+      "description": "Use when an AI Agent needs to measure source and reference audio spectra and produce a native EQ match. Performs analysis.eq-match through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "2779359913d579aa0f29b0c7abc9d4680d3a2137570240067d8aeade6e475d59"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "7e9503b589ac057a22288b0528f4f13019b64fba039e7ba9908e84ca26445e8e"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "07f26cb952284af31d52091e3e8da4425f5d539b491c9bfba00352cbd4adfbd2"
+        }
+      ]
+    },
+    {
+      "name": "verdant-analysis-reverb-ir",
+      "description": "Use when an AI Agent needs to estimate native algorithmic reverb settings from a measured impulse response. Performs analysis.reverb-ir through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "a5b344644ab5c03ae194f522ad7a8294d7bda7d3fb5ef4c9dc5397466695fe2a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "29cecceeaa3cb75fc1ea25cab9b60b40a8e3976005ad8241a3d1758a694cb337"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "0ff514d940e4752ce434f2b6c46e7ae61d01781c840a12ca143335d2548c79cb"
+        }
+      ]
+    },
+    {
+      "name": "verdant-batch",
+      "description": "Use when an AI Agent needs to execute sequential independent requests with explicit error handling. Performs batch through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "89b50e4dc59e6e9e6ebec6ded930c8938fe6da66968ce4af5d955a9f07a3ff67"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "126419e191d6cb8dae966032f14fefa90d8e08fea830a60bef6a3e380b2e4c23"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "12b80ac770f2b8472ff9506d7a6a17931c7b3b89374849f211e8491a759e093d"
+        }
+      ]
+    },
+    {
+      "name": "verdant-cache-clean",
+      "description": "Use when an AI Agent needs to remove selected cache entries. Performs cache.clean through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "866d3de7dba3292b6bd8c905e56d3450462f6ef8d10f96e7f4c640bf982fe668"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "da6bf5b349f78a658eafff2972746bc20364eb6a6145b0e071adda690af2b211"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "2123d23357e9e34d55a4995c9084d5adb76f2f68593866d65fda5c359c6c8e22"
+        }
+      ]
+    },
+    {
+      "name": "verdant-cache-list",
+      "description": "Use when an AI Agent needs to inspect the rendering cache. Performs cache.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "d1f801b2f282de1996e3d3db690ee2768c897acc64912eba982f5c4bdac5920a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "6b94980f18ed3097dc061dd1eb170b3db8c9a8689b99f4f07f866b42478d04db"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "26069d2f1a1016df667a1b492696048c9f650766ef88b7c31f521dd6373f6c56"
+        }
+      ]
+    },
+    {
+      "name": "verdant-cache-verify",
+      "description": "Use when an AI Agent needs to verify cached artifact fingerprints. Performs cache.verify through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "a66f84b486102624d1c5213a68ed263e859d8afe840bc8259988823eab3aa7cd"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "9f6dbf072c0451a923b0efc08ff20695dd3bcdac9c9b459ee94315a28d7a59b5"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "8129dc54fd7f898885c10a86b641977e613e497998f5f3b58912c297e499d3fb"
+        }
+      ]
+    },
+    {
+      "name": "verdant-capabilities",
+      "description": "Use when an AI Agent needs to discover installed operations, formats and protocols. Performs capabilities through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "01dba24d83980de60ce9cfa0e901ac861cbe8912db065a943ac5fdc37c66d61c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "5a65893746014c53ff963ca1f7974cabe1846f314c30a5e35d5e3d2af877ebae"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1b25eb3bf823adfd544d03cbed3795ba8e581e31a9d2df781b7187b73c5b2b91"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-bounce",
+      "description": "Use when an AI Agent needs to sum clip processing into a fresh float WAV. Performs clip.bounce through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1d63bbf16206d95666a8b8d33a65ec5a49b211b0850976aae0af96a713287a6f"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "673d334b0289efa9165a1b913d3a24c826f22d097687d70c63be21786e32502d"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1b5bd976484511c10b1b34d64f4b604203c159699d65fd2eb383e01d1b21bfec"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-copy",
+      "description": "Use when an AI Agent needs to obtain a JSON audio clipboard. Performs clip.copy through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "cce342f24e9878493da4a64daf237f88ee4798ea3fd8c29c3771a51a6f7a413a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "fb152a50966b07a52cf34b95311e95f5ab482d661b81d12574b4abccbd940574"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "0a1cbf7ebf1a88cdc55a68baf1dd05a8f9c29135014efeb192c8cb41aa7f738a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-copy-range",
+      "description": "Use when an AI Agent needs to copy selected audio inside a time range. Performs clip.copy-range through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "d9b49e86c6d6ecf705b20dc4013741d0595214d2eed04b43f12020c57ed90099"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "68f3be8fb254f9539d700e6392d1af32a8cb990e1be2ba159e38783a5359e9d8"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "31d4b4c3a7063bb0ca08f66c84c680e6f47b5687ba18b293467c2c64f514b5c8"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-crossfade",
+      "description": "Use when an AI Agent needs to apply matched fades to overlapping clips. Performs clip.crossfade through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "c4545bb8bef2a86c4e7e5e55c0b0b0016d118047b70eade2b4e96831ca9b5f52"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "c555f3cdddda08f7507c800fab2425c14d49b6f28f9f59ff64080edc717283d4"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "bb908b0f100e8112f9d0ed4ace880e312de9721ea2500d1e8cf7ee1fb8ef132c"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-delete",
+      "description": "Use when an AI Agent needs to delete clips with an explicit ripple choice. Performs clip.delete through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "d5fb6bb05a1c87fadbe68bf682bf35fb33fb45e9326c140bc30630ba4231887f"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "7ce512903ecc0cf9846bbf298e2de696756be545bad38fec94d71376ec00e31c"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "8a3b5acd5f13a9301f14530096cd3bac588487181b11dcf239797e7c63e42293"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-delete-range",
+      "description": "Use when an AI Agent needs to remove a selected range with an explicit ripple choice. Performs clip.delete-range through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "47a79dd24d844197109fbac21a5e5002cb471a0f9a0fe9b6bf4b02c10be58ba5"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "388dff3904de86dec3d046d1e3807dcb54f62bd22aa8f9b681bf1cf3cfdce6d4"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "d9504d709819d23cbe0827be12b408b984f0ce810d929b6fd43d090f86d110a6"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-duplicate",
+      "description": "Use when an AI Agent needs to duplicate clips at a chosen tick and track. Performs clip.duplicate through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "86b0c09fda1e65ea977ae86a1d7047f265952d2ba538ff36305cd707ec259dbe"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "b6b89e14583621bbc1de0296e0493d6928475334291483a53468eda9c66fbc27"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "fb041093140607ea12347d10824056a5b91ac3a9d463b2d1746d224997d4cda6"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-edit",
+      "description": "Use when an AI Agent needs to commit a typed atomic batch of clip operations. Performs clip.edit through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "27be370c03610079fb76a1760a5d2ab07c3fcfdd395b9a7b05d2a154cbb0c135"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "09aa34da706321150a4cfedf6a49eb7cbf3706a7c405933f99909692e0c86b2f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a56509ba274c562618d8f9191094b5fffbf9272d063f840644561fafb7c3ef13"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-inspect",
+      "description": "Use when an AI Agent needs to inspect stable audio clip IDs and source metadata. Performs clip.inspect through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "ebe4c64df472bfab2af5dffb992d77d52b36cd000b6c39e5841d369f134ca9eb"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "585a6261d5a4a108853c4b4f9278abc98b76037094aa807cd31185e65048280f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "ec33b5d4d1fdbf7c3ebd0c9c7eb4966956c7a5531d434da3d207d8bb834cfa69"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-join",
+      "description": "Use when an AI Agent needs to join compatible adjacent source slices. Performs clip.join through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "3dd369cf03ab8c576260b4f4297caa5fef6c53ca3a4e66f990f471cc9cee4ff1"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "ae27a4251b6376f6e718a06b958b40e698be8433dae084327ed90a98329c1b72"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "e578cbb8be1f7860f1d86fc6164b988acb86b5f5a7a5ef0c1001d11ed97c3d4e"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-move",
+      "description": "Use when an AI Agent needs to move clips together in time and across tracks. Performs clip.move through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "8afe1154ff87eb719d9076fc3436f5a86a3bc5ff1ccfdade25f0e921adc5f8ba"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "470ed0493dbb70c5937166b77d668d5daeb4771f1576e1bc84ccc29cfe31853d"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "10a5aac2aa467e7cb701308c1fdda93441ec5965f65e651ceabbfa8553f6586b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-normalize",
+      "description": "Use when an AI Agent needs to measure audio and set non-destructive peak normalization. Performs clip.normalize through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1c30f470d7af8361587d3d4c0d3366bd53a6d677ac09ebd4e1568d6c09236cd8"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "bbb4ecb5fa55abd52df294cdc9c9413ebbbfa13491afc50eef208b026dd04f51"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "69740857543b4e0250f3b13a9f71be695b88f554b52375217e898141943a8367"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-paste",
+      "description": "Use when an AI Agent needs to paste an explicit JSON audio clipboard. Performs clip.paste through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "6d978b7bcb92e19c17248f6662664c397801452e4cfab4e04ab7cf8f1dfd2b7f"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "c89c528fda5a046d2b6e4a7c4d5e00c1c754307bc72744ef642f452d68462378"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "7705c04328cef16fc8f8f1917f9dde7a1c587f3577660afee3bc983c451014a2"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-set-properties",
+      "description": "Use when an AI Agent needs to edit clip gain, pan, fades, mute, reverse or playback rate. Performs clip.set-properties through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "474443bc3e06041228f3507e2cba5ad2f269b798b07226bba59e6e4f06abef56"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "7e45168966181f372eab7681cd764e10f712c898893e0b9870e2212f1f4d6afa"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "7e43cbe2ab07a57a7c3dce326678f82487742a3248bfe1dda89b4c42b2c44598"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-slip",
+      "description": "Use when an AI Agent needs to shift source content without moving timeline positions. Performs clip.slip through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "57a4d8e4d16a1259e33d9fb86a8b758c4ec4c6f8e5760e0b735b39e7d8a60427"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "f99f92fa48b8d6f01798ef4d6fe3d81ed07c6d9cd44b21262a4fac3b38673410"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "6d99b3f7c2baf82836eecda71854df57ea91f65de9235cc884725026a5547db1"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-split",
+      "description": "Use when an AI Agent needs to split selected clips at a tick while preserving source frames and fades. Performs clip.split through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "3985a027fcf76d84a24139a8dc271185547f546445d5aefcb4336fbecd55735c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0fc9fd820d2e45433f0074a873672c099a552f6ed32cf7a69630c0643c5b7d71"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "c0f2499240ec9cf8ccf5f1fd0eac0361967561f57067660dc66081abf6e5f073"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-split-range",
+      "description": "Use when an AI Agent needs to split clips at both edges of a selected time range. Performs clip.split-range through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "944ba2ddeeac3f30814db8750df38ba021087e32479f64479c0b67559c807547"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "38a497dbbea2ca307d4f7f86ab54d791cfe0b1b652eeb491e0948b8557048b02"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "bbb3224cff1ca571c5b7d295d2456fb08f5b51089cc33dace3666e3140877754"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-split-silence",
+      "description": "Use when an AI Agent needs to split clips at measured silent regions. Performs clip.split-silence through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "c57e76de982e6bfcd5015967570748381c758f451d18d7c48b9abeae68b3801e"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "f45752963b926669c3fab7bd6f411c03ade339a3f0f5f1d1b87fea95a1b58bc5"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "c483c9d65d3f5ea6d12491a2964172963bd5dc905690b446399f053ec26aea84"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-split-zero-crossing",
+      "description": "Use when an AI Agent needs to split near a measured zero crossing. Performs clip.split-zero-crossing through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "14a77be7f6e19176081f486c25ff02b5194945ecdb2d15a5cec28fdb920c33a7"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "500f875ab7feb516adde5dcff3827e3feaab3d1487307e194898d9f647ce76c1"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "358979904ebb3f95d1a0cb2511a87dba37efcbff2cd687821aa1a43bbc0363bc"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-trim",
+      "description": "Use when an AI Agent needs to set non-destructive source-frame trim bounds. Performs clip.trim through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "53dccbd00fee30a9494488e4bb23c33378cf89741a7a4d32130e796954d936de"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "5b49010f6df4f4198830b1c800fe965822e9c13ad397e38ab3c0d082e2df7475"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "6044b1d6c8530bfed495cf06d9f2fb559c9a38a75e19962c19a843ae9a00a6a4"
+        }
+      ]
+    },
+    {
+      "name": "verdant-clip-trim-to-range",
+      "description": "Use when an AI Agent needs to keep selected audio inside a time range. Performs clip.trim-to-range through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "de91f841411f758cc8d02059cff2e7d2616f085523e933574eae373c27968666"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2c9696bdcfcc291eff69e275805f3d36d9f4da0425f42115dd80ce622d7288e7"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "3c9626a84e2675f05c2db271ce431374ed6ca2def9de59db3d68e3608872e885"
+        }
+      ]
+    },
+    {
+      "name": "verdant-doctor",
+      "description": "Use when an AI Agent needs to diagnose synthesis and rendering dependencies. Performs doctor through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "e2d8812b20b698c775430cfb1f45d03250854d76252c85b08922510df99e5b9c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "e02b8f113a47faefb063d56eddfa11f726a47c10f9eaed3f332e4325b532f88f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "978f9c58cc0a15d3bdf6362447440f0a56452439d422cb5e352cf2d111ae258a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-add-track",
+      "description": "Use to add track in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0bf499d350b6bb3ba93dccce6ecd44683a2e82a6738c9e9a5b49625a3a10ca66"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "4078153c6520ab641be6558fc0605311bf97c025e55bcc024007fe88fa4dcf41"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a7f01a7258781622d3ce83a77a53044ec8c6eef25628f727a0675730ef00c614"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-delete-notes",
+      "description": "Use to delete notes in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "65d2a89fb2ffa9401059fd6dd2299efe911bdef71918b8a78fd30969b8c9008d"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "04ab862bc4e37b19b209ebb06bffaf1406690c3d0f7f99af1880756ac1cfc1ae"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "ea3408361fa5fabde327f7494d0272719c0817d532fdf63c15c45b6dd5b6c76f"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-duplicate-notes",
+      "description": "Use to duplicate notes in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "3305185fc0b1c2235d24c6fac0193f8a063d15a26579a5c631e3d47d1e74b111"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "06409bab7ef88f4acd823ee5ff032fb157ef5826b49407f8501a43e9b20eb67c"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "18a6a340e3f552c97dd1c92e720b9fcd86f05af817541845953b61a1e0174b37"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-insert-notes",
+      "description": "Use to insert notes in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1be5769dd90e0dedb6e58bc82b18820050f9c95b5d230b8a9dcd345b6485f6fe"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "a2e2b9b1f98f73906a2a4bb95c4d0efd87ff881a90e8d6cf673620e5a9cf7f17"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "79f7c4c443975d2339fa5c7a170c9198ca8f420a3eb1cc5217efb2cbae179637"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-move-notes",
+      "description": "Use to move notes in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "ee6511c915b699e4f14dd1809db67ecbdd821c73d8737571a0a074a1722f1dd3"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "141cb67f77ab0ec229d3ff74bd7a9a1dd6cd2d0754ba957c997e6e32133d94ec"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "94e92c729f6c79b5850279fbeb9f63ab2c778406e18efd36ca2ec13a2d854f22"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-move-track",
+      "description": "Use to move track in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "95bbdb5802a0e6f535e5e0c47f1a306e4faf3102b3801c7f32da5fdd9b9d04ba"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "7fd2dade5f6fabd8574e43ac4cd68c04485ac6c1bffe7451bcdd4581a7bca79e"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "e9e9cc30d89eb6ae529129cfa624645a3d5be54f1ea5c98beabd3c0bc7196804"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-remove-track",
+      "description": "Use to remove track in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "2fe620011e154463099103809b19c2cfcbe84f30b8fc6c414ac9a9f04ec1cbf3"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "fbb00d12469ae5fc40d03f361fff0f9bc86010e481c84f364d58831ead4cb9b8"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "38dd67e5d05f620b9a4bd6b38ca16517e69820078423185e6b9ad1da39b42782"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-replace-notes",
+      "description": "Use to replace notes in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0a66b29382d969a2903d165d73d5bfabc98563fc699d52f6115ba7b07065c93e"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "5d503b78399e6d6d8c41c52ec5fc30fcb66e2d491180fee6659175af65ad81da"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "941273367689182be4dfa72cb3ec8207d86663042e2fd3f1993d6905bc6c3cf9"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-resize-notes",
+      "description": "Use to resize notes in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "932efa0f5d87db70d49dbae086c16975cc362c8ba6122c8f16c33d8699188c46"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "bacd0b2bf1bbe1df58d020ff6e490600bc7c8e561daf61c7857405e6167269ae"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "5d0cac5d674f308b33aacce3363e322995eba54c7bd83cef9041406c62d21e41"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-consonant-dynamics",
+      "description": "Use to set consonant dynamics in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "c7cc13431c4c0f13d56933c9ad64c7abadaa65ed406e6a5365e2d9acc4f82111"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2fa19cefaf3bbb87be5a324eaac1afb2dda86d872dbb1185c79d2b16eb4de350"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a1a9b5833f30c223acc1b40093dfef60a2fec9d15e8927ad1216446ae0b992d9"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-expression-curve",
+      "description": "Use to set expression curve in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "2844eb12d2568edafa37fffb6d55d3b87b1add72048fc60c41ccea7394e35ddf"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "e85a7e773c0ee39625fa187c7fc15c74f06b8425f19de369eeba854631319dac"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "f599727be1c1642fa42cc0b337b70b8f2694b37149252c44b7a3dc838c49839a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-gain-curve",
+      "description": "Use to set gain curve in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "9412e43430e326cf184fa15fbf3c76ad47dbff8ab3fc07d9a3daec432470867f"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "d9f89992b38fbf6b2ef1af00a305b3e0e3733a6b90118395e728060678994286"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "bfe206d6bf4dad0a0595c652371f327d28c6438444498dbee422dd2a90ca0412"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-lyric",
+      "description": "Use to set lyric in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "90f287648233e67f90b128bec8f7ba96d6052cb9f553393cad74838d8a7ddd68"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "104be58bcdec71ace366d6fa222e613cee5813c020a33222191819935c37c7bb"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1b68f2baf6295834888d0caa0ace59f95f08af9b486b9efd0b689fc845efaaa2"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-model-dynamics",
+      "description": "Use to set model dynamics in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "3344eb61d057eeb3a8d31ba6a12d3c28711ec179dde7243be8111bbe78a17a2d"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1738e2045186ef0a7bae848681dc77a85bbcd0135bb7fa455056a33688c2d9c6"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "9f67de7ffdfa5fc3032aa9e292272aeaa87b7c211cde53f7574485e61919607b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-output-transients",
+      "description": "Use to set output transients in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "fbfe66239b61843c9cf1636b7e9c160c4b00461a3f91a59b7dba8e2091c41b04"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "4f93ea206e568797b96aef8e509e4fee90e93f905262da95c68cd8078d0da305"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "9f7eec4bc8836da2e52a41e4e1d935ab05e4906658075e748406a43b435cc1db"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-phoneme-timing",
+      "description": "Use to set phoneme timing in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "41a31b64932ad30553622c2e09fcc832708703dd9abd22b06e1bd877222ee060"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "ef9ab1b1ffb9ffdc068df60ea91aa3e781cb30213fee139633e2c89912d88d61"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "af145e996013d7e49d379dd2c1a9eb73824a667ac691916b9bf073033bc196d3"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-pitch",
+      "description": "Use to set pitch in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "730ea37997875e9d6b19dbba5f94b73412cd624e8e4b77cdbd3c5e1b1d8339c8"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "5b101b3ce303da540c36643216d622619df04b335c1600678f23f5b3ffde1786"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "6c248de88ba0b0adece5bfdc73e3ef607acac76d3857eb414c7aef07e268ca48"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-pitch-curve",
+      "description": "Use to set pitch curve in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "53df70b1a4fae5901d47f6f10f72069059e8a5b7c21153bd148c1d6b7d35f1b2"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "3025eda3f4e883052e37e4e4f226f654fa53f2e9fb6b7f9b266603dadaf9b7fd"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1091e26bb907b84404401f7cf489b900820af21ea81fd4a29976ae6286eaefca"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-portamento",
+      "description": "Use to set portamento in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "6d14355a9af1d1afba7004df2c76e40331b2b79bab2e0482a8594968ed8b4015"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2064541c087454fcb071498548bc6783e1faf0d1ebee353eac8995540331b97f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "32dd7ae063d267cf648937d70dd4773bb6a70bbc1916a118cd9c0d39c7fbb76a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-project-extension",
+      "description": "Use to set project extension in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "21d3535ec5403325e4c6d6672705735cada7d6323e0bb40769ba3bceef1c0cce"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "d55dfd71b7d8df9e2b9c67f0d1f44d11094621292275dd5a8840ca793c3e0871"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "0d181808ea2775ce8a557e719897b681c26d1cb784cd5306e969442fd2efb31f"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-pronunciation",
+      "description": "Use to set pronunciation in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "78c0e29e5ab6388f595aa5f660e2f5d206d798276bf87a654a37460ba539f9c9"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "50a28ae553affb17bd67aa6f89f91d90df3b603b0332ca20f7105b828398f14b"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "70c63e7ce832cd2c8f5fa5e488828c632737ace23ad9cba8de9f1bc29ec2a68e"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-route",
+      "description": "Use to set route in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "5131fccf7fc17f954340357260f8a3de36cc87625ffea06f4bc8830cbec0218a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "5556b1d78ef7e8cfef38d6d80c2e7df733e18e74ffbecb6160351e1861c01540"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "c1b30f45f2615f492476c1805da38a97eca255946d684ed1cc1a64446e5b706f"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-synthesis",
+      "description": "Use to set synthesis in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "08394a2bc36b7caafb3b2b251d82c4a6ce75e321a9f651c9a86567236aabd8aa"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "6a0590e1ae38f5a82baa81afc8e8fccefd8c270121442cd32fd1dfdd4db20ca3"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "93aebe42224d37fb8504fd4919bc87036fcb43dec79e403b59f22bf0ba782d5f"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-tempo-event",
+      "description": "Use to set tempo event in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "570547e774902db4598bd3fe292e8a171d441ef6241f68a662abcd016ecb1ee8"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0d244f3db2de035afec03112905d7adf9de18d3162313b114c5a650e8cba80cd"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "7036fd6a411f7b74054d8e07cb7bdcb23ccd5991cf17f0ad83da8a90a80aa512"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-time-signature-event",
+      "description": "Use to set time signature event in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "b47c9058a46820fbea07f1b6be7ccd6d62f5c46555aa8aa43944fa29d0716e8e"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "8d7bcdc6a1bf37dd250f2b8ddaa40724f92fa716b964069890c6d42f874e1d3a"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "95bcd0cc8dd0c957bea30ffaa5da019a47b90046ea4bbe568a36e6205479746b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-timing",
+      "description": "Use to set timing in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "c4b1f8cf6fb1019051f4dc175a5acf3c7503652b5b91950fce5f92eb3fa7cbee"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2180f1b414f3297867d5ac93d3ddbc9306f7b9c359ec4bc570a8aaaf5c477872"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a6015e478134d30c2c4e3c978aa9226488b3206aaffbb61901c2aeefbdfb0434"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-track-data",
+      "description": "Use to set track data in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "f5f31a38ce8c15377900803d5ee5c1b1b5dafa09bae4a83df8188dc0ba05016a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "220ef7a6afadaadba04919d58504f6c7fafff4c9aa041d231dc01e147dc0043f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "172d15411aa4b2ffc8d2f2a012662c561bfb2c468a5c29f33c52d31e422c4bdd"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-track-header",
+      "description": "Use to set track header in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "9b1157e82e53506954332bebdeff4b251ac70ff600ef8b3d70b8bd4c6c2dd84c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "3917bd79d4c6f701e37f5713c26a6a5fe93eadd5bb9340bc31302ff4bcaea2a9"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "d315cda069288fd97328a39ae240aa6750130cdbdf8b917b2f0401dab5b2801c"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-track-inserts",
+      "description": "Use to set track inserts in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "64625b8bff95175301b925b7856e158071d9aff3dcf542a9351b76a52722b34d"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2ea91b1d1b73aac24018f26709ee5673b79b8f8f096ce33d4fc496a1341ff919"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1b73076186d1d97de65e7732c695702e219f4368f8a5608d6cfde899c0c2180d"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-track-instrument",
+      "description": "Use to set track instrument in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "763df6f60f9332bd93210e811a9c0f23b0d4fcc4baeae77db899c89592e8824d"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1aa23119c1c36c9fa9f24da9ac8f059b3fbb855a16f83e7d921fc0af8002efd1"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "f6e822790f80b3346d0f8a6e51e081abf16726626ec8f1de31332be697b2b462"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-vibrato",
+      "description": "Use to set vibrato in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "e5488ae6585b65f6421ef7e0f51ba30ef1526e21678ca8a0b8a7a925db8e70d7"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "c5c31174786e92ba35d050792ea4d54bc9caedac658ae66b3e1fef2be1c8de6a"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "bd2f69638792c70bc84a2a208ab3e0dc1828ef6e6fe3a34ba63526381576bf33"
+        }
+      ]
+    },
+    {
+      "name": "verdant-edit-set-vocal-tract",
+      "description": "Use to set vocal tract in Verdant as one revision-checked, undoable atomic project edit.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "23fd0f5bf22d7efdee5e96134447e0fa90cbd86a3c4d6b4c0ae6ef0f64abae02"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "33945c149d4b6e531992617ef79532003281376a05a4f9bee5eba9ad6e81cc5f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "006b976af33466b044fa5e22a7e75f69e496c89691f4cafb5f5a25250b443b28"
+        }
+      ]
+    },
+    {
+      "name": "verdant-effect-catalog",
+      "description": "Use when an AI Agent needs to read the external and native plugin catalog. Performs effect.catalog through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1466ea418d3a201dc47374100c334c437f6711b11daff0a68dfbf8ed132fddbe"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "db1e15c5ae39a7dca3fb871dc2879ebfd039e8d41262501e0404f9e50c2d7e2b"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "703ba3416875cec4519438e9f9be5f9a053a67e54cd9aa36ebf3488a53838bf8"
+        }
+      ]
+    },
+    {
+      "name": "verdant-effect-scan",
+      "description": "Use when an AI Agent needs to scan explicit external plugin files in isolated hosts. Performs effect.scan through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "93da25a79371d53063fab0a96939c57f1ade1f4ad2c543fa22a99fa9b3942723"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "564b587a35b7c3ec072b97d4ab756035c607697fc07fb923d722fa63b32e212c"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "e7a8f5689871acb90e781949a20c3cf2345ba7ec9f7618da4da3cb53ef32b01b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-effect-status",
+      "description": "Use when an AI Agent needs to inspect saved plugin instances and availability. Performs effect.status through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "fb987490c2261365fea6dd993195ce6a7850ef677f63b92a92eea65bff81b7d8"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "e68b3eb2b67814e7f573e9f75ade4af6989582e9dbf1bf38954290151a1f5d3d"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "b066149e5577eabc3f127b28f425acd6db2350abf1c2812bdb259bfd4561644a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-export-audio",
+      "description": "Use when an AI Agent needs to export a mix, track, stems or range with effects and automation. Performs export.audio through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "ccf4638b90e6588cc7a2353f4a286ff5405ebbc82eb3533a5f8deee0ea055691"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "9f62b1f9e3f2939c633f65e94b7048fec23b2e211491998d81450e25630b654e"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "646d158f04ce45f0a333f2b31504f02baa97a79a65c4545f766ad9c9c7eac0e2"
+        }
+      ]
+    },
+    {
+      "name": "verdant-export-project",
+      "description": "Use when an AI Agent needs to export an interchange project with a loss report. Performs export.project through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "5da0e3755f7b227834d840295283e1035d903f8bfe1b5cc1d52c587d66bc306b"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "d24252a3bc9bb3f1360bad12e2b671723e40628b5f484601c1e61665fcd3267b"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "97fbd3d63b859513f66d82e76b211ed8546e51b1f2a8eb053330aea33ade9c77"
+        }
+      ]
+    },
+    {
+      "name": "verdant-history-list",
+      "description": "Use when an AI Agent needs to inspect undo and redo history. Performs history.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "f60fd1706227c43b60206aa4ce98854d421f5e6f4562eca5721703f5d196862c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "bc2f31d8ca0844c9056ee6c238215745fa138564dc3e14ed02d5f78918aef12d"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "fec4c8229b6e7a7fd65a2317e07cfbe389008d0074baf2a70dca489be94eb2fe"
+        }
+      ]
+    },
+    {
+      "name": "verdant-history-redo",
+      "description": "Use when an AI Agent needs to redo one project transaction. Performs history.redo through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "a276012d455470d254b745f363f99d50393c6fa53f0516720af020df47e18a6e"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "64aefc7ba3158c8fa9f56c6695d4cd0b8c21645fa49b9be8b718fff811c6f9b1"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "52f9f61758366349d40b01683818dd016734ad5f6eb1b67056f3967d7e380bf0"
+        }
+      ]
+    },
+    {
+      "name": "verdant-history-undo",
+      "description": "Use when an AI Agent needs to undo one project transaction. Performs history.undo through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "f2ad7b80974fa7c61061de5da837b7bd63defd37c9f56b66394626b31beedaeb"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "3eadf8624dcf1abefc6b497750a105985545a4f1cb8b988a74d9a764a275f9cb"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "9224103c4d9575ed8c494f0cc237b8a18d107561e1ec8788ed2e1904fec7ef34"
+        }
+      ]
+    },
+    {
+      "name": "verdant-import",
+      "description": "Use when an AI Agent needs to import a supported singing project or MIDI file. Performs import through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "289b50c7a4bb00ea51aaed298c9e4c71b7cafdac994aded8ef91d97b9053a2b0"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "22e89c79cba9a99e6063cbccee9ccc33fc521f4d34e14c2716d93e946827842e"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "2cebc6cf6783c5ec2365dd651d4860a2ea84a1d342a7a42d0a59870b51b41bfa"
+        }
+      ]
+    },
+    {
+      "name": "verdant-job-cancel",
+      "description": "Use when an AI Agent needs to cancel an identified rendering job. Performs job.cancel through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "03e3c843a94dedbc0b12f060f8a8c6d28a88e904c470836d2bcbe194ffe9868c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2f289396bbd0d61bbb5b3b83dc38dabcbd6ccda7ef1cc771a94827fdc4923564"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "f8d01ff5fe49457b4a5301f01527d64513c224704dd0848aa50874f741fae972"
+        }
+      ]
+    },
+    {
+      "name": "verdant-job-inspect",
+      "description": "Use when an AI Agent needs to inspect a rendering job. Performs job.inspect through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "8ef0bf8cf28da46d8ea4ae1aaff3777c79d73b5d2d396166f16376fd53789e9e"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0a53ebb12933f7748928def2976d7a878eb77f7b1138b1dc7941f931132e761c"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "c9cfdfeeb49b0e9491f52d3151bdae8af2eb922763a5a13486fa4e688b236ae7"
+        }
+      ]
+    },
+    {
+      "name": "verdant-job-list",
+      "description": "Use when an AI Agent needs to find persisted rendering jobs. Performs job.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "b09f6cde89d760df1282e672babf1cd7466a31761a372d46e5a329992e484cad"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "8d25253ea9b80fc333ff6f484e89c0de657a05e68cf159db25af2fbbbcf8931c"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "cbcde0148bbce8954ad21e8c8f64057e968dbacbaeaa5c04a57d7d9c96a39e1f"
+        }
+      ]
+    },
+    {
+      "name": "verdant-job-retry",
+      "description": "Use when an AI Agent needs to retry a failed or cancelled rendering job. Performs job.retry through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "4a87dd7316047b074e8fe0851300ab2f6b1e49032beb76fafd0d40f181780185"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "5020ed9a1cddc1cf85eba11ace6f0c779854fa18b01fcad31dd4c41c31163e7d"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "250e41a21d59e1aa56e8f1b8c86ec2e8906c9f3029ff4fbf48e8b291497d6792"
+        }
+      ]
+    },
+    {
+      "name": "verdant-job-verify",
+      "description": "Use when an AI Agent needs to verify rendered job artifacts. Performs job.verify through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0a1c9aab5dfa25bf8d99ef1523465560ff8e3efc883436179231c89b319c20ea"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "45f94873cd50d148e969edcc8e5a03bda0817b551bfcc33db9cefd7e7dcb8048"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "96491679b4e0e043fcdce8519bf9ccf7f8feccc4dbcc332ee88f9f0dfaa386c2"
+        }
+      ]
+    },
+    {
+      "name": "verdant-media-import",
+      "description": "Use when an AI Agent needs to admit an audio source as a non-destructive timeline clip. Performs media.import through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "afb8f33c76745ef5c0c8368de29f6528247a067a8a403d000f4de48ea5c094cc"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "a7df9be23a22df6bb4b79eb0545c958320c1adbd437528f4170fd3ad7f0ca0d9"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "b15e0fb2d0b163e48dce91e529de8123d3e4c17fa3b214baff59a0f1924d0f6b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-media-inspect",
+      "description": "Use when an AI Agent needs to inspect imported audio sources and stable clip IDs. Performs media.inspect through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "87a1e89743e9b5a8c90425176e67c2e35ff29c48301432cca104114dd50873f1"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "179f7f16a9f558491031bbf6fd635f7987139c7471d628c746b821b66c7e0f59"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "06fb2e4a598ea01c02fa16f4ceae04d5dd2ac25f15d0a1635cc4090b9e09d305"
+        }
+      ]
+    },
+    {
+      "name": "verdant-media-relink",
+      "description": "Use when an AI Agent needs to relink a clip to an explicit audio source. Performs media.relink through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "bd965ea8a691a9240fb40ae141d22bfbd4010a0974193b3977ef324bacaf2174"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "ebeef301c9b0f1e94855e266617a9064567ad800013017cbf49e48cab96d5d7f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "5f45490b87d5e2b44798f7118d1d9ffaa4f838088a5ea84b43f3fd72e7aa9e8b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-media-verify",
+      "description": "Use when an AI Agent needs to verify saved source fingerprints. Performs media.verify through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "d4bd6c1f12b0e817f2eec13e99004eb5a59260feb64756dff67d6bdc85e94c39"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "7e6fd24eaf30100c1daab73edb9384b88c8ece8be23ee848df07af58e7c41537"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "f693dcca6be0a1333c2648863aa1184cee10a05163c5d5f24be3386972750b8a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-mixer-apply",
+      "description": "Use when an AI Agent needs to commit several mixer and plugin edits in one transaction. Performs mixer.apply through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "e6663da55d35d0670d846149bb83d1c6fc9950c7574d39eaa5f7f7010b6b97aa"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "072c14571b7141ec50eb4f90426fa91b95daea368d783d0603af85215e3d9506"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "d6973e3621861e53a75102a9f693c7a0d3deeb1980fa9791595d84939df8a02e"
+        }
+      ]
+    },
+    {
+      "name": "verdant-mixer-automate",
+      "description": "Use when an AI Agent needs to author a validated automation lane. Performs mixer.automate through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "bc605d54e46eabe33787667bcb5d8bce8a65088f2ebe03def03d9ef76238d761"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "9c91d54228856aae2e5826a7b721a4d215e02b50ac381762d43240f4cae3c5b0"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "432cdcb387621894c419614485f0c815adb4a5a8b44f07252e777ba0f2469d43"
+        }
+      ]
+    },
+    {
+      "name": "verdant-mixer-inspect",
+      "description": "Use when an AI Agent needs to inspect channels, master settings and automation. Performs mixer.inspect through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "9c4bbc236febe42e32bfdfabd22f86a99d8ca9cbab20dc9730ef3465523d4e16"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "29d50663d48c374636924f3b3397d92fa643f0e759dda8b00d1248a0c3abf543"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "99801ca353a0e95645fcc6d5835a0f03f93406702cc9d842e5087f233afe7126"
+        }
+      ]
+    },
+    {
+      "name": "verdant-mixer-remove-automation",
+      "description": "Use when an AI Agent needs to remove an identified automation lane. Performs mixer.remove-automation through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "5bf76ef88c28ea831d41e2ce175f88b50915d45cf0cf3199ffd2471fa2944fad"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2d664d787e93d0a4e55f7f93106db2bcb919714b1016388b337fcd74fb4b1c36"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "42a62e27435bf454ca65268106b8682918f1b886f7132caf7555d36489ec6293"
+        }
+      ]
+    },
+    {
+      "name": "verdant-mixer-set",
+      "description": "Use when an AI Agent needs to set track or master gain, pan and channel properties. Performs mixer.set through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1a4675c07c0ba7fae3a87344383ef2ad88d910beea4c9c7edd89b92ffaa6819d"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "66354e5c77aa1adc99a6fb5fd621acca21a4574fef59ea1bfe3f2eace5bf55f4"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "fd62cffad9c2cc648921fc4dc5ccf2e8d443e76684892090c58f68ba7f1a442f"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-add",
+      "description": "Use when an AI Agent needs to insert a native effect or instrument. Performs plugin.add through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "7254bf09cdd08a841e6cd11fd0b4b66a9e1ee97b460bf60d0d4fc4cc64f80fdc"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "4576f3d0fde66dc73e015142c4b32383660109c6efb1590cb632bbc71e103c14"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "b4ebd754bcb158019e39291038c191f087c24c7fb44b2cab22e1269c4347de86"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-bypass",
+      "description": "Use when an AI Agent needs to set a plugin's bypass state. Performs plugin.bypass through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "848da0be781349dcad34f67bcbf1f177ebbc03f6a00d2d909bd792b39faa8f47"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "ac46d1f1a21905d599bb41a923bcc348ee17c911a61be9bd5d4f8c69d823edeb"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "649ef0d3387990f3c64428e4501d9a85f6a3fa5136c117ba1eaf824e20d86700"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-describe",
+      "description": "Use when an AI Agent needs to discover native parameter IDs, units, ranges and automation eligibility. Performs plugin.describe through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "65f63bd7d9a1463a01e56ec8d74fb5282608ceb2ed770fc8d23459ecead8fbdd"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1b00ec1a90a82af10cbce69091182abc4688243933681a0171feaaf262b281db"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "e7bd702cda268a2d711865b503796095a7e7c0fa930801f424cef0403d600d11"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-edit",
+      "description": "Use when an AI Agent needs to commit a typed atomic batch of plugin operations. Performs plugin.edit through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "bbc1b61b7720babe0bc0b453fb28fa6b6267a146cd17ca74a28d6b1b99c61682"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1d044b3aa35d11b5847dbec707a95c4ef769038dee60d1f91f792acb66deadea"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "d3d255786e5201306eaac31811131cc8800a5e9d69b8850af31909aee955cb54"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-inspect",
+      "description": "Use when an AI Agent needs to read a native plugin instance's saved parameters. Performs plugin.inspect through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "93fe18bc5b7702cfb7b6963986b620dcaf04233b8c8357a83352fe259f726ad2"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "12fa72c805fb42cda72d5b22118fd7db3d3827cb0acfb02c725b465c51ac3cfd"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "679fe8268843cccae1d4f55bc73126ba2b031edf836a638ea5fdc8935905bce3"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-list",
+      "description": "Use when an AI Agent needs to discover every native effect and instrument. Performs plugin.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "d7341d84f4baec25d0fc6626fcb8957638bb7fc5878094e8f9f916231262c5e9"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "26f7e0b385b53e4aed244959129dfb5a0b0f887837df4dcc287b1ed006657b47"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "aea788801d0c5a54917389b2c1bc0a79bd868ac66c74d38a2e5d9e54f61004b5"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-remove",
+      "description": "Use when an AI Agent needs to remove a plugin and its dependent automation. Performs plugin.remove through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "6c7d195bdc46bc55277996383e6d44d8ac846c599f3d92e3e546f08c682eee69"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "134e90aa4d7db1e0b6add1aac5550fe635549a6c03219f5b692b84bc3caecccf"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "c6552800149bcd8ab654c7ffd0f928b9f147182178deed6ab3db20a30b0aad1b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-reorder",
+      "description": "Use when an AI Agent needs to reorder inserts by stable instance IDs. Performs plugin.reorder through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "bed73599d52183aa245f7546c17bf7d458deaa2bad449546455026a4e31d11aa"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0283557be74bb85da89629070e446304f96a7c7413e1c06dd54eb660956be1a2"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "7c15ebfb175cee10f81b360eba4164f152c8c6c7e0cf246b96b726586a0ccdb4"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-reset",
+      "description": "Use when an AI Agent needs to restore one plugin's complete defaults. Performs plugin.reset through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "fe50cc94306a6717964fce0ac9616cd4a793edcb184379995468ddb6c5b3cd2a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "ce093a510d14ccd2dc02704f78147b94c213d2781c519a2f6371d5f090c729e6"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "5343a936640c2c382280c83218a35b4f7073164c663cd12523624bc2955b1ac4"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-set",
+      "description": "Use when an AI Agent needs to write a validated set of native parameters atomically. Performs plugin.set through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "82f2e43609b843676cafd76981875476e3d0007056897a8b82b8ac264d14192c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "116909b95635c2c052600beefbe27761c2a4e9b6a33409aad8b7a59d0cacb944"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "abc0b70b2cda3a49765bc04365f00ffcc90134fc4a6642100bb2ad1eb3913e60"
+        }
+      ]
+    },
+    {
+      "name": "verdant-plugin-sidechain",
+      "description": "Use when an AI Agent needs to route or clear an effect's external sidechain. Performs plugin.sidechain through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0f9ae903bdb75183544eb72bc6da7cd6032ac301ec2a4b8eeac42a1ce0cd360b"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "90ac5a104fb521a3c38c8cb9f359b3ed62b5482b203b368b68f683d3cc9ef489"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "33159d6f6eed092437e6c688d926039a39de2670d426def9e185a84046d6a289"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-apply",
+      "description": "Use when an AI Agent needs to apply a factory preset to its matching plugin. Performs preset.apply through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "77c12e3405af0094e06ed1f30e671b3239443b44501ff6b724a8a876fc15a12b"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "98b5be416514e231a3f0bb6c5d1eb382e0bdeac7ad98f3429694f3d3facf2058"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "b3d7a6cadea556f11221d0f7e6f75b03ce46536572cda453149f6b9e69e73b1e"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-export",
+      "description": "Use when an AI Agent needs to save a native preset to a fresh file. Performs preset.export through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "c3a71d212ddb220a7d5ce72d17f53dc33283cf67bb383ab5965ca8eda5ab3b12"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "2b12f1bb69dd23c429204247a9ce7c1737f429e372d1407dc4ebacfa799a9c4b"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "be563cf511eb9e2c41e827d87b3cf4006831a8d2ecd60d7491e54c723972b5f9"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-import",
+      "description": "Use when an AI Agent needs to load a validated native vpreset. Performs preset.import through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "bebcf6f32a741d9e454d35ea32070bc4df4539a5a80bc3d65666ca2324e81e3f"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "b1ee993e2a8d1ba4e4a38e13aa17641341327719631c02372fba48ca6b4725f8"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "201c91e7b1baa0bf7097feb386cd8b8d14f5716c1d1b5f9e18da2bc74d412dea"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-import-ffp",
+      "description": "Use when an AI Agent needs to import verified FabFilter mappings with an explicit loss policy. Performs preset.import-ffp through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "6043a6414a419cc6e2b1143079e4c8deaf8fdcb118a906698c597bf8c5c5ab2c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0ea04ef182bcba2fcd2b39fed7b5018a7d0649c967fb1667d980439c85c34b59"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "0db5fa3f01a0ddebae5631c44f1085a86dd6118463d915e4d605d36df8f4afd0"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-inspect-ffp",
+      "description": "Use when an AI Agent needs to inspect verified FabFilter mappings and unsupported fields. Performs preset.inspect-ffp through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "f7b5a46d351a7769e52053781052e08954b1d9f7357a5a05b54339f35075e5e3"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "ae8294b573cd0a1ebc709851c0dab34ece46038dd6a681669b1338d20871d545"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "abb7c0f7954f3ca6d4a88dda065a3e6629af14ecaa39e3302adc067475578ac5"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-list",
+      "description": "Use when an AI Agent needs to search the original factory library. Performs preset.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "90d01f894606aef1841091128f1db2de8c9315056d52d5bafa8152ad2c80943d"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "499642cce9fc831194b76df574a8261b7ac74d03768ae0ffe4c88b247edec600"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "2603542587f8bd0be01dab929cea4e25b32cfcd91296ba5a2560d3306fe45636"
+        }
+      ]
+    },
+    {
+      "name": "verdant-preset-show",
+      "description": "Use when an AI Agent needs to read a factory preset's metadata and complete native state. Performs preset.show through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "6f70f6b0bc578130558e6dc26297b8902659d17b7e21c750eba2234e5df2ce60"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1dc2efdab4e0c54913807adbc0c4cda594a2132ae3f2030e9364ad3381c47a7b"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "f7290459077ce879a2bfd252d11789c40e2dc7f94fe53f82d3f7f50809e5e511"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-apply",
+      "description": "Use when an AI Agent needs to commit note, track and project edits atomically. Performs project.apply through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "9240d8c7287332902d587fb561f4d7c60a470774c99290807ebee65cc021784c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "590b2a94577955dbb58903abe2b69fec335b5bf5742075885f83d71a04bb2493"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "ab9e016a4b711e203db9c91f227a375bb0472bfb7ff11e2c6391262edda1d0bf"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-inspect",
+      "description": "Use when an AI Agent needs to read project identity, revision, tracks, notes and recovery state. Performs project.inspect through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "325c803cf1d9dcf813145571c6c1bfee9c2e4a2e4938988f23d54ebda7e2d2a2"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "45e8e046f24c42cb48cf162f2e0d19e54972bd416165f02ae4592640a34d072c"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1c6961a10fe33287df3d849aa3edc84ce39e5a606670fd15a4e2a1cd9e476dfa"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-migrate",
+      "description": "Use when an AI Agent needs to migrate a project with a stated loss policy. Performs project.migrate through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "ec68059b618172194e968cc0228496a83a60ae1de4f1dcf09501fe90b61b2b60"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "b11d14ff241eb5a9bbacb3dcf556b639b49054bbdbfb22141701cbdfbd5e9e45"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "413f2bc4a7f0b98962bf9e44ce11d8e3aee41d93f680090f7a471b75cccf1c83"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-new",
+      "description": "Use when an AI Agent needs to create a native project at an explicit output path. Performs project.new through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "741c4e239fb4336c47c93b624e775eb4d7448b16d2e1529c4326efb7d30f17c1"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1ab9a9bc06d4a6698981117bdda15d7a17abbdf206d62384e102379056f176f4"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "67615b8ac80166df6391a759e6072b702a6b1c665f038774845650ea864e29ba"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-pack",
+      "description": "Use when an AI Agent needs to pack a portable project with its verified media. Performs project.pack through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "5340b197f3410015b468df1502dc140f76930d67f7dc3567c8a7cd8088a22692"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "44bc8d3e09a582759fb72961b919e9fef71931c95beb959d0720765cee91d3cb"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "bf40824f6cb30f85ab6f33ab78f7e59d038227752701c4cbc62708fdd0abb712"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-recover",
+      "description": "Use when an AI Agent needs to apply an explicitly selected saved or recovered branch. Performs project.recover through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "024d8464ed3601c1a6973255243e7b156068f46e23d27a0b597904cd6a561070"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "bc1f48a924299da712d4c3e1c61ccb843470540a7359e76989e97442e11d0d6f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a6fd4960acb50604311ef315efb94e12746ac3d2d83daa901e18aea099d3c938"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-save-as",
+      "description": "Use when an AI Agent needs to copy a native project with history and verified media. Performs project.save-as through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "b6671982327cb5079730a39f0099ca9e762d1a98749a8ea046991de73fb0798b"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "29ce7d8b1e54baa704a99e4db498759562e9cf241e57a258b138ccf6b6f3d6f8"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a382b3af916c489d2a91abdf2072f6ba8965650fb5e4e00c051cd830cf6ca59c"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-unpack",
+      "description": "Use when an AI Agent needs to unpack a bounded portable archive to a fresh destination. Performs project.unpack through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "615709230fdf4643a4b9da172fad9b2a1182e02f9997fff5641d0fbed259eccc"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "745c99c3cbb3ffde79c005f811f28e624a972169182a6e0e8d4794425dc23fb4"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "39143b959240b9629fd1a70f23ae77bc4d36cb863cd37db50e018adc02433d7b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-project-validate",
+      "description": "Use when an AI Agent needs to validate a native project. Performs project.validate through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "b35da88ade36482a5639b4d7ebaaba0e95620f63085f33449c5d5b57f1c98dd1"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0247ebf52212116fdc1e857e933b40be6a2e06fe0f85b4565a24308687720155"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "07bd48ff4650a8e60b30bb5e55feb8170b7369d0880f4326dbe5e35687e333a5"
+        }
+      ]
+    },
+    {
+      "name": "verdant-render",
+      "description": "Use when an AI Agent needs to render a project through the synthesis and mixing pipeline. Performs render through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "28196560a932cb6c8be5922d01f3131f632d06f6f66a1e58876b7defdd9cf222"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "223b109b2ebcbd75548c7b41bdb92db74976e8192c7a8f84a139df89a7be2394"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "09999aa806f2c5d821e335057fa8c908d804fd8e3a930b2ec4867f1f874d56b5"
+        }
+      ]
+    },
+    {
+      "name": "verdant-render-plan",
+      "description": "Use when an AI Agent needs to preflight mix, track, stem or range export. Performs render.plan through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "5dd3e220205a9a3981ad56145aefd136ec1b3664e0d01e9ce5b95de542f84117"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "0f4606d20c0b0b5861f11303921a4171d81a268bb0bd96c37f3ac5945dc5aa91"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "91f13cb4283c913055d79ca181d53cb9d6ddf792f8ec42963f7718d99310f3fc"
+        }
+      ]
+    },
+    {
+      "name": "verdant-schema",
+      "description": "Use when an AI Agent needs to inspect an operation's exact admitted fields and types. Performs schema through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0e9628ca8e3721a6a69f3cffd5a93d936c55c9f50c257b5bef57f90e26eebfe2"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "486c339ad51fb91d8068c86d94bb170a8db0d02d792de1b21b5f592cb7228bef"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "56894d32428f8493694c308097f9fa187a3dd9e126300aeba603fb9a36cac405"
+        }
+      ]
+    },
+    {
+      "name": "verdant-skill-install",
+      "description": "Use when an AI Agent needs to install selected bundled skills for an agent. Performs skill.install through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "6cc865302d51ab9279980331777dbece92d65480dad63b812312f11eecdf6d4c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "674736c0565f4342199358b7e5c1f56e6c9aba4da16785509c61183f31d08c59"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "1a6a1a84f2f7197f164a41ce48c417f7ade0fcc80d3a8a34a5bd4b48f2143567"
+        }
+      ]
+    },
+    {
+      "name": "verdant-skill-list",
+      "description": "Use when an AI Agent needs to list bundled offline Agent Skills. Performs skill.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "508f6ebd06c55afd6e4dd3c49372dc277b9f329f798e1312a2ec58fa1e876e8c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "d66ae134a904667471ec33b288057a5e4866ac8aeb053ef62d38db85799ac4aa"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "2d2308415d4fa4e8d6649b7ba0be7ce14dc1a784433456307f68375d2346882b"
+        }
+      ]
+    },
+    {
+      "name": "verdant-skill-show",
+      "description": "Use when an AI Agent needs to inspect a bundled Agent Skill. Performs skill.show through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "bb04c0d030810b387cf8970897ff861b16ff566517023d8b63b80022ce84bbca"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "be054ca3534a63b07e98ed88250e730bceffa41918c2c07ae4d6883496fa1155"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "200254c60de29e0d16347909c338ac3c10360670a807ebf0d57a85d3da17b696"
+        }
+      ]
+    },
+    {
+      "name": "verdant-skill-uninstall",
+      "description": "Use when an AI Agent needs to remove only unmodified Verdant-managed skills. Performs skill.uninstall through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "3cff8746f5623a5b8c5a2a3a2029fb69aff53d3b2b04aaa75fb25fc80423cbe4"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "81ec56adc751190a65dad0598f39236a1a7326c0c0de0c69332d5544b2c42d86"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "bf78f79c6d71beb22b6d77a51c71a7b5560bc763119f6004e6b30fed39555088"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-convert",
+      "description": "Use when an AI Agent needs to convert authorized original voice inputs into a package. Performs voice.convert through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "d65230c4ec3697978da856f7d348c04db41ec854a60155a6307491fd0067f6bb"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "3baf605ba54bebf6b9af3d85e100300f164b4763c06de9327681ce4577ecf4c1"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "0d4c7b9ab79f521e7fd6cd17c9cb0fc27509b2743f64fd8eedfb641c14b0a4f3"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-import-originals",
+      "description": "Use when an AI Agent needs to import authorized original voice token and model files. Performs voice.import-originals through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "f71b3c0d45454e47adef78f172ea1bb716d4f27e4919cbdaca0f9c417d3011f8"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1639cd6f8c633587e42b023be9db866a5ccbefb6c502a186c036e4b1c7c53e56"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "0d1cfb0e244c4e8b709e98dec4ca914dba324ed71d31e936a94596ca85487fb0"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-install",
+      "description": "Use when an AI Agent needs to install a verified voice package. Performs voice.install through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "30a3fa9c5e055b55925d1384631ab85d7aa9a0fc5d95ce3027ae33e4e064268a"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "64b1eb7933edf33b5e758c9150751606af7f21985fa6a8729ab92edd33020c28"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "79ca220968c6d299e5a6def1b7d57aaa90af1e889ea26d6c83c3b94d7eed5f0c"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-list",
+      "description": "Use when an AI Agent needs to discover installed voices. Performs voice.list through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "2418c994c805eae99ab80b500ece6508094ebe3d902cd262f1e3e9c6229e8dbc"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "937d4609857e7d95fd9c431f57176d07c3aa0a543d98ed855fdad53a93e7e48d"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a8a71b0c4e19ce0b9e5be6eddbc1fc478c2d7b5b32cc6e473f1ce2ed6bcf493e"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-remove",
+      "description": "Use when an AI Agent needs to remove an identified voice package. Performs voice.remove through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "2ac5177d5e9c21ac16873bd2f2b6cf707138d8363221b598e003c3dec1129840"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "1d116496c4bc557f00b4ec285676d02c810500892eb17b6474a60cfe0001706a"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "a275d31c601c03af349a613e00a46617fb3eb01083565f794f78d38a8e55cb0a"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-set-default",
+      "description": "Use when an AI Agent needs to select the default voice. Performs voice.set-default through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "a3a9e983598744d2670ee4b73d3bc346e9f34b1c8344c34a3ce57f1e7375f52c"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "bcb3f1a66ab8e082ff054cd7e021be9519b45f8810be45fa55fb746bd5904a8f"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "ccff01970b0266e5e58ff07823f59d3d20c551ac2fab4cf0feae784c4653b259"
+        }
+      ]
+    },
+    {
+      "name": "verdant-voice-verify",
+      "description": "Use when an AI Agent needs to verify a voice package with the synthesis worker. Performs voice.verify through Verdant's CLI or NDJSON worker.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "51f07109a8cda98c8e65d2b17ae9110b699be25e81c03c4eea49e05faa944e75"
+        },
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "8527dd531a304c0c1d3057332373a2c9d1eb1c4a9bdaa4c8499e1a07f9175924"
+        },
+        {
+          "path": "references/operation.json",
+          "sha256": "d3562f395b395cbbfb96e3752807a33ee40099b440d82e9e17042ec5d94fd109"
+        }
+      ]
+    }
+  ]
+}

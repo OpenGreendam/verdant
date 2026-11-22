@@ -1,0 +1,42 @@
+{
+  "op": "media.verify",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "asset_paths": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "asset_roots": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "clip_id": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "track": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  }
+}

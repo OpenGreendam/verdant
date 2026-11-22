@@ -1,0 +1,3 @@
+selected_family=Noto Sans CJK SC; primary=FontId(2); explicit_noto_sans=FontId(0); explicit_noto_serif=FontId(5)
+shaped_run=FontId(2); registered_family=Some("Noto Sans CJK SC"); glyphs=27
+CJK installed=["Noto Sans CJK SC", "Noto Serif CJK SC"]

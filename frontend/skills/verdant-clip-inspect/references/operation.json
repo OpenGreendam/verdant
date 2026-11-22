@@ -1,0 +1,32 @@
+{
+  "effect": "read_or_export",
+  "native_units": true,
+  "op": "clip.inspect",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "clip_id": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "track": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  }
+}

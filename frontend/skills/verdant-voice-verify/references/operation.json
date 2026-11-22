@@ -1,0 +1,28 @@
+{
+  "op": "voice.verify",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "onnxruntime_library": {
+        "type": "string"
+      },
+      "project_root": {
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "type": "integer"
+      },
+      "voice_package": {
+        "type": "string"
+      },
+      "voice_registry": {
+        "type": "string"
+      },
+      "worker": {
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

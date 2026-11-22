@@ -1,0 +1,16 @@
+{
+  "op": "cache.clean",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "digest": {
+        "type": "string"
+      },
+      "workspace": {
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

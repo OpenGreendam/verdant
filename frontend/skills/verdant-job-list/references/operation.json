@@ -1,0 +1,16 @@
+{
+  "op": "job.list",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "limit": {
+        "type": "integer"
+      },
+      "workspace": {
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

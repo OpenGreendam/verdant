@@ -1,0 +1,26 @@
+{
+  "op": "effect.scan",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "cache_dir": {
+        "type": "string"
+      },
+      "paths": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "plughost": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "plughost",
+      "cache_dir",
+      "paths"
+    ],
+    "type": "object"
+  }
+}

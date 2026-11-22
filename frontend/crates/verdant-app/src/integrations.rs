@@ -1,31 +1,35 @@
 //! Native editor integrations. Every authored edit enters the ordinary document journal.
 use super::*;
+#[path="audio_edit_ui.rs"]
+pub mod audio_edit_ui;
 use verdant_domain::automation::{AutomationDocument,AutomationLane,AutomationOwner,AutomationPoint,AutomationTarget,Interpolation as AutomationInterpolation};
 use verdant_media::{AssetPolicy,AudioClip,ImportLimits,MediaImporter};
 use verdant_midi::{CaptureOrigin,MidiCapture,MidiInputService,MidiPort,MidiTake};
 
 #[derive(Clone,Debug)]
 pub enum IntegrationAction {
-    Menu,Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
+    AudioEdit(audio_edit_ui::AudioUiAction),Menu,Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
     MonitorPorts,Monitor(MidiPort),StopMonitoring,
     MidiPorts,MidiChannels(MidiPort),Record(MidiPort,Option<u8>),FinishRecording,CancelRecording,ImportAudio,AuthorizeAudio,Clips,SelectClip(TrackId,String),EditClip,DuplicateClip,DeleteClip,RelinkClip,
     Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),VocaloidMetadata,
     Scale,OtherTracks,ThreeLanes,AuditionSelection,Report,
 }
 #[derive(Clone,Debug)]
-pub enum IntegrationPrompt { InstallVoice(super::voice_ui::VoiceImportDraft),Dictionary(Option<(String,bool)>),Segment(Option<String>),Clip(TrackId,String),Automation(AutomationTarget),Vocaloid,Scale }
+pub enum IntegrationPrompt { AudioEdit(audio_edit_ui::AudioPrompt),InstallVoice(super::voice_ui::VoiceImportDraft),Dictionary(Option<(String,bool)>),Segment(Option<String>),Clip(TrackId,String),Automation(AutomationTarget),Vocaloid,Scale }
 
 pub struct Recording {
     capture:MidiCapture,take:Option<MidiTake>,track:TrackId,base:Revision,tempo:TempoMap,origin_micros:u64,origin_tick:i64,
 }
 pub struct IntegrationState {
+    pub timeline_preparation:verdant_service::preparation::TimelinePreparationGate,
+    pub audio_edit:audio_edit_ui::AudioEditUiState,
     pub performance:crate::performance::PerformanceState,
     pub asset_policy:AssetPolicy,pub selected_clip:Option<(TrackId,String)>,pub recording:Option<Recording>,pub media_ready:bool,pub media_cache:verdant_media::WaveformCache,pub media_previews:HashMap<String,Arc<verdant_media::WaveformPreview>>,pub media_save_generation:u64,pub media_file_jobs:usize,
     pub report:String,pub other_tracks:bool,/// Parameter lanes shown under the roll, top to bottom; `active_panel` edits.
     pub lanes:Vec<Param>,pub active_panel:usize,pub scale_root:u8,pub scale_intervals:Vec<u8>,
 }
 impl Default for IntegrationState {
-    fn default()->Self{Self{performance:Default::default(),asset_policy:AssetPolicy::new(Vec::<PathBuf>::new()).expect("empty asset policy"),selected_clip:None,recording:None,media_ready:false,media_cache:verdant_media::WaveformCache::default(),media_previews:HashMap::new(),media_save_generation:0,media_file_jobs:0,
+    fn default()->Self{Self{timeline_preparation:Default::default(),audio_edit:Default::default(),performance:Default::default(),asset_policy:AssetPolicy::new(Vec::<PathBuf>::new()).expect("empty asset policy"),selected_clip:None,recording:None,media_ready:false,media_cache:verdant_media::WaveformCache::default(),media_previews:HashMap::new(),media_save_generation:0,media_file_jobs:0,
         report:String::new(),other_tracks:false,lanes:vec![Param::Pit],active_panel:0,scale_root:0,scale_intervals:Vec::new()}}
 }
 fn action(label:impl Into<gpui::SharedString>,command:IntegrationAction)->crate::menu::MenuItem{
@@ -44,6 +48,7 @@ impl Editor {
     pub fn run_integration(&mut self,command:IntegrationAction,window:&mut Window,cx:&mut Context<Self>)->Result<(),String>{
         use IntegrationAction as A;
         match command{
+            A::AudioEdit(action)=>self.run_audio_ui(action,window,cx)?,
             A::Menu=>self.integrations_menu(window,cx),
             A::Singers=>{
                 let items=self.singer_menu_items()?;
@@ -80,10 +85,10 @@ impl Editor {
             A::Record(port,channel)=>self.start_midi_recording(&port,channel,cx)?,A::FinishRecording=>self.finish_midi_recording(cx)?,A::CancelRecording=>{self.cancel_midi_recording("已取消 MIDI 录音");cx.notify();}
             A::ImportAudio=>self.audio_file_dialog(false,false,window,cx),A::AuthorizeAudio=>self.audio_file_dialog(true,false,window,cx),A::RelinkClip=>{self.selected_audio_clip()?;self.audio_file_dialog(false,true,window,cx);}
             A::Clips=>{let mut items=Vec::new();for track in &self.project().tracks{for clip in verdant_media::read_clips(track).map_err(|e|e.to_string())?{items.push(action(format!("{} · {} · tick {}",track.name,Path::new(&clip.source.path).file_name().unwrap_or_default().to_string_lossy(),clip.start_tick),A::SelectClip(track.id.clone(),clip.id.to_string())));}}if items.is_empty(){items.push(crate::menu::MenuItem::disabled("尚无音频片段"));}self.show_menu(window.mouse_position(),items,window,cx);}
-            A::SelectClip(track,id)=>{self.select_track(track.clone(),cx);if self.session.track!=track{return Err("先完成当前歌词编辑".into());}self.integrations.selected_clip=Some((track,id));cx.notify();}
+            A::SelectClip(track,id)=>{self.select_track(track.clone(),cx);if self.session.track!=track{return Err("先完成当前歌词编辑".into());}self.integrations.selected_clip=Some((track,id));let clip=self.selected_audio_clip()?;self.select_audio_clip(&clip,false,false);cx.notify();}
             A::EditClip=>self.open_audio_clip_dialog(window,cx)?,
-            A::DuplicateClip=>{let clip=self.selected_audio_clip()?;let copy=clip.duplicate_at_tick(self.tempo().tick_at(self.playhead_seconds()).round()as i64).map_err(|e|e.to_string())?;let track=clip.track;let mut clips=verdant_media::read_clips(self.project().track(&track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;self.integrations.selected_clip=Some((track.clone(),copy.id.to_string()));clips.push(copy);self.commit_audio_clips(&track,&clips,"复制音频片段",cx)?;}
-            A::DeleteClip=>{let clip=self.selected_audio_clip()?;let mut clips=verdant_media::read_clips(self.project().track(&clip.track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;clips.retain(|c|c.id!=clip.id);self.commit_audio_clips(&clip.track,&clips,"删除音频片段",cx)?;self.integrations.selected_clip=None;}
+            A::DuplicateClip=>self.run_audio_ui(audio_edit_ui::AudioUiAction::Duplicate,window,cx)?,
+            A::DeleteClip=>self.run_audio_ui(audio_edit_ui::AudioUiAction::Delete,window,cx)?,
             A::Automation=>self.automation_menu(window,cx)?,
             A::EditAutomation(target)=>{
                 match target.owner() {
@@ -118,6 +123,7 @@ impl Editor {
     }
     pub(super) fn apply_integration_prompt(&mut self,purpose:&IntegrationPrompt,text:&str,cx:&mut Context<Self>)->Result<(),String>{
         match purpose{
+            IntegrationPrompt::AudioEdit(prompt)=>self.apply_audio_prompt(prompt,text,cx)?,
             IntegrationPrompt::InstallVoice(draft)=>self.submit_voice_import(draft,text)?,
             IntegrationPrompt::Dictionary(original)=>{
                 let(lyrics,mut readings)=dictionary_entry(text)?;let key=lyrics.concat();let mut settings=verdant_backend::phonemizer::settings_from_project(self.project())?;
@@ -153,7 +159,7 @@ impl Editor {
                 let muted=match fields[5]{"0"=>false,"1"=>true,_=>return Err("静音须为 0 或 1".into())};
                 let mut clips=verdant_media::read_clips(self.project().track(track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;
                 let clip=clips.iter_mut().find(|c|c.id.to_string()==*id).ok_or("片段已不存在")?;
-                clip.start_tick=start_tick;clip.source_offset_frames=offset_frames;clip.duration_frames=duration_frames;
+                *clip=clip.trim_source(offset_frames,duration_frames,start_tick as f64,&self.tempo()).map_err(|e|e.to_string())?;
                 clip.gain=gain;clip.pan=pan;clip.muted=muted;
                 clip.validate().map_err(|e|e.to_string())?;
                 self.commit_audio_clips(track,&clips,"编辑音频片段",cx)?;
@@ -266,7 +272,7 @@ impl Editor {
             cx.spawn(async move|this,cx|{let read_policy=policy.clone();let result=cx.background_spawn(async move{MediaImporter::new(read_policy,ImportLimits::default()).import_file(&path).map_err(|e|e.to_string())}).await;
                 let _=this.update(cx,|ed,cx|{let result=(||->Result<(),String>{if ed.project().project_id!=project_id{return Err("工程已切换，未导入音频".into());}let imported=result?;let mut clips=verdant_media::read_clips(ed.project().track(&track).ok_or("目标轨道已删除")?).map_err(|e|e.to_string())?;
                     let clip=if let Some(previous)=selected{if previous.source.sha256!=imported.source.sha256{return Err("重新定位必须选择相同内容；要替换音源，请新建音频片段".into());}let clip=clips.iter_mut().find(|c|c.id==previous.id).ok_or("原片段已不存在")?;clip.source=imported.source;clip.validate().map_err(|e|e.to_string())?;clip.clone()}else{let clip=AudioClip::new(imported.source,track.clone(),tick);clips.push(clip.clone());clip};
-                    ed.commit_audio_clips(&track,&clips,if relink{"重新定位音源"}else{"导入音频片段"},cx)?;ed.integrations.asset_policy=policy;ed.remember_media_authorizations(&[PathBuf::from(&clip.source.path)]);ed.integrations.selected_clip=Some((track,clip.id.to_string()));ed.rebuild_timeline(cx);Ok(())})();if let Err(error)=result{ed.notice(format!("音频导入失败：{error}"));}cx.notify();});}).detach();
+                    ed.commit_audio_clips(&track,&clips,if relink{"重新定位音源"}else{"导入音频片段"},cx)?;ed.integrations.asset_policy=policy;ed.remember_media_authorizations(&[PathBuf::from(&clip.source.path)]);ed.select_audio_clip(&clip,false,false);ed.rebuild_timeline(cx);Ok(())})();if let Err(error)=result{ed.notice(format!("音频导入失败：{error}"));}cx.notify();});}).detach();
         }));}}).detach();
     }
     fn remember_media_authorizations(&mut self,paths:&[PathBuf]){let mut authorized=self.prefs.extra.get("media_authorizations").and_then(|v|v.as_array()).cloned().unwrap_or_default();for path in paths{if let Ok(path)=path.canonicalize(){let value=serde_json::Value::String(path.display().to_string());if !authorized.contains(&value){authorized.push(value);}}}self.prefs.extra.insert("media_authorizations".into(),authorized.into());self.prefs_dirty=true;}

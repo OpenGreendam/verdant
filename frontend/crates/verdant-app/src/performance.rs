@@ -52,8 +52,15 @@ fn learned_instrument_changes(id:&str,params:&dsp::SynthParams,messages:&[(u32,f
  }
  writes.retain(|(id,value)|params.get(id)!=*value);writes
 }
+fn retire_monitor_source(audio:&mut verdant_audio::Control)->bool{
+ audio.reset_monitor();!audio.set_monitor(0,None)
+}
 impl Editor {
  pub(crate) fn prepare_instrument_monitor(&mut self,track:&TrackId)->bool{
+  if !self.project().track(track).is_some_and(crate::instrument::synth_monitor_enabled){
+   if self.integrations.performance.binding.as_ref().is_some_and(|(owner,_,_)|owner==track){self.clear_instrument_monitor();}
+   return false;
+  }
   let Some(t)=self.project().track(track)else{return false};
   let Some(params)=crate::instrument::synth_params(t)else{return false};
   let Some(spec)=t.instrument()else{return false};
@@ -101,14 +108,14 @@ impl Editor {
   }
   let capture=MidiInputService::open(port,None,65536).map_err(|e|e.to_string())?;
   let target=self.integrations.performance.target.clone().unwrap_or_else(||DeviceTarget::Track(self.session.track.clone()));
-  let instrument=match &target{DeviceTarget::Track(track)=>self.project().track(track).and_then(crate::instrument::synth_params).map(|_|track.clone()),DeviceTarget::Master=>None};
+  let instrument=match &target{DeviceTarget::Track(track)=>self.project().track(track).filter(|track|crate::instrument::synth_monitor_enabled(track)).map(|_|track.clone()),DeviceTarget::Master=>None};
   if let Some(track)=instrument{if !self.prepare_instrument_monitor(&track){return Err("实时乐器尚未准备好，请重试 MIDI 输入".into());}}
   else{self.clear_instrument_monitor();}
   self.integrations.performance.capture=Some(capture);self.integrations.performance.target=Some(target);
   self.notice(format!("MIDI 实时监听：{} · 全部通道",port.name));cx.notify();Ok(())
  }
  fn clear_instrument_monitor(&mut self){
-  self.audio.reset_monitor();let pending=!self.audio.set_monitor(0,None);
+  let pending=retire_monitor_source(&mut self.audio);
   let state=&mut self.integrations.performance;state.binding=None;state.parameters=None;state.instrument_id=None;
   state.track_index=None;state.telemetry=None;state.snapshot=None;state.preview_keys=[false;128];state.preview_release_pending=false;state.meter_reset_pending=false;state.stop_pending=pending;
  }
@@ -164,6 +171,14 @@ impl Editor {
    if generation!=self.document_generation||self.project().track(&track).and_then(crate::instrument::synth_params).is_none(){self.stop_instrument_monitor(cx);return;}
    self.prepare_instrument_monitor(&track);
   }
+  // Preserve the selected MIDI port while bypassed. On unbypass a new native
+  // voice starts without replaying notes that arrived while monitoring was off.
+  if self.integrations.performance.capture.is_some()&&self.integrations.performance.binding.is_none(){
+   let target=self.integrations.performance.target.clone().unwrap_or_else(||DeviceTarget::Track(self.session.track.clone()));
+   if let DeviceTarget::Track(track)=target{
+    if self.project().track(&track).is_some_and(crate::instrument::synth_monitor_enabled){self.prepare_instrument_monitor(&track);}
+   }
+  }
   if self.integrations.performance.preview_release_pending&&self.integrations.performance.binding.is_some()
    &&self.audio.monitor_events(&[(dsp::SYNTH_PREVIEW_RELEASE,0.)]){
    self.integrations.performance.preview_release_pending=false;self.integrations.performance.preview_keys=[false;128];
@@ -195,7 +210,10 @@ impl Editor {
  pub(crate) fn consume_performance_events(&mut self,events:&[CapturedEvent],cx:&mut Context<Self>){
   if events.is_empty(){return;}
   let messages:Vec<(u32,f64)>=events.iter().copied().map(native_event).collect();
-  if self.integrations.performance.binding.as_ref().is_some_and(|(_,g,_)|*g==self.document_generation){
+  let route=self.integrations.performance.binding.as_ref().is_some_and(|(track,g,_)|
+   *g==self.document_generation&&self.project().track(track).is_some_and(crate::instrument::synth_monitor_enabled));
+  if !route&&self.integrations.performance.binding.is_some(){self.clear_instrument_monitor();}
+  if route{
    for &(id,value)in &messages{if !self.audio.monitor_event(id,value){self.notice("MIDI 队列已满，已释放全部发声");break;}}
   }
   if let Some(learn)=self.integrations.performance.learn.take(){
@@ -246,5 +264,31 @@ impl Editor {
    let(id,v)=native_event(e);assert!(matches!(proto::decode_midi(id,v),Some(proto::MidiEvent::PitchBend{channel:7,..})));assert!((-1.0..=1.0).contains(&v));}
   let(id,v)=native_event(CapturedEvent{timestamp_micros:0,channel:2,kind:EventKind::Control{controller:74,value:127}});
   assert_eq!(proto::decode_midi(id,v),Some(proto::MidiEvent::Control{channel:2,controller:74,value:1.}));
+ }
+
+ #[test]
+ fn bypassed_synth_stops_live_pcm_without_removing_editor_parameters(){
+  for id in [dsp::SYNTH_ID,dsp::ONE_SYNTH_ID]{
+   let mut track=verdant_domain::Track::new("instrument","blue");
+   let params=if id==dsp::ONE_SYNTH_ID{dsp::SynthParams::one_defaults()}else{dsp::SynthParams::default()};
+   track.unknown.insert(verdant_domain::model::INSTRUMENT_KEY.into(),crate::instrument::builtin_instrument_spec(id,&params,""));
+   assert!(crate::instrument::synth_monitor_enabled(&track));
+   let(mut audio,mut callback)=verdant_audio::engine::channel(48_000,256);
+   assert!(audio.set_monitor(0,Some(Box::new(RealtimeSynth::for_instrument(id,&params,48_000.)))));
+   let(event,_,value)=proto::note_on(60,0,0.8);
+   assert!(audio.monitor_event(event,value));
+   let mut output=[0.;512];let mut peak=0f32;
+   for _ in 0..32{callback.process(&mut output,2);peak=peak.max(output.iter().fold(0f32,|p,x|p.max(x.abs())));}
+   assert!(peak>0.0001,"{id}: {peak}");
+   track.unknown.get_mut(verdant_domain::model::INSTRUMENT_KEY).unwrap()["bypass"]=true.into();
+   assert!(!crate::instrument::synth_monitor_enabled(&track));
+   assert_eq!(crate::instrument::synth_params(&track).unwrap(),params);
+   assert!(!retire_monitor_source(&mut audio));
+   for _ in 0..4{output.fill(1.);callback.process(&mut output,2);assert_eq!(output,[0.;512]);}
+   track.unknown.get_mut(verdant_domain::model::INSTRUMENT_KEY).unwrap()["bypass"]=false.into();
+   assert!(crate::instrument::synth_monitor_enabled(&track));
+   assert!(audio.set_monitor(0,Some(Box::new(RealtimeSynth::for_instrument(id,&params,48_000.)))));
+   callback.process(&mut output,2);assert_eq!(output,[0.;512],"bypassed notes must not replay");
+  }
  }
 }

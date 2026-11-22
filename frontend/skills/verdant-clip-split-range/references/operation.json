@@ -1,0 +1,63 @@
+{
+  "effect": "one_atomic_project_transaction",
+  "native_units": true,
+  "op": "clip.split-range",
+  "params": {
+    "additionalProperties": false,
+    "properties": {
+      "allowed_creator": {
+        "type": "string"
+      },
+      "asset_paths": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "asset_roots": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "end_tick": {
+        "type": "number"
+      },
+      "expect_project_id": {
+        "type": "string"
+      },
+      "expect_revision": {
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "recovery": {
+        "enum": [
+          "saved",
+          "recovered"
+        ]
+      },
+      "start_tick": {
+        "type": "number"
+      },
+      "tracks": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "path",
+      "expect_revision",
+      "tracks",
+      "start_tick",
+      "end_tick"
+    ],
+    "type": "object"
+  }
+}

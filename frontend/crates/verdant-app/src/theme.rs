@@ -403,6 +403,18 @@ pub fn black() -> Rgba {
     rgb(0x000000)
 }
 
+/// Native audio workspaces keep the platform face and explicitly prefer sans
+/// CJK fallbacks instead of a backend-dependent serif face for missing glyphs.
+pub fn plugin_ui_font(family: impl Into<gpui::SharedString>) -> gpui::Font {
+    static FALLBACKS: std::sync::OnceLock<gpui::FontFallbacks> = std::sync::OnceLock::new();
+    let mut font = gpui::font(family);
+    font.fallbacks = Some(FALLBACKS.get_or_init(|| gpui::FontFallbacks::from_fonts(
+        ["Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Droid Sans Fallback"]
+            .into_iter().map(str::to_string).collect()
+    )).clone());
+    font
+}
+
 /// The platform UI face, chosen for a reason rather than by default:
 /// SF on macOS, Segoe on Windows, the desktop's fontconfig `sans-serif`
 /// on Linux (falling back to a face with CJK coverage if needed).

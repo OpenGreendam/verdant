@@ -1,13 +1,15 @@
 //! Verdant 翠绿 — a GPUI singing-voice editor for the OpenGreendam backend.
 //!
 //! ```text
-//! verdant [PROJECT.verp | --import FILE] [--worker real] [--worker-binary FILE]
+//! verdant gui [PROJECT.verp | --import FILE] [--worker real] [--worker-binary FILE]
 //!         [--workspace DIR] [--worker-arg ARG]… [--silent-audio]
 //!         [--voice-package DIR] [--voice-registry FILE]
 //! ```
 //!
 //! `--worker real` launches the owned Rust `verdant-worker` executable. Voice
 //! packages are user-provided. The desktop launches the Rust worker directly.
+
+#![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
 mod actions;
 mod alert;
@@ -132,7 +134,7 @@ fn parse_args() -> Args {
             "--plughost" => a.plughost = it.next().map(PathBuf::from),
             "-h" | "--help" => {
                 println!(
-                    "verdant [PROJECT.verp | --import FILE] [--worker real] [--worker-binary FILE] [--workspace DIR] [--worker-arg ARG]... \
+                    "verdant gui [PROJECT.verp | --import FILE] [--worker real] [--worker-binary FILE] [--workspace DIR] [--worker-arg ARG]... \
                      [--silent-audio] [--voice-package DIR] [--voice-registry FILE] [--plughost PATH] [--audition-dir DIR]\n\
                      Open, Save and Save As use .verp.\n\
                      Import: .ufdata, .ust, .ustx, .mid/.midi, .svp, .vsqx, .vpr."

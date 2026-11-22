@@ -111,13 +111,13 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
         .child(header)
         .when(has_reference, |d| d.child(div().text_xs().text_color(band_color(2)).child(format!("参考输出 · {}", reference_name.unwrap_or_default()))))
         .child(graph(editor.clone(), Target { track: owner.clone(), slot, key }, Vec::new(), "signal-analyzer",
-            if waveform { "实际输入和输出波形" } else { "实际输入和输出频谱" }, th, painter, vec![], None, None).w_full().h(gpui::rems(130./16.)))
+            if waveform { "实际输入和输出波形" } else { "实际输入和输出频谱" }, th, painter, vec![], None, None).w_full().h(gpui::rems(285./16.)))
         .child(div().flex().flex_wrap().gap(gpui::rems(12./16.))
             .child(meters("输入", snapshot.input_peak, snapshot.input_rms, th.text_secondary, th))
             .child(meters("输出", snapshot.output_peak, snapshot.output_rms, th.accent, th)))
         .children(snapshot.loudness.as_ref().map(|reading| loudness(reading, th)))
         .when(!snapshot.gain_reduction_db.is_empty(), |d| d.child(graph(editor.clone(), Target { track: owner.clone(), slot, key }, Vec::new(),
-            "gain-history", "内部检测器增益历史", th, gain_painter, vec![], None, None).w_full().h(gpui::rems(84./16.))))
+            "gain-history", "内部检测器增益历史", th, gain_painter, vec![], None, None).w_full().h(gpui::rems(130./16.))))
         .into_any_element()
 }
 
@@ -177,4 +177,87 @@ mod tests {
         assert_eq!(waveform_frames(8192, 128), 8192);
         assert_eq!(waveform_frames(8193, 128), 8129);
     }
+}
+
+/// The GUI only reads immutable host snapshots; no analysis work is scheduled
+/// by the drawing code and empty streams never acquire a fabricated trace.
+pub(super) fn snapshot(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey) -> Option<std::sync::Arc<verdant_plugins::telemetry::TelemetrySnapshot>> {
+    let cached = if slot == crate::instrument::INSTRUMENT_SLOT {
+        match owner { DeviceTarget::Track(t) => ed.instrument_telemetry(t), DeviceTarget::Master => None }
+    } else { ed.live_device_insert(owner, slot).filter(|h| h.key() == key).and_then(|h| h.cached_telemetry()) };
+    cached.filter(|s| s.frames_total > 0 && s.window_frames > 0)
+}
+
+pub(super) fn paint_spectrum(window: &mut Window, plot: Plot, measured: Option<&verdant_plugins::telemetry::TelemetrySnapshot>, th: Theme, texts: &mut Texts) {
+    let Some(measured) = measured else {
+        texts.push(("频谱 · 等待音频".into(), p(12., 9., plot.o), 11., th.text_secondary));
+        return;
+    };
+    let stale = measured.captured_at.elapsed() > Duration::from_secs(1);
+    let axis = Axis::lin(-96., 0.);
+    for (bins, color, filled) in [
+        (&measured.spectrum_input_db, with_alpha(th.text_secondary, if stale { 0.22 } else { 0.38 }), false),
+        (&measured.spectrum_output_db, with_alpha(th.accent, if stale { 0.22 } else { 0.4 }), true),
+    ] {
+        let points: Vec<_> = measured.spectrum_frequencies.iter().zip(bins).filter_map(|(&freq, &level)| {
+            (freq >= FREQ_AXIS.min as f32 && freq <= FREQ_AXIS.max as f32 && level.is_finite())
+                .then(|| (plot.x(FREQ_AXIS.norm(freq as f64)), plot.y(axis.norm(level as f64))))
+        }).collect();
+        if filled { fill_under(window, plot, &points, plot.y(0.), with_alpha(th.accent, if stale { 0.035 } else { 0.07 })); }
+        polyline(window, plot.o, points.into_iter().map(Some), 1., color);
+    }
+    texts.push((format!("{} · 频谱 −96…0 dBFS", if stale { "上次音频" } else { "输入 / 输出" }), p(12., 9., plot.o), 11., th.text_secondary));
+}
+
+pub(super) fn compact(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey) -> gpui::AnyElement {
+    let th = ed.theme;
+    let Some(s) = snapshot(ed, owner, slot, key) else {
+        return div().min_h(gpui::rems(26./16.)).flex().items_center().text_xs().text_color(th.text_secondary)
+            .child("等待音频 · 输入与输出计量在播放后显示").into_any_element();
+    };
+    let stale = s.captured_at.elapsed() > Duration::from_secs(1);
+    let label = |name: &str, peaks: [f32; 2], color| div().flex().items_center().gap(gpui::rems(6./16.))
+        .child(div().text_xs().text_color(th.text_secondary).child(name.to_string()))
+        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(color)
+            .child(format!("{} / {} dBFS", meter_number(dbfs(peaks[0])), meter_number(dbfs(peaks[1])))));
+    let mut row = div().flex().flex_wrap().items_center().gap(gpui::rems(16./16.)).min_h(gpui::rems(26./16.))
+        .child(label("IN L/R", s.input_peak, th.text_secondary))
+        .child(label("OUT L/R", s.output_peak, if s.output_peak.iter().any(|p| *p >= 1.) { th.error } else { th.accent }));
+    if let Some(gain) = s.gain_reduction_db.last() {
+        row = row.child(div().text_xs().text_color(th.text_secondary).child(format!("检测器增益 {gain:+.1} dB")));
+    }
+    row.child(div().flex_1()).child(div().text_xs().text_color(th.text_tertiary)
+        .child(if stale { "上次音频" } else { "实时" })).into_any_element()
+}
+
+/// Actual recent waveform peaks on a dBFS time axis, separated from the static
+/// transfer graph and from the detector-block history on the meters page.
+pub(super) fn history(ed: &Editor, editor: &Entity<Editor>, target: Target, cx: &mut Context<Editor>) -> gpui::AnyElement {
+    let _ = cx;
+    let measured = snapshot(ed, &target.track, target.slot, target.key);
+    let th = ed.theme;
+    let painter: Painter = Rc::new(move |window, plot, _, texts| {
+        let axis = Axis::lin(-72., 6.);
+        let ms = measured.as_ref().map_or(0., |s| waveform_frames(s.frames_total, s.waveform_input.len()) as f64 / s.sample_rate.max(1.) * 1000.);
+        let xs = [0., 0.5, 1.].map(|x| (x, format!("{:.0} ms", (x - 1.) * ms)));
+        let ys = [-60., -36., -12., 0.].map(|x| (axis.norm(x), if x == 0. { String::new() } else { format!("{x:.0} dBFS") }));
+        paint_grid(window, plot, th, &xs, &ys, None, texts);
+        let Some(s) = measured.as_ref() else {
+            texts.push(("实际电平历史 · 等待音频".into(), p(12., 9., plot.o), 11., th.text_secondary)); return;
+        };
+        let stale = s.captured_at.elapsed() > Duration::from_secs(1);
+        for (samples, color, fill) in [
+            (&s.waveform_input, with_alpha(th.text_secondary, if stale {0.25} else {0.45}), false),
+            (&s.waveform_output, with_alpha(th.accent, if stale {0.5} else {0.9}), true),
+        ] {
+            let points: Vec<_> = samples.iter().enumerate().map(|(index, point)| {
+                (plot.x(index as f64 / samples.len().saturating_sub(1).max(1) as f64), plot.y(axis.norm(dbfs(point.min.abs().max(point.max.abs())))))
+            }).collect();
+            if fill { fill_under(window, plot, &points, plot.y(0.), with_alpha(th.accent, 0.1)); }
+            polyline(window, plot.o, points.into_iter().map(Some), if fill {1.75} else {1.}, color);
+        }
+        texts.push((format!("{} · 输入 / 输出波形峰值", if stale { "上次音频" } else { "实时" }), p(12., 9., plot.o), 11., th.text_secondary));
+    });
+    graph(editor.clone(), target, Vec::new(), "dynamics-history", "实际输入与输出电平历史", th, painter, vec![], None, None)
+        .w_full().min_w(gpui::rems(240./16.)).h(gpui::rems(260./16.)).into_any_element()
 }

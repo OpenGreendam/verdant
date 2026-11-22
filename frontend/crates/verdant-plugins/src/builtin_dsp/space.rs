@@ -246,58 +246,8 @@ pub fn reverb_predelay_ms(v:&[f64],tempo:Option<f64>)->f64 {
     if sync==0{v[0]}else{beat_ms(sync,tempo.unwrap_or(v[109]))}
 }
 
-/// Schroeder energy-decay fit, independently implemented. Input is mono PCM;
-/// callers decode/downmix files on the control thread. The returned editable
-/// algorithmic settings do not preserve or convolve the original recording.
-pub fn fit_reverb_ir(samples:&[f32],sample_rate:f64)->Result<Vec<(String,f64)>,String> {
-    if !sample_rate.is_finite()||!(8000.0..=384000.0).contains(&sample_rate)||samples.len()<64||samples.len()>(sample_rate*60.0) as usize||samples.iter().any(|x|!x.is_finite()) {
-        return Err("IR requires finite mono PCM, 64 samples to 60 seconds, at 8–384 kHz".into());
-    }
-    let peak=samples.iter().map(|x|x.abs()).fold(0.0_f32,f32::max);
-    if peak<1e-8{return Err("IR contains no measurable energy".into());}
-    let onset=samples.iter().position(|x|x.abs()>peak*0.01).unwrap_or(0);
-    let peak_at=samples.iter().position(|x|x.abs()==peak).unwrap_or(onset);
-    if peak_at>onset+(sample_rate*0.25) as usize {return Err("Input is not a transient impulse response".into());}
-    fn decay_fit(x:&[f32],fs:f64)->Option<f64> {
-        let total=x.iter().map(|&x|(x as f64).powi(2)).sum::<f64>();
-        if total<1e-18{return None;}
-        let mut remaining=total;let(mut n,mut sx,mut sy,mut sxx,mut sxy)=(0.0,0.0,0.0,0.0,0.0);
-        for (i,&v) in x.iter().enumerate() {
-            let db=10.0*(remaining/total).max(1e-30).log10();
-            if (-35.0..=-5.0).contains(&db) {let t=i as f64/fs;n+=1.0;sx+=t;sy+=db;sxx+=t*t;sxy+=t*db;}
-            remaining=(remaining-(v as f64).powi(2)).max(0.0);
-        }
-        let den=n*sxx-sx*sx;if n<16.0||den<1e-15{return None;}
-        let slope=(n*sxy-sx*sy)/den;
-        if slope>=-0.1 {None}else{Some((-60.0/slope).clamp(0.05,80.0))}
-    }
-    let tail=&samples[onset..];
-    let decay=decay_fit(tail,sample_rate).ok_or("IR does not contain a measurable decay")?.clamp(0.2,20.0);
-    let mut changes=vec![("decay".into(),decay),("decay_rate".into(),100.0),("predelay".into(),(onset as f64/sample_rate*1000.0).min(250.0)),
-        ("predelay_sync".into(),0.0),("style".into(),0.0),("room".into(),(decay.log2()+1.0).clamp(0.0,4.0)),("freeze".into(),0.0),
-        ("auto_gate".into(),0.0),("decay_low_rate".into(),100.0),("decay_high_rate".into(),100.0),("damping".into(),20000.0)];
-    let centers=[63.0,125.0,250.0,500.0,1000.0,2000.0,4000.0,8000.0];
-    let total=tail.iter().map(|&v|(v as f64).powi(2)).sum::<f64>();
-    for (i,f) in centers.into_iter().enumerate() {
-        if f>=sample_rate*0.45 {continue;}
-        let mut filter=Biquad::default();filter.set(rbj(Rbj::BandPass,f,0.707,0.0,sample_rate));
-        let filtered:Vec<f32>=tail.iter().map(|&x|filter.run(x as f64) as f32).collect();
-        let rt=decay_fit(&filtered,sample_rate).unwrap_or(decay);
-        let energy=filtered.iter().map(|&x|(x as f64).powi(2)).sum::<f64>();
-        let gain=(10.0*(energy/total.max(1e-18)).max(1e-12).log10()+9.0).clamp(-12.0,12.0);
-        for(field,v)in[("on",1.0),("freq",f),("rate",(100.0*rt/decay).clamp(25.0,400.0)),("q",0.707),("shape",0.0)] {
-            changes.push((format!("decay{}_{field}",i+1),v));
-        }
-        for(field,v)in[("on",1.0),("freq",f),("gain",gain),("q",0.707),("shape",0.0)] {
-            changes.push((format!("post{}_{field}",i+1),v));
-        }
-    }
-    let mut values=std::collections::BTreeMap::new();
-    for i in 1..=8 {values.insert(format!("decay{i}_on"),0.0);values.insert(format!("post{i}_on"),0.0);}
-    for (id,value) in [("low_cut",20.0),("high_cut",20000.0),("post_low_gain",0.0),("post_high_gain",0.0),("post_mid_gain",0.0)]{values.insert(id.to_string(),value);}
-    for (id,value) in changes {values.insert(id,value);}
-    Ok(values.into_iter().collect())
-}
+mod ir_fit;
+pub use ir_fit::{ReverbIrBandFit, ReverbIrFitReport, fit_reverb_ir, fit_reverb_ir_report};
 
 pub struct ReverbProcessor {
     pub values: Vec<f64>,

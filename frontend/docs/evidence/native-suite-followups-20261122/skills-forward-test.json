@@ -1,0 +1,721 @@
+{
+  "schema": "verdant-skills-forward-acceptance/1",
+  "created_at_utc": "2026-11-22T10:25:36.029834+00:00",
+  "status": "pass_with_documentation_followups",
+  "test_root": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b",
+  "device_id": "ec69e76d-71fb-4bc8-8671-c089fd87096f",
+  "method": {
+    "mode": "fresh-user forward acceptance",
+    "sources_used": [
+      "CLI help",
+      "CLI skill list/install",
+      "installed SKILL.md and references/operation.json",
+      "CLI capabilities/schema and operation responses"
+    ],
+    "implementation_source_read_by_test_agent": false,
+    "implementation_source_edited_by_test_agent": false,
+    "build_commands_run_by_test_agent": false,
+    "git_commands_run_by_test_agent": false,
+    "gui_launched_by_test_agent": false,
+    "test_data_only": true,
+    "root_agent_updated_binary_for_findings_F1_F2": true
+  },
+  "runtime": {
+    "cli": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+    "plugin_host": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-plughost",
+    "cli_version": "0.1.0",
+    "baseline_cli_sha256": "not captured before the main workflow; baseline requests and responses are retained",
+    "worker_roundtrip_cli_sha256_before": "2f62bd6aa66b19931f2490b5e2577efa81f270ab9500f39399c65dc52ddef21f",
+    "worker_roundtrip_cli_sha256_after": "2f62bd6aa66b19931f2490b5e2577efa81f270ab9500f39399c65dc52ddef21f",
+    "preflight_regression_cli_sha256": "2f62bd6aa66b19931f2490b5e2577efa81f270ab9500f39399c65dc52ddef21f"
+  },
+  "skills": {
+    "installation_command": [
+      "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+      "skill",
+      "install",
+      "--all",
+      "--dest",
+      "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/installed-skills",
+      "--json"
+    ],
+    "installed_count": 125,
+    "bundle_version": "1.0.0",
+    "bundle_sha256": "f72c179c4f3ee57ceab4f6429daffba6c90b21075d5d6e5c52a151dbdd34da50",
+    "used": [
+      "verdant",
+      "verdant-project-new",
+      "verdant-edit-set-tempo-event",
+      "verdant-project-inspect",
+      "verdant-media-import",
+      "verdant-clip-split",
+      "verdant-clip-set-properties",
+      "verdant-plugin-list",
+      "verdant-preset-list",
+      "verdant-preset-show",
+      "verdant-plugin-add",
+      "verdant-mixer-set",
+      "verdant-render-plan",
+      "verdant-export-audio",
+      "verdant-analysis-audio",
+      "verdant-project-save-as",
+      "verdant-project-validate",
+      "verdant-project-apply"
+    ],
+    "read_for_discovery_but_not_needed": [
+      "verdant-edit-add-track"
+    ],
+    "runtime_fix_regression_used_baseline_installed_skills": true,
+    "regenerated_skill_documentation_not_yet_reviewed": true
+  },
+  "workflow": {
+    "project": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/forward.verp",
+    "saved_copy": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/saved.verp",
+    "project_id": "62994c84-2d6e-4a97-9a3d-caffd2d5213e",
+    "revision": 6,
+    "ppq": 480,
+    "tempo_bpm": 120.0,
+    "track_id": "1591f37f-9fc0-473e-aaaf-0a7bdcf2a89e",
+    "track_gain_db": -6.0,
+    "source_wav": {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/stereo-test-2s.wav",
+      "duration_seconds": 2,
+      "sample_rate": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "encoding": "PCM16",
+      "sha256": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+      "generation": "i=0..95999; t=i/48000; envelope=0.12+0.22*t/2; L=envelope*sin(2*pi*(220*t+90*t*t)); R=envelope*0.7*sin(2*pi*(330*t+55*t*t)+0.2); round(channel*32767) little-endian int16."
+    },
+    "clips": [
+      {
+        "id": "35b51f7e-4d23-4127-8aba-7c56e289be8b",
+        "start_tick": 0,
+        "source_offset_frames": 0,
+        "duration_frames": 48000,
+        "reversed": false
+      },
+      {
+        "id": "eb38c5a0-3214-4597-a7fc-2c1d605495b1",
+        "start_tick": 960,
+        "source_offset_frames": 48000,
+        "duration_frames": 48000,
+        "reversed": true
+      }
+    ],
+    "inserts": [
+      {
+        "id": "verdant.builtin.compressor",
+        "instance_id": "8831042f-6953-4ff6-8af0-8ee00ee9a17a",
+        "preset_id": "verdant.factory.compressor.vocal-leveler.v1",
+        "parameter_count": 228,
+        "all_parameters_match": true,
+        "bypass": false
+      },
+      {
+        "id": "verdant.builtin.reverb",
+        "instance_id": "26abce5b-3265-42d4-88af-cadeb1490be6",
+        "preset_id": "verdant.factory.reverb.vocal-intimate-room.v1",
+        "parameter_count": 279,
+        "all_parameters_match": true,
+        "bypass": false
+      }
+    ],
+    "save_as_validation": {
+      "project_id_preserved": true,
+      "revision": 6,
+      "clip_count": 2,
+      "reversed_right": true,
+      "gain_millidecibels": -6000,
+      "preset_ids": [
+        "verdant.factory.compressor.vocal-leveler.v1",
+        "verdant.factory.reverb.vocal-intimate-room.v1"
+      ]
+    },
+    "project_validate_result": {
+      "valid": true,
+      "project_id": "62994c84-2d6e-4a97-9a3d-caffd2d5213e",
+      "revision": 6,
+      "content_digest": "39062dae4e0ddc13b12aa3d5d39afeddbf38097b59f076cf4bbe8ab5c06503a3",
+      "recovery": {
+        "saved_revision": 6,
+        "recovered_revision": 6,
+        "decision_required": false,
+        "used_autosave": false,
+        "replayed_commits": 0,
+        "torn_tail_bytes": 0,
+        "recovered_at_ms": 1795342893575,
+        "completed_interrupted_save": false,
+        "preserved_unknown_keys": [
+          "/tracks/0/audio_clips",
+          "/tracks/0/inserts"
+        ]
+      },
+      "creator_approval_required": null,
+      "monophonic_overlaps": [],
+      "renderability_checked": false
+    }
+  },
+  "audio_outputs": [
+    {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/mix-44100.wav",
+      "format_code": 3,
+      "bits": 32,
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 88200,
+      "seconds": 2.0,
+      "nonfinite_samples": 0,
+      "sha256": "057b5ed77a1a1721f163488c780ce5c7ecff98d08a431cc59c3694e16e362040",
+      "per_channel": [
+        {
+          "peak": 0.13007088005542755,
+          "rms": 0.06243212546491271,
+          "nonzero_samples": 88200,
+          "clipped_samples": 0
+        },
+        {
+          "peak": 0.09195096790790558,
+          "rms": 0.04416494687120952,
+          "nonzero_samples": 88200,
+          "clipped_samples": 0
+        }
+      ],
+      "expected_frames": 88200,
+      "pass": true
+    },
+    {
+      "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b/mix-96000.wav",
+      "format_code": 3,
+      "bits": 32,
+      "channels": 2,
+      "sample_rate": 96000,
+      "frames": 192000,
+      "seconds": 2.0,
+      "nonfinite_samples": 0,
+      "sha256": "8896be85b52d313e33f99752db1b58457fe9588437a0190aa87f7b5cbcb09395",
+      "per_channel": [
+        {
+          "peak": 0.13077223300933838,
+          "rms": 0.06242008558502614,
+          "nonzero_samples": 192000,
+          "clipped_samples": 0
+        },
+        {
+          "peak": 0.09182288497686386,
+          "rms": 0.044140717586226834,
+          "nonzero_samples": 192000,
+          "clipped_samples": 0
+        }
+      ],
+      "expected_frames": 192000,
+      "pass": true
+    }
+  ],
+  "actual_waveform_reverse_and_gain_validation": {
+    "frames": 96000,
+    "channels": 2,
+    "length_match": true,
+    "max_abs_error": 1.6993644130769425e-08,
+    "rms_error": 4.5251517854032545e-09,
+    "pass": true,
+    "interpretation": "First second is forward; second second reverses stereo frames within the second-half source slice; -6 dB gain applied."
+  },
+  "worker_protocol_validation": {
+    "exit_code": 0,
+    "request_ids": [
+      "37-worker-export-saved",
+      "38-worker-analyze-saved"
+    ],
+    "events": [
+      {
+        "event": "progress",
+        "request_id": "37-worker-export-saved",
+        "sequence": 1,
+        "ok": null
+      },
+      {
+        "event": "progress",
+        "request_id": "37-worker-export-saved",
+        "sequence": 2,
+        "ok": null
+      },
+      {
+        "event": "result",
+        "request_id": "37-worker-export-saved",
+        "sequence": 3,
+        "ok": true
+      },
+      {
+        "event": "result",
+        "request_id": "38-worker-analyze-saved",
+        "sequence": 1,
+        "ok": true
+      }
+    ],
+    "all_result_ok": true,
+    "capture_file": "37-38-worker-record.json"
+  },
+  "safety_checks": {
+    "media_import_dry_run": {
+      "pass": true,
+      "before": {
+        "skill-install.stdout": "d33aa07e221675857921a60feca2240f33c459ebec45e6ac8fce4df6ca5f1aa1",
+        "skill-list.stdout": "a8a9d2277d3a28ca1c28d0953e97263b3cc872b92a10f64bb7165b322b55a583",
+        "capabilities.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "skill-help.stdout": "218b59f6a829ee1b9b5f3318c9acd12d1e6902d32143bda2029dc858eba4fedb",
+        "forward.verp.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "capabilities.stdout": "6f3804d12bde00fd2976da2210fdd248d7164e40004f49005259e7a284b5e638",
+        "stereo-test-2s.wav": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+        "skill-help.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "skill-list.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "skill-install.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "forward_harness.py": "7080f2731b74aef8b71bd1d1149f9bb5f1fb9dafa331e9911f66ad030e2221ca",
+        "forward.verp": "8af654ee6a0bbaa1e1f5de9b1aa0ccfe547706f27aad90ee94a5b0d1c13eef16",
+        "schema-project-apply.stdout": "d6e2ccba045957459f17ae2b4db4f094e65b58150702114b83ef95092befedb7",
+        "forward.verp.journal": "e9d22e22463f3fd8949c477ed7e92a20cad2f4d0e0fb8c7914ac2c8c6adc1f3b",
+        "__pycache__/forward_harness.cpython-313.pyc": "db4dbd76172dc2a61d0860b313cdb11f77c0e75979b10845607c88780cb12e8a"
+      },
+      "after": {
+        "skill-install.stdout": "d33aa07e221675857921a60feca2240f33c459ebec45e6ac8fce4df6ca5f1aa1",
+        "skill-list.stdout": "a8a9d2277d3a28ca1c28d0953e97263b3cc872b92a10f64bb7165b322b55a583",
+        "capabilities.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "skill-help.stdout": "218b59f6a829ee1b9b5f3318c9acd12d1e6902d32143bda2029dc858eba4fedb",
+        "forward.verp.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "capabilities.stdout": "6f3804d12bde00fd2976da2210fdd248d7164e40004f49005259e7a284b5e638",
+        "stereo-test-2s.wav": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+        "skill-help.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "skill-list.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "skill-install.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "forward_harness.py": "7080f2731b74aef8b71bd1d1149f9bb5f1fb9dafa331e9911f66ad030e2221ca",
+        "forward.verp": "8af654ee6a0bbaa1e1f5de9b1aa0ccfe547706f27aad90ee94a5b0d1c13eef16",
+        "schema-project-apply.stdout": "d6e2ccba045957459f17ae2b4db4f094e65b58150702114b83ef95092befedb7",
+        "forward.verp.journal": "e9d22e22463f3fd8949c477ed7e92a20cad2f4d0e0fb8c7914ac2c8c6adc1f3b",
+        "__pycache__/forward_harness.cpython-313.pyc": "db4dbd76172dc2a61d0860b313cdb11f77c0e75979b10845607c88780cb12e8a"
+      }
+    },
+    "other_dry_runs_and_invalid_parameters": {
+      "checks": [
+        {
+          "label": "31-dry-run-new",
+          "expected_ok": true,
+          "actual_ok": true,
+          "error": null,
+          "project_sha256_before": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "project_sha256_after": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "bytes_unchanged": true
+        },
+        {
+          "label": "32-dry-run-mixer",
+          "expected_ok": true,
+          "actual_ok": true,
+          "error": null,
+          "project_sha256_before": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "project_sha256_after": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "bytes_unchanged": true
+        },
+        {
+          "label": "33-bad-clip-selection",
+          "expected_ok": false,
+          "actual_ok": false,
+          "error": {
+            "code": "INVALID_ARGUMENT",
+            "message": "unknown audio clip ID",
+            "retryable": false
+          },
+          "project_sha256_before": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "project_sha256_after": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "bytes_unchanged": true
+        },
+        {
+          "label": "34-bad-mixer-range",
+          "expected_ok": false,
+          "actual_ok": false,
+          "error": {
+            "code": "INVALID_ARGUMENT",
+            "message": "pan must be within -1..1",
+            "retryable": false
+          },
+          "project_sha256_before": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "project_sha256_after": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "bytes_unchanged": true
+        },
+        {
+          "label": "35-bad-atomic-tempo",
+          "expected_ok": false,
+          "actual_ok": false,
+          "error": {
+            "code": "INVALID_PROJECT",
+            "message": "invalid command: tempo must be positive",
+            "retryable": false
+          },
+          "project_sha256_before": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "project_sha256_after": "a70d8a493e8c20fd767dcff4e00493d2e7f66215359cae677970eefd94bc74bd",
+          "bytes_unchanged": true
+        }
+      ],
+      "new_dry_run_output_absent": true,
+      "revision_unchanged": true,
+      "content_digest_unchanged": true,
+      "project_equal": true
+    },
+    "scope_note": "media.import dry-run compared a recursive file-hash inventory excluding request logs and installed skill files; later negative cases compared main project bytes and final persisted project/revision/content digest."
+  },
+  "preflight_regressions": [
+    {
+      "label": "39-regression-preflight-no-roots",
+      "expected_ok": false,
+      "actual_ok": false,
+      "error": {
+        "code": "MISSING_ASSET",
+        "message": "audio asset is outside the explicitly authorized locations",
+        "retryable": false
+      },
+      "cli_sha256": "2f62bd6aa66b19931f2490b5e2577efa81f270ab9500f39399c65dc52ddef21f"
+    },
+    {
+      "label": "40-regression-preflight-roots",
+      "expected_ok": true,
+      "actual_ok": true,
+      "error": null,
+      "cli_sha256": "2f62bd6aa66b19931f2490b5e2577efa81f270ab9500f39399c65dc52ddef21f",
+      "result": {
+        "project_id": "62994c84-2d6e-4a97-9a3d-caffd2d5213e",
+        "revision": 6,
+        "duration_seconds": 2.0,
+        "processing_timeline_seconds": 2.0,
+        "range_ticks": [
+          0,
+          1920
+        ],
+        "sample_rate": 44100,
+        "processing_sample_rate": 44100,
+        "media": [
+          {
+            "sha256": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+            "bytes": 384044,
+            "frames": 96000,
+            "sample_rate": 48000
+          }
+        ],
+        "effects": [
+          {
+            "instance_id": "8831042f-6953-4ff6-8af0-8ee00ee9a17a",
+            "format": "builtin",
+            "id": "verdant.builtin.compressor",
+            "version": "",
+            "binary": null
+          },
+          {
+            "instance_id": "26abce5b-3265-42d4-88af-cadeb1490be6",
+            "format": "builtin",
+            "id": "verdant.builtin.reverb",
+            "version": "",
+            "binary": null
+          }
+        ],
+        "plughost": {
+          "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-plughost",
+          "role": "plughost",
+          "bytes": 13832600,
+          "sha256": "d2a4cb885b266a08ce814f2162e42177a10d4a8d76727aed4f54063c43dae17b"
+        },
+        "plans": [],
+        "tail_policy": "explicit range excludes audio beyond its end"
+      }
+    },
+    {
+      "label": "41-regression-preflight-last-second",
+      "expected_ok": true,
+      "actual_ok": true,
+      "error": null,
+      "cli_sha256": "2f62bd6aa66b19931f2490b5e2577efa81f270ab9500f39399c65dc52ddef21f",
+      "result": {
+        "project_id": "62994c84-2d6e-4a97-9a3d-caffd2d5213e",
+        "revision": 6,
+        "duration_seconds": 1.0,
+        "processing_timeline_seconds": 2.0,
+        "range_ticks": [
+          960,
+          1920
+        ],
+        "sample_rate": 44100,
+        "processing_sample_rate": 44100,
+        "media": [
+          {
+            "sha256": "b30a74a88149274867adce225d711e8d48fa0d8cd646656afc8da21bb90dd1de",
+            "bytes": 384044,
+            "frames": 96000,
+            "sample_rate": 48000
+          }
+        ],
+        "effects": [
+          {
+            "instance_id": "8831042f-6953-4ff6-8af0-8ee00ee9a17a",
+            "format": "builtin",
+            "id": "verdant.builtin.compressor",
+            "version": "",
+            "binary": null
+          },
+          {
+            "instance_id": "26abce5b-3265-42d4-88af-cadeb1490be6",
+            "format": "builtin",
+            "id": "verdant.builtin.reverb",
+            "version": "",
+            "binary": null
+          }
+        ],
+        "plughost": {
+          "path": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-plughost",
+          "role": "plughost",
+          "bytes": 13832600,
+          "sha256": "d2a4cb885b266a08ce814f2162e42177a10d4a8d76727aed4f54063c43dae17b"
+        },
+        "plans": [],
+        "tail_policy": "explicit range excludes audio beyond its end"
+      }
+    }
+  ],
+  "skill_sufficiency": [
+    {
+      "skills": [
+        "verdant"
+      ],
+      "assessment": "Sufficient: operation families, stable IDs, revision binding, typed atomic batches, readback and worker-vs-synthesis distinction."
+    },
+    {
+      "skills": [
+        "verdant-project-new",
+        "verdant-edit-set-tempo-event",
+        "verdant-project-apply",
+        "verdant-edit-add-track"
+      ],
+      "assessment": "Partially sufficient: task completed with default track; typed nested project/track data and native-unit examples remain missing."
+    },
+    {
+      "skills": [
+        "verdant-media-import",
+        "verdant-clip-split",
+        "verdant-clip-set-properties"
+      ],
+      "assessment": "Sufficient for import/split/reverse from inspected IDs; downstream audio authorization and dry-run identity semantics need explicit explanation."
+    },
+    {
+      "skills": [
+        "verdant-plugin-list",
+        "verdant-preset-list",
+        "verdant-preset-show",
+        "verdant-plugin-add"
+      ],
+      "assessment": "Sufficient: real device/preset IDs are discoverable, Vocal metadata supports selection, owner schema and preset_id complete the insertion without guessed parameter mapping."
+    },
+    {
+      "skills": [
+        "verdant-mixer-set"
+      ],
+      "assessment": "Sufficient: dB and pan units/ranges explicit, returned persisted state confirms -6 dB."
+    },
+    {
+      "skills": [
+        "verdant-render-plan",
+        "verdant-export-audio"
+      ],
+      "assessment": "Baseline preflight inconsistency found and fixed by root; updated binary passes. Documentation needs explicit asset_roots/project_root/workspace roles and bounded-range examples."
+    },
+    {
+      "skills": [
+        "verdant-analysis-audio"
+      ],
+      "assessment": "Sufficient: source field clear and sample-peak/RMS limitations explicit. Measurements agree with independent RIFF decoding."
+    },
+    {
+      "skills": [
+        "verdant-project-inspect",
+        "verdant-project-save-as",
+        "verdant-project-validate"
+      ],
+      "assessment": "Sufficient for persistence and re-open verification; saved copy also rendered through worker, exceeding schema validation alone."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "major",
+      "area": "render.plan",
+      "status": "fixed_and_regression_passed",
+      "observation": "Baseline preflight accepted an external audio reference without asset_roots, while export.audio with the same common parameters failed MISSING_ASSET. project_root pointed at the test root containing the WAV.",
+      "baseline_evidence": [
+        "20-render-plan-44100.json",
+        "21-export-44100.json"
+      ],
+      "reproduction": {
+        "capture_file": "20-render-plan-44100.json",
+        "stdin_field": "request",
+        "command": [
+          "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+          "request",
+          "--json"
+        ]
+      },
+      "regression_evidence": "39-regression-preflight-no-roots.json",
+      "recommendation": "Keep plan/export media admission identical and explain that project_root is not an audio source authorization grant."
+    },
+    {
+      "id": "F2",
+      "severity": "moderate",
+      "area": "render.plan",
+      "status": "fixed_and_regression_passed",
+      "observation": "Baseline plan reported duration_seconds=12 for an explicit 0..1920 tick range whose actual output is 2 seconds at 120 BPM and 480 PPQ. plans was empty for audio-only material.",
+      "baseline_evidence": [
+        "20-render-plan-44100.json",
+        "22-render-plan-authorized-44100.json",
+        "23-export-authorized-44100.json"
+      ],
+      "regression_evidence": [
+        "40-regression-preflight-roots.json",
+        "41-regression-preflight-last-second.json"
+      ],
+      "regression_observation": "Authorized full-range plan now reports duration=2, processing timeline=2, media/effect/plughost pins, range ticks and explicit tail policy. Start tick 960 reports duration=1 and processing timeline=2."
+    },
+    {
+      "id": "F3",
+      "severity": "moderate",
+      "area": "installed export.audio and render.plan skills",
+      "status": "documentation_followup_pending_regeneration",
+      "observation": "Installed SKILL.md and reference files list asset_roots, project_root and workspace only as types; none explains their distinct path/authorization roles. The first export failed even though its source was inside project_root.",
+      "recommended_text": "project_root resolves project-related resources and is not an authorization grant. For imported audio stored outside the managed project locations, pass asset_roots containing explicitly authorized absolute directories to both render.plan and export.audio. workspace stores render jobs/cache. Use the same common parameters for both calls.",
+      "workaround_used": {
+        "asset_roots": [
+          "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b"
+        ]
+      },
+      "skills": [
+        "verdant-export-audio",
+        "verdant-render-plan",
+        "verdant-media-import"
+      ]
+    },
+    {
+      "id": "F4",
+      "severity": "moderate",
+      "area": "project/new and project edit schemas",
+      "status": "documentation_followup",
+      "observation": "project.new.project is an untyped object; project.new.operations and project.apply.operations require only op. edit-add-track reference contains only fields=[index,track], with no track object shape. edit-set-tempo-event contains only fields=[tick,micro_bpm], with no types or unit conversion. Runtime schema project.apply is equally field-name-only, so refreshing does not resolve the missing domain information.",
+      "impact": "This task could continue using the default track returned by project.new and inferred micro_bpm units. Creating a distinct audio track solely from these documents would require additional schema/example guidance.",
+      "recommendation": "Include a minimal executable new-project example, native .verp extension, default project/track behavior, micro_bpm=BPM*1000000, tick/PPQ/tempo conversion, and complete typed add_track/project structures or an exact discoverable domain-schema command.",
+      "evidence": [
+        "schema-project-apply.stdout",
+        "installed-skills/verdant-edit-add-track/references/operation.json",
+        "installed-skills/verdant-edit-set-tempo-event/references/operation.json",
+        "01-new.json"
+      ]
+    },
+    {
+      "id": "F5",
+      "severity": "minor",
+      "area": "dry_run response semantics",
+      "status": "documentation_followup",
+      "observation": "media.import dry_run returns a hypothetical next revision, dirty=true, commit object and a generated clip ID, all without disk changes; actual import returns a different clip ID. Installed instructions do not explicitly distinguish these preview identities from persisted identities.",
+      "recommendation": "State that dry-run state/commit/IDs are previews. Continue with the original persisted expect_revision for the real operation, and use IDs from the actual result or a fresh inspect.",
+      "evidence": [
+        "05-import-dry-run.json",
+        "06-import.json",
+        "dry-run-import-check.json"
+      ]
+    },
+    {
+      "id": "F6",
+      "severity": "minor",
+      "area": "export report range terminology",
+      "status": "diagnostic_clarity_followup",
+      "observation": "Successful explicit-range exports report audio.range=Full together with range_ticks=[0,1920]. Frames and duration are correct, but these two report fields can confuse a new agent.",
+      "recommendation": "Document which field is authoritative for a supplied start/end range or serialize a range value that matches the explicit ticks.",
+      "evidence": [
+        "23-export-authorized-44100.json",
+        "25-export-authorized-96000.json"
+      ]
+    }
+  ],
+  "pass_criteria": {
+    "120_bpm_project": true,
+    "two_second_stereo_input": true,
+    "two_clips_half_reversed": true,
+    "native_vocal_presets_match": true,
+    "track_minus_6_db": true,
+    "44100_and_96000_frames_and_signal": true,
+    "saved_copy_reopens_and_renders": true,
+    "dry_run_no_project_write": true,
+    "invalid_parameters_no_partial_modification": true,
+    "runtime_preflight_regressions": true
+  },
+  "evidence_files": [
+    "01-new.json",
+    "02-inspect-new.json",
+    "03-plugin-list.json",
+    "04-presets-vocal.json",
+    "05-import-dry-run.json",
+    "06-import.json",
+    "07-inspect-import.json",
+    "08-compressor-preset.json",
+    "09-reverb-preset.json",
+    "10-split.json",
+    "11-inspect-split.json",
+    "12-reverse.json",
+    "13-inspect-reverse.json",
+    "14-add-compressor.json",
+    "15-inspect-compressor.json",
+    "16-add-reverb.json",
+    "17-inspect-reverb.json",
+    "18-track-level.json",
+    "19-inspect-final.json",
+    "20-render-plan-44100.json",
+    "21-export-44100.json",
+    "22-render-plan-authorized-44100.json",
+    "23-export-authorized-44100.json",
+    "24-render-plan-authorized-96000.json",
+    "25-export-authorized-96000.json",
+    "26-analysis-44100.json",
+    "27-analysis-96000.json",
+    "28-save-as.json",
+    "29-inspect-saved.json",
+    "30-validate-saved.json",
+    "31-dry-run-new.json",
+    "32-dry-run-mixer.json",
+    "33-bad-clip-selection.json",
+    "34-bad-mixer-range.json",
+    "35-bad-atomic-tempo.json",
+    "36-inspect-after-negatives.json",
+    "37-38-worker-record.json",
+    "39-regression-preflight-no-roots.json",
+    "40-regression-preflight-roots.json",
+    "41-regression-preflight-last-second.json",
+    "dry-run-import-check.json",
+    "mix-44100-report.json",
+    "mix-96000-report.json",
+    "negative-validation.json",
+    "preflight-regression-validation.json",
+    "preset-state-validation.json",
+    "save-as-validation.json",
+    "saved-dry-48000-report.json",
+    "wav-validation.json",
+    "waveform-reverse-validation.json"
+  ],
+  "reproduce_recorded_request": {
+    "program": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant",
+    "argv": [
+      "request",
+      "--json"
+    ],
+    "stdin": "Read the request object from any numbered single-request JSON record. Use its existing request_id or a fresh unique ID. Expected-failure cases 33-35 remain repeatable against unchanged revision 6. Do not replay successful mutations against an advanced revision.",
+    "cwd": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/skills-forward-test-20261122-a81d4c0b",
+    "environment": {
+      "VERDANT_PLUGIN_HOST": "/tank/shared/projects/opengreendam/verdant-plugin-suite-build/target/debug/verdant-plughost"
+    }
+  },
+  "limits": [
+    "Synthetic stereo fixture verifies functionality and numeric integrity, not perceptual vocal mix quality.",
+    "Explicit 0..1920 tick range intentionally excludes reverb after the two-second endpoint.",
+    "The installed baseline skill bundle is preserved; root plans to regenerate improved documentation separately.",
+    "No external third-party plugins, voice synthesis, audio device, or GUI flow was tested."
+  ]
+}
