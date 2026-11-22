@@ -1,5 +1,5 @@
 //! Actual public executables; every mutation is confined to temporary directories.
-use std::{fs, io::{Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}, process::{Command, Stdio}, thread, time::{Duration, Instant}};
+use std::{fs, io::{Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}, process::{Command, Output, Stdio}, sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, thread, time::{Duration, Instant}};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -122,7 +122,7 @@ fn workflow_worker_and_legacy_serve_share_sequential_ndjson_dispatch() {
 fn native_fixture(root: &Path) -> PathBuf {
     let source = root.join("gui-fixture.rs");
     fs::write(&source, r#"
-use std::{env, fs, path::PathBuf, thread, time::Duration};
+use std::{env, fs, io::{self, Write}, path::PathBuf, thread, time::{Duration, Instant}};
 fn main() {
     let report = PathBuf::from(env::var_os("VERDANT_FIXTURE_REPORT").unwrap());
     fs::write(report.join("cwd"), env::current_dir().unwrap().to_string_lossy().as_bytes()).unwrap();
@@ -131,8 +131,13 @@ fn main() {
     }
     println!("fixture GUI stdout");
     eprintln!("fixture GUI stderr");
-    if let Ok(ms) = env::var("VERDANT_FIXTURE_SLEEP_MS") {
-        thread::sleep(Duration::from_millis(ms.parse().unwrap()));
+    io::stdout().flush().unwrap();
+    io::stderr().flush().unwrap();
+    fs::write(report.join("ready"), b"ready").unwrap();
+    let start = Instant::now();
+    while !report.join("release").exists() {
+        assert!(start.elapsed() < Duration::from_secs(60), "fixture was not released");
+        thread::sleep(Duration::from_millis(10));
     }
     fs::write(report.join("done"), b"done").unwrap();
 }
@@ -144,43 +149,117 @@ fn main() {
     executable
 }
 
+struct GuiProbe {
+    report: PathBuf,
+    output: mpsc::Receiver<std::io::Result<Output>>,
+    cancel: Arc<AtomicBool>,
+    collector: Option<thread::JoinHandle<()>>,
+}
+impl GuiProbe {
+    fn spawn(command: &mut Command, report: &Path) -> Self {
+        let mut child = command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
+        let (sender, output) = mpsc::channel();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancelled = Arc::clone(&cancel);
+        let collector = thread::spawn(move || {
+            // Keep a cancellation path while the CLI itself is running. Once it
+            // exits, wait_with_output must also observe EOF on both real pipes.
+            let error = loop {
+                if cancelled.load(Ordering::Relaxed) { let _ = child.kill(); break None; }
+                match child.try_wait() {
+                    Ok(Some(_)) => break None,
+                    Ok(None) => thread::sleep(Duration::from_millis(10)),
+                    Err(error) => { let _ = child.kill(); break Some(error); },
+                }
+            };
+            let captured = child.wait_with_output();
+            let _ = sender.send(match error { Some(error) => Err(error), None => captured });
+        });
+        Self { report: report.to_owned(), output, cancel, collector: Some(collector) }
+    }
+    fn ready(&self) {
+        let start = Instant::now();
+        while !self.report.join("ready").exists() {
+            assert!(start.elapsed() < Duration::from_secs(30), "spawned GUI did not initialize");
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+    fn release(&self) { fs::write(self.report.join("release"), b"release").unwrap(); }
+    fn finished(&self) {
+        let start = Instant::now();
+        while !self.report.join("done").exists() {
+            assert!(start.elapsed() < Duration::from_secs(10), "released GUI did not finish");
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+impl Drop for GuiProbe {
+    fn drop(&mut self) {
+        // Always release the GUI, including assertion/timeout failures. The
+        // collector also kills a CLI still running after the test has failed.
+        let _ = fs::write(self.report.join("release"), b"release");
+        self.cancel.store(true, Ordering::Relaxed);
+        let start = Instant::now();
+        if let Some(collector) = self.collector.take() {
+            while (!collector.is_finished() || !self.report.join("done").exists())
+                && start.elapsed() < Duration::from_secs(10)
+            { thread::sleep(Duration::from_millis(10)); }
+            if collector.is_finished() { let _ = collector.join(); }
+        }
+    }
+}
+
 #[test]
 fn gui_preserves_arguments_cwd_unicode_and_never_inherits_agent_output_pipes() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().canonicalize().unwrap();
     let fixture = native_fixture(&root);
     let cwd = root.join("unrelated cwd 空 格"); fs::create_dir(&cwd).unwrap();
-    let report = root.join("report"); fs::create_dir(&report).unwrap();
     let logs = root.join("logs");
     let checked = result(Command::new(cli()).args(["gui", "--check", "--json", "--gui-binary"]).arg(&fixture).current_dir(&cwd));
-    assert_eq!(PathBuf::from(checked["executable"].as_str().unwrap()), fixture);
-    assert!(!report.join("done").exists());
-    let start = Instant::now();
-    // A finite long-lived GUI makes inherited stdout/stderr pipes observable:
-    // output() would wait for the child GUI even after verdant itself exited.
-    let output = Command::new(cli()).args(["gui", "--json", "--gui-binary"]).arg(&fixture)
-        .args(["--", "工程 名.verp", "--appearance", "dark"])
-        .current_dir(&cwd).env("VERDANT_FIXTURE_REPORT", &report).env("VERDANT_FIXTURE_SLEEP_MS", "1800")
-        .env("VERDANT_LOG_DIR", &logs).stdout(Stdio::piped()).stderr(Stdio::piped()).output().unwrap();
-    assert!(start.elapsed() < Duration::from_millis(1500), "CLI waited on GUI or inherited GUI pipes");
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(response["result"]["wait"], false);
-    // The public command promises a successful spawn, not child readiness.
-    // Wait for the fixture's own files without weakening the pipe/exit check.
-    let log = PathBuf::from(response["result"]["log"].as_str().unwrap());
-    while !report.join("arg2").exists() || !fs::read_to_string(&log).unwrap_or_default().contains("fixture GUI stdout") {
-        assert!(start.elapsed() < Duration::from_secs(10), "spawned GUI did not initialize");
-        thread::sleep(Duration::from_millis(10));
-    }
-    assert_eq!(fs::read_to_string(report.join("cwd")).unwrap(), cwd.to_str().unwrap());
-    assert_eq!(fs::read_to_string(report.join("arg0")).unwrap(), "工程 名.verp");
-    assert_eq!(fs::read_to_string(report.join("arg1")).unwrap(), "--appearance");
-    let log = PathBuf::from(response["result"]["log"].as_str().unwrap());
-    assert!(log.starts_with(&logs));
-    assert!(fs::read_to_string(log).unwrap().contains("fixture GUI stdout"));
-    while !report.join("done").exists() {
-        assert!(start.elapsed() < Duration::from_secs(10), "fixture GUI did not finish");
-        thread::sleep(Duration::from_millis(20));
+    assert_eq!(PathBuf::from(checked["executable"].as_str().unwrap()).canonicalize().unwrap(), fixture.canonicalize().unwrap());
+    assert_eq!(checked["launched"], false);
+    for wait in [false, true] {
+        let report = root.join(if wait { "report-wait" } else { "report-detached" });
+        fs::create_dir(&report).unwrap();
+        let mut command = Command::new(cli());
+        command.args(["gui", "--json", "--gui-binary"]).arg(&fixture);
+        if wait { command.arg("--wait"); }
+        command.args(["--", "工程 名.verp", "--appearance", "dark"])
+            .current_dir(&cwd).env("VERDANT_FIXTURE_REPORT", &report).env("VERDANT_LOG_DIR", &logs);
+        let probe = GuiProbe::spawn(&mut command, &report);
+        probe.ready();
+        assert!(!report.join("release").exists() && !report.join("done").exists());
+        let output = if wait {
+            assert!(matches!(probe.output.recv_timeout(Duration::from_millis(250)), Err(mpsc::RecvTimeoutError::Timeout)),
+                "--wait returned before the GUI was released");
+            probe.release();
+            probe.output.recv_timeout(Duration::from_secs(10)).expect("--wait did not return after GUI release").unwrap()
+        } else {
+            // The GUI cannot finish on its own. Receiving this output proves
+            // the CLI exited AND both captured pipes reached EOF while it lives.
+            let output = probe.output.recv_timeout(Duration::from_secs(10))
+                .expect("CLI waited on the unreleased GUI or inherited GUI pipes").unwrap();
+            assert!(!report.join("release").exists() && !report.join("done").exists());
+            output
+        };
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(output.stderr.is_empty(), "GUI stderr leaked into CLI output");
+        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["wait"], wait);
+        if wait { assert_eq!(response["result"]["exit_code"], 0); }
+        else { assert!(response["result"]["exit_code"].is_null()); }
+        let reported_cwd = PathBuf::from(fs::read_to_string(report.join("cwd")).unwrap());
+        assert_eq!(reported_cwd.canonicalize().unwrap(), cwd.canonicalize().unwrap());
+        for (index, expected) in ["工程 名.verp", "--appearance", "dark"].into_iter().enumerate() {
+            assert_eq!(fs::read_to_string(report.join(format!("arg{index}"))).unwrap(), expected);
+        }
+        let log = PathBuf::from(response["result"]["log"].as_str().unwrap());
+        assert!(log.starts_with(&logs));
+        let log = fs::read_to_string(log).unwrap();
+        assert!(log.contains("fixture GUI stdout") && log.contains("fixture GUI stderr"));
+        probe.release();
+        probe.finished();
     }
 }
