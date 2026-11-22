@@ -47,13 +47,17 @@ jobs:
           node --input-type=module <<'JS'
           import { appendFileSync, readFileSync } from 'node:fs';
           const pin = JSON.parse(readFileSync('frontend/proto-ui/compiler.pin.json', 'utf8'));
+          const input = JSON.parse(readFileSync('frontend/proto-ui/src/upstream-input/provenance.json', 'utf8'));
           if (pin.upstream.repository !== 'https://github.com/Proto-UI/Proto-UI'
             || !/^[0-9a-f]{40}$/.test(pin.upstream.revision)
             || !/^pnpm@\d+\.\d+\.\d+$/.test(pin.packageVersions.packageManager)) {
             throw new Error('Unsupported compiler repository, revision, or package-manager pin');
           }
+          if (input.repository !== pin.upstream.repository || !/^[0-9a-f]{40}$/.test(input.revision)) {
+            throw new Error('Unsupported vendored Input repository or source revision');
+          }
           appendFileSync(process.env.GITHUB_OUTPUT,
-            `revision=${pin.upstream.revision}\npnpm=${pin.packageVersions.packageManager.slice(5)}\n`);
+            `revision=${pin.upstream.revision}\npnpm=${pin.packageVersions.packageManager.slice(5)}\ninput-revision=${input.revision}\n`);
           JS
       - uses: actions/checkout@v4
         with:
@@ -61,6 +65,12 @@ jobs:
           ref: ${{ steps.compiler-pin.outputs.revision }}
           path: .ci/proto-ui-upstream
           persist-credentials: false
+      - name: Fetch the recorded official Input source for identity checks
+        env:
+          INPUT_SOURCE_REVISION: ${{ steps.compiler-pin.outputs.input-revision }}
+        # Keep the compiler checkout at its pin; the source identity test also
+        # compares the vendored bytes with this separately recorded Git commit.
+        run: git -C .ci/proto-ui-upstream fetch --no-tags --depth=1 origin "$INPUT_SOURCE_REVISION"
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ steps.compiler-pin.outputs.pnpm }}
