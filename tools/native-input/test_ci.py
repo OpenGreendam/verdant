@@ -8,7 +8,7 @@ import runpy
 import tempfile
 import unittest
 
-from ci import PROGRAM_PATHS, validate_run, verify_identity, write_json
+from ci import PROGRAM_PATHS, observed_programs, validate_run, verify_identity, write_json
 from probe import CASES, sha256
 
 
@@ -32,17 +32,46 @@ class CiRefusals(unittest.TestCase):
             self.identity['programs'][name] = {'path': str(path), 'sha256': sha256(path)}
         self.harness = {'format': 'verdant.isolated-native-run.v1', 'backend': 'x11', 'ok': True,
                         'exitCode': 0, 'probeOptions': [],
-                        'binarySha256': self.identity['programs']['verdant']['sha256'],
+                        'binarySha256': self.identity['programs']['verdant-gui']['sha256'],
                         'workerSha256': self.identity['programs']['verdant-worker']['sha256']}
         self.report = {'format': 'verdant.native-input-observation.v1', 'backend': 'x11', 'ok': True,
                        'skipSetValue': False, 'cases': [{'name': name, 'status': 'passed'} for name in CASES],
-                       'binary': self.identity['programs']['verdant'],
+                       'binary': self.identity['programs']['verdant-gui'],
                        'worker': self.identity['programs']['verdant-worker']}
         self.save()
 
     def save(self):
         write_json(self.run / 'harness.json', self.harness)
         write_json(self.evidence / 'result.json', self.report)
+
+    def test_package_roles_select_gui_and_refuse_cli_or_launcher_aliases(self):
+        manifest = {'format': 'verdant-native-package/3', 'target': 'linux-x86_64',
+                    'programs': [
+                        {'name': 'verdant', 'role': 'cli', 'path': 'bin/verdant', 'sha256': '1' * 64},
+                        {'name': 'verdant-gui', 'role': 'gpui', 'path': 'libexec/verdant/verdant-gui', 'sha256': '2' * 64},
+                        {'name': 'verdant-launcher', 'role': 'launcher', 'path': 'verdant-launcher', 'sha256': '3' * 64},
+                        {'name': 'verdant-worker', 'role': 'worker', 'path': 'bin/verdant-worker', 'sha256': '4' * 64},
+                    ]}
+        selected = observed_programs(manifest)
+        self.assertEqual(set(selected), {'verdant-gui', 'verdant-worker'})
+        self.assertEqual(selected['verdant-gui']['sha256'], '2' * 64)
+        self.assertEqual(selected['verdant-worker']['sha256'], '4' * 64)
+        for field, value in (('name', 'verdant'), ('name', 'verdant-launcher'),
+                             ('role', 'cli'), ('role', 'launcher'),
+                             ('path', 'bin/verdant'), ('path', 'verdant-launcher'),
+                             ('path', 'libexec/verdant/verdant')):
+            with self.subTest(field=field, value=value):
+                changed = copy.deepcopy(manifest)
+                changed['programs'][1][field] = value
+                with self.assertRaisesRegex(RuntimeError, 'packaged identity'):
+                    observed_programs(changed)
+        for programs in (manifest['programs'][:1] + manifest['programs'][2:],
+                         manifest['programs'] + [manifest['programs'][1]]):
+            with self.subTest(programs=programs):
+                with self.assertRaisesRegex(RuntimeError, 'packaged identity'):
+                    observed_programs({**manifest, 'programs': programs})
+        with self.assertRaisesRegex(RuntimeError, 'manifest identity'):
+            observed_programs({**manifest, 'format': 'verdant-native-package/2'})
 
     def test_missing_result_never_becomes_a_skip(self):
         (self.evidence / 'result.json').unlink()
