@@ -60,6 +60,8 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --recover-publication
 
 ## 准入与证据
 
+本次修复的实际工具链、测试结果、OS 输入观察和剩余范围见 [2026-11-22 验收记录](VALIDATION-2026-11-22.md)。
+
 TOML admission 使用 parser，按实际 `package` 名检查普通/build/dev 和 target-specific 的所有依赖表，支持 alias、子表、多行和注释。它检查声明；另一个门禁调用完整 `cargo metadata --locked --all-features`，沿全部 workspace members 的 resolve graph 检查 GPUI package ID/source/rev 和唯一 SDK。`--no-deps` 或扫描 Cargo.lock 字符串不能替代这一检查。
 
 ```sh
