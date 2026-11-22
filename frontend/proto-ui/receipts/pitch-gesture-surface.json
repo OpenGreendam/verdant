@@ -17,7 +17,7 @@
     },
     {
       "path": "frontend/proto-ui/src/pitch-gesture-surface.proto.ts",
-      "sha256": "525c5ac3e54e7a327ae7eb07b556fd810e071899656bc0fe904aded6d299ae78"
+      "sha256": "2fd4b73f88ec7d01454e5fba5e626897800fd22a9b897e5dc02a8f655e09d159"
     },
     {
       "path": "node_modules/@proto.ui/core/package.json",
@@ -160,12 +160,12 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "3518d72c2c7ba8489ae939822855eb4ab496e6fb21676fd527bdbd1e1cd0feb4"
+      "sha256": "84bf4ea2071c882d1e38b965b35df388a9ecc806fbccf3fa5d40b0605b693192"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "f8fd31510beb0d7f3538baa23374199056dc03d49d9a376bc1ba2a7cb307d176"
+      "sha256": "d3301b28ac76fabba667183894bdf5be2869787275d4519da7274e2375a6d9a3"
     }
   ]
 }
