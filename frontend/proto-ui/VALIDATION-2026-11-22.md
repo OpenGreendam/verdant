@@ -1,5 +1,7 @@
 # Proto-UI / GPUI 修复验收记录
 
+> 本文保留首轮实际结果及当时未完成范围。后续完成的 headless 解耦、原生交互与 22 项 OS 验收见 [最终完成记录](VALIDATION-COMPLETION-2026-11-22.md)；不要将本文历史状态当作当前实现状态。
+
 日期：2026-11-22。实现提交：`5cf8fd6998e2d6ea20d80872343e8b63c53de356`；审查基线：`dd0db139656322061fa51daf12cbc8a992c0cd8c`。
 
 本记录区分源码重编译、依赖图、Rust 执行、GPUI 框架事件和 OS 窗口输入。下面的结果来自本次修复环境的实际执行，不表示 GitHub Actions 或所有平台验收已经完成。重现入口与设计边界见 [README.md](README.md)。
