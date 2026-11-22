@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Offline selector/trace regressions; these do not execute a native window."""
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 from probe import Probe, nodes_in_window, wayland_contact_evidence, weston_surface_from_scene
 
@@ -22,7 +25,82 @@ Layer 5:
 """
 
 
+class PresetActionSelected(Exception):
+    """Stop the offline case at the real accessibility transport boundary."""
+
+
 class ProbeHelpers(unittest.TestCase):
+    def preset_probe(self, controls):
+        main, native = [':1.3', '/frame/0'], [':1.3', '/frame/3']
+        snapshot = {'nodes': [
+            {'reference': main, 'name': 'project', 'role': 'frame'},
+            {'reference': native, 'name': 'Verdant Synth — Verdant', 'role': 'frame'},
+            *controls,
+        ]}
+        probe = object.__new__(Probe)
+        probe.binary = Path('verdant-gui')
+        probe.observer = SimpleNamespace(snapshot=lambda _: snapshot)
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        probe.frame = None
+        probe.main_frame_reference = tuple(main)
+        probe.active_frame_reference = tuple(main)
+        before = {'gainDb': -8.0, 'revision': 12, 'sha256': 'unchanged'}
+        probe.persisted = lambda: before
+        probe.open_native_window = lambda: setattr(probe, 'active_frame_reference', tuple(native))
+        probe.start_drag = lambda: (before, (0, 0), 1.0)
+        probe.record = Mock()
+        # Use the actual case, snapshot, nodes, node and wait methods. Only OS
+        # setup is substituted; stop before sending any accessibility action.
+        probe.advertised_action = Mock(side_effect=PresetActionSelected)
+        return probe
+
+    def test_native_preset_case_selects_its_frame_and_combo_role(self):
+        main, native = [':1.3', '/frame/0'], [':1.3', '/frame/3']
+        selected = {'reference': [':1.3', '/native/preset'], 'name': '预设',
+                    'role': 'combo box', 'windowReference': native}
+        probe = self.preset_probe([
+            {'reference': [':1.3', '/main/preset'], 'name': '预设', 'role': 'combo box', 'windowReference': main},
+            {'reference': [':1.3', '/main/custom'], 'name': '自定义', 'role': 'combo box', 'windowReference': main},
+            {'reference': [':1.3', '/native/button'], 'name': '预设', 'role': 'push button', 'windowReference': native},
+            {'reference': [':1.3', '/unowned/preset'], 'name': '预设', 'role': 'combo box', 'windowReference': None},
+            selected,
+        ])
+        with self.assertRaises(PresetActionSelected):
+            probe.native_preset_cancel()
+        probe.advertised_action.assert_called_once_with(selected)
+        self.assertEqual(probe.node('预设', 'combo box')['reference'], selected['reference'])
+        self.assertEqual(len(probe.nodes('预设')), 2)
+        self.assertEqual(probe.nodes('自定义', 'combo box'), [])
+
+    def test_native_preset_case_rejects_missing_wrong_role_and_legacy_targets(self):
+        main, native = [':1.3', '/frame/0'], [':1.3', '/frame/3']
+        for native_controls in [
+            [],
+            [{'name': '预设', 'role': 'push button', 'windowReference': native}],
+            [{'name': '自定义', 'role': 'combo box', 'windowReference': native}],
+        ]:
+            with self.subTest(native_controls=native_controls):
+                probe = self.preset_probe([
+                    {'name': '预设', 'role': 'combo box', 'windowReference': main},
+                    {'name': '自定义', 'role': 'combo box', 'windowReference': main},
+                    *native_controls,
+                ])
+                with self.assertRaisesRegex(RuntimeError, "Timed out waiting for '预设' in AT-SPI"):
+                    probe.native_preset_cancel()
+                probe.advertised_action.assert_not_called()
+
+    def test_native_preset_case_rejects_ambiguous_native_combos(self):
+        native = [':1.3', '/frame/3']
+        probe = self.preset_probe([
+            {'reference': [':1.3', f'/native/preset/{index}'], 'name': '预设',
+             'role': 'combo box', 'windowReference': native}
+            for index in range(2)
+        ])
+        with self.assertRaisesRegex(RuntimeError, "Ambiguous accessible target '预设': 2 matches"):
+            probe.native_preset_cancel()
+        probe.advertised_action.assert_not_called()
+
     def test_native_close_selects_button_among_same_frame_radio_names(self):
         main, native = [':1.3', '/frame/0'], [':1.3', '/frame/1']
         snapshot = {'nodes': [
