@@ -118,6 +118,58 @@ fn create_log(directory: &Path) -> io::Result<(PathBuf, File)> {
     Err(io::Error::new(io::ErrorKind::AlreadyExists, "cannot reserve a unique GUI log"))
 }
 
+#[cfg(windows)]
+fn spawn_without_parent_stdio(command: &mut Command) -> io::Result<std::process::Child> {
+    use std::{ffi::c_void, sync::Mutex};
+    const HANDLE_FLAG_INHERIT: u32 = 1;
+    #[link(name = "Kernel32")]
+    unsafe extern "system" {
+        fn GetStdHandle(kind: u32) -> *mut c_void;
+        fn GetHandleInformation(handle: *mut c_void, flags: *mut u32) -> i32;
+        fn SetHandleInformation(handle: *mut c_void, mask: u32, flags: u32) -> i32;
+    }
+    struct Restore {
+        handles: [(*mut c_void, u32); 3],
+        count: usize,
+    }
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            for &(handle, flags) in self.handles[..self.count].iter().rev() {
+                if flags & HANDLE_FLAG_INHERIT != 0 {
+                    // Change only the inheritance bit; leave all other flags intact.
+                    unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, flags & HANDLE_FLAG_INHERIT); }
+                }
+            }
+        }
+    }
+    // Windows Command::spawn duplicates the selected child stdio handles but
+    // also inherits every other inheritable handle. Temporarily exclude the
+    // parent's original pipes, which would otherwise keep an agent waiting for
+    // EOF even after the CLI exits. Explicit null/log stdio remains unaffected.
+    static STDIO_INHERITANCE_LOCK: Mutex<()> = Mutex::new(());
+    let _lock = STDIO_INHERITANCE_LOCK.lock()
+        .map_err(|_| io::Error::other("GUI stdio inheritance lock was poisoned"))?;
+    let mut restore = Restore { handles: [(std::ptr::null_mut(), 0); 3], count: 0 };
+    for kind in [-10i32, -11, -12] { // STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE
+        let handle = unsafe { GetStdHandle(kind as u32) };
+        if handle.is_null() || handle == (-1isize as *mut c_void)
+            || restore.handles[..restore.count].iter().any(|entry| entry.0 == handle)
+        { continue; }
+        let mut flags = 0;
+        if unsafe { GetHandleInformation(handle, &mut flags) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        restore.handles[restore.count] = (handle, flags);
+        restore.count += 1;
+        if flags & HANDLE_FLAG_INHERIT != 0
+            && unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) } == 0
+        { return Err(io::Error::last_os_error()); }
+    }
+    // Restore the original flags on success and every error path, before the
+    // mutex unlocks. The lock is never held while waiting for the GUI to exit.
+    command.spawn()
+}
+
 impl LaunchPlan {
     pub fn command(&self, arguments: &[OsString]) -> Command {
         let mut command = Command::new(&self.executable);
@@ -144,7 +196,11 @@ impl LaunchPlan {
                 command.creation_flags(0x0000_0200 | 0x0800_0000); // new group; no console
             }
         }
-        let mut child = command.spawn().map_err(|error|
+        #[cfg(windows)]
+        let spawned = spawn_without_parent_stdio(&mut command);
+        #[cfg(not(windows))]
+        let spawned = command.spawn();
+        let mut child = spawned.map_err(|error|
             io::Error::new(error.kind(), format!("cannot launch {}: {error}; log {}", self.executable.display(), log.display())))?;
         let pid = child.id();
         let status = if wait { Some(child.wait()?) } else {
