@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate versioned, standalone Agent Skills from Verdant's executable schema."""
-import argparse, hashlib, json, pathlib, subprocess, sys
+import argparse, hashlib, json, pathlib, subprocess, sys, tomllib
 
 PURPOSES = {
 "capabilities":"discover installed operations, formats and protocols", "schema":"inspect an operation's exact admitted fields and types",
@@ -128,6 +128,8 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument("--binary",required=True,type=pathlib.Path)
     ap.add_argument("--output",type=pathlib.Path,default=pathlib.Path(__file__).resolve().parents[1]/"skills")
     ap.add_argument("--initializer",type=pathlib.Path);args=ap.parse_args()
+    workspace=pathlib.Path(__file__).resolve().parents[1]/"Cargo.toml"
+    version=tomllib.loads(workspace.read_text(encoding="utf-8"))["workspace"]["package"]["version"]
     root=args.output.resolve();root.mkdir(parents=True,exist_ok=True)
     schema=query(args.binary,"schema");caps=query(args.binary,"capabilities");entries=[]
     for operation in schema["operations"]:
@@ -207,6 +209,6 @@ Launch §verdant worker --stdio§. Send complete §verdant-cli/1§ requests as J
 """
     entries.append(emit(root,"verdant","Use when an AI Agent needs to operate Verdant end to end, choose atomic skills, install the offline bundle, or use the CLI and workflow worker.",overview,None,args.initializer))
     entries.sort(key=lambda e:e["name"])
-    write(root/"manifest.json",json.dumps({"schema":"verdant-agent-skills/1","version":"1.0.0","skills":entries},ensure_ascii=False,indent=2)+"\n")
+    write(root/"manifest.json",json.dumps({"schema":"verdant-agent-skills/1","version":version,"skills":entries},ensure_ascii=False,indent=2)+"\n")
     print(json.dumps({"skills":len(entries),"operations":len(schema["operations"]),"domain_operations":len(caps["project_operations"]["operations"]),"output":str(root)}))
 if __name__=="__main__":main()

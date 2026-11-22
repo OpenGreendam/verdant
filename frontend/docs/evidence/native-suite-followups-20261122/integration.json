@@ -59,9 +59,10 @@
     "cli_operations": 95,
     "domain_operations": 32,
     "overview_skills": 1,
-    "manifest_sha256": "f899a0b423ff8894c027a11100a048a0164f6dbdf4379a2359055a7fa10d9dd1",
+    "manifest_sha256": "bfe8f79ad5ba70983a4b86cdd17c3364da3d02c731c496cc4b66acdb2113f81b",
     "all_manifest_files_verified": true,
-    "line_endings": "LF"
+    "line_endings": "LF",
+    "bundle_version": "0.1.0"
   },
   "native_devices": 14,
   "factory_presets": 280,
@@ -88,5 +89,17 @@
     }
   },
   "pinned_generated_output": "skipped_locally_missing_upstream_checkout",
-  "remaining_opt_in_workspace_cases": 7
+  "remaining_opt_in_workspace_cases": 7,
+  "package_preflight_correction": {
+    "observed_head": "6ead70d878d1f1e0bd1a6b175e4a34c2bd8e76f6",
+    "guard_error": "Agent Skills version differs from app version",
+    "previous_bundle_version": "1.0.0",
+    "workspace_and_bundle_version": "0.1.0",
+    "resolution": "Generator reads workspace.package.version from frontend/Cargo.toml; only manifest.version changed. All 128 skill payloads and hashes are unchanged.",
+    "checks": [
+      "all manifest payload hashes verified",
+      "actual CLI skill.list reads 128 skills at workspace version",
+      "generator output exactly reproduces the current manifest"
+    ]
+  }
 }
