@@ -32,6 +32,19 @@ selection_sha=$("$release" select-source --repo . --output build/source.json | j
 
 打包器检查受选源码与实际文件，附可重建的对应源码、上游许可、`RELEASE-ASSETS.json` 和 SHA-256。已有同名文件时拒绝覆盖。`check` 校验产物、嵌套源码归档和包成员。软件包由 [OpenGreendam/verdant](https://github.com/OpenGreendam/verdant/releases) 发行。
 
+### 公开验证源码
+
+对应源码包含用于复核 Linux 原生输入和辅助功能的开发工具。Python 分类仅接受下列具体路径，清单由 [source.rs](frontend/crates/verdant-release/src/source.rs) 执行；不按整个 `tools/` 目录或所有 `.py` 文件放行。
+
+| 目录 | 已分类的 Python 源码 |
+|---|---|
+| `tools/a11y/` | `observe-atspi.py`、`run-isolated.py` |
+| `tools/native-input/` | `ci.py`、`probe.py`、`run-linux-isolated.py`、`x11_screenshot.py`、`test_ci.py`、`test_probe.py` |
+
+两个目录中的 `README.md` 按既有 Markdown 文档规则纳入。公开的验证 Markdown/JSON 记录也必须先提交，再由 `select-source` 从实际 HEAD 选择；未跟踪文档、已选择文件的工作树改动，以及未分类的新增 Python 路径都会被拒绝。选择清单记录每个文件的 Git blob、SHA-256、大小和 mode，并由嵌套源码检查重新核对。运行日志、截图、依赖与缓存仍受既有排除规则约束。
+
+这些脚本用于开发和 CI 验证，只作为对应源码收录；它们不成为应用或 worker 的生产 Python 依赖，不改变 `production_python_required: false`。增加新验证脚本时应明确更新分类并通过源码选择和归档检查。
+
 运行包使用 `verdant-voice` 所需的 ONNX Runtime。历史 OpenVPI 声码器通知随对应源码保存。[原文通知](docs/archive/research/licenses/vocoder/)
 
 ## 声库
