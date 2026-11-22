@@ -21,6 +21,15 @@ pub(crate) const REQUIRED: &[&str] = &[
 const SCOPES: &[&str] = &["frontend", "backend", "tools", "spec", "docs", ".github", "runtime-assets", "plugins/dsh",
     "LICENSE", "NOTICE.md", "README.md", "RELEASE.md", "SPEC.md", "DEV_PLAN.md", "TODO.md",
     "CONTRIBUTING.md", "SYNTHESIS-FIDELITY.md", ".gitignore", ".gitattributes"];
+// Public OS/accessibility verification sources only. This is deliberately an
+// exact path inventory, not permission for Python throughout tools/ or the
+// production runtime. Keep the reviewed inventory in RELEASE.md in sync.
+const VALIDATION_PYTHON_SOURCES: &[&str] = &[
+    "tools/a11y/observe-atspi.py", "tools/a11y/run-isolated.py",
+    "tools/native-input/ci.py", "tools/native-input/probe.py",
+    "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py",
+    "tools/native-input/test_ci.py", "tools/native-input/test_probe.py",
+];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,7 +81,8 @@ fn excluded(path: &str) -> Option<&'static str> {
 
 fn source_kind(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
-    matches!(name, "Dockerfile" | "LICENSE" | "NOTICE" | "COPYING" | ".gitignore" | ".gitattributes" | ".dockerignore")
+    VALIDATION_PYTHON_SOURCES.contains(&path)
+        || matches!(name, "Dockerfile" | "LICENSE" | "NOTICE" | "COPYING" | ".gitignore" | ".gitattributes" | ".dockerignore")
         || name.starts_with("LICENSE-")
         || Path::new(path).extension().and_then(|s| s.to_str()).is_some_and(|ext| matches!(ext,
             "rs" | "toml" | "lock" | "json" | "md" | "txt" | "html" | "css" | "js" | "mjs" | "ts"
