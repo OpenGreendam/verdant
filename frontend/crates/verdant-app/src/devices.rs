@@ -1951,6 +1951,74 @@ mod native_tests {
     }
 
     #[gpui::test]
+    fn graph_rejects_a_stale_frame_before_pointer_down(cx: &mut TestAppContext) {
+        let window = open(cx, false);
+        window.update(cx, |host, window, cx| {
+            let position = start(host);
+            let track = host.target.track.track_id().unwrap().clone();
+            host.editor.update(cx, |editor, _| {
+                let mut params = crate::instrument::synth_params(editor.project().track(&track).unwrap()).unwrap();
+                params.set("gain", -18.0).unwrap();
+                editor.persistence.commit(editor.revision(), CommandBatch::single("External value before press", Command::SetTrackInstrument {
+                    track, instrument: Some(crate::instrument::synth_spec(&params, "test")),
+                })).unwrap();
+            });
+            let revision = host.editor.read(cx).revision();
+            // No repaint: the native hit target and its parameter descriptors
+            // still describe the earlier value. A new press cannot adopt the
+            // newer authority token while retaining that old starting value.
+            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                position, button: MouseButton::Left, ..Default::default()
+            }), cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: position + point(px(0.0), px(-6.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            assert_eq!(gain(host, cx), -18.0, "a stale presentation must not overwrite the newer value");
+            assert_eq!(host.editor.read(cx).revision(), revision, "stale press and late up cannot append an edit");
+            assert!(host.editor.read(cx).device_drag.is_none());
+            assert!(window.captured_hitbox().is_none());
+            host.desc = current_params(host.editor.read(cx), &host.target).unwrap().into_iter().find(|desc| desc.id == "gain").unwrap();
+            cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let revision = host.editor.read(cx).revision();
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: start(host) + point(px(0.0), px(-6.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            assert!(gain(host, cx) > -18.0, "the refreshed graph remains editable");
+            assert_eq!(host.editor.read(cx).revision().get(), revision.get() + 1);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn graph_animation_does_not_become_the_drag_authority(cx: &mut TestAppContext) {
+        let window = open(cx, false);
+        window.update(cx, |host, _, cx| {
+            host.editor.update(cx, |editor, cx| {
+                assert!(editor.set_device_params(host.target.track.clone(), host.target.slot, vec![("gain".into(), -18.0)], cx));
+            });
+            // Keep the earlier displayed descriptor for an animation frame.
+            // The plot may animate, but dragging must start from accepted truth.
+            assert!(host.desc.value > -18.0);
+            cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let revision = host.editor.read(cx).revision();
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: start(host) + point(px(0.0), px(-6.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            let expected = -18.0 + 6.0 * (host.desc.max - host.desc.min) / (f64::from(HEIGHT) - 2.0 - 2.0 * GRAPH_PAD);
+            assert!((gain(host, cx) - expected).abs() < 1e-6,
+                "one six-pixel drag must adjust the accepted value, not the animated display: {} vs {expected}", gain(host, cx));
+            assert_eq!(host.editor.read(cx).revision().get(), revision.get() + 1);
+        }).unwrap();
+    }
+
+    #[gpui::test]
     fn graph_stale_track_slot_and_value_cannot_reach_the_store(cx: &mut TestAppContext) {
         for change in ["track", "slot", "value", "generation"] {
             let window = open(cx, false);

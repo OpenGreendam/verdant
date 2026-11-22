@@ -327,6 +327,10 @@ impl RenderOnce for Frame{
             let _=weak.update(cx,|ed,cx|{if ed.device_drag.as_ref().is_some_and(|drag|drag.surface.same(&surface)){ed.cancel_device_drag(cx);}});
         });
         let plot=Rc::new(Cell::new(Plot{o:gpui::point(px(0.),px(0.)),w:1.,h:1.}));
+        // Input is bound to this frame's accepted authority, independently of
+        // animated drawing descriptors. Old frame callbacks cannot adopt a
+        // newer parameter refresh just because its project revision is equal.
+        let input_basis=self.target.basis(self.editor.read(cx));
         let points:Vec<_>=self.handles.iter().enumerate().map(|(index,handle)|{
             let target=PointTarget{editor:self.editor.downgrade(),target:self.target.clone(),scope:DeviceScope::for_window(window),point:handle.clone(),basis:None,
                 plot:plot.clone(),surface:surface.clone(),menu:self.menu.clone(),index};
@@ -334,12 +338,12 @@ impl RenderOnce for Frame{
                 .ml(px((GRAPH_PAD*(1.-2.*handle.at.0)-13.)as f32)).mt(px((GRAPH_PAD*(2.*handle.at.1-1.)-13.)as f32))
                 .size(px(26.)).child(Point{target,theme:self.theme})
         }).collect();
-        div().relative().size_full().child(paint_surface(self.editor,self.target,self.params,self.theme,self.painter,self.handles,self.double,self.input,plot)).children(points)
+        div().relative().size_full().child(paint_surface(self.editor,self.target,self.params,self.theme,self.painter,self.handles,self.double,self.input,plot,input_basis,surface)).children(points)
     }
 }
 #[allow(clippy::too_many_arguments)]
 fn paint_surface(editor:Entity<Editor>,target:Target,params:Vec<ParamDesc>,th:Theme,painter:Painter,handles:Vec<Handle>,double:Option<DoubleClick>,
-    input:crate::proto_editor_surface::Input,plot_cell:Rc<Cell<Plot>>)->impl IntoElement{
+    input:crate::proto_editor_surface::Input,plot_cell:Rc<Cell<Plot>>,basis:Option<DeviceBasis>,surface:crate::host_pointer::SurfaceToken)->impl IntoElement{
     let key=target.key;
     canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move|bounds,hitbox,window,cx|{
             let plot = Plot { o: bounds.origin, w: f64::from(bounds.size.width), h: f64::from(bounds.size.height) };
@@ -392,11 +396,13 @@ fn paint_surface(editor:Entity<Editor>,target:Target,params:Vec<ParamDesc>,th:Th
             window.on_mouse_event(move|event:&MouseDownEvent,phase,window,cx|{
                 if !phase.bubble()||event.button!=MouseButton::Left||!hitbox.is_hovered(window)||near(event.position).is_some(){return;}
                 let Some(double)=double.as_ref()else{return;};
-                let available={let ed=editor.read(cx);DeviceScope::for_window(window).allows(&target.track,ed)&&may_begin_device_input(ed)&&target.basis(ed).is_some()};
+                let available={let ed=editor.read(cx);surface.is_live()&&basis.is_some()
+                    &&DeviceScope::for_window(window).allows(&target.track,ed)&&may_begin_device_input(ed)&&target.basis(ed)==basis};
                 if !available||!input.double_activate(event.click_count,window,cx){return;}
                 let (x,y)=(f64::from(event.position.x-plot.o.x),f64::from(event.position.y-plot.o.y));
                 let normalized=(((x-GRAPH_PAD)/plot.inner_w()).clamp(0.,1.),((plot.h-GRAPH_PAD-y)/plot.inner_h()).clamp(0.,1.));
                 editor.update(cx,|ed,cx|{
+                    if !surface.is_live()||target.basis(ed)!=basis{return;}
                     if let Some((writes,selected))=double(normalized){if let Some(index)=selected{select_band(ed,target.key,index);}write_if_current(ed,&target,writes,cx);}
                     else{ed.notice("所有频段都已在使用；右键频段可关闭它");cx.notify();}
                 });cx.stop_propagation();
