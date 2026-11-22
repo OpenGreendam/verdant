@@ -2,7 +2,7 @@
 """Offline selector/trace regressions; these do not execute a native window."""
 import unittest
 
-from probe import nodes_in_window, wayland_contact_evidence, weston_surface_from_scene
+from probe import Probe, nodes_in_window, wayland_contact_evidence, weston_surface_from_scene
 
 
 SCENE = """Weston scene graph at 262750.759224263:
@@ -23,6 +23,20 @@ Layer 5:
 
 
 class ProbeHelpers(unittest.TestCase):
+    def test_native_close_selects_button_among_same_frame_radio_names(self):
+        main, native = [':1.3', '/frame/0'], [':1.3', '/frame/1']
+        snapshot = {'nodes': [
+            {'reference': [':1.3', '/native/close'], 'name': '关闭', 'role': 'push button', 'windowReference': native},
+            {'reference': [':1.3', '/native/off/1'], 'name': '关闭', 'role': 'radio button', 'windowReference': native},
+            {'reference': [':1.3', '/native/off/2'], 'name': '关闭', 'role': 'radio button', 'windowReference': native},
+            {'reference': [':1.3', '/main/close'], 'name': '关闭', 'role': 'push button', 'windowReference': main},
+        ]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = native
+        probe.snapshot = lambda: snapshot
+        self.assertEqual(len(probe.nodes('关闭')), 3)
+        self.assertEqual([node['reference'][1] for node in probe.nodes('关闭', 'push button')], ['/native/close'])
+
     def test_identical_names_remain_bound_to_their_observed_frame(self):
         main, native = [':1.2', '/frame/1'], [':1.2', '/frame/2']
         snapshot = {'nodes': [
