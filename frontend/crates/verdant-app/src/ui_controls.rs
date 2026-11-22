@@ -777,9 +777,6 @@ impl gpui::RenderOnce for TimelineScrollbar {
 
 /// Horizontal timeline scrollbar + zoom buttons for Arrangement or Piano Roll.
 pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: Theme, cx: &mut Context<Editor>) -> impl IntoElement {
-    let space = if is_arrange { crate::clock::Space::Arrange } else { crate::clock::Space::Editor };
-    let e_zoom_out = editor.clone();
-    let e_zoom_in = editor.clone();
     let id_prefix = if is_arrange { "arrange-scroll" } else { "roll-scroll" };
     div()
         .id(id_prefix)
@@ -805,16 +802,8 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
                 .child("−")
-                .on_click(cx.listener(move |ed, _, _, cx| {
-                    if is_arrange {
-                        let c = ed.arrange.width * 0.5;
-                        ed.arrange.zoom_x_at(c, 0.8);
-                    } else {
-                        let c = ed.session.viewport.width * 0.5;
-                        ed.session.viewport.zoom_x_at(c, 0.8);
-                    }
-                    let _ = &e_zoom_out;
-                    ed.notify_viewport(space, cx);
+                .on_click(cx.listener(move |ed, _, window, cx| {
+                    crate::proto_editor_surface::zoom(ed, is_arrange, "zoom-out", window, cx);
                 })),
         )
         .child(
@@ -830,16 +819,8 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
                 .child("+")
-                .on_click(cx.listener(move |ed, _, _, cx| {
-                    if is_arrange {
-                        let c = ed.arrange.width * 0.5;
-                        ed.arrange.zoom_x_at(c, 1.25);
-                    } else {
-                        let c = ed.session.viewport.width * 0.5;
-                        ed.session.viewport.zoom_x_at(c, 1.25);
-                    }
-                    let _ = &e_zoom_in;
-                    ed.notify_viewport(space, cx);
+                .on_click(cx.listener(move |ed, _, window, cx| {
+                    crate::proto_editor_surface::zoom(ed, is_arrange, "zoom-in", window, cx);
                 })),
         )
 }

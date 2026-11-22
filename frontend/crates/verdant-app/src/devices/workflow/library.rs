@@ -322,7 +322,7 @@ impl Library {
                 let entity = cx.entity(); let handle = handle.clone(); let basis = basis.clone();
                 crate::proto_scroll::content("compiled-preset-scroll", "预设列表", move |_, cx| {
                     entity.update(cx, |view, cx| view.native_list(&handle, &basis, cx))
-                }).native_scroll(view.native_scroll.clone()).into_any_element()
+                }).tab_stop(false).native_scroll(view.native_scroll.clone()).into_any_element()
             })
         });
         let entity = cx.entity().downgrade();
@@ -484,7 +484,7 @@ impl Render for Library {
                 .when(self.original.is_some(), |d| d.child(button("preset-restore", "返回原音").on_click(cx.listener(|v, _, _, cx| v.restore(cx)))))
                 .child(div().flex_1()).child(div().text_xs().text_color(th.text_secondary).child("↑↓ 浏览 · Enter 载入 · 关闭保留当前声音"))))
             .when(self.save_open, |d| d.child(div().flex_1().min_h_0().child(crate::proto_scroll::content("compiled-preset-save-scroll", "保存预设", move |_, cx|
-                save_form.update(cx, |view, cx| view.save_form(cx))))))
+                save_form.update(cx, |view, cx| view.save_form(cx))).tab_stop(false))))
             .child(div().id("preset-library-status").role(Role::Status).text_xs().text_color(th.text_secondary)
                 .child(if self.busy { "正在读取或保存…".into() } else { self.message.clone() }))
     }

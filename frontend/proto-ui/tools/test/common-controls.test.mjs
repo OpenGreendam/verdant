@@ -211,6 +211,17 @@ runtimeTest('scroll opt-in trap and axes update without capturing descendant edi
   assert.equal(f.call('key', 'Home', false), false);
   assert.equal(f.scrollRequests.length, count);
 });
+runtimeTest('compound scroll content can opt out of Tab without becoming inert', async t => {
+  const f = await fixture(t, 'scroll-region', { tabStop: false });
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'none');
+  f.event('host:focus'); f.call('key', 'PageDown', false);
+  assert.deepEqual(f.scrollRequests, [{ kind: 'page', axis: 'vertical', direction: 'after' }]);
+  f.update({ tabStop: true });
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'auto');
+  f.update({ tabStop: false });
+  await f.session.unmount(); await f.session.mount();
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'none');
+});
 runtimeTest('action projects expansion only for declared disclosure controls', async t => {
   const f = await fixture(t, 'action-control', { expandable: true, expanded: false, label: 'Section' });
   assert.deepEqual(f.semantics().states, { disabled: false, expanded: false });

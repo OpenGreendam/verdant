@@ -205,17 +205,179 @@ runtimeTest('editor focus and phase observers cannot continue suspended admissio
 
 runtimeTest('editor wheel modifier priority, directional policy and pinch admission are source-owned', async (t) => {
   const f = await fixture(t, 'editor-surface');
-  assert.deepEqual(f.call('wheel', 2, 3, false, false, false, false), {kind:'pan',x:-2,y:-3,amount:0});
-  assert.deepEqual(f.call('wheel', 0, 3, false, true, false, true), {kind:'pan',x:-3,y:0,amount:0});
+  assert.deepEqual(f.call('wheel', 2, 3, false, false, false, false), {kind:'pan',x:-2,y:-3,scale:1,exponent:0});
+  assert.deepEqual(f.call('wheel', 0, 3, false, true, false, true), {kind:'pan',x:-3,y:0,scale:1,exponent:0});
   assert.equal(f.call('wheel', 2, 3, true, true, true, false).kind, 'zoom-x');
   assert.equal(f.call('wheel', 2, 3, false, false, true, false).kind, 'zoom-y');
   assert.equal(f.call('wheel', 0, 3, false, false, false, true).kind, 'none');
   assert.equal(f.call('wheel', NaN, 3, false, false, false, false).kind, 'none');
-  assert.equal(f.call('pinch', -1), false);
-  assert.equal(f.call('pinch', 1.2), true);
+  assert.equal(f.call('pinch', -1).kind, 'none');
+  assert.deepEqual(f.call('pinch', 1.2), { kind: 'zoom-x', x: 0, y: 0, scale: 1.2, exponent: 1 });
   f.update({disabled:true});
-  assert.equal(f.call('pinch', 1.2), false);
+  assert.equal(f.call('pinch', 1.2).kind, 'none');
   assert.equal(f.call('wheel', 2, 3, true, false, false, false).kind, 'none');
+});
+
+runtimeTest('toolbar and keyboard navigation share source zoom policy with native wheel and pinch intents', async t => {
+  const f = await fixture(t, 'editor-surface');
+  const request = source => f.call('navigate', source, 0, 0, 1, false, false, false, false);
+  assert.deepEqual(request('zoom-in'), { kind: 'zoom-x', x: 0, y: 0, scale: 1.25, exponent: 1 });
+  assert.deepEqual(request('zoom-out'), { kind: 'zoom-x', x: 0, y: 0, scale: 0.8, exponent: 1 });
+  assert.equal(request('unrecognized-command').kind, 'none');
+  assert.equal(f.call('wheel', 0, -120, true, true, true, true).exponent, -120);
+  assert.equal(f.call('wheel', 0, -120, false, true, true, false).kind, 'zoom-y');
+  await f.session.unmount();
+  assert.equal(request('zoom-in').kind, 'none');
+  assert.equal(f.call('pinch', 2).kind, 'none');
+});
+
+runtimeTest('arrangement source owns tool, modifier, double activation and handle priorities for one lease', async t => {
+  const f = await fixture(t, 'editor-surface');
+  const cases = [
+    ['range', ['audio', true, false, true, true, 2, 0, 0, 0, 0, true, false]],
+    ['select', ['audio', false, false, true, true, 2, 0, 0, 0, 0, true, false]],
+    ['split', ['audio', false, false, false, true, 2, 0, 0, 0, 0, true, false]],
+    ['region-menu', ['audio', false, false, false, false, 2, 0, 0, 0, 0, true, false]],
+    ['open-part', ['part', false, false, false, false, 2, 0, 0, 0, 0, true, false]],
+    ['fade-in', ['audio', false, false, false, false, 1, 0, 50, 0, 50, true, false]],
+    ['fade-out', ['audio', false, false, false, false, 1, 50, 0, 50, 0, true, false]],
+    ['resize-left', ['audio', false, false, false, false, 1, 0, 50, 0, 50, false, false]],
+    ['resize-right', ['part', false, false, false, false, 1, 50, 0, -1, -1, false, false]],
+    ['move-region', ['part', false, false, false, false, 1, 50, 50, -1, -1, false, true]],
+    ['create-part', ['empty', false, false, false, false, 2, -1, -1, -1, -1, false, false]],
+    ['seek', ['empty', false, false, false, false, 1, -1, -1, -1, -1, false, false]],
+  ];
+  for (const [expected, args] of cases) {
+    assert.equal(f.call('begin', 'Mouse', 0, 0), true);
+    const chosen = f.call('regionGesture', ...args);
+    assert.equal(chosen.kind, expected);
+    assert.equal(f.x.operation.get(), expected);
+    assert.equal(f.call('regionGesture', ...args).kind, 'none', 'an active lease cannot choose another operation');
+    assert.equal(f.call('motion', 10, 20, false, false).kind, expected);
+    assert.equal(f.call('finish', 'Mouse', 10, 20), true);
+    assert.equal(f.x.operation.get(), '');
+  }
+  assert.equal(f.call('regionGesture', ...cases[0][1]).kind, 'none', 'primary gesture needs a contact');
+  assert.equal(f.call('activate'), true);
+  assert.equal(f.call('regionGesture', 'empty', false, true, false, false, 1, -1, -1, -1, -1, false, false).kind, 'lane-menu');
+});
+
+runtimeTest('curve source owns selection, snapping and persistent shift axis across samples', async t => {
+  const f = await fixture(t, 'editor-surface');
+  f.call('begin', 'Mouse', 10, 20);
+  assert.deepEqual(f.call('curveGesture', 'select', false, true, true, true, false, true, false),
+    { kind: 'curve-point', selection: 'toggle', snap: true });
+  assert.deepEqual(f.call('motion', 12, 22, true, false),
+    { kind: 'curve-point', snap: true, fine: 0.1, axis: '', moveX: false, moveY: false });
+  assert.equal(f.call('motion', 20, 23, true, false).axis, 'x');
+  assert.equal(f.call('motion', 12, 70, true, false).axis, 'x', 'dominant axis is held for the authored lock');
+  assert.equal(f.call('motion', 12, 70, false, true).axis, '');
+  assert.equal(f.call('motion', 12, 70, true, false).axis, 'y');
+  f.call('cancel');
+  assert.equal(f.x.axis.get(), '');
+  f.call('begin', 'Mouse', 10, 20);
+  assert.equal(f.call('curveGesture', 'select', false, false, false, false, true, false, false).snap, false);
+  assert.equal(f.call('motion', 20, 30, false, false).snap, false, 'portamento remains continuous after the first sample');
+  f.call('cancel');
+  for (const tool of ['line', 'smooth', 'eraser', 'pencil']) {
+    f.call('begin', 'Mouse', 0, 0);
+    assert.equal(f.call('curveGesture', tool, false, true, true, true, false, false, false).snap, false);
+    assert.equal(f.call('motion', 20, 30, false, false).snap, false);
+    f.call('cancel');
+  }
+});
+
+runtimeTest('note tools and touch long press choose authored operations before domain edits', async t => {
+  const f = await fixture(t, 'editor-surface');
+  const cases = [
+    ['none', ['pointer', false, true, false, false, false]],
+    ['note-edit', ['pointer', true, true, false, false, false]],
+    ['note-modulation', ['eraser', true, false, false, true, false]],
+    ['pitch-draw', ['pitch', true, false, false, true, false]],
+    ['erase-note', ['eraser', true, false, false, false, false]],
+    ['none', ['eraser', false, false, false, false, false]],
+    ['draw-note', ['pencil', false, false, false, false, false]],
+    ['note-edit', ['pencil', true, false, false, false, false]],
+    ['note-lyric', ['pointer', true, true, true, false, false]],
+    ['note-marquee', ['pointer', false, true, true, false, false]],
+    ['none', ['pitch', true, true, true, false, false]],
+  ];
+  for (const [expected, args] of cases) {
+    f.call('begin', 'Touch(0)', 0, 0);
+    assert.equal(f.call('noteGesture', ...args).kind, expected);
+    f.call('cancel');
+  }
+  f.call('begin', 'Mouse', 0, 0);
+  f.call('noteGesture', 'pencil', false, false, false, false, true);
+  assert.equal(f.call('motion', 20, 0, false, true).snap, false);
+  assert.equal(f.call('motion', 20, 0, false, false).snap, true);
+  assert.equal(f.call('edgePan', 995, 1000).active, false, 'note drawing never inherits selection autoscroll');
+  f.call('cancel');
+  f.call('begin', 'Mouse', 20, 0);
+  f.call('noteGesture', 'pointer', true, false, false, false, false);
+  assert.deepEqual(f.call('edgePan', 995, 1000), { position: 995, delta: 11, active: true });
+  assert.deepEqual(f.call('edgePan', 1100, 1000), { position: 1040, delta: 40, active: true });
+  assert.deepEqual(f.call('edgePan', -100, 1000), { position: -100, delta: -40, active: true });
+  f.call('cancel');
+  assert.equal(f.call('edgePan', 995, 1000).active, false);
+});
+
+runtimeTest('point, phoneme and ruler operation decisions preserve explicit editing capabilities', async t => {
+  const f = await fixture(t, 'editor-surface');
+  const choose = (method, ...args) => { f.call('cancel'); f.call('begin', 'Mouse', 0, 0); return f.call(method, ...args); };
+  assert.equal(choose('pointGesture', 'tempo', false, false, 2, false).kind, 'edit-tempo');
+  assert.equal(choose('pointGesture', 'automation', true, false, 2, false).kind, 'move-automation');
+  assert.equal(choose('pointGesture', 'automation', false, true, 1, false).kind, 'none');
+  assert.equal(choose('phonemeGesture', true, true, false).kind, 'select-note');
+  assert.equal(choose('phonemeGesture', true, true, true).kind, 'phoneme-drag');
+  assert.equal(choose('phonemeGesture', false, false, false).kind, 'none');
+  assert.equal(choose('rulerGesture', true, 2, false, true, true, true, true, true).kind, 'ruler-menu');
+  assert.equal(choose('rulerGesture', false, 2, false, true, true, true, true, true).kind, 'edit-segment');
+  assert.equal(choose('rulerGesture', false, 2, true, true, true, true, true, true).kind, 'drag-loop-start');
+  assert.equal(choose('rulerGesture', false, 1, false, false, false, true, true, true).kind, 'drag-loop-end');
+  assert.equal(choose('rulerGesture', false, 1, false, false, false, false, true, true).kind, 'set-loop-start');
+  assert.equal(choose('rulerGesture', false, 1, false, false, false, false, false, true).kind, 'set-loop-end');
+  assert.equal(choose('rulerGesture', false, 1, false, false, false, false, false, false).kind, 'scrub');
+});
+
+runtimeTest('gesture and axis observers cannot publish an operation across replacement authority', async t => {
+  const f = await fixture(t, 'editor-surface');
+  f.call('begin', 'Mouse', 0, 0);
+  let operationOnce = true;
+  const stopOperation = f.x.operation.subscribe(event => {
+    if (event.type === 'next' && operationOnce && f.x.operation.get() !== '') {
+      operationOnce = false; f.update({ revision: 'document:2' });
+    }
+  });
+  t.after(stopOperation);
+  assert.equal(f.call('noteGesture', 'pointer', true, false, false, false, false).kind, 'none');
+  assert.equal(f.x.operation.get(), '');
+  assert.equal(f.x.phase.get(), 'idle');
+  f.call('begin', 'Mouse', 0, 0);
+  f.call('curveGesture', 'pencil', false, false, false, true, false, false, false);
+  let axisOnce = true;
+  const stopAxis = f.x.axis.subscribe(event => {
+    if (event.type === 'next' && axisOnce && f.x.axis.get() !== '') { axisOnce = false; f.call('cancel'); }
+  });
+  t.after(stopAxis);
+  assert.equal(f.call('motion', 20, 1, true, false).kind, 'none');
+  assert.equal(f.x.operation.get(), '');
+  assert.equal(f.call('finish', 'Mouse', 20, 1), false);
+});
+
+runtimeTest('ruler source owns initial snap, continuous scrub and bounded edge scroll velocity', async t => {
+  const f = await fixture(t, 'editor-surface');
+  assert.equal(f.call('rulerSample', 10, 0, 0).accepted, false);
+  f.call('begin', 'Mouse', 10, 0);
+  f.call('rulerGesture', false, 1, false, false, false, false, false, false);
+  assert.deepEqual(f.call('rulerSample', 10, 0, 0), { position: 10, delta: 0, active: false, snap: true, accepted: true });
+  f.call('sample', 'Mouse', 20, 0);
+  assert.deepEqual(f.call('rulerSample', 499, 20, 0.02), { position: 499, delta: 5.6000000000000005, active: true, snap: false, accepted: true });
+  assert.equal(f.call('rulerSample', 499, 20000, 1).delta, 100, 'long or stalled frames cannot jump farther than the source speed/time cap');
+  assert.equal(f.call('rulerSample', 0, -20, 0.02).delta, -5.6000000000000005);
+  assert.equal(f.call('rulerSample', 0, -20, -1).accepted, false);
+  f.update({ revision: 'document:2' });
+  assert.equal(f.call('rulerSample', 499, 20, 0.02).accepted, false, 'an old frame cannot seek after authority changed');
 });
 
 runtimeTest('performance source suppresses repeat and keeps independent pointer and typing contacts', async (t) => {

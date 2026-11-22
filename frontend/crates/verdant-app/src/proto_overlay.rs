@@ -82,14 +82,20 @@ impl RenderOnce for Overlay {
             mount.drawing.update(cx, |drawing, cx| { drawing.draw = self.draw; cx.notify(); });
             mount.root.clone()
         });
-        gpui::div().absolute().inset_0().child(root)
+        let keyboard = root.read(cx).handle();
+        gpui::div().absolute().inset_0()
+            // Native descendant keys bubble through this physical boundary.
+            // The source chooses default/cancel, after any focused text or
+            // action source has consumed the sample (including marked text).
+            .on_key_down(move |event, window, cx| key(&keyboard, event, window, cx))
+            .child(root)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{AppContext, TestAppContext, WindowHandle, div, px, size};
+    use gpui::{TestAppContext, WindowHandle, div, px, size};
     use verdant_action_control::{ActionControlHandle, native::gpui_native_owner::{all_owners, resolved}};
     use verdant_overlay_control::native::gpui_native_owner::focus_members;
 

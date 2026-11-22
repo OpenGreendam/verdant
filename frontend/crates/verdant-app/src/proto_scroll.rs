@@ -22,14 +22,15 @@ pub(crate) fn content(id: impl Into<ElementId>, label: impl Into<String>,
 }
 type NativeDraw = Rc<dyn Fn(&gpui::ScrollHandle, &mut Window, &mut App) -> gpui::AnyElement>;
 #[derive(IntoElement)]
-pub(crate) struct NativeContent { id: ElementId, label: String, axes: &'static str, draw: NativeDraw }
+pub(crate) struct NativeContent { id: ElementId, label: String, axes: &'static str, tab_stop: bool, draw: NativeDraw }
 /// Preserve native layout/overflow while exposing its exact physical scroll
 /// handle to the compiled surface. Content is rebuilt, never replayed once.
 pub(crate) fn native_content(id: impl Into<ElementId>, label: impl Into<String>,
     draw: impl Fn(&gpui::ScrollHandle, &mut Window, &mut App) -> gpui::AnyElement + 'static) -> NativeContent {
-    NativeContent { id: id.into(), label: label.into(), axes: "vertical", draw: Rc::new(draw) }
+    NativeContent { id: id.into(), label: label.into(), axes: "vertical", tab_stop: true, draw: Rc::new(draw) }
 }
 impl NativeContent {
+    pub(crate) fn tab_stop(mut self, tab_stop: bool) -> Self { self.tab_stop = tab_stop; self }
     pub(crate) fn axes(mut self, axes: &'static str) -> Self {
         assert!(matches!(axes, "vertical" | "horizontal" | "both")); self.axes = axes; self
     }
@@ -47,10 +48,14 @@ impl RenderOnce for NativeContent {
         });
         let physical = state.read(cx); let handle = physical.handle.clone(); let target = physical.target.clone();
         content(self.id, self.label, move |window, cx| (self.draw)(&handle, window, cx))
-            .axes(self.axes).native_scroll(target)
+            .axes(self.axes).tab_stop(self.tab_stop).native_scroll(target)
     }
 }
 impl Region {
+    /// Compound collections/forms already provide their own keyboard target.
+    pub(crate) fn tab_stop(mut self, tab_stop: bool) -> Self {
+        self.props["tabStop"] = tab_stop.into(); self
+    }
     /// Native content retains virtualization, layout and item-reveal mechanics;
     /// all ScrollSurface requests and facts address this exact same handle.
     pub(crate) fn native_scroll(mut self, target: NativeScroll) -> Self {

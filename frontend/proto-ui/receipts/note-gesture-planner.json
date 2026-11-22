@@ -26,7 +26,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "1a76e079a4ae3877b08af6a09b4110bfac82df71"
+    "revision": "231be0e8d1d05367dfde14a172dc8ae4a014ed83"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",

@@ -835,10 +835,24 @@ mod pointer_boundary_tests {
         window
     }
     fn down(host: &Harness, window: &mut Window, cx: &mut gpui::App) {
+        let label=match(host.master,host.control) {
+            (false,MixerControl::Pan)=>"轨道声像",(false,MixerControl::Fader)=>"轨道推子",
+            (true,MixerControl::Pan)=>"主声像",(true,MixerControl::Fader)=>"主推子",
+        };
+        let owner=verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+            let owner=owner.borrow();owner.window_id==Some(window.window_handle().window_id())
+                && owner.props.get("label").and_then(serde_json::Value::as_str)==Some(label)
+        }).expect("mixer renders an actual compiled scalar");
+        let source=verdant_continuous_control::ContinuousControlHandle{owner};
+        let position=point(px(70.0),px(60.0));
+        assert!(source.owner.borrow().bounds.is_some_and(|bounds|bounds.contains(&position)),
+            "compiled mixer scalar must cover the native fader/pan allocation; bounds={:?}",source.owner.borrow().bounds);
         window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
-            position: point(px(70.0), px(60.0)), button: MouseButton::Left, ..Default::default()
+            position, button: MouseButton::Left, ..Default::default()
         }), cx);
-        assert!(if host.master { host.editor.read(cx).master_drag.is_some() } else { host.editor.read(cx).mixer_drag.is_some() });
+        assert!(if host.master { host.editor.read(cx).master_drag.is_some() } else { host.editor.read(cx).mixer_drag.is_some() },
+            "accepted authored scalar starts its matching audio preview; source_phase={:?}, failures={:?}",
+            source.state("phase"),source.take_failures());
         assert!(window.captured_hitbox().is_some());
     }
     #[gpui::test]

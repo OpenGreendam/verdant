@@ -5,7 +5,7 @@ type Props = {
   value?: number; min?: number; max?: number; step?: number; fineStep?: number;
   defaultValue?: number; label?: string; disabled?: boolean; revision?: string;
   role?: string; dragMode?: string; doubleAction?: string; tapAction?: string;
-  previewEcho?: boolean;
+  previewEcho?: boolean; keyboardMode?: string;
 };
 
 // Geometry and musical/plugin unit conversion stay at the native boundary.
@@ -23,6 +23,7 @@ export default definePrototype<Props>({
       revision: { type: 'string', default: '' }, role: { type: 'string', default: 'slider' },
       dragMode: { type: 'string', default: 'absolute' }, doubleAction: { type: 'string', default: 'reset' },
       tapAction: { type: 'string', default: 'none' }, previewEcho: { type: 'boolean', default: false },
+      keyboardMode: { type: 'string', default: 'full' },
     });
     const phase = def.state.string('phase', 'idle');
     const value = def.state.numberRange('value', 0, { min: -1e15, max: 1e15 });
@@ -66,7 +67,7 @@ export default definePrototype<Props>({
     let accepted = 0;
     let revision = '';
     let stepPolicy = 0.01; let finePolicy = 0.001;
-    let dragPolicy = 'absolute'; let doublePolicy = 'reset'; let tapPolicy = 'none';
+    let dragPolicy = 'absolute'; let doublePolicy = 'reset'; let tapPolicy = 'none'; let keyboardPolicy = 'full';
     const current = (ticket: number): boolean => !disposed && run !== null && epoch === ticket;
     const authorityCurrent = (ticket: number): boolean => !disposed && run !== null && authorityEpoch === ticket;
     const enabled = (): boolean => run !== null && attached && !disposed && !syncing && !disabled.get();
@@ -200,6 +201,11 @@ export default definePrototype<Props>({
       }
       if (!enabled() || event.altKey || event.ctrlKey || event.metaKey) return;
       const key = event.key ?? '';
+      // A scalar inside a traversable point collection owns value steps while
+      // the collection owns row navigation and returning to its parent. Keep
+      // that division in the source, before consuming the physical key.
+      if (run?.props.get().keyboardMode === 'vertical-step'
+        && key !== 'ArrowUp' && key !== 'ArrowDown' && key !== '+' && key !== '=' && key !== '-') return;
       if (key !== 'ArrowLeft' && key !== 'ArrowDown' && key !== 'ArrowRight' && key !== 'ArrowUp'
         && key !== 'PageUp' && key !== 'PageDown' && key !== 'Home' && key !== 'End'
         && key !== 'Enter' && key !== 'Backspace' && key !== '+' && key !== '=' && key !== '-') return;
@@ -222,7 +228,8 @@ export default definePrototype<Props>({
       const previous = accepted;
       const policyChanged = stepPolicy !== (props.step ?? 0.01) || finePolicy !== (props.fineStep ?? 0.001)
         || dragPolicy !== (props.dragMode ?? 'absolute')
-        || doublePolicy !== (props.doubleAction ?? 'reset') || tapPolicy !== (props.tapAction ?? 'none');
+        || doublePolicy !== (props.doubleAction ?? 'reset') || tapPolicy !== (props.tapAction ?? 'none')
+        || keyboardPolicy !== (props.keyboardMode ?? 'full');
       const echoed = props.previewEcho === true && phase.get() !== 'idle'
         && (props.revision ?? '') === revision && props.value === value.get()
         && (props.min ?? 0) === minimum.get() && (props.max ?? 1) === maximum.get()
@@ -236,6 +243,7 @@ export default definePrototype<Props>({
       run = handle;
       stepPolicy = props.step ?? 0.01; finePolicy = props.fineStep ?? 0.001;
       dragPolicy = props.dragMode ?? 'absolute'; doublePolicy = props.doubleAction ?? 'reset'; tapPolicy = props.tapAction ?? 'none';
+      keyboardPolicy = props.keyboardMode ?? 'full';
       const low = props.min ?? 0;
       const high = props.max ?? 1;
       const valid = Number.isFinite(low) && Number.isFinite(high) && low < high
@@ -291,7 +299,7 @@ export default definePrototype<Props>({
     def.lifecycle.onCreated(sync);
     def.lifecycle.onMounted((handle) => { if (!disposed) { attached = true; sync(handle); } });
     def.props.watch(['value', 'min', 'max', 'step', 'fineStep', 'defaultValue', 'label', 'disabled',
-      'revision', 'role', 'dragMode', 'doubleAction', 'tapAction', 'previewEcho'], sync);
+      'revision', 'role', 'dragMode', 'doubleAction', 'tapAction', 'previewEcho', 'keyboardMode'], sync);
     def.event.on('host:blur', cancel);
     def.lifecycle.onUnmounted(() => retire(false));
     def.lifecycle.onBeforeDispose(() => retire(true));

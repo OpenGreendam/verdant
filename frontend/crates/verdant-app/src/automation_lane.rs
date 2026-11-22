@@ -172,13 +172,13 @@ fn cancel_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, wi
 }
 
 fn sample_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, position: gpui::Point<gpui::Pixels>,
-    bounds: gpui::Bounds<gpui::Pixels>, modifiers: gpui::Modifiers, cx: &mut gpui::App) {
+    bounds: gpui::Bounds<gpui::Pixels>, snap: bool, cx: &mut gpui::App) {
     if !owns_automation_drag(editor, target, cx) { return; }
     let ed = editor.read(cx);
     let local = position - bounds.origin;
     let range = target_domain_range(ed, target);
     let raw_tick = ed.arrange.x_to_tick(f64::from(local.x)).max(0.0);
-    let tick = if modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick).max(0) };
+    let tick = if snap { ed.session.snap.snap(raw_tick).max(0) } else { raw_tick.round() as i64 };
     let value = y_to_value(f64::from(local.y), range, f64::from(bounds.size.height), target);
     if let Some(drag) = cx.global_mut::<AutoPointDragState>().drag.as_mut() {
         drag.tick = tick;
@@ -472,7 +472,7 @@ fn native_automation_curve(editor: Entity<Editor>, target: AutomationTarget,
             }
             flush_texts(window, cx, bounds, texts);
 
-            let (e,t)=(editor.clone(),target.clone());
+            let (e,t,policy)=(editor.clone(),target.clone(),input.clone());
             crate::proto_editor_surface::install_pointer_input(&input,bounds,&hitbox,window,move |event,window,cx| {
                 use crate::proto_editor_surface::PointerPhase;
                 match event.phase {
@@ -484,7 +484,9 @@ fn native_automation_curve(editor: Entity<Editor>, target: AutomationTarget,
                             let hit=doc.lane(&t).and_then(|lane|lane.points.iter().find(|pt|
                                 (vp.tick_to_x(pt.tick as f64)-event.x).abs()<=7.0 &&
                                 (value_to_y(pt.value,range,height)-event.y).abs()<=8.0).cloned());
-                            if event.phase==PointerPhase::Context {
+                            let Some(intent)=policy.intent(ed,"pointGesture",vec!["automation".into(),hit.is_some().into(),
+                                (event.phase==PointerPhase::Context).into(),(event.clicks as u64).into(),event.modifiers.alt.into()],window,cx) else{return false;};
+                            if intent.kind=="point-menu" {
                                 if let Some(point)=hit {
                                     let interpolation=if point.interpolation==Interpolation::Step { Interpolation::Linear } else { Interpolation::Step };
                                     ed.show_menu(event.position,vec![
@@ -496,16 +498,21 @@ fn native_automation_curve(editor: Entity<Editor>, target: AutomationTarget,
                             }
                             if cx.global::<AutoPointDragState>().drag.is_some() { return false; }
                             let raw_tick=vp.x_to_tick(event.x).max(0.0);
-                            let tick=if event.modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick).max(0) };
-                            let drag=if let Some(point)=hit {
+                            let tick=if intent.snap { ed.session.snap.snap(raw_tick).max(0) } else { raw_tick.round() as i64 };
+                            let drag=if intent.kind=="move-automation" {
+                                let Some(point)=hit else{return false;};
                                 AutoPointDrag { editor:e.entity_id(),target:t.clone(),base:ed.revision(),original_tick:Some(point.tick),tick:point.tick,value:point.value,interpolation:point.interpolation }
-                            } else {
+                            } else if intent.kind=="create-automation" {
                                 AutoPointDrag { editor:e.entity_id(),target:t.clone(),base:ed.revision(),original_tick:None,tick,value:y_to_value(event.y,range,height,&t),interpolation:Interpolation::Linear }
-                            };
+                            } else {return false;};
                             cx.global_mut::<AutoPointDragState>().drag=Some(drag);cx.notify();true
                         })
                     }
-                    PointerPhase::Sample => { sample_automation_drag(&e,&t,event.position,bounds,event.modifiers,cx);true }
+                    PointerPhase::Sample => {
+                        let intent=e.update(cx,|ed,cx|policy.motion(ed,event.x,event.y,event.modifiers,window,cx));
+                        if let Some(intent)=intent { sample_automation_drag(&e,&t,event.position,bounds,intent.snap,cx); }
+                        true
+                    }
                     PointerPhase::Finish => {
                         if !owns_automation_drag(&e,&t,cx) { return false; }
                         let Some(drag)=cx.global_mut::<AutoPointDragState>().drag.take() else { return false };

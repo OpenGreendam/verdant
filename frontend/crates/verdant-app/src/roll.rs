@@ -821,32 +821,14 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
         }
     }
 
-    let (e,h,live)=(editor.clone(),hitbox.clone(),surface.clone());
+    let (e,h,live,policy)=(editor.clone(),hitbox.clone(),surface.clone(),input.clone());
     crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
         use crate::proto_editor_surface::PointerPhase;
         if !live.is_live() { return false; }
         match event.phase {
             PointerPhase::Begin => {
-                let ed=e.read(cx);
-                if ed.has_proto_pointer_contact() || ed.note_creation.is_some() || ed.session.pointer_owner().is_some()
-                    || ed.lane_stroke.is_some() || ed.device_drag.is_some() || ed.mixer_drag.is_some()
-                    || has_note_mod_drag(e.entity_id(),cx) { return false; }
-                if matches!(event.pointer,PointerId::Touch(_)) && ed.tool==Tool::Pointer {
-                    let claim=ed.active_track().is_some_and(|t|!matches!(hit_test_touch(t,&ed.session.viewport,&ed.session.selection,event.x,event.y),Hit::Background));
-                    if !claim { return false; }
-                }
-                if event.pointer==PointerId::Mouse && ed.tool!=Tool::Pitch {
-                    if let Some(mut drag)=hit_mod_handle(ed,event.x,event.y) {
-                        drag.editor=e.entity_id();cx.global_mut::<RollExtraDragState>().mod_drag=Some(drag);
-                        e.update(cx,|ed,cx| { ed.capture_roll_pointer(h.id,window,cx);cx.notify(); });return true;
-                    }
-                }
-                e.update(cx,|ed,cx| {
-                    pointer_down(ed,event.pointer,event.x,event.y,mods(&event.modifiers),event.clicks as u32,&h,window,cx);
-                    ed.note_creation.as_ref().is_some_and(|c|c.pointer==event.pointer)
-                        || ed.session.pointer_owner()==Some(event.pointer)
-                        || ed.lane_stroke.as_ref().is_some_and(|s|s.roll&&s.pointer==event.pointer)
-                })
+                e.update(cx,|ed,cx| pointer_down(ed,event.pointer,event.x,event.y,mods(&event.modifiers),
+                    event.clicks as u32,&h,&policy,window,cx))
             }
             PointerPhase::Sample => {
                 let values=cx.try_global::<RollExtraDragState>().and_then(|s|s.mod_drag.as_ref())
@@ -856,7 +838,11 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                         drag.portamento_ms=portamento;drag.delay_permille=delay;drag.depth_cents=depth;
                     }
                     e.update(cx,|_,cx|cx.notify());
-                } else { e.update(cx,|ed,cx|pointer_move(ed,event.pointer,event.x,event.y,mods(&event.modifiers),window,cx)); }
+                } else { e.update(cx,|ed,cx| {
+                    if let Some(intent)=policy.motion(ed,event.x,event.y,event.modifiers,window,cx) {
+                        pointer_move(ed,event.pointer,event.x,event.y,mods(&event.modifiers),&intent,&policy,window,cx);
+                    }
+                }); }
                 true
             }
             PointerPhase::Finish => {
@@ -874,7 +860,7 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
     let gate=input.clone();
     window.on_mouse_event(move |ev: &LongPressEvent, phase, window, cx| {
         let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
-        if phase != expected_phase || e.read(cx).tool == Tool::Pitch || !long_surface.is_live() {
+        if phase != expected_phase || !long_surface.is_live() {
             return;
         }
         if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
@@ -897,11 +883,12 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                     if ed.session.pointer_owner().is_some_and(|p| p != PointerId::Touch(0)) || ed.lane_stroke.is_some() { return; }
                     let p = ed.store().snapshot();
                     let Some(t) = p.track(&ed.session.track) else { return };
-                    match hit_test_touch(t, &ed.session.viewport, &ed.session.selection, x, y) {
-                        // Secondary activation on a note: edit its lyric.
-                        Hit::Body(id) | Hit::Handle(id, _) => ed.begin_lyric(id, window, cx),
-                        // On empty space: start a marquee that follows the finger.
-                        Hit::Background => {
+                    let hit=hit_test_touch(t, &ed.session.viewport, &ed.session.selection, x, y);
+                    let Some(intent)=gate.intent(ed,"noteGesture",vec![note_tool(ed.tool).into(),
+                        (!matches!(hit,Hit::Background)).into(),true.into(),true.into(),false.into(),false.into()],window,cx) else { return; };
+                    match intent.kind.as_str() {
+                        "note-lyric" => if let Hit::Body(id) | Hit::Handle(id, _) = hit { ed.begin_lyric(id, window, cx); },
+                        "note-marquee" => {
                             let music = ed.session.viewport.to_music(x, y);
                             let fx = ed.session.handle_pointer(
                                 &p,
@@ -917,15 +904,25 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
                             );
                             ed.apply_pointer_effects(fx, h.id, window, cx);
                         }
+                        _ => {},
                     }
                 });
+                if e.read(cx).session.pointer_owner()!=Some(PointerId::Touch(0)) { gate.cancel_pointer(PointerId::Touch(0),window,cx); }
             }
             TouchPhase::Moved => { if !gate.sample(PointerId::Touch(0),x,y,window,cx) { return; } e.update(cx, |ed, cx| {
                 if matches!(ed.session.pointer_owner(), Some(PointerId::Touch(_))) {
-                    pointer_move(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
+                    if let Some(intent)=gate.motion(ed,x,y,gpui::Modifiers::default(),window,cx) {
+                        pointer_move(ed, PointerId::Touch(0), x, y, Modifiers::default(),&intent,&gate,window,cx);
+                    }
                 }
             }); },
-            TouchPhase::Ended => { if !gate.finish(PointerId::Touch(0),x,y,window,cx) { return; } e.update(cx, |ed, cx| {
+            TouchPhase::Ended => {
+                if gate.sample(PointerId::Touch(0),x,y,window,cx) { e.update(cx,|ed,cx| {
+                    if let Some(intent)=gate.motion(ed,x,y,gpui::Modifiers::default(),window,cx) {
+                        pointer_move(ed,PointerId::Touch(0),x,y,Modifiers::default(),&intent,&gate,window,cx);
+                    }
+                }); }
+                if !gate.finish(PointerId::Touch(0),x,y,window,cx) { return; } e.update(cx, |ed, cx| {
                 if matches!(ed.session.pointer_owner(), Some(PointerId::Touch(_))) {
                     pointer_up(ed, PointerId::Touch(0), x, y, Modifiers::default(), window, cx);
                 }
@@ -940,11 +937,10 @@ fn install_roll_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &
         if phase != DispatchPhase::Bubble || !h.is_hovered(window) {
             return;
         }
-        if !gate.pinch(1.0+f64::from(ev.delta),window,cx) {return;}
+        let Some(intent) = gate.pinch(1.0+f64::from(ev.delta),window,cx) else {return;};
         let l = ev.position - bounds.origin;
         e.update(cx, |ed, cx| {
-            ed.session.viewport.zoom_x_at(l.x.as_f32() as f64, 1.0 + ev.delta as f64);
-            ed.notify_viewport(crate::clock::Space::Editor, cx);
+            if intent.apply(&mut ed.session.viewport, (f64::from(l.x), f64::from(l.y))) { ed.notify_viewport(crate::clock::Space::Editor, cx); }
         });
         cx.stop_propagation();
     });
@@ -974,11 +970,15 @@ fn finish_note_modulation(editor:&Entity<Editor>,window:&mut Window,cx:&mut App)
     });
 }
 
-pub(crate) fn begin_pitch_stroke(
+fn note_tool(tool:Tool)->&'static str {
+    match tool { Tool::Pointer=>"pointer",Tool::Pencil=>"pencil",Tool::Eraser=>"eraser",Tool::Pitch=>"pitch" }
+}
+
+fn begin_pitch_stroke(
     ed: &mut Editor, pointer: PointerId, x: f64, y: f64, window: &mut Window,
     cx: &mut gpui::Context<Editor>,
 ) -> bool {
-    if ed.tool != Tool::Pitch || ed.note_creation.is_some() || ed.session.pointer_owner().is_some()
+    if ed.note_creation.is_some() || ed.session.pointer_owner().is_some()
         || ed.lane_stroke.is_some() || ed.mixer_drag.is_some() || ed.device_drag.is_some() || ed.has_proto_pointer_contact()
     {
         return false;
@@ -987,15 +987,10 @@ pub(crate) fn begin_pitch_stroke(
         ed.end_lyric(true, None, window, cx);
         if ed.lyric.is_some() { return false; }
     }
-    let Some(track) = ed.active_track() else { return false; };
-    let (handle, outside) = if matches!(pointer, PointerId::Touch(_)) { (22.0, 14.0) } else { (7.0, 4.0) };
-    let hit = ed.index.hit_test(track, &ed.session.viewport, &ed.session.selection, x, y, handle, outside);
-    if let Hit::Body(id) | Hit::Handle(id, _) = hit {
-        ed.session.selection = [id].into();
-    }
+    if ed.active_track().is_none() { return false; }
     let music = ed.session.viewport.to_music(x, y);
     let started = ed.begin_curve(verdant_backend::params::Param::Pit, pointer, None, None, true,
-        music.tick.max(0.0), music.pitch, (x, y), false);
+        music.tick.max(0.0), music.pitch, (x, y), false,crate::editor::LaneTool::Pencil);
     if started { cx.notify(); }
     started
 }
@@ -1009,21 +1004,19 @@ fn pointer_down(
     m: Modifiers,
     clicks: u32,
     h: &Hitbox,
+    input:&crate::proto_editor_surface::Input,
     window: &mut Window,
     cx: &mut gpui::Context<Editor>,
-) {
-    if ed.tool == Tool::Pitch {
-        if begin_pitch_stroke(ed, pointer, x, y, window, cx) { ed.capture_roll_pointer(h.id, window, cx); }
-        return;
-    }
+) -> bool {
     if ed.note_creation.is_some() || ed.session.pointer_owner().is_some() || ed.lane_stroke.is_some()
-        || ed.mixer_drag.is_some() || ed.device_drag.is_some() || ed.has_proto_pointer_contact() { return; }
+        || ed.mixer_drag.is_some() || ed.device_drag.is_some() || ed.has_proto_pointer_contact()
+        || has_note_mod_drag(cx.entity_id(),cx) { return false; }
     if ed.lyric.is_some() {
         ed.end_lyric(true, None, window, cx);
-        if ed.lyric.is_some() { return; }
+        if ed.lyric.is_some() { return false; }
     }
     let p = ed.store().snapshot();
-    let Some(track) = p.track(&ed.session.track) else { return };
+    let Some(track) = p.track(&ed.session.track) else { return false; };
     // Bounded candidate scan through the note index; touch gets the
     // finger-sized thresholds.
     let (handle_px, outside_px) = match pointer {
@@ -1033,38 +1026,57 @@ fn pointer_down(
     let hit = ed
         .index
         .hit_test(track, &ed.session.viewport, &ed.session.selection, x, y, handle_px, outside_px);
+    let mod_handle=hit_mod_handle(ed,x,y);
+    let Some(intent)=input.intent(ed,"noteGesture",vec![note_tool(ed.tool).into(),
+        (!matches!(hit,Hit::Background)).into(),matches!(pointer,PointerId::Touch(_)).into(),false.into(),
+        mod_handle.is_some().into(),m.alt.into()],window,cx) else { return false; };
     let music = ed.session.viewport.to_music(x, y);
-    match (ed.tool, &hit) {
-        (Tool::Eraser, Hit::Body(id) | Hit::Handle(id, _)) => {
+    match intent.kind.as_str() {
+        "pitch-draw" => {
+            if intent.selection=="replace" && let Hit::Body(id) | Hit::Handle(id,_) = &hit { ed.session.selection=[id.clone()].into(); }
+            let started=begin_pitch_stroke(ed,pointer,x,y,window,cx);
+            if started && pointer==PointerId::Mouse { ed.capture_roll_pointer(h.id,window,cx); }
+            return started;
+        }
+        "note-modulation" => {
+            let Some(mut drag)=mod_handle else { return false; };
+            drag.editor=cx.entity_id();cx.global_mut::<RollExtraDragState>().mod_drag=Some(drag);
+            ed.capture_roll_pointer(h.id,window,cx);cx.notify();return true;
+        }
+        "erase-note" => {
+            let (Hit::Body(id) | Hit::Handle(id,_))=&hit else { return false; };
             let cmd = Command::DeleteNotes { track: ed.session.track.clone(), note_ids: vec![id.clone()] };
             ed.session.selection.remove(id);
             ed.commit(ed.revision(), CommandBatch::single("擦除音符", cmd), cx);
-            return;
+            return false;
         }
-        (Tool::Eraser, Hit::Background) => return,
-        (Tool::Pencil, Hit::Background) => {
+        "draw-note" => {
             let meter = ed.meter();
             let origin = meter.signature_at(music.tick.max(0.) as i64).tick;
-            let start = if m.alt { music.tick.round() as i64 } else { origin + ed.session.snap.snap(music.tick-origin as f64) }.max(0);
+            let start = if intent.snap { origin + ed.session.snap.snap(music.tick-origin as f64) } else { music.tick.round() as i64 }.max(0);
             // Zero is an armed preview only; finish_note_draw refuses it.
             let note = Note::new(start, 0, (music.pitch.floor() as i32).clamp(0,127));
             ed.note_creation = Some(crate::editor::workflow::NoteCreation { pointer, base: ed.revision(), origin_tick: start, note });
             if pointer == PointerId::Mouse { ed.capture_roll_pointer(h.id, window, cx); }
-            cx.notify(); return;
+            cx.notify(); return true;
         }
-        _ => {}
+        "note-edit" => {},
+        _ => return false,
     }
     let fx =
         ed.session.handle_pointer(&p, ed.revision(), pointer, InputEvent::PointerDown { hit, music, screen: (x, y), mods: m, click_count: clicks });
     ed.apply_pointer_effects(fx, h.id, window, cx);
+    ed.session.pointer_owner()==Some(pointer)
 }
 
-fn pointer_move(ed: &mut Editor, pointer: PointerId, mut x: f64, y: f64, m: Modifiers, window: &mut Window, cx: &mut gpui::Context<Editor>) {
+fn pointer_move(ed: &mut Editor, pointer: PointerId, mut x: f64, y: f64, m: Modifiers,
+    intent:&crate::proto_editor_surface::MotionIntent,input:&crate::proto_editor_surface::Input,
+    window: &mut Window, cx: &mut gpui::Context<Editor>) {
     if ed.note_creation.as_ref().is_some_and(|c|c.pointer==pointer) {
         let tick = ed.session.viewport.x_to_tick(x);
         let origin = ed.meter().signature_at(tick.max(0.) as i64).tick;
-        let snapped = if m.alt { tick.round() as i64 } else { origin + ed.session.snap.snap(tick - origin as f64) };
-        let minimum = if m.alt { 1 } else { ed.session.snap.grid_ticks.max(1) };
+        let snapped = if intent.snap { origin + ed.session.snap.snap(tick - origin as f64) } else { tick.round() as i64 };
+        let minimum = if intent.snap { ed.session.snap.grid_ticks.max(1) } else { 1 };
         if let Some(creation) = &mut ed.note_creation {
             verdant_domain::editing::preview_note_draw(&mut creation.note, creation.origin_tick, snapped, minimum);
         }
@@ -1073,22 +1085,16 @@ fn pointer_move(ed: &mut Editor, pointer: PointerId, mut x: f64, y: f64, m: Modi
     if ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && s.roll) {
         let tick = ed.session.viewport.x_to_tick(x);
         let pitch = ed.session.viewport.y_to_pitch(y);
-        ed.roll_pitch_sample(pointer, tick, pitch, (x, y), m.shift); cx.notify();
+        ed.roll_pitch_sample(pointer, tick, pitch, &intent.axis); cx.notify();
         return;
     }
     if ed.session.gesture.is_none() {
         return;
     }
-    let w = ed.session.viewport.width;
-    if x > w - 16.0 {
-        ed.session.viewport.pan_px((x - (w - 16.0)).min(40.0), 0.0);
-        ed.session.autoscroll_active = true;
-        x = x.min(w + 40.0);
-    } else if x < 16.0 {
-        ed.session.viewport.pan_px((x - 16.0).max(-40.0), 0.0);
-        ed.session.autoscroll_active = true;
-    } else {
-        ed.session.autoscroll_active = false;
+    if let Some(pan)=input.edge_pan(ed,x,ed.session.viewport.width,window,cx) {
+        ed.session.viewport.pan_px(pan.delta,0.0);
+        ed.session.autoscroll_active=pan.active;
+        x=pan.position;
     }
     let music = ed.session.viewport.to_music(x, y);
     let p = ed.store().snapshot();
@@ -1104,10 +1110,8 @@ fn pointer_up(ed: &mut Editor, pointer: PointerId, x: f64, y: f64, mods: Modifie
         cx.notify();
         return;
     }
-    if ed.note_creation.as_ref().is_some_and(|c| c.pointer == pointer)
-        || ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && s.roll) {
-        pointer_move(ed, pointer, x, y, mods, window, cx);
-    }
+    // The physical adapter supplies the last sample before source finish.
+    // A completed source lease must never be sampled again by its host.
     if ed.note_creation.as_ref().is_some_and(|c|c.pointer==pointer){
         let creation = ed.note_creation.take().expect("owned creation");
         ed.release_roll_capture(window, cx);
@@ -1230,33 +1234,10 @@ pub(crate) fn install_roll_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixels>,h
                 ScrollSurface::Timeline => (local.x.as_f32() as f64, vp.height * 0.5),
                 ScrollSurface::Keyboard => (0.0, local.y.as_f32() as f64),
             };
-            match intent.kind.as_str() {
-                "zoom-x"=>vp.zoom_x_at(anchor.0,1.0015f64.powf(intent.amount)),
-                "zoom-y"=>vp.zoom_y_at(anchor.1,1.0015f64.powf(intent.amount)),
-                _=>vp.pan_px(intent.x,intent.y),
-            }
-            ed.notify_viewport(crate::clock::Space::Editor, cx);
+            if intent.apply(vp, anchor) { ed.notify_viewport(crate::clock::Space::Editor, cx); }
         });
         cx.stop_propagation();
     });
-}
-
-#[cfg(test)]
-fn scroll_viewport(vp: &mut Viewport, delta: ScrollDelta, modifiers: gpui::Modifiers, anchor: (f64, f64)) {
-    let d = match delta {
-        ScrollDelta::Pixels(p) => (p.x.as_f32() as f64, p.y.as_f32() as f64),
-        ScrollDelta::Lines(l) => (l.x as f64 * 40.0, l.y as f64 * 40.0),
-    };
-    if modifiers.control || modifiers.platform {
-        vp.zoom_x_at(anchor.0, 1.0015f64.powf(d.1));
-    } else if modifiers.alt {
-        vp.zoom_y_at(anchor.1, 1.0015f64.powf(d.1));
-    } else if modifiers.shift {
-        // GPUI normalizes Shift+vertical wheel into X on some platforms.
-        vp.pan_px(-(if d.0 != 0.0 { d.0 } else { d.1 }), 0.0);
-    } else {
-        vp.pan_px(-d.0, -d.1);
-    }
 }
 
 /// Bar ruler for a horizontal view. `arrange` selects which viewport.
@@ -1362,7 +1343,7 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                 install_roll_scroll(&editor,bounds,&hitbox,ScrollSurface::Timeline,&input,window);
             }
             crate::ruler_navigation::install(&editor, arrange, bounds, &hitbox, window, cx);
-            let (e,h_down)=(editor.clone(),hitbox.clone());
+            let (e,h_down,policy)=(editor.clone(),hitbox.clone(),input.clone());
             crate::proto_editor_surface::install_pointer_input(&input,bounds,&hitbox,window,move |event,window,cx| {
                 use crate::proto_editor_surface::PointerPhase;
                 let (x,y)=(event.x,event.y);
@@ -1373,7 +1354,15 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                 e.update(cx, |ed, cx| {
                     let vp = if arrange { ed.arrange } else { ed.session.viewport };
                     let tick=ed.session.snap.snap(vp.start_tick+x/vp.px_per_tick).max(0);
-                    if event.phase==PointerPhase::Context {
+                    let segment=ed.language_segments.at(&ed.session.track,tick).map(|segment|segment.key.clone());
+                    let pb=ed.playback_settings();let(ls,le)=(pb.loop_start,pb.loop_end);
+                    let loop_band=le>ls&&y<=12.;
+                    let start_hit=loop_band&&(x-vp.tick_to_x(ls as f64)).abs()<=6.5;
+                    let end_hit=loop_band&&(x-vp.tick_to_x(le as f64)).abs()<=6.5;
+                    let Some(intent)=policy.intent(ed,"rulerGesture",vec![(event.phase==PointerPhase::Context).into(),
+                        (event.clicks as u64).into(),arrange.into(),segment.is_some().into(),start_hit.into(),end_hit.into(),
+                        event.modifiers.shift.into(),event.modifiers.alt.into()],window,cx) else{return;};
+                    if intent.kind=="ruler-menu" {
                         use crate::menu::MenuItem as I;use crate::editor::{MenuAction as M,WorkflowAction as A};
                         let tempo=ed.project().tempo_map.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
                         let meter=ed.project().time_signatures.iter().rev().find(|p|p.tick<=tick).map(|p|p.tick).unwrap_or(0);
@@ -1390,36 +1379,22 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                         ed.show_menu(event.position,items,window,cx);
                         return;
                     }
-                    if event.clicks >= 2 && !arrange {
-                        {
-                            if let Some(segment) = ed.language_segments.at(&ed.session.track, tick) {
-                                let key = segment.key.clone();
-                                let _ = ed.open_segment_dialog(Some(key), window, cx);
-                                return;
-                            }
-                        }
+                    if intent.kind=="edit-segment" {
+                        if let Some(key)=segment { let _=ed.open_segment_dialog(Some(key),window,cx); }
+                        return;
                     }
-                    let pb = ed.playback_settings();
-                    if pb.loop_end > pb.loop_start && y <= 12.0 {
-                        let a = vp.tick_to_x(pb.loop_start as f64);
-                        let z = vp.tick_to_x(pb.loop_end as f64);
-                        if (x - a).abs() <= 6.5 {
-                            started_loop_drag = Some((true, pb.loop_start, pb.loop_end));
-                            return;
-                        } else if (x - z).abs() <= 6.5 {
-                            started_loop_drag = Some((false, pb.loop_start, pb.loop_end));
-                            return;
-                        }
+                    if matches!(intent.kind.as_str(),"drag-loop-start"|"drag-loop-end") {
+                        started_loop_drag=Some((intent.kind=="drag-loop-start",ls,le));return;
                     }
                     let min_loop_len = ed.project().ppq.max(1);
-                    if event.modifiers.shift{ed.edit_playback("循环起点",cx,|s|{s.loop_start=tick;if s.loop_end<=tick{s.loop_end=tick+min_loop_len;}s.looping=true;});}
-                    else if event.modifiers.alt{ed.edit_playback("循环终点",cx,|s|{s.loop_end=tick.max(s.loop_start+1);s.looping=true;});}
-                    else { scrub = true; }
+                    if intent.kind=="set-loop-start"{ed.edit_playback("循环起点",cx,|s|{s.loop_start=tick;if s.loop_end<=tick{s.loop_end=tick+min_loop_len;}s.looping=true;});}
+                    else if intent.kind=="set-loop-end"{ed.edit_playback("循环终点",cx,|s|{s.loop_end=tick.max(s.loop_start+1);s.looping=true;});}
+                    else if intent.kind=="scrub" { scrub = true; }
                 });
                 if let Some((drag_start, ls, le)) = started_loop_drag {
                     cx.global_mut::<RollExtraDragState>().loop_drag = Some((e.entity_id(), arrange, drag_start, ls, le));
                     return true;
-                } else if scrub { return crate::ruler_navigation::begin_pointer(&e,arrange,bounds,&h_down,event.pointer,window,cx,event.position); }
+                } else if scrub { return crate::ruler_navigation::begin_pointer(&e,arrange,bounds,&h_down,&policy,window,cx,event.position); }
                 false
 
                     }
@@ -1634,54 +1609,6 @@ mod keyboard_tests {
         for (x, y) in [(-1.0, 105.0), (width, 105.0), (10.0, -1.0), (10.0, vp.height)] {
             assert_eq!(keyboard_pitch_at(vp, x, y, width, vp.height), None);
         }
-    }
-}
-
-#[cfg(test)]
-mod scroll_tests {
-    use super::*;
-
-    #[test]
-    fn shift_wheel_accepts_normalized_x_and_vertical_y_in_pixels_and_lines() {
-        let initial = Viewport { start_tick: 2000.0, ..Viewport::default() };
-        for delta in [
-            ScrollDelta::Pixels(gpui::point(px(-40.0), px(0.0))),
-            ScrollDelta::Pixels(gpui::point(px(0.0), px(-40.0))),
-            ScrollDelta::Lines(gpui::point(-1.0, 0.0)),
-            ScrollDelta::Lines(gpui::point(0.0, -1.0)),
-            ScrollDelta::Pixels(gpui::point(px(-40.0), px(80.0))),
-        ] {
-            let mut vp = initial;
-            scroll_viewport(&mut vp, delta, gpui::Modifiers { shift: true, ..Default::default() }, (300.0, 200.0));
-            assert_eq!(vp.start_tick, initial.start_tick + 40.0 / initial.px_per_tick);
-            assert_eq!(vp.top_pitch, initial.top_pitch);
-            assert_eq!(vp.px_per_tick, initial.px_per_tick);
-            assert_eq!(vp.row_height, initial.row_height);
-        }
-    }
-
-    #[test]
-    fn wheel_zoom_modifiers_keep_priority_and_anchor_over_shift_pan() {
-        let initial = Viewport { start_tick: 2000.0, ..Viewport::default() };
-        let anchor = (300.0, 200.0);
-        let delta = ScrollDelta::Lines(gpui::point(1.0, 1.0));
-        for modifiers in [
-            gpui::Modifiers { control: true, alt: true, shift: true, ..Default::default() },
-            gpui::Modifiers { platform: true, alt: true, shift: true, ..Default::default() },
-        ] {
-            let mut vp = initial;
-            scroll_viewport(&mut vp, delta, modifiers, anchor);
-            assert!(vp.px_per_tick > initial.px_per_tick);
-            assert!((vp.x_to_tick(anchor.0) - initial.x_to_tick(anchor.0)).abs() < 1e-9);
-            assert_eq!(vp.top_pitch, initial.top_pitch);
-            assert_eq!(vp.row_height, initial.row_height);
-        }
-        let mut vp = initial;
-        scroll_viewport(&mut vp, delta, gpui::Modifiers { alt: true, shift: true, ..Default::default() }, anchor);
-        assert!(vp.row_height > initial.row_height);
-        assert!((vp.y_to_pitch(anchor.1) - initial.y_to_pitch(anchor.1)).abs() < 1e-9);
-        assert_eq!(vp.start_tick, initial.start_tick);
-        assert_eq!(vp.px_per_tick, initial.px_per_tick);
     }
 }
 

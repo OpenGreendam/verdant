@@ -2081,15 +2081,11 @@ impl Render for Editor {
             .on_action(cx.listener(|ed, _: &NudgeRightBar, w, cx| nudge(ed, ed.bar_nudge_delta(true), 0, w, cx)))
             .on_action(cx.listener(|ed, _: &NudgeUpOctave, w, cx| nudge(ed, 0, 12, w, cx)))
             .on_action(cx.listener(|ed, _: &NudgeDownOctave, w, cx| nudge(ed, 0, -12, w, cx)))
-            .on_action(cx.listener(|ed, _: &ZoomIn, _, cx| {
-                let x = ed.session.viewport.width / 2.0;
-                ed.session.viewport.zoom_x_at(x, 1.25);
-                ed.notify_viewport(crate::clock::Space::Editor, cx);
+            .on_action(cx.listener(|ed, _: &ZoomIn, window, cx| {
+                crate::proto_editor_surface::zoom(ed, false, "zoom-in", window, cx);
             }))
-            .on_action(cx.listener(|ed, _: &ZoomOut, _, cx| {
-                let x = ed.session.viewport.width / 2.0;
-                ed.session.viewport.zoom_x_at(x, 0.8);
-                ed.notify_viewport(crate::clock::Space::Editor, cx);
+            .on_action(cx.listener(|ed, _: &ZoomOut, window, cx| {
+                crate::proto_editor_surface::zoom(ed, false, "zoom-out", window, cx);
             }))
             .on_action(cx.listener(|ed, _: &ToggleFollow, _, cx| crate::clock::toggle_follow(ed, cx)))
             .on_action(cx.listener(|ed, _: &ToggleF0, _, cx| {

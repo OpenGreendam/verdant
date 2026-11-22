@@ -170,7 +170,7 @@ fn native_note_table(ed: &mut Editor, entity: Entity<Editor>, handle: verdant_co
             uniform_list(SharedString::from(format!("note-rows-{track}")), count, move |range, _, cx| {
                 notes.update(cx, |ed, cx| range.filter_map(|i| note_row(ed, i, &handle, &revision, cx)).collect::<Vec<_>>())
             }).track_scroll(&note_scroll).size_full().into_any_element()
-        }).native_scroll(note_native_scroll)))
+        }).tab_stop(false).native_scroll(note_native_scroll)))
         .child(div().h(px(28.0)).px(px(12.0)).flex().items_center().text_xs().text_color(ed.theme.text_secondary)
             .child(format!("全部参数曲线 · {point_count} 点 · Tab / ←→ 选点 · ↑↓ 步进，Shift 精调 PIT/DYN · Esc 返回音符")))
         .child(div().h(px(140.0)).min_h_0().children(point_note.map(|note| point_collection(ed, points, note)))).into_any_element()
@@ -245,7 +245,7 @@ fn point_collection(ed: &Editor, entity: Entity<Editor>, note: NoteId) -> crate:
                 uniform_list(SharedString::from(format!("compiled-point-rows-{note}")), count, move |range, _, cx| {
                     editor.update(cx, |ed, cx| range.filter_map(|index| point_row(ed, &note, index, &handle, &revision, cx)).collect::<Vec<_>>())
                 }).track_scroll(&scroll).size_full().into_any_element()
-            }).native_scroll(ed.point_native_scroll.clone()).into_any_element()
+            }).tab_stop(false).native_scroll(ed.point_native_scroll.clone()).into_any_element()
         })
     });
     let editor = entity.downgrade();
@@ -278,7 +278,7 @@ fn point_row(ed: &mut Editor, note: &NoteId, index: usize, collection: &verdant_
     let (min, max) = match param { Param::Pit => (-1200., 1200.), Param::Dyn => (-24., 6.), _ => (0., 127.) };
     let mut spec = Spec::slider(value, min, max, label);
     spec.role = "spinbutton"; spec.step = step; spec.fine_step = fine_step;
-    spec.drag_mode = "relative"; spec.tap_action = "activate";
+    spec.drag_mode = "relative"; spec.tap_action = "activate"; spec.keyboard_mode = "vertical-step";
     spec.disabled = !verdant_backend::params::support(param, ed.route(), ed.scheduler.capabilities.as_ref()).is_effective()
         || (crate::editor::curves::region_parameter(param) && crate::editor::curves::lane_disabled(n, param));
     let editor = cx.entity(); let focus_editor = editor.clone();
@@ -311,4 +311,83 @@ fn point_row(ed: &mut Editor, note: &NoteId, index: usize, collection: &verdant_
                 if previous.is_some_and(|previous| previous.is_focused(window) && previous != *focus) { window.focus(focus, cx); }
             });
         }).into_any_element())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{AppContext, Render, Subscription, TestAppContext, size};
+
+    struct Harness { editor: Entity<Editor>, _changed: Subscription }
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.editor.update(cx, |ed, cx| note_table(ed, cx.entity(), window, cx))
+        }
+    }
+
+    #[gpui::test]
+    fn native_point_table_separates_scalar_value_keys_from_collection_navigation(cx: &mut TestAppContext) {
+        let mut project = verdant_domain::Project::new_empty();
+        let mut note = Note::new(0, 960, 60);
+        note.curves.gain_millidecibel_points = (0..10).map(|index| verdant_domain::model::GainPoint {
+            id: PointId::generate(), tick: index * 48, millidecibels: 0, unknown: Default::default(),
+        }).collect();
+        project.tracks[0].notes = vec![note];
+        project.tracks[0].refresh_index();
+        let window = cx.open_window(size(px(640.), px(360.)), |window, cx| {
+            let editor = cx.new(|cx| {
+                let mut editor = Editor::for_native_test(project, window, cx);
+                editor.scheduler.capabilities = Some(verdant_backend::Capabilities::default());
+                editor
+            });
+            let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+            Harness { editor, _changed: changed }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        let original_revision = window.update(cx, |host, window, cx| {
+            let editor = host.editor.read(cx);
+            let focus = editor.focus_table.clone(); let revision = editor.revision();
+            window.focus(&focus, cx); revision
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "tab");
+        crate::native_test_support::frames(window, cx);
+        for (key, index) in [("right", 1), ("pagedown", 5), ("end", 9), ("home", 0)] {
+            cx.simulate_keystrokes(window.into(), key);
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                let editor = host.editor.read(cx);
+                assert_eq!(editor.table_focus.cursor_index, index, "{key} must traverse the point collection");
+                let point = &editor.table_focus.order[index];
+                assert!(editor.table_focus.handles[point].is_focused(window), "{key} must focus the selected compiled scalar");
+                assert_eq!(editor.revision(), original_revision, "navigation must not propose a numeric edit");
+                if index >= 5 {
+                    assert!(editor.point_scroll.0.borrow().base_handle.offset().y < px(0.), "virtual point navigation must reveal its row");
+                }
+            }).unwrap();
+        }
+        cx.simulate_keystrokes(window.into(), "up");
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "shift-down");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let editor = host.editor.read(cx);
+            assert_eq!(editor.project().tracks[0].notes[0].curves.gain_millidecibel_points[0].millidecibels, 90);
+            assert_eq!(editor.table_focus.cursor_index, 0, "value steps must retain the point cursor");
+            assert!(!editor.focus_table.is_focused(window));
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let editor = host.editor.read(cx);
+            assert!(editor.focus_table.is_focused(window), "Enter returns from a scalar to the note collection");
+            assert!(editor.lyric.is_none(), "point Enter must not activate the ancestor note editor");
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(), "tab escape");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            assert!(host.editor.read(cx).focus_table.is_focused(window), "idle scalar Escape belongs to the collection");
+        }).unwrap();
+    }
 }

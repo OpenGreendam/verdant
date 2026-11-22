@@ -360,6 +360,8 @@ jobs:
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui devices::
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui table::
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui menu::
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui commands::
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui files::
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui roll::native_tests
           cargo test --offline --locked --release -p verdant-app --bin verdant-gui pointer_boundary_tests
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package

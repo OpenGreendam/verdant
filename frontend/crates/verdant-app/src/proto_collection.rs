@@ -86,8 +86,11 @@ impl RenderOnce for Collection {
             mount.drawing.update(cx, |drawing, cx| { drawing.draw = self.draw; cx.notify(); });
             mount.root.clone()
         });
-        if props_mode(&root, cx) { gpui::div().absolute().inset_0().child(root).into_any_element() }
-        else { root.into_any_element() }
+        let menu = props_mode(&root, cx);
+        let keyboard = root.read(cx).handle();
+        let body = gpui::div().on_key_down(move |event, window, cx| key(&keyboard, event, window, cx)).child(root);
+        if menu { body.absolute().inset_0().into_any_element() }
+        else { body.size_full().min_h_0().into_any_element() }
     }
 }
 
@@ -138,7 +141,7 @@ fn invoke_key(handle: &CollectionControlHandle, method: &str, args: Vec<Value>, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{AppContext, TestAppContext, WindowHandle, div, px, size, uniform_list};
+    use gpui::{TestAppContext, WindowHandle, div, px, size, uniform_list};
 
     struct Harness {
         selected: usize, activations: usize, revision: usize,
@@ -155,7 +158,7 @@ mod tests {
                     uniform_list("collection-test-rows", 100, |range, _, _| range.map(|index|
                         div().h(px(30.)).child(format!("Row {index}"))).collect::<Vec<_>>())
                         .track_scroll(&scroll).size_full().into_any_element()
-                }).native_scroll(view.native_scroll.clone()).into_any_element()
+                }).tab_stop(false).native_scroll(view.native_scroll.clone()).into_any_element()
             }));
             let entity = cx.entity(); let basis = revision.clone();
             let sink: Sink = Rc::new(move |name, payload, _, cx| {

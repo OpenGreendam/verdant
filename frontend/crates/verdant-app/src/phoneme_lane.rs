@@ -311,6 +311,7 @@ fn native_timeline_phonemes(editor:Entity<Editor>,input:crate::proto_editor_surf
 fn install_timeline_phoneme_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,
     input:&crate::proto_editor_surface::Input,window:&mut Window) {
     let editor=editor.clone();
+    let policy=input.clone();
     crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
         use crate::proto_editor_surface::PointerPhase;
         let local_x=event.x;
@@ -372,13 +373,16 @@ fn install_timeline_phoneme_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,h
         };
 
         if let Some((maybe_drag, maybe_note)) = hit {
+            let intent=editor.update(cx,|ed,cx|policy.intent(ed,"phonemeGesture",vec![maybe_drag.is_some().into(),
+                maybe_note.is_some().into(),maybe_drag.is_some().into()],window,cx));
+            let Some(intent)=intent else{return false;};
             editor.update(cx, |ed, cx| {
-                if let Some(nid) = maybe_note {
+                if intent.selection=="replace" && let Some(nid) = maybe_note {
                     ed.session.selection = [nid].into();
                 }
                 cx.notify();
             });
-            if let Some(drag) = maybe_drag {
+            if intent.kind=="phoneme-drag" && let Some(drag) = maybe_drag {
                 cx.global_mut::<TimelinePhonemeDragState>().drag = Some(drag);
                 return true;
             }

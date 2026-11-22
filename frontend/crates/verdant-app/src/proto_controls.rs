@@ -53,13 +53,13 @@ type Assistive = Rc<RefCell<dyn FnMut(Option<&gpui::accesskit::ActionData>, &mut
 
 #[derive(IntoElement)]
 pub(crate) struct Action {
-    shell: Stateful<Div>, label: SharedString, description: SharedString,
+    shell: Stateful<Div>, children: Vec<gpui::AnyElement>, label: SharedString, description: SharedString,
     role: &'static str, selected: bool, selectable: bool, disabled: bool, tab_stop: bool, expanded: Option<bool>,
     clicks: Vec<Click>, assistive: Option<Assistive>, navigation: Option<Navigation>, context_menu: Option<Click>, position: usize, count: usize,
 }
 
 pub(crate) fn action(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Action {
-    Action { shell: div().id(id).relative(), label: label.into(), description: "".into(),
+    Action { shell: div().id(id).relative(), children: Vec::new(), label: label.into(), description: "".into(),
         role: "button", selected: false, selectable: false, disabled: false, tab_stop: true, expanded: None,
         clicks: Vec::new(), assistive: None, navigation: None, context_menu: None, position: 0, count: 0 }
 }
@@ -107,7 +107,7 @@ impl Action {
     pub(crate) fn focusable(self) -> Self { self }
 }
 impl Styled for Action { fn style(&mut self) -> &mut StyleRefinement { self.shell.style() } }
-impl ParentElement for Action { fn extend(&mut self, elements: impl IntoIterator<Item = gpui::AnyElement>) { self.shell.extend(elements); } }
+impl ParentElement for Action { fn extend(&mut self, elements: impl IntoIterator<Item = gpui::AnyElement>) { self.children.extend(elements); } }
 impl InteractiveElement for Action { fn interactivity(&mut self) -> &mut gpui::Interactivity { self.shell.interactivity() } }
 impl StatefulInteractiveElement for Action {}
 
@@ -255,7 +255,11 @@ impl RenderOnce for Action {
                 state.update(cx, |binding, cx| collect(binding, None, Some(event), cx));
                 flush(&state, window, cx);
             }))
+            // This source owns the background rectangle. Foreground controls
+            // stay above it in native hit testing, so their own compiled root
+            // claims the physical sample before this background can see it.
             .child(root)
+            .children(self.children)
     }
 }
 

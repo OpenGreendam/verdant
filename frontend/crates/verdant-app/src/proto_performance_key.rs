@@ -129,3 +129,162 @@ impl RenderOnce for Key {
         })
     }
 }
+
+#[cfg(test)]
+mod native_tests {
+    use super::*;
+    use gpui::{div, px, size, FocusHandle, InteractiveElement, KeyDownEvent, KeyUpEvent,
+        Keystroke, MouseButton, MouseDownEvent, MouseUpEvent, ParentElement, PlatformInput, Styled,
+        StatefulInteractiveElement, TestAppContext, WindowHandle};
+    use verdant_performance_key::native::gpui_native_owner::{drive_owners,dispatch_accessibility_action};
+
+    struct Harness {
+        visible: bool, revision: String, disabled: bool, momentary: bool,
+        focus: FocusHandle, outside: FocusHandle, delivered: Rc<RefCell<Vec<(String,bool)>>>,
+    }
+    impl Render for Harness {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            let mut root=div().id("performance-test").size_full().track_focus(&self.focus)
+                .on_key_down(|event:&KeyDownEvent,window,cx|{route_key("native-performance",&event.keystroke.key,true,window,cx);})
+                .on_key_up(|event:&KeyUpEvent,window,cx|{route_key("native-performance",&event.keystroke.key,false,window,cx);});
+            if self.visible {
+                let delivered=self.delivered.clone();let revision=self.revision.clone();
+                let mut authored=key("native-performance",60,"C4",revision.clone(),self.disabled,
+                    |_|div().size_full().into_any_element(),
+                    move |pressed,_|delivered.borrow_mut().push((revision.clone(),pressed)));
+                if self.momentary {authored=authored.momentary();}
+                root=root.child(div().w(px(120.)).h(px(90.)).child(authored));
+            }
+            root.child(div().id("outside-performance").track_focus(&self.outside).w(px(100.)).h(px(30.)))
+        }
+    }
+    fn open(cx:&mut TestAppContext,momentary:bool)->WindowHandle<Harness> {
+        let host=cx.open_window(size(px(260.),px(180.)),|_,cx|Harness {
+            visible:true,revision:"instrument:one".into(),disabled:false,momentary,
+            focus:cx.focus_handle(),outside:cx.focus_handle(),delivered:Rc::default(),
+        });
+        host.update(cx,|host,window,cx|{window.activate_window();window.focus(&host.focus,cx);}).unwrap();
+        crate::native_test_support::frames(host,cx);host
+    }
+    fn physical_key(down:bool,held:bool,window:&mut Window,cx:&mut App) {
+        let keystroke=Keystroke::parse("a").unwrap();
+        window.dispatch_event(if down {PlatformInput::KeyDown(KeyDownEvent {keystroke,is_held:held,prefer_character_input:false})}
+            else {PlatformInput::KeyUp(KeyUpEvent {keystroke})},cx);
+    }
+    fn entry(window:&Window,cx:&App)->Entry {
+        cx.global::<Keys>().0.get(&(window.window_handle().window_id(),"native-performance".into(),60)).unwrap().clone()
+    }
+    fn click_sample(down:bool,window:&mut Window,cx:&mut App) {
+        let position=entry(window,cx).handle.owner.borrow().bounds.expect("laid-out authored key").center();
+        window.dispatch_event(if down {PlatformInput::MouseDown(MouseDownEvent {position,button:MouseButton::Left,..Default::default()})}
+            else {PlatformInput::MouseUp(MouseUpEvent {position,button:MouseButton::Left,..Default::default()})},cx);
+    }
+    #[gpui::test]
+    fn native_held_key_repeats_and_pointer_overlap_release_only_the_last_contact(cx:&mut TestAppContext) {
+        let host=open(cx,false);
+        host.update(cx,|_,window,cx|{physical_key(true,false,window,cx);physical_key(true,true,window,cx);}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{
+            assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true)]);
+            click_sample(true,window,cx);physical_key(false,false,window,cx);
+        }).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{
+            assert_eq!(host.delivered.borrow().len(),1,"typing release does not stop a physical pointer hold");
+            assert_eq!(entry(window,cx).handle.state("pressed").unwrap(),Value::Bool(true));
+            click_sample(false,window,cx);
+        }).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,_|assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true),("instrument:one".into(),false)])).unwrap();
+    }
+    #[gpui::test]
+    fn native_revision_change_and_detach_release_the_held_target_without_late_note_on(cx:&mut TestAppContext) {
+        let host=open(cx,false);
+        host.update(cx,|_,window,cx|physical_key(true,false,window,cx)).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,cx|{host.revision="instrument:two".into();cx.notify();}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{
+            assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true),("instrument:one".into(),false)]);
+            physical_key(false,false,window,cx);physical_key(true,false,window,cx);
+        }).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,cx|{host.visible=false;cx.notify();}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{
+            assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true),("instrument:one".into(),false),
+                ("instrument:two".into(),true),("instrument:two".into(),false)]);
+            assert!(!route_key("native-performance","a",true,window,cx));
+            host.visible=true;cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{
+            window.focus(&host.focus,cx);physical_key(true,false,window,cx);physical_key(false,false,window,cx);
+        }).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,_|assert_eq!(host.delivered.borrow().len(),4,"a down/up batch retired before delivery never starts audio")).unwrap();
+    }
+    #[gpui::test]
+    fn native_focus_loss_and_disable_release_sustained_keys(cx:&mut TestAppContext) {
+        for disable in [false,true] {
+            let host=open(cx,false);
+            host.update(cx,|_,window,cx|click_sample(true,window,cx)).unwrap();
+            crate::native_test_support::frames(host,cx);
+            host.update(cx,|host,window,cx|{
+                assert_eq!(host.delivered.borrow().last(),Some(&("instrument:one".into(),true)));
+                if disable {host.disabled=true;cx.notify();} else {window.focus(&host.outside,cx);}
+            }).unwrap();
+            crate::native_test_support::frames(host,cx);
+            host.update(cx,|host,window,cx|{
+                assert_eq!(host.delivered.borrow().last(),Some(&("instrument:one".into(),false)));
+                click_sample(false,window,cx);
+                assert_eq!(host.delivered.borrow().len(),2);
+            }).unwrap();
+        }
+    }
+    #[gpui::test]
+    fn native_detached_owner_cannot_release_a_replacement_key_with_the_same_registration(cx:&mut TestAppContext) {
+        let host=open(cx,false);
+        let retired=host.update(cx,|_,window,cx|{physical_key(true,false,window,cx);entry(window,cx)}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,cx|{host.visible=false;cx.notify();}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,cx|{host.visible=true;cx.notify();}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{window.focus(&host.focus,cx);physical_key(true,false,window,cx);}).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,window,cx|{
+            let replacement=entry(window,cx);
+            assert!(!Rc::ptr_eq(&retired.handle.owner,&replacement.handle.owner));
+            assert_eq!(&*host.delivered.borrow(),&[("instrument:one".into(),true),("instrument:one".into(),false),("instrument:one".into(),true)]);
+            // A real retained native handle can outlive its physical view.
+            let _=retired.handle.call("cancel",vec![],window,cx);
+            drain(&retired,cx);
+            assert_eq!(replacement.handle.state("pressed").unwrap(),Value::Bool(true));
+            assert_eq!(host.delivered.borrow().len(),3,"old cleanup cannot emit a second release after the replacement starts");
+            physical_key(false,false,window,cx);
+        }).unwrap();
+        crate::native_test_support::frames(host,cx);
+        host.update(cx,|host,_,_|assert_eq!(host.delivered.borrow().last(),Some(&("instrument:one".into(),false)))).unwrap();
+    }
+    #[gpui::test]
+    fn native_accessibility_activation_obeys_sustain_or_momentary_policy(cx:&mut TestAppContext) {
+        for momentary in [false,true] {
+            let host=open(cx,momentary);
+            host.update(cx,|_,window,cx|{
+                let source=entry(window,cx);dispatch_accessibility_action(&source.handle.owner,"activate",None);drive_owners(window,cx);
+            }).unwrap();
+            crate::native_test_support::frames(host,cx);
+            host.update(cx,|host,window,cx|{
+                assert_eq!(host.delivered.borrow().len(),if momentary{2}else{1});
+                assert_eq!(entry(window,cx).handle.state("pressed").unwrap(),Value::Bool(!momentary));
+                host.disabled=true;cx.notify();
+            }).unwrap();
+            crate::native_test_support::frames(host,cx);
+            host.update(cx,|host,window,cx|{
+                let source=entry(window,cx);dispatch_accessibility_action(&source.handle.owner,"activate",None);drive_owners(window,cx);
+                assert_eq!(host.delivered.borrow().len(),2);
+            }).unwrap();
+        }
+    }
+}

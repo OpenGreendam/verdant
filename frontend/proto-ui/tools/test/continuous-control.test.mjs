@@ -120,7 +120,7 @@ runtimeTest('continuous cancellation carries the retired accepted value and orig
 });
 
 runtimeTest('continuous preview echo cannot mask a synchronous policy change during finish', async t => {
-  for (const policy of [{ max: 2 }, { disabled: true }, { step: 0.2 }, { dragMode: 'relative' }]) {
+  for (const policy of [{ max: 2 }, { disabled: true }, { step: 0.2 }, { dragMode: 'relative' }, { keyboardMode: 'vertical-step' }]) {
     const f = await fixture(t, { previewEcho: true });
     f.call('begin', 0.5, false, false, false);
     f.onEvent((name, payload) => { if (name === 'valuePreview') f.update({ value: payload.value, ...policy }); });
@@ -138,6 +138,29 @@ runtimeTest('continuous plus minus and fine keys use the same authored numeric p
   assert.equal(f.key('-').defaultPrevented, true);
   assert.deepEqual(f.commits().map(proposal => proposal.value), [0.51, 0.501, 0.49]);
   assert.equal(f.key('+', { ctrlKey: true }).defaultPrevented, false);
+});
+
+runtimeTest('point scalar key policy owns value steps and releases collection navigation', async t => {
+  const f = await fixture(t, { keyboardMode: 'vertical-step', step: 0.1, fineStep: 0.01 });
+  for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', 'Escape', 'Tab', 'Backspace']) {
+    assert.equal(f.key(key).defaultPrevented, false, `${key} belongs to the surrounding collection`);
+  }
+  assert.deepEqual(f.events, []);
+  assert.equal(f.key('ArrowUp').defaultPrevented, true);
+  assert.equal(f.key('ArrowDown', { shiftKey: true }).defaultPrevented, true);
+  assert.equal(f.key('+').defaultPrevented, true);
+  assert.equal(f.key('-').defaultPrevented, true);
+  assert.deepEqual(f.commits().map(proposal => proposal.value), [0.6, 0.49, 0.6, 0.4]);
+  f.call('begin', 0.5, false, false, false);
+  f.call('sample', 0.8, 0.53, true, false);
+  assert.equal(f.key('Escape').defaultPrevented, true, 'active scalar cancels before collection dismissal');
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.key('Escape').defaultPrevented, false, 'idle scalar leaves dismissal to the collection');
+  f.action('increment');
+  assert.equal(f.commits().at(-1).value, 0.6, 'assistive adjustment stays independent of keyboard layout');
+  f.update({ keyboardMode: 'full' });
+  assert.equal(f.key('End').defaultPrevented, true);
+  assert.equal(f.commits().at(-1).value, 1);
 });
 
 runtimeTest('continuous synchronous draft echoes cannot swallow the final release commit', async (t) => {

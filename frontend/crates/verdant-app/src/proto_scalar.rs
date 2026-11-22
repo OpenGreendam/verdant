@@ -30,6 +30,8 @@ pub(crate) struct Spec {
     pub drag_mode: &'static str,
     pub double_action: &'static str,
     pub tap_action: &'static str,
+    /// Point collections retain horizontal/page traversal and Enter/Escape.
+    pub keyboard_mode: &'static str,
     /// The host has a transient draft/viewport that echoes emitted previews.
     /// Such an echo is distinct from a new project revision or external value.
     pub preview_echo: bool,
@@ -40,7 +42,7 @@ impl Spec {
     pub fn slider(value: f64, min: f64, max: f64, label: impl Into<String>) -> Self {
         Self { value, min, max, step: (max-min)/100.0, fine_step: (max-min)/1000.0,
             default_value: value, label: label.into(), role: "slider", drag_mode: "absolute",
-            double_action: "reset", tap_action: "none", preview_echo: false, disabled: false, mixer_preview: false }
+            double_action: "reset", tap_action: "none", keyboard_mode: "full", preview_echo: false, disabled: false, mixer_preview: false }
     }
 }
 
@@ -285,7 +287,8 @@ impl RenderOnce for Scalar {
         let props = json!({ "value": spec.value, "min": spec.min, "max": spec.max, "step": spec.step,
             "fineStep": spec.fine_step, "defaultValue": spec.default_value, "label": spec.label,
             "disabled": spec.disabled, "revision": token, "role": spec.role, "dragMode": spec.drag_mode,
-            "doubleAction": spec.double_action, "tapAction": spec.tap_action, "previewEcho": spec.preview_echo });
+            "doubleAction": spec.double_action, "tapAction": spec.tap_action, "keyboardMode": spec.keyboard_mode,
+            "previewEcho": spec.preview_echo });
         let parent = crate::proto_parent::current(); let initial_parent = parent.clone();
         let initial_props = props.clone();
         let initial_target = target.clone();
@@ -315,6 +318,10 @@ impl RenderOnce for Scalar {
                 let (handle, target, lease, contact) = (mount.root.read(cx).handle(), mount.target.borrow().clone(), mount.lease.clone(), mount.contact.clone());
                 let expected = contact.generation.get();
                 cx.defer(move |cx| { let _ = window_handle.update(cx, |_, window, cx| {
+                    // A delayed observer belongs to this acquisition. It may
+                    // neither consume a replacement's outputs nor dispatch
+                    // them through the callback captured for the old target.
+                    if !contact.is_current(expected) { return; }
                     let good = drain(&handle, &target, window, cx);
                     if contact.is_current(expected) && (!good || state::<String>(&handle, "phase").is_ok_and(|phase| phase == "idle")) {
                         lease.cancel(MoveGestureCancelReason::HostCancel, window, cx);

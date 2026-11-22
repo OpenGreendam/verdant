@@ -20,8 +20,8 @@
 | 滚动与缩放 | `scroll-region`、`continuous-control`、`editor-surface` | `proto_scroll.rs`、时间线条与编辑画布；原生滚动句柄、viewport 和物理事件提供事实 |
 | 列表与表格 | `collection-control`、`action-control`、`scroll-region` | `table.rs`、预设库、历史、实例列表；宿主保留虚拟化、数据投影及 item reveal |
 | 弹层、对话框与抽屉 | `overlay-control`、`text-field`、`action-control` | `proto_overlay.rs`、`dialogs.rs`、提示／导出／数值窗口；源拥有焦点范围和 response，业务校验保留宿主 |
-| 编曲区 | `editor-surface` | `arrange.rs`、`audio_edit_ui.rs`；源拥有 contact、取消和键盘命令准入，领域层拥有音频编辑操作 |
-| 参数曲线与自动化 | `editor-surface`、`continuous-control` | `lanes.rs`、`automation_lane.rs`、`phoneme_lane.rs`、EQ sketch；坐标、曲线采样与事务留在宿主 |
+| 编曲区 | `editor-surface` | `arrange.rs`、`audio_edit_ui.rs`；源拥有工具与命中事实到选择、范围、移动、边界、淡化、分割等操作意图的决策，以及 contact、取消和键盘策略；领域层执行音频操作 |
+| 参数曲线与自动化 | `editor-surface`、`continuous-control` | `lanes.rs`、`automation_lane.rs`、`phoneme_lane.rs`、EQ sketch；源拥有创建／移动、选择修饰键与锁轴策略；音乐坐标、曲线采样与事务留在宿主 |
 | 虚拟演奏键盘 | `performance-key` | `proto_performance_key.rs`、原生合成器窗口；源拥有按下／松开和取消，宿主发送 note-on/note-off |
 | 调制拖放映射 | `drag-source`、`action-control` | `proto_drag.rs`、`devices/modulation.rs`；GPUI 运送 payload 和拖动图像，源控制单次 lease 接受、取消和键盘选择 |
 
@@ -33,6 +33,7 @@
 - 项目、store、revision、track/master、插件实例、parameter key 和权威值都由宿主再次校验。原型接受输入不等于领域层接受写入。旧菜单、旧文本草稿或旧参数目标的延迟事件不能写入新的实例。
 - 普通鼠标 capture 绑定 window、hitbox 与 generation；源 contact 另外拥有 revision 与单调 lease。即使指针或 hitbox 相同，旧终止事件也不能提交或释放新的捕获。触摸使用真实 touch arena，不能借用鼠标捕获。
 - `NativeScroll` 绑定已有 ScrollHandle（虚拟列表为原有 base_handle）。Proto 的翻页、首末定位和滚动事实必须指向它；不能加一个外层空滚动容器冒充原列表已经接入。
+- wheel、pinch、缩放按钮和快捷键都向同一个编辑原型提供输入事实，由原型选择滚动方向、缩放意图和修饰键策略；宿主负责 viewport 几何、时间单位换算和实际显示。数值表格单元格只消费数值编辑键，未消费的导航键交给所属集合。
 - native slot 明确携带 Proto parent。Adwaita 布局、自绘、音乐时间／单位换算、播放与撤销事务是宿主职责。操作系统窗口移动、边框调整和第三方插件窗口机制仍是原生系统能力。
 - 文本字段不通过 Rust 的字符串追加／删除来另写编辑器。程序替换通过编辑会话 reset，清理旧组合与历史；选区按 UTF-16 检查边界。未结束的 IME composition 不应被 Enter 提交或外围快捷键抢走。
 
@@ -44,8 +45,8 @@
 
 ## 验证范围
 
-源级测试覆盖受控值拒绝、重入更新、revision 替换、卸载、取消、文本组合和输入准入。GPUI 测试使用真实生成组件与事件，覆盖鼠标、键盘、AccessKit 动作、虚拟列表滚动、图形末次采样、触摸仲裁和卸载后的迟到事件。测试直接调用 Expose 方法与实际派发原生事件的证据分别保留。
+源级测试覆盖受控值拒绝、重入更新、revision 替换、卸载、取消、文本组合和输入准入。GPUI 测试使用真实生成组件与事件，覆盖鼠标、键盘、AccessKit 动作、虚拟列表与实际音符表格、导出对话框、图形末次采样、触摸仲裁、持续演奏键和卸载后的迟到事件。图形测试还验证捕获丢失／同 hitbox 被重新取得后不得写入，旧清理不得释放新捕获。测试直接调用 Expose 方法与实际派发原生事件的证据分别保留。
 
-macOS 与 Windows 的 workflow 除原有 pointer/roll/参数链外，也运行 `proto_`、`devices::`、`table::`、`menu::` 范围，Linux 运行完整 app 测试。真实 X11／Wayland 输入 job 继续依赖同一次构建的发布包，并绑定源身份与二进制摘要。
+macOS 与 Windows 的 workflow 除原有 pointer/roll/参数链外，也运行 `proto_`、`devices::`、`table::`、`menu::`、`commands::`、`files::` 范围，Linux 运行完整 app 测试。真实 X11／Wayland 输入 job 继续依赖同一次构建的发布包，并绑定源身份与二进制摘要。
 
 每个验证结果以本变更对应提交的 CI Checks 为准；README 中保留的 #79 结果是迁移前基线。框架测试不能代替物理触摸、平台 IME、屏幕阅读器或所有平台的实际窗口验收，未运行的范围不能由覆盖清单推断为通过。

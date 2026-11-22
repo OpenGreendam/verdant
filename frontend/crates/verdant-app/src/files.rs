@@ -607,7 +607,7 @@ impl Render for ScoreExportDialog{
         let draw:crate::proto_overlay::Draw=std::rc::Rc::new(move|_,_,_,_| {
             let entity=entity.clone();
             crate::proto_scroll::content("compiled-score-export-scroll","乐谱导出选项",move|window,cx|
-                entity.update(cx,|view,cx|view.native_form(window,cx))).into_any_element()
+                entity.update(cx,|view,cx|view.native_form(window,cx))).tab_stop(false).into_any_element()
         });
         let entity=cx.entity().downgrade();
         let response:crate::proto_overlay::Response=std::rc::Rc::new(move|index,window,cx| {

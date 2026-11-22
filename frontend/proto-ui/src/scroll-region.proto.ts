@@ -1,7 +1,7 @@
 import { definePrototype, tw, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable, asFocusScope, asScrollSurface } from '@proto.ui/hooks';
 
-type Props = { label?: string; description?: string; role?: string; autoFocus?: boolean; trapFocus?: boolean; axes?: string };
+type Props = { label?: string; description?: string; role?: string; autoFocus?: boolean; trapFocus?: boolean; axes?: string; tabStop?: boolean };
 
 // The native slot supplies document layout. Scroll extents, native wheel
 // projection and focus targets are host facts; keyboard page/edge requests,
@@ -11,7 +11,8 @@ export default definePrototype<Props>({
   setup(def) {
     def.props.define({ label: { type: 'string', default: '' }, description: { type: 'string', default: '' },
       role: { type: 'string', default: 'document' }, autoFocus: { type: 'boolean', default: false },
-      trapFocus: { type: 'boolean', default: false }, axes: { type: 'string', default: 'vertical' } });
+      trapFocus: { type: 'boolean', default: false }, axes: { type: 'string', default: 'vertical' },
+      tabStop: { type: 'boolean', default: true } });
     const label = def.state.string('label', ''); const description = def.state.string('description', '');
     const role = def.state.string('role', 'document');
     const focus = asFocusable(); focus.configure({ disabled: false });
@@ -60,6 +61,8 @@ export default definePrototype<Props>({
       label.set(props.label ?? '', 'reason: scroll region name'); if (epoch !== ticket || disposed) return;
       description.set(props.description ?? '', 'reason: scroll region description'); if (epoch !== ticket || disposed) return;
       role.set(props.role ?? 'document', 'reason: scroll region role'); if (epoch !== ticket || disposed) return;
+      focus.setNavParticipation(props.tabStop === false ? 'none' : 'auto');
+      if (epoch !== ticket || disposed) return;
       axes = props.axes === 'horizontal' ? 'horizontal' : props.axes === 'both' ? 'both' : 'vertical';
       if (axes === 'horizontal') scroll.sync({ axes: 'horizontal' });
       else if (axes === 'both') scroll.sync({ axes: 'both' });
@@ -71,7 +74,7 @@ export default definePrototype<Props>({
       if (attached) run.update();
     };
     def.lifecycle.onCreated(sync);
-    def.props.watch(['label', 'description', 'role', 'autoFocus', 'trapFocus', 'axes'], sync);
+    def.props.watch(['label', 'description', 'role', 'autoFocus', 'trapFocus', 'axes', 'tabStop'], sync);
     def.lifecycle.onMounted((run) => {
       if (disposed) return; attached = true; sync(run); const ticket = epoch;
       if (ticket !== epoch || !attached || disposed) return;

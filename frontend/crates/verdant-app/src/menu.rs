@@ -231,7 +231,7 @@ impl Editor {
 
     fn activate_menu_item(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(menu) = self.menu.as_mut().filter(|menu| menu.window == window.window_handle()) else { return; };
-        let Some((index, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
+        let Some((_, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
         match &item.command {
             Some(MenuCommand::Submenu(_)) => {},
             Some(MenuCommand::Editor(command)) => {
@@ -550,12 +550,12 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, _window: &Window, cx: &m
     let props = serde_json::json!({"mode":"menu", "label":"上下文菜单", "cursor":menu.selected,
         "expanded": expanded, "revision":revision, "autoFocus":true, "disabled":false});
     let draw_editor = cx.entity(); let snapshot = menu.clone(); let basis = revision.clone();
-    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, window: &mut Window, cx: &mut gpui::App| {
+    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, _window: &mut Window, _cx: &mut gpui::App| {
         let editor = draw_editor.clone(); let snapshot = snapshot.clone(); let basis = basis.clone(); let handle = handle.clone();
         let target = snapshot.native_scroll.clone();
         crate::proto_scroll::content("compiled-context-menu-scroll", "菜单选项", move |window, cx| {
             editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), window, cx).into_any_element())
-        }).native_scroll(target).into_any_element()
+        }).tab_stop(false).native_scroll(target).into_any_element()
     });
     let editor = cx.entity().downgrade();
     let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
@@ -586,7 +586,7 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, _window: &Window, cx: &m
 }
 
 fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_collection_control::CollectionControlHandle,
-    revision: String, window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
+    revision: String, window: &Window, _cx: &mut Context<Editor>) -> impl IntoElement {
 
     let th = ed.theme;
     let win = window.viewport_size();

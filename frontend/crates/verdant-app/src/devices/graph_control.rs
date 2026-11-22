@@ -108,9 +108,11 @@ fn drain(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window,cx:&mut
             "context"=>{
                 if payload.get("revision").and_then(Value::as_str)!=Some(target.revision().as_str()){continue;}
                 let Some(menu)=target.menu.clone()else{continue;};
+                let anchor=handle.owner.borrow().bounds.map(|bounds|bounds.bottom_left())
+                    .unwrap_or_else(||window.mouse_position());
                 let _=target.editor.update(cx,|ed,cx|{if target.current(ed,cx){
                     if let Control::Band(index)=target.point.control{select_band(ed,target.target.key,index);}
-                    let items=menu(ed,target.index);ed.show_menu(window.mouse_position(),items,window,cx);
+                    let items=menu(ed,target.index);ed.show_menu(anchor,items,window,cx);
                 }});
             },
             "exact"=>{

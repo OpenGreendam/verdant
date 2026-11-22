@@ -53,7 +53,7 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
         }
 
         // These are the actual rows stored in Shortcuts and rendered without
-        // filtering. Identity proves no help-only rows or omitted bindings;
+        // filtering. Identity proves no omitted action or compiled-input rows;
         // the displayed platform modifiers and chord delimiters are also exact.
         let rows = cheat_sheet(mac);
         assert_eq!(rows.len(), SHORTCUTS.len());
@@ -80,7 +80,25 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
         "Editor root must install the WorkflowShortcut dispatcher");
     let track = verdant_domain::TrackId::generate();
     for shortcut in SHORTCUTS {
-        let action = (shortcut.action)();
+        let action = match shortcut.target {
+            ShortcutTarget::Application(action) => action(),
+            ShortcutTarget::CompiledText(command) => {
+                // This is a source/native intrinsic, so installing an orphan
+                // GPUI action would intercept the actual TextControl route.
+                // proto_text's native registry test exercises every variant
+                // below with the application's real bindings installed.
+                assert!(matches!(shortcut.scope, Scope::Text | Scope::Lyric));
+                let expected = match command {
+                    TextCommand::Submit => "enter", TextCommand::Advance => "tab", TextCommand::Retreat => "shift-tab",
+                    TextCommand::Cancel => "escape", TextCommand::Undo => "secondary-z", TextCommand::Space => "space",
+                    TextCommand::Backspace => "backspace", TextCommand::Delete => "delete", TextCommand::Left => "left",
+                    TextCommand::Right => "right", TextCommand::SelectLeft => "shift-left", TextCommand::SelectRight => "shift-right",
+                    TextCommand::Home => "home", TextCommand::End => "end", TextCommand::SelectAll => "secondary-a", TextCommand::Paste => "secondary-v",
+                };
+                assert_eq!(shortcut.keys, expected, "compiled input command must describe its actual key");
+                continue;
+            }
+        };
         if let Some(workflow) = action.as_any().downcast_ref::<WorkflowShortcut>() {
             // Calling the exhaustive resolver also covers every bound enum
             // value, including all concrete score formats and part operations.

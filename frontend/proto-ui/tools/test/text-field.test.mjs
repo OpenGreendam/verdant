@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -6,6 +9,22 @@ import test from 'node:test';
 
 const upstream = process.env.PROTO_UI_UPSTREAM;
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+test('vendored Base Input preserves the exact recorded official source', () => {
+  const directory = path.join(repository, 'frontend/proto-ui/src/upstream-input');
+  const record = JSON.parse(readFileSync(path.join(directory, 'provenance.json'), 'utf8'));
+  assert.equal(record.repository, 'https://github.com/Proto-UI/Proto-UI');
+  assert.match(record.revision, /^[0-9a-f]{40}$/);
+  assert.deepEqual(record.files.map(file => file.path), ['root.proto.ts', 'types.ts']);
+  for (const file of record.files) {
+    const bytes = readFileSync(path.join(directory, file.path));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
+    assert.equal(file.upstreamPath, `packages/prototypes/base/src/input/${file.path}`);
+    if (upstream) assert.deepEqual(bytes, execFileSync('git', ['show', `${record.revision}:${file.upstreamPath}`], { cwd: upstream }));
+  }
+  const entry = readFileSync(path.join(repository, 'frontend/proto-ui/src/text-field.proto.ts'), 'utf8');
+  assert.match(entry, /const inherited = asInputRoot\(\)/);
+  assert.doesNotMatch(entry, /asInputEditor/);
+});
 let prototype, createRuntimeSession, caps, dom;
 if (upstream) {
   const require = createRequire(path.join(upstream, 'package.json'));

@@ -580,7 +580,7 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, _cx: &mut Contex
                 ed.focus_dialog = focus.clone();
                 native_modal_dialog_layer(ed, &cx.entity(), handle.clone(), basis.clone(), &scroll, cx).unwrap_or_else(|| div().into_any_element())
             })
-        }).native_scroll(target).into_any_element()
+        }).tab_stop(false).native_scroll(target).into_any_element()
     });
     let editor = entity.downgrade();
     let response = std::rc::Rc::new(move |index: usize, window: &mut Window, cx: &mut gpui::App| {

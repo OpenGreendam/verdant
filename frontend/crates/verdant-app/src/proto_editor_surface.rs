@@ -23,11 +23,15 @@ struct Contact {
 }
 impl Global for Contacts {}
 #[derive(Default)]
-struct AudioSurfaces { inputs: HashMap<(EntityId, String), (gpui::AnyWindowHandle, Input)> }
-impl Global for AudioSurfaces {}
+struct Surfaces { inputs: HashMap<(EntityId, String), (gpui::AnyWindowHandle, Input)> }
+impl Global for Surfaces {}
 
 pub(crate) fn has_contact(editor:EntityId,cx:&App)->bool {
     cx.try_global::<Contacts>().is_some_and(|contacts|contacts.active.contains_key(&editor))
+}
+#[cfg(test)]
+pub(crate) fn source_state(editor:EntityId,key:&str,name:&str,cx:&App)->Option<Value> {
+    cx.try_global::<Surfaces>()?.inputs.get(&(editor,key.to_owned()))?.1.handle.state(name).ok()
 }
 
 #[derive(Clone)]
@@ -79,6 +83,10 @@ impl Input {
         self.contact(window, cx).is_some_and(|contact|
             contact.pointer == pointer(PointerId::Mouse)
                 && contact.capture.as_ref().is_some_and(|capture| capture.is_current(window, cx)))
+    }
+    pub(crate) fn contact_current(&self, window:&Window, cx:&App)->bool {
+        self.contact(window,cx).is_some_and(|contact| contact.pointer!=pointer(PointerId::Mouse)
+            || contact.capture.as_ref().is_some_and(|capture|capture.is_current(window,cx)))
     }
     fn set_touch_start(&self, start: gpui::Point<gpui::Pixels>, window: &Window, cx: &mut App) {
         if !self.owns(window, cx) { return; }
@@ -193,9 +201,76 @@ struct Cancellation { pointer: String, revision: String, lease: f64 }
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Wheel { pub kind:String,pub x:f64,pub y:f64,pub amount:f64 }
+pub(crate) struct Navigation { pub kind:String,pub x:f64,pub y:f64,pub scale:f64,pub exponent:f64 }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GestureIntent { pub kind: String, pub selection: String, pub snap: bool }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct MotionIntent { pub kind: String, pub snap: bool, pub fine: f64, pub axis: String, pub move_x: bool, pub move_y: bool }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EdgePan { pub position: f64, pub delta: f64, pub active: bool }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RulerSample { pub position: f64, pub delta: f64, pub active: bool, pub snap: bool, pub accepted: bool }
+impl Navigation {
+    fn decode(value: Value) -> Option<Self> {
+        let value: Self = serde_json::from_value(value).ok()?;
+        (value.x.is_finite() && value.y.is_finite() && value.scale.is_finite()
+            && value.scale > 0. && value.exponent.is_finite()
+            && matches!(value.kind.as_str(), "pan" | "zoom-x" | "zoom-y")).then_some(value)
+    }
+    /// Project an accepted navigation intent onto the music-space viewport.
+    /// Sensitivity, axis and command step are supplied by the authored source.
+    pub(crate) fn apply(&self, viewport: &mut verdant_session::Viewport, anchor: (f64, f64)) -> bool {
+        let scale = self.scale.powf(self.exponent);
+        if !scale.is_finite() || scale <= 0. || !anchor.0.is_finite() || !anchor.1.is_finite() { return false; }
+        match self.kind.as_str() {
+            "zoom-x" => viewport.zoom_x_at(anchor.0, scale),
+            "zoom-y" => viewport.zoom_y_at(anchor.1, scale),
+            "pan" => viewport.pan_px(self.x, self.y),
+            _ => return false,
+        }
+        true
+    }
+}
 impl Input {
-    pub(crate) fn wheel(&self,delta:gpui::ScrollDelta,mods:gpui::Modifiers,arrange:bool,window:&mut Window,cx:&mut App)->Option<Wheel> {
+    /// Native hit testing supplies facts. Operation choice and its lifetime
+    /// are authored; this returns only the current source-owned operation.
+    pub(crate) fn intent(&self, editor: &Editor, method: &str, args: Vec<Value>, window: &mut Window, cx: &mut App) -> Option<GestureIntent> {
+        if authority(editor) != self.target.borrow().revision || editor.menu.is_some()
+            || editor.text_prompt.is_some() || editor.modal_dialog.is_some() { return None; }
+        let value = self.handle.call(method, args, window, cx).ok()?;
+        let intent: GestureIntent = serde_json::from_value(value).ok()?;
+        if intent.kind == "none" || !matches!(intent.selection.as_str(), "none" | "replace" | "extend" | "toggle" | "keep" | "clear")
+            || self.handle.state("operation").ok().as_ref().and_then(Value::as_str) != Some(intent.kind.as_str()) { return None; }
+        Some(intent)
+    }
+    pub(crate) fn motion(&self, editor: &Editor, x: f64, y: f64, modifiers: gpui::Modifiers, window: &mut Window, cx: &mut App) -> Option<MotionIntent> {
+        if authority(editor) != self.target.borrow().revision || !x.is_finite() || !y.is_finite()
+            || editor.menu.is_some() || editor.text_prompt.is_some() || editor.modal_dialog.is_some() { return None; }
+        let value = self.handle.call("motion", vec![x.into(), y.into(), modifiers.shift.into(), modifiers.alt.into()], window, cx).ok()?;
+        let intent: MotionIntent = serde_json::from_value(value).ok()?;
+        if intent.kind == "none" || !intent.fine.is_finite() || intent.fine <= 0. || !matches!(intent.axis.as_str(), "" | "x" | "y")
+            || self.handle.state("operation").ok().as_ref().and_then(Value::as_str) != Some(intent.kind.as_str()) { return None; }
+        Some(intent)
+    }
+    pub(crate) fn edge_pan(&self, editor: &Editor, x: f64, width: f64, window: &mut Window, cx: &mut App) -> Option<EdgePan> {
+        if authority(editor) != self.target.borrow().revision || !x.is_finite() || !width.is_finite() { return None; }
+        let value = self.handle.call("edgePan", vec![x.into(), width.into()], window, cx).ok()?;
+        let intent: EdgePan = serde_json::from_value(value).ok()?;
+        (intent.position.is_finite() && intent.delta.is_finite()).then_some(intent)
+    }
+    pub(crate) fn ruler_sample(&self, editor:&Editor, position:f64, outside:f64, elapsed:f64,
+        window:&mut Window,cx:&mut App)->Option<RulerSample> {
+        if authority(editor)!=self.target.borrow().revision || !self.owns(window,cx)
+            || !position.is_finite() || !outside.is_finite() || !elapsed.is_finite() {return None;}
+        let value=self.handle.call("rulerSample",vec![position.into(),outside.into(),elapsed.into()],window,cx).ok()?;
+        let intent:RulerSample=serde_json::from_value(value).ok()?;
+        (intent.accepted&&intent.position.is_finite()&&intent.delta.is_finite()).then_some(intent)
+    }
+    pub(crate) fn wheel(&self,delta:gpui::ScrollDelta,mods:gpui::Modifiers,arrange:bool,window:&mut Window,cx:&mut App)->Option<Navigation> {
         if !self.valid(cx) { return None; }
         let (x,y)=match delta {
             gpui::ScrollDelta::Pixels(p)=>(f64::from(p.x),f64::from(p.y)),
@@ -203,12 +278,13 @@ impl Input {
         };
         let result=self.handle.call("wheel",vec![x.into(),y.into(),(mods.control||mods.platform).into(),mods.shift.into(),mods.alt.into(),arrange.into()],window,cx).ok()?;
         self.drain(window,cx);
-        let value:Wheel=serde_json::from_value(result).ok()?;
-        if !value.x.is_finite()||!value.y.is_finite()||!value.amount.is_finite()||!matches!(value.kind.as_str(),"pan"|"zoom-x"|"zoom-y") {return None;}
-        Some(value)
+        Navigation::decode(result)
     }
-    pub(crate) fn pinch(&self,scale:f64,window:&mut Window,cx:&mut App)->bool {
-        self.valid(cx)&&self.call("pinch",vec![scale.into()],window,cx)
+    pub(crate) fn pinch(&self,scale:f64,window:&mut Window,cx:&mut App)->Option<Navigation> {
+        if !self.valid(cx) || !scale.is_finite() { return None; }
+        let result = self.handle.call("pinch",vec![scale.into()],window,cx).ok()?;
+        self.drain(window,cx);
+        Navigation::decode(result)
     }
 }
 
@@ -233,9 +309,9 @@ impl Drop for Mount {
     fn drop(&mut self) {
         let input=self.input.clone(); let handle=self.window; let audio_key = self.audio_key.clone();
         self.app.spawn(async move |cx| { let _=cx.update(|cx| {
-            if let Some(key) = audio_key && let Some(registry) = cx.try_global::<AudioSurfaces>()
+            if let Some(key) = audio_key && let Some(registry) = cx.try_global::<Surfaces>()
                 && registry.inputs.get(&key).is_some_and(|(_, current)| current.owner == input.owner) {
-                cx.global_mut::<AudioSurfaces>().inputs.remove(&key);
+                cx.global_mut::<Surfaces>().inputs.remove(&key);
             }
             let _=handle.update(cx,|_,window,cx| {
                 if input.owns(window,cx) {
@@ -250,8 +326,9 @@ impl Drop for Mount {
 /// meaning and retires the contact; the caller clears its domain previews.
 pub(crate) fn audio_key(editor: &Editor, editor_id: EntityId, event: &gpui::KeyDownEvent,
     window: &mut Window, cx: &mut App) -> Option<(String, bool)> {
-    let registry = cx.try_global::<AudioSurfaces>()?;
-    let focused = registry.inputs.iter().find(|((id, _), (host, input))| *id == editor_id
+    let registry = cx.try_global::<Surfaces>()?;
+    let focused = registry.inputs.iter().find(|((id, key), (host, input))| *id == editor_id
+        && matches!(key.as_str(), "arrangement" | "ruler-true")
         && *host == window.window_handle() && input.handle.state("focused").ok() == Some(Value::Bool(true)));
     let input = focused.or_else(|| editor.focus_arrange.is_focused(window).then(||
         registry.inputs.iter().find(|((id, key), (host, _))| *id == editor_id && key == "arrangement"
@@ -267,6 +344,26 @@ pub(crate) fn audio_key(editor: &Editor, editor_id: EntityId, event: &gpui::KeyD
     let command = result.ok().and_then(|value| value.as_str().map(str::to_owned)).unwrap_or_default();
     if !matches!(command.as_str(), "" | "delete" | "ripple-delete" | "split" | "select-all" | "join" | "range-tool" | "select-tool" | "escape") { return None; }
     (!command.is_empty() || retired).then_some((command, retired))
+}
+
+/// A toolbar activation or remappable application keyboard action requests
+/// the same source navigation used by physical wheels and pinches. The caller
+/// already holds Editor, so this path never reborrows it or drains callbacks.
+pub(crate) fn zoom(editor: &mut Editor, arrange: bool, command: &str, window: &mut Window, cx: &mut Context<Editor>) {
+    if editor.menu.is_some() || editor.text_prompt.is_some() || editor.modal_dialog.is_some() { return; }
+    let keys = if arrange { ["arrangement", "ruler-true"] } else { ["piano-roll", "ruler-false"] };
+    let input = cx.try_global::<Surfaces>().and_then(|surfaces| keys.iter().find_map(|key|
+        surfaces.inputs.get(&(cx.entity_id(), (*key).to_owned()))
+            .filter(|(host, _)| *host == window.window_handle()).map(|(_, input)| input.clone())));
+    let Some(input) = input else { return; };
+    if input.target.borrow().revision != authority(editor) { return; }
+    let result = input.handle.call("navigate", vec![command.into(), 0.into(), 0.into(), 1.into(),
+        false.into(), false.into(), false.into(), arrange.into()], window, cx);
+    let Some(intent) = result.ok().and_then(Navigation::decode) else { return; };
+    let viewport = if arrange { &mut editor.arrange } else { &mut editor.session.viewport };
+    if intent.apply(viewport, (viewport.width * 0.5, viewport.height * 0.5)) {
+        editor.notify_viewport(if arrange { crate::clock::Space::Arrange } else { crate::clock::Space::Editor }, cx);
+    }
 }
 
 /// Retire the compiled contact while Editor is already borrowed by a domain
@@ -302,7 +399,7 @@ impl RenderOnce for Surface {
         let disabled = editor.menu.is_some() || editor.text_prompt.is_some() || editor.modal_dialog.is_some();
         let props = json!({ "revision": revision, "label": self.label, "threshold": self.threshold, "disabled": disabled,
             "commands": if self.audio_keys { "audio" } else { "none" } });
-        let audio_key = self.audio_keys.then(|| (self.editor.entity_id(), self.key.clone()));
+        let audio_key = Some((self.editor.entity_id(), self.key.clone()));
         let initial_audio_key = audio_key.clone();
         let initial_props = props.clone();
         let initial_target = target.clone();
@@ -336,8 +433,8 @@ impl RenderOnce for Surface {
             }
             *mount.input.target.borrow_mut() = target;
             if let Some(key) = audio_key {
-                if cx.try_global::<AudioSurfaces>().is_none() { cx.set_global(AudioSurfaces::default()); }
-                cx.global_mut::<AudioSurfaces>().inputs.insert(key.clone(), (window.window_handle(), mount.input.clone()));
+                if cx.try_global::<Surfaces>().is_none() { cx.set_global(Surfaces::default()); }
+                cx.global_mut::<Surfaces>().inputs.insert(key.clone(), (window.window_handle(), mount.input.clone()));
                 mount.audio_key = Some(key);
             }
             mount.drawing.update(cx, |drawing, cx| { drawing.draw = self.draw; cx.notify(); });
@@ -558,10 +655,12 @@ mod contact_tests {
                 }), cx);
             };
             touch(gpui::TouchPhase::Started, point(px(20.), px(20.)), window, cx);
-            assert_eq!(&*host.phases.borrow(), &["begin"]);
+            let started=host.phases.borrow().clone();
+            assert_eq!(started.first(),Some(&"begin"));
+            assert!(started.iter().all(|phase|matches!(*phase,"begin"|"sample")));
             assert!(window.captured_hitbox().is_none());
             up(window, cx);
-            assert_eq!(&*host.phases.borrow(), &["begin"]);
+            assert_eq!(&*host.phases.borrow(), &started, "rival mouse release cannot sample or finish the touch lease");
             touch(gpui::TouchPhase::Moved, point(px(80.), px(30.)), window, cx);
             touch(gpui::TouchPhase::Ended, point(px(100.), px(30.)), window, cx);
             assert_eq!(host.phases.borrow().iter().filter(|phase| **phase == "finish").count(), 1);

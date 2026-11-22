@@ -203,7 +203,7 @@ impl Render for HistoryPanel {
                     uniform_list("history-rows", count + 1, move |range, _, cx| {
                         panel.update(cx, |view, cx| view.rows(range, &collection, &revision, cx))
                     }).track_scroll(&scroll).size_full().into_any_element()
-                }).native_scroll(view.native_scroll.clone()).into_any_element()
+                }).tab_stop(false).native_scroll(view.native_scroll.clone()).into_any_element()
             })
         });
         let panel = cx.entity().downgrade();

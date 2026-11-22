@@ -163,7 +163,7 @@ impl Disclosures {
 }
 
 impl Render for Disclosures {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let locale = i18n::current(cx); let semantics = Surface::Disclosures.semantics(locale);
         let props = serde_json::json!({"label":semantics.label, "description":semantics.description, "role":"document", "autoFocus":true});
         let entity = cx.entity();

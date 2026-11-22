@@ -77,7 +77,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --recover-publication
 
 ## 准入与证据
 
-首轮修复的历史版本和当时尚未完成的范围见 [首轮验收记录](VALIDATION-2026-11-22.md)。本次完成结果、历史失败和证据边界见 [后续修复验收](VALIDATION-COMPLETION-2026-11-22.md)。下方结果固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。后续文档提交不会改写这批证据，最新检查状态见 [PR #5](https://github.com/OpenGreendam/verdant/pull/5)。
+PR #5 首轮修复的历史版本和当时尚未完成的范围见 [首轮验收记录](VALIDATION-2026-11-22.md)，该轮后续修复结果见 [历史修复验收](VALIDATION-COMPLETION-2026-11-22.md)。下方历史结果固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。它们不证明后来新增的控件已通过。全部控件迁移的入口、职责与验收范围见 [迁移清单](CONTROL-MIGRATION.md)，运行结果必须绑定对应提交的 CI Checks。
 
 TOML admission 使用 parser，按实际 `package` 名检查普通/build/dev 和 target-specific 的所有依赖表，支持 alias、子表、多行和注释。它检查声明；另一个门禁调用完整 `cargo metadata --locked --all-features`，沿全部 workspace members 的 resolve graph 检查 GPUI package ID/source/rev 和唯一 SDK，同时按实际 workspace/manifest 身份追踪 session 的所有可达边，拒绝原生组件、GPUI、SDK 和图像支持。两个 data crate 必须可达且没有依赖；不能改个包名躲过路径核验。`--no-deps` 或扫描 Cargo.lock 字符串不能替代这一检查。
 
@@ -88,11 +88,7 @@ PROTO_UI_UPSTREAM="$PWD/../Proto-UI" corepack pnpm@10.32.1 --dir frontend/proto-
 node frontend/proto-ui/tools/check-cargo-gpui.mjs --offline
 
 (cd frontend && cargo test --locked -p verdant-ui-protocol -p verdant-session)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui host_pointer::tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui proto_knob::tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui devices::native_tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui roll::native_tests)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui pointer_boundary_tests)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui)
 ```
 
 离线 Cargo graph 检查前，需要在 `frontend/` 中执行过 `cargo fetch --locked`。Rust 测试进入该目录执行，使 rustup 采用其中的固定工具链。
