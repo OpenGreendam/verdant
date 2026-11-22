@@ -233,11 +233,12 @@ stop 不得静默丢失，换入和旧 buffer 回收须遵守实时边界。设�
 ### 13.1 控件源码与卷帘声明
 
 控件和命令表由 `frontend/crates/verdant-app/src/generated/controls.rs` 的检入 Rust 源码实现。
-`frontend/proto-ui/src/pitch-gesture-surface.proto.ts` 声明卷帘投影及移动、复制、调整长度与框选的状态转换。上游编译入口位于 `frontend/proto-ui/`，按该目录的 `compiler.pin.json` 编译。Rust 会话调用该声明编译出的数据方法，负责守卫判断与领域副作用。
+`frontend/proto-ui/src/pitch-gesture-surface.proto.ts` 只声明尺寸、裁剪与 slot 根；卷帘绘图、音乐坐标和领域预览保留在 Rust 宿主。`note-gesture-planner.proto.ts` 声明移动、复制、调整长度与框选的决策，`control-gesture-planner.proto.ts` 声明连续参数决策和归一化拖动计算；二者生成只依赖标准库的类型化 Rust crate，由 `verdant-ui-protocol` 适配后供 session 使用，不依赖 GPUI 或 native SDK。
+`normalized-knob.proto.ts` 是本次完整的有状态组件切片，声明值、phase、props 同步、取消、键盘、焦点和 Slider 辅助功能契约；Adwaita 绘图、参数单位、实时目标校验和领域提交留在 Rust。pitch 与 normalized knob 共用一个 native SDK；两个 data planner 不使用该 SDK。
 
 ### 13.2 编译阶段
 
-上游 Proto UI 编译器检查卷帘声明并生成 Rust。生成物保留 source map 与来源记录，Rust 宿主通过具名接口调用生成的投影与数据方法。详细输入和证据范围见[编译规格](spec/SPEC.md)。
+上游编译入口位于 `frontend/proto-ui/`，按 `compiler.pin.json` 固定 compiler、目标、工具链和完整依赖身份。`gpui-source-v1` 发射原生组件与 source map；`rust-data-v1` 发射稳定命名、零 Cargo 依赖的类型化决策 crate。生成制品与完整来源闭包由 provenance 和 receipt 绑定，不能手改生成 Rust。新鲜编译检查与保留制品检查分别记录，详细输入和证据范围见[编译规格](spec/SPEC.md)及[集成说明](frontend/proto-ui/README.md)。
 
 ### 13.3 上游 GPUI 实验
 
