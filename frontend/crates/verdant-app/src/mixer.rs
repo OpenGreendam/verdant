@@ -960,3 +960,76 @@ mod pointer_boundary_tests {
         } }
     }
 }
+
+
+#[cfg(test)]
+mod escape_route_tests {
+    use super::*;
+    use gpui::{AppContext, TestAppContext, size};
+    use verdant_continuous_control::{ContinuousControlHandle, native::gpui_native_owner::resolved};
+
+    #[gpui::test]
+    fn native_editor_escape_cancels_mixer_contact_before_late_release(cx: &mut TestAppContext) {
+        for master in [false, true] {
+            // The actual Editor keymap resolves Escape before a raw key.down
+            // handler. A bare scalar cannot exercise that application route.
+            let window = cx.open_window(size(px(1300.0), px(900.0)), |window, cx| {
+                let bindings = crate::shortcuts::bindings(cx);
+                cx.bind_keys(bindings);
+                let mut editor = Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx);
+                editor.bottom = crate::editor::Bottom::Mixer;
+                editor.needs_fit = false;
+                editor
+            });
+            cx.update_window(window.into(), |_, window, _| window.activate_window()).unwrap();
+            crate::native_test_support::frames(window, cx);
+            let initial_revision = window.update(cx, |editor, _, _| editor.revision().get()).unwrap();
+            let (handle, accepted, start) = cx.update_window(window.into(), |_, window, cx| {
+                let label = if master { "主声像" } else { "轨道声像" };
+                let owner = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                    let owner = owner.borrow();
+                    owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                        && owner.props.get("label").and_then(serde_json::Value::as_str) == Some(label)
+                }).expect("actual Mixer renders its compiled pan control");
+                let handle = ContinuousControlHandle { owner };
+                let accepted = handle.state("value").unwrap().as_f64().unwrap();
+                let start = handle.owner.borrow().bounds.expect("mounted pan bounds").center();
+                window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                    position: start, button: MouseButton::Left, ..Default::default()
+                }), cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: start + point(px(22.0), px(0.0)),
+                    pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                assert_eq!(handle.state("phase").unwrap(), serde_json::json!("dragging"));
+                assert_ne!(handle.state("value").unwrap().as_f64(), Some(accepted));
+                assert!(window.captured_hitbox().is_some());
+                (handle, accepted, start)
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |editor, _, _| {
+                assert!(editor.has_proto_pointer_contact());
+                assert!(if master { editor.master_drag.is_some() } else { editor.mixer_drag.is_some() });
+                assert_eq!(editor.revision().get(), initial_revision, "preview never writes the project");
+            }).unwrap();
+            cx.simulate_keystrokes(window.into(), "escape");
+            crate::native_test_support::frames(window, cx);
+            cx.update_window(window.into(), |_, window, cx| {
+                assert_eq!(handle.state("phase").unwrap(), serde_json::json!("idle"),
+                    "production Mixer Escape must cancel the authored interaction; contexts={:?}", window.context_stack());
+                assert_eq!(handle.state("value").unwrap().as_f64(), Some(accepted));
+                assert_eq!(resolved(&handle.owner.borrow().accessible_states["valueNow"]).num(), accepted);
+                assert!(window.captured_hitbox().is_none(), "cancel releases its owned capture before MouseUp");
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: start + point(px(22.0), px(0.0)), button: MouseButton::Left, ..Default::default()
+                }), cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |editor, _, _| {
+                assert!(editor.mixer_drag.is_none() && editor.master_drag.is_none());
+                assert!(!editor.has_proto_pointer_contact());
+                assert_eq!(editor.revision().get(), initial_revision, "Escape and late MouseUp cannot commit");
+            }).unwrap();
+        }
+    }
+}
