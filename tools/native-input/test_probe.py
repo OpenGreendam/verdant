@@ -33,7 +33,30 @@ class TextFocusObserved(Exception):
     """Stop after the actual selector and focus predicate accept a native node."""
 
 
+class CollectionEntrySelected(Exception):
+    """Stop before clicking the observed library entry in the native window."""
+
+
 class ProbeHelpers(unittest.TestCase):
+    def test_collection_entry_uses_the_native_push_button_in_its_own_window(self):
+        main, other = [':1.3', '/frame/0'], [':1.3', '/frame/1']
+        selected = {'reference': [':1.3', '/library'], 'name': '预设库',
+                    'role': 'push button', 'roleNumber': 43, 'windowReference': main}
+        snapshot = {'nodes': [selected,
+            {**selected, 'reference': [':1.3', '/other/library'], 'windowReference': other},
+            {**selected, 'reference': [':1.3', '/generic'], 'role': 'button'},
+        ]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = main
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        probe.persisted = lambda: {'revision': 2}
+        probe.click = Mock(side_effect=CollectionEntrySelected)
+        with self.assertRaises(CollectionEntrySelected):
+            probe.collection_scroll_cancel()
+        probe.click.assert_called_once_with(selected)
+
     def test_text_journey_selects_the_native_push_button_after_tab(self):
         frame = [':1.3', '/frame/0']
         field = {'reference': [':1.3', '/input'], 'name': '输入文字…', 'role': 'entry',

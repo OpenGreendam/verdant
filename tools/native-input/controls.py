@@ -158,7 +158,7 @@ class ControlCases:
 
     def collection_scroll_cancel(self):
         before = self.persisted()
-        self.click(self.node("预设库", "button"))
+        self.click(self.node("预设库", "push button"))
         def frames():
             return [node for node in self.snapshot()["nodes"]
                     if node["role"] in ("frame", "window") and node["name"] == LIBRARY_TITLE]
