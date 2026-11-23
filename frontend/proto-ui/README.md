@@ -127,8 +127,8 @@ Rust 各 crate 的数量是 Linux 总数中的子集，不重复相加。macOS/W
 
 以下链接固定到本次 compiler pin；实验性目标的能力不能从当前 main 或旧 source audit 推断。
 
-- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/compiler/README.md)
-- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/compiler/src/compile.ts)
-- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/compiler/src/rust-data.ts)
-- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/internal/compiler/gpui-accessibility-value.md)
-- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/prototypes/base/src/slider/root.proto.ts)
+- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/35a2769d718e7764c1654b88394f3e005d1e5315/packages/compiler/README.md)
+- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/35a2769d718e7764c1654b88394f3e005d1e5315/packages/compiler/src/compile.ts)
+- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/35a2769d718e7764c1654b88394f3e005d1e5315/packages/compiler/src/rust-data.ts)
+- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/35a2769d718e7764c1654b88394f3e005d1e5315/internal/compiler/gpui-accessibility-value.md)
+- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/35a2769d718e7764c1654b88394f3e005d1e5315/packages/prototypes/base/src/slider/root.proto.ts)
