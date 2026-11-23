@@ -52,7 +52,8 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
             ("分割","在播放头或选区边界切分",AudioUiAction::Split,false),
             ("片段 ▾","剪切、淡化、变速与合并",AudioUiAction::Menu,false),
         ].into_iter().map(|(label,description,action,selected)|crate::proto_controls::action(SharedString::from(format!("audio-tool-{label}")),description)
-            .authority(format!("{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision())).aria_selected(selected)
+            .authority(format!("{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision()))
+            .when(matches!(action,AudioUiAction::SelectTool|AudioUiAction::RangeTool),|button|button.aria_selected(selected))
             .h(px(26.0)).px(px(9.0)).flex().items_center().rounded(px(6.0)).cursor_pointer()
             .bg(if selected{th.control}else{th.surface}).hover(move|style|style.bg(th.hover))
             .child(label).on_click(cx.listener(move|ed,_,window,cx|{

@@ -26,6 +26,8 @@ export default definePrototype<Props>({
     const key = (name: string, shift: boolean): boolean => {
       if (!attached || disposed) return false;
       if (name === 'Tab') { if (!scope.isActive()) return false; if (shift) scope.focusPrev(); else scope.focusNext(); return true; }
+      // A horizontal document leaves vertical arrows to its surrounding content.
+      if (axes === 'horizontal' && (name === 'ArrowUp' || name === 'ArrowDown')) return false;
       const horizontal = axes === 'horizontal' || (axes === 'both' && shift);
       if ((name === 'ArrowLeft' || name === 'ArrowRight') && axes !== 'vertical') {
         scroll.request({ kind: 'by', axis: 'horizontal', delta: name === 'ArrowLeft' ? -40 : 40 }); return true;
@@ -63,7 +65,12 @@ export default definePrototype<Props>({
       return true;
     });
     def.expose.method('focusSelf', () => { if (attached && !disposed) focus.focusSelf(); });
-    def.event.on('key.down', (_run, event) => { if (keyInput(event.key ?? '', event.shiftKey === true, event.ctrlKey === true || event.metaKey === true, event.altKey === true)) event.control.requestDefaultActionPrevention(); });
+    def.event.on('key.down', (_run, event) => {
+      // Native descendants own their editing keys. The explicit keyInput
+      // method remains the host's fallback after a child leaves a key free.
+      if (!focus.focused.get()) return;
+      if (keyInput(event.key ?? '', event.shiftKey === true, event.ctrlKey === true || event.metaKey === true, event.altKey === true)) event.control.requestDefaultActionPrevention();
+    });
     const sync = (run: RunHandle<Props>) => {
       if (disposed) return; const ticket = ++epoch; const props = run.props.get();
       axes = props.axes === 'horizontal' || props.axes === 'both' ? props.axes : 'vertical';
@@ -90,8 +97,9 @@ export default definePrototype<Props>({
       if (ticket !== epoch || !attached || disposed) return;
       if (run.props.get().autoFocus) focus.focusSelf();
     });
-    def.lifecycle.onUnmounted(() => { ++epoch; attached = false; if (scope.isActive()) scope.deactivate(); });
-    def.lifecycle.onBeforeDispose(() => { ++epoch; attached = false; disposed = true; });
+    // Also clear the observed active fact when the scope root itself had focus.
+    def.lifecycle.onUnmounted(() => { ++epoch; attached = false; scope.deactivate(); });
+    def.lifecycle.onBeforeDispose(() => { ++epoch; attached = false; disposed = true; scope.deactivate(); });
     def.feedback.style.use(tw('w-full h-full min-h-0'));
     return renderer => renderer.slot();
   },

@@ -551,6 +551,65 @@ mod tests {
         }).unwrap();
     }
 
+    #[gpui::test]
+    fn native_text_registry_commands_reach_the_compiled_editor_with_application_bindings_installed(cx: &mut TestAppContext) {
+        use crate::shortcuts::TextCommand as C;
+        cx.update(|cx| { let bindings = crate::shortcuts::bindings(cx); cx.bind_keys(bindings); });
+        for (command, keys) in crate::shortcuts::compiled_text_shortcuts() {
+            let window = open(cx, "abcd", false);
+            window.update(cx, |host, window, cx| {
+                host.field.update(cx, |field, cx| {
+                    assert!(field.invoke("selectRange", vec![2.into(), 2.into()], window, cx));
+                });
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string("paste".into()));
+                host.events.clear();
+            }).unwrap();
+            frames(window, cx);
+            if matches!(command, C::Undo | C::Redo) {
+                cx.simulate_input(window.into(), "x"); frames(window, cx);
+                window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "abxcd")).unwrap();
+                if command == C::Redo {
+                    cx.simulate_keystrokes(window.into(), "secondary-z"); frames(window, cx);
+                    window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "abcd")).unwrap();
+                }
+            }
+            cx.simulate_keystrokes(window.into(), keys);
+            frames(window, cx);
+            if matches!(command, C::Undo | C::Redo | C::Left | C::Right | C::SelectLeft | C::SelectRight | C::Home | C::End | C::SelectAll) {
+                // Observe the actual caret/selection through subsequent OS
+                // text input, without inspecting private editor state.
+                cx.simulate_input(window.into(), "!"); frames(window, cx);
+            }
+            window.update(cx, |host, _, cx| {
+                let field = host.field.read(cx);
+                let value = field.value();
+                assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))), "{command:?}: source input failure");
+                assert_eq!(host.workspace_commands, 0, "{command:?}: a document action cannot shadow the compiled editor");
+                match command {
+                    C::Submit => assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Submit { value } if value == "abcd")).count(), 1),
+                    C::Advance | C::Retreat => assert_eq!(host.events.iter().filter(|event| matches!(event,
+                        Event::Advance { value, forward } if value == "abcd" && *forward == (command == C::Advance))).count(), 1),
+                    C::Cancel => assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Cancel)).count(), 1),
+                    C::Undo => assert_eq!(value, "ab!cd"),
+                    C::Redo => assert_eq!(value, "abx!cd"),
+                    C::Space => assert_eq!(value, "ab cd"),
+                    C::Backspace => assert_eq!(value, "acd"),
+                    C::Delete => assert_eq!(value, "abd"),
+                    C::Left => assert_eq!(value, "a!bcd"),
+                    C::Right => assert_eq!(value, "abc!d"),
+                    C::SelectLeft => assert_eq!(value, "a!cd"),
+                    C::SelectRight => assert_eq!(value, "ab!d"),
+                    C::Home => assert_eq!(value, "!abcd"),
+                    C::End => assert_eq!(value, "abcd!"),
+                    C::SelectAll => assert_eq!(value, "!"),
+                    C::Paste => assert_eq!(value, "abpastecd"),
+                }
+            }).unwrap();
+            window.update(cx, |_, window, _| window.remove_window()).unwrap();
+            cx.run_until_parked();
+        }
+    }
+
     struct SearchHarness {
         field: Entity<Field>, collection: Option<verdant_collection_control::CollectionControlHandle>,
         selected: usize, activations: usize, dismissals: usize, failures: Vec<String>,

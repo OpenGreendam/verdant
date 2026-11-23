@@ -109,9 +109,12 @@ fn note_exit_blur_detach_and_project_change_release_capture_before_up(cx: &mut T
             assert!(host.editor.read(cx).session.pointer_owner().is_some());
         }).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |_,window,cx| {
+        window.update(cx, |host,window,cx| {
             let source=editing_source(window);
             assert_eq!(source.state("focused").unwrap(),serde_json::json!(true),"roll owns focus before {reason}; native focus: {:?}",window.focused(cx));
+            assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","focused",cx),Some(serde_json::Value::Bool(true)), "accepted note contact physically focuses its authored source");
+            assert_eq!(crate::proto_editor_surface::source_native_snapshot(host.editor.entity_id(),"piano-roll",window,cx).as_ref().and_then(|value|value.get("physicalFocus")),Some(&serde_json::Value::Bool(true)),
+                "accepted note contact retains the actual native leaf focus");
         }).unwrap();
         window.update(cx, |host, window, cx| match reason {
             "exit" => { window.dispatch_event(gpui::PlatformInput::MouseExited(gpui::MouseExitEvent::default()), cx); }
@@ -130,6 +133,11 @@ fn note_exit_blur_detach_and_project_change_release_capture_before_up(cx: &mut T
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
             if reason == "blur" {
+                assert!(host.outside.is_focused(window),"the native focus transfer reaches the outside target");
+                assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","focused",cx),Some(serde_json::Value::Bool(false)),
+                    "blur updates the authored focus fact: {:?}",crate::proto_editor_surface::source_native_snapshot(host.editor.entity_id(),"piano-roll",window,cx));
+                assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","phase",cx),Some(serde_json::Value::String("idle".into())),
+                    "blur retires the authored contact before domain delivery");
                 let source=editing_source(window);
                 assert_eq!(source.state("focused").unwrap(), serde_json::json!(false), "physical roll blur; failures {:?}", source.take_failures());
                 assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"), "source roll blur; failures {:?}", source.take_failures());
@@ -188,6 +196,10 @@ fn note_mod_handle_blur_uses_the_same_cancel_executor(cx: &mut TestAppContext) {
     window.update(cx, |host, window, cx| window.focus(&host.outside, cx)).unwrap();
     crate::native_test_support::frames(window, cx);
     window.update(cx, |host, window, cx| {
+        assert!(host.outside.is_focused(window));
+        assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","focused",cx),Some(serde_json::Value::Bool(false)),
+            "modulation blur updates source focus: {:?}",crate::proto_editor_surface::source_native_snapshot(host.editor.entity_id(),"piano-roll",window,cx));
+        assert_eq!(crate::proto_editor_surface::source_state(host.editor.entity_id(),"piano-roll","phase",cx),Some(serde_json::Value::String("idle".into())));
         let source=editing_source(window);
         assert_eq!(source.state("focused").unwrap(), serde_json::json!(false), "physical modulation blur; failures {:?}", source.take_failures());
         assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"), "source modulation blur; failures {:?}", source.take_failures());
@@ -440,5 +452,24 @@ fn production_wheel_pinch_and_zoom_commands_use_the_compiled_navigation_intents(
             crate::proto_editor_surface::zoom(ed,false,"zoom-out",window,cx);
             assert!((ed.session.viewport.px_per_tick-initial.px_per_tick).abs()<1e-9);
         });
+    }).unwrap();
+}
+
+#[gpui::test]
+fn production_wheel_transport_preserves_source_shift_policy_for_pixels_and_lines(cx:&mut TestAppContext) {
+    let window=open(cx,false);
+    window.update(cx,|host,window,cx|{
+        let initial=Viewport{start_tick:2000.0,..host.editor.read(cx).session.viewport};
+        for delta in [ScrollDelta::Pixels(point(px(-40.),px(0.))),ScrollDelta::Pixels(point(px(0.),px(-40.))),
+            ScrollDelta::Lines(point(-1.,0.)),ScrollDelta::Lines(point(0.,-1.)),ScrollDelta::Pixels(point(px(-40.),px(80.)))] {
+            host.editor.update(cx,|ed,_|ed.session.viewport=initial);
+            window.dispatch_event(gpui::PlatformInput::Scroll(ScrollEvent{position:point(px(200.),px(90.)),delta,
+                modifiers:gpui::Modifiers{shift:true,..Default::default()},..Default::default()}),cx);
+            let current=host.editor.read(cx).session.viewport;
+            assert_eq!(current.start_tick,initial.start_tick+40./initial.px_per_tick);
+            assert_eq!(current.top_pitch,initial.top_pitch);
+            assert_eq!(current.px_per_tick,initial.px_per_tick);
+            assert_eq!(current.row_height,initial.row_height);
+        }
     }).unwrap();
 }

@@ -204,14 +204,15 @@ impl Render for HistoryPanel {
                 .into_any_element()
         });
         let panel = cx.entity().downgrade(); let basis = revision.clone();
-        let sink: crate::proto_collection::Sink = std::rc::Rc::new(move |name, payload, _, cx| {
-            if !matches!(name, "select" | "activate") || payload.get("revision").and_then(serde_json::Value::as_str) != Some(basis.as_str()) { return; }
-            let Some(position) = crate::proto_controls::source_index(payload.get("index")) else { return; };
-            if position > count { return; }
+        let sink: crate::proto_collection::Sink = std::rc::Rc::new(move |name, payload, window, cx| {
+            if !matches!(name, "select" | "activate" | "close") || payload.get("revision").and_then(serde_json::Value::as_str) != Some(basis.as_str()) { return; }
             let _ = panel.update(cx, |panel, cx| {
                 let Some(editor) = panel.editor.upgrade() else { return; };
                 let ed = editor.read(cx);
                 if ed.project().project_id != project_id || ed.document_generation != generation || ed.revision() != base { return; }
+                if name == "close" { window.remove_window(); return; }
+                let Some(position) = crate::proto_controls::source_index(payload.get("index")) else { return; };
+                if position > count { return; }
                 panel.selected = position;
                 if name == "activate" { editor.update(cx, |ed, cx| ed.jump_history(&project_id, base, position, cx)); }
                 cx.notify();
@@ -222,7 +223,9 @@ impl Render for HistoryPanel {
         }), vec![1;count + 1], draw, sink).scroll_engine(crate::proto_scroll::Engine::Uniform(self.scroll.clone()));
         div().id("undo-history").size_full().flex().flex_col().bg(th.surface).text_color(th.text).font_family(font)
             .child(div().p(px(12.0)).text_sm().child(format!("撤销历史 · {current}/{count}")))
-            .child(div().flex_1().min_h_0().child(collection))
+            .child(div().flex_1().min_h_0()
+                .aria_description("上下键选择历史状态，Home/End 到开头或末尾，Enter 或空格跳转。点击条目立即跳转。")
+                .child(collection))
             .child(div().p(px(12.0)).border_t_1().border_color(th.shade).text_xs().text_color(th.text_secondary)
                 .child("上下键选择，Home/End 到两端，Enter 或空格跳转。点击状态立即跳转；新编辑会清除后续历史。"))
             .into_any_element()

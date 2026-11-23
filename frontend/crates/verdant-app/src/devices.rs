@@ -1528,11 +1528,14 @@ mod native_tests {
     }
 
     fn hold_suite_knob(window: &mut Window, cx: &mut App) -> (verdant_normalized_knob::NormalizedKnobHandle, gpui::Point<Pixels>, serde_json::Value) {
-        let owner = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+        let mut owners = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().filter(|owner| {
             let owner = owner.borrow();
             owner.mounted && owner.window_id == Some(window.window_handle().window_id()) && owner.declared_events.contains("valueCommit")
+                && owner.declared_events.contains("exactValueRequested")
                 && owner.exposes.contains_key("value") && owner.exposes.contains_key("phase")
-        }).expect("the production compiled knob is mounted in this window");
+        });
+        let owner = owners.next().expect("the production compiled knob is mounted in this window");
+        assert!(owners.next().is_none(), "the fixture has exactly one production knob, independently of the graph's compiled owners");
         let knob = verdant_normalized_knob::NormalizedKnobHandle { owner };
         let accepted = knob.state("value").unwrap();
         let start = knob.owner.borrow().native_hitbox.as_ref().unwrap().bounds.center();
@@ -1712,20 +1715,25 @@ mod native_tests {
         let main = open(cx, false);
         let (editor, target, desc) = main.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
         let window = cx.open_window(size(px(520.), px(220.)), |_, _| EqTabHarness { editor, target, desc });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
         crate::native_test_support::frames(window, cx);
         let (knob, start, accepted) = window.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |_, window, cx| {
+        let tab = window.update(cx, |_, window, cx| {
             use verdant_action_control::native::gpui_native_owner::{all_owners, resolved};
             let name = format!("频段 3：{}", EqParams::default().bands[2].kind.label());
             let owner = all_owners().into_iter().find(|owner| {
                 let owner = owner.borrow();
                 owner.mounted && owner.window_id == Some(window.window_handle().window_id())
                     && owner.modules.accessible_text.get("name").is_some_and(|value| resolved(value).text() == name)
+                    && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("tab")
+                    && crate::proto_controls::source_index(owner.props.get("position")) == Some(2)
             }).expect("actual compiled EQ tab focus target");
-            verdant_action_control::ActionControlHandle { owner }.call("focusSelf", vec![], window, cx).unwrap();
+            let tab = verdant_action_control::ActionControlHandle { owner };
+            tab.call("focusSelf", vec![], window, cx).unwrap(); tab
         }).unwrap();
         crate::native_test_support::frames(window, cx);
+        assert_eq!(tab.state("focused").unwrap(), serde_json::json!(true), "keyboard input targets the source-owned focus handle");
         cx.simulate_keystrokes(window.into(), "space");
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
@@ -1876,6 +1884,71 @@ mod native_tests {
     }
 
     #[gpui::test]
+    fn graph_lost_or_replaced_capture_cannot_commit_or_release_its_successor(cx: &mut TestAppContext) {
+        for replacement in [false, true] {
+            for terminal_only in [false, true] {
+                let window = open(cx, false);
+                window.update(cx, |host, window, cx| {
+                    down(host, window, cx);
+                    let hitbox = window.captured_hitbox().unwrap();
+                    let successor = if replacement {
+                        Some(crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx))
+                    } else {
+                        window.release_pointer(); None
+                    };
+                    if !terminal_only {
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: start(host) + point(px(20.), px(-12.)),
+                            pressed_button: Some(MouseButton::Left), ..Default::default()
+                        }), cx);
+                        assert!(host.editor.read(cx).device_drag.is_none());
+                        if let Some(successor) = successor.as_ref() {
+                            assert!(successor.is_current(window, cx), "old cancellation preserves the newer capture");
+                        }
+                    }
+                    up(window, cx);
+                    assert!(host.editor.read(cx).device_drag.is_none());
+                    assert_eq!(host.editor.read(cx).revision().get(), 0);
+                    assert_eq!(gain(host, cx), host.desc.value);
+                    if let Some(successor) = successor { successor.release(window, cx); }
+                }).unwrap();
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn production_graph_touch_has_no_mouse_capture_and_obeys_its_window_retirement(cx: &mut TestAppContext) {
+        for cancel in [false, true] {
+            let window = open(cx, false);
+            window.update(cx, |host, window, cx| {
+                let origin = start(host);
+                let touch = |phase, position, window: &mut Window, cx: &mut App| {
+                    window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+                        id: gpui::TouchId(91), phase, position, ..Default::default()
+                    }), cx);
+                };
+                touch(gpui::TouchPhase::Started, origin, window, cx);
+                assert!(host.editor.read(cx).device_drag.is_some(), "production graph accepts touch");
+                assert!(window.captured_hitbox().is_none(), "touch uses its own gesture arena");
+                up(window, cx);
+                assert!(host.editor.read(cx).device_drag.is_some(), "mouse release cannot terminate touch");
+                touch(gpui::TouchPhase::Moved, origin + point(px(0.), px(-12.)), window, cx);
+                if cancel {
+                    host.editor.update(cx, |ed, cx| ed.cancel_device_drag_in(window.window_handle(), cx));
+                    assert!(host.editor.read(cx).device_drag.is_none());
+                }
+                touch(gpui::TouchPhase::Ended, origin + point(px(0.), px(-20.)), window, cx);
+                assert!(host.editor.read(cx).device_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+                assert_eq!(host.editor.read(cx).revision().get(), if cancel { 0 } else { 1 });
+                if cancel { assert_eq!(gain(host, cx), host.desc.value); }
+                else { assert!(gain(host, cx) > host.desc.value); }
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+        }
+    }
+
+    #[gpui::test]
     fn graph_rejects_a_stale_frame_before_pointer_down(cx: &mut TestAppContext) {
         let window = open(cx, false);
         window.update(cx, |host, window, cx| {
@@ -2011,13 +2084,15 @@ mod native_tests {
             let window = open(cx, false);
             window.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
             crate::native_test_support::frames(window, cx);
-            window.update(cx, |_,window,cx| {
+            let point = window.update(cx, |_,window,cx| {
                 let owner=verdant_graph_point::native::gpui_native_owner::all_owners().into_iter().find(|owner|{
                     let source=owner.borrow();source.mounted&&source.window_id==Some(window.window_handle().window_id())
                         &&source.exposes.contains_key("x")&&source.exposes.contains_key("y")&&source.exposes.contains_key("phase")
+                        &&source.exposes.contains_key("axis")&&source.declared_events.contains("valueCommit")
                 }).expect("compiled graph point");
                 let source=verdant_graph_point::GraphPointHandle{owner};
                 assert_eq!(source.state("focused").unwrap(),serde_json::json!(true),"graph owns focus before {reason}; native focus: {:?}",window.focused(cx));
+                source
             }).unwrap();
             window.update(cx, |host, window, cx| match reason {
                 "exit" => { window.dispatch_event(gpui::PlatformInput::MouseExited(gpui::MouseExitEvent::default()), cx); }
@@ -2029,6 +2104,11 @@ mod native_tests {
             if reason == "escape" { cx.simulate_keystrokes(window.into(), "escape"); }
             crate::native_test_support::frames(window, cx);
             window.update(cx, |host, window, cx| {
+                if reason == "detach" {
+                    assert!(!point.owner.borrow().mounted, "detached source cannot accept another input");
+                } else {
+                    assert_eq!(point.state("phase").unwrap(), serde_json::json!("idle"), "{reason} retires the authored graph phase");
+                }
                 if reason == "blur" {
                     let owner=verdant_graph_point::native::gpui_native_owner::all_owners().into_iter().find(|owner|{
                         let source=owner.borrow();source.mounted&&source.window_id==Some(window.window_handle().window_id())
@@ -2076,6 +2156,7 @@ mod native_tests {
             touch(gpui::TouchPhase::Started, touch_start, window, cx);
             let current=host.editor.read(cx).proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade).expect("graph contact survives rival touch");
             assert!(Rc::ptr_eq(&current,&graph_contact));
+            assert!(current.is_active(), "the graph contact remains live after the rival touch");
             assert_eq!(current.generation.get(),generation);
             assert_eq!(current.input.get(),Some(verdant_graph_point::native::gpui_native_move::MoveGestureInput::Mouse));
             assert!(host.editor.read(cx).device_drag.is_some());
@@ -2189,6 +2270,95 @@ mod native_tests {
             }), cx);
             assert_eq!(host.editor.read(cx).revision().get(), 1, "normal blank double-click remains a domain command");
             assert_eq!(gain(host, cx), -2.0);
+        }).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod compiled_control_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, WindowHandle, size};
+    use serde_json::json;
+
+    struct Harness { root: Entity<verdant_graph_point::GraphPoint> }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().child(self.root.clone())
+        }
+    }
+    fn open(cx: &mut TestAppContext) -> WindowHandle<Harness> {
+        let window = cx.open_window(size(px(240.0), px(140.0)), |window, cx| Harness {
+            root: verdant_graph_point::GraphPoint::create(json!({
+                "x":0.5, "y":0.5, "hasX":true, "hasY":true,
+                "label":"Compiled graph protocol", "revision":"protocol-test",
+            }), None, window, cx).unwrap(),
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx); window
+    }
+
+    #[gpui::test]
+    fn compiled_control_protocol_selects_drags_commits_and_resets(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            let source = host.root.read(cx).handle(); source.take_events();
+            assert_eq!(source.call("begin", vec![false.into(), false.into()], window, cx).unwrap(), json!(true));
+            assert_eq!(source.state("phase").unwrap(), json!("pressed"));
+            assert_eq!(source.take_events(), vec![("selected".into(), json!({"revision":"protocol-test"}))]);
+            source.call("sample", vec![1.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap();
+            assert_eq!(source.state("phase").unwrap(), json!("pressed"));
+            assert_eq!(source.state("x").unwrap(), json!(0.5));
+            source.call("sample", vec![90.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap();
+            assert_eq!(source.state("phase").unwrap(), json!("dragging"));
+            assert_eq!(source.state("x").unwrap(), json!(1.0));
+            source.call("sample", vec![90.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), true.into()], window, cx).unwrap();
+            assert!((source.state("x").unwrap().as_f64().unwrap() - 0.55).abs() < 1e-9);
+            source.call("sample", vec![(-500.0).into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap();
+            assert_eq!(source.state("x").unwrap(), json!(0.0));
+            assert!(source.take_events().is_empty(), "preview does not publish a commit");
+            assert_eq!(source.call("finish", vec![90.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap(), json!(true));
+            assert_eq!(source.state("phase").unwrap(), json!("idle"));
+            assert_eq!(source.state("x").unwrap(), json!(0.5), "a controlled proposal restores accepted truth");
+            assert_eq!(source.take_events(), vec![("valueCommit".into(), json!({"x":1.0,"y":0.5,"reset":false,"revision":"protocol-test"}))]);
+            source.call("begin", vec![false.into(), false.into()], window, cx).unwrap(); source.take_events();
+            source.call("finish", vec![0.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap();
+            assert_eq!(source.state("phase").unwrap(), json!("idle"));
+            assert!(source.take_events().is_empty(), "an un-dragged press does not commit");
+            for (reset, double) in [(true, false), (false, true)] {
+                assert_eq!(source.call("begin", vec![reset.into(), double.into()], window, cx).unwrap(), json!(true));
+                assert_eq!(source.state("phase").unwrap(), json!("idle"));
+                assert_eq!(source.take_events(), vec![
+                    ("selected".into(), json!({"revision":"protocol-test"})),
+                    ("valueCommit".into(), json!({"x":0.5,"y":0.5,"reset":true,"revision":"protocol-test"})),
+                ]);
+            }
+            assert!(source.take_failures().is_empty());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn compiled_control_cancel_discards_armed_and_previewed_edits(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            let source = host.root.read(cx).handle(); source.take_events();
+            for preview in [false, true] {
+                assert_eq!(source.call("begin", vec![false.into(), false.into()], window, cx).unwrap(), json!(true));
+                source.take_events();
+                if preview {
+                    source.call("sample", vec![30.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap();
+                    assert_eq!(source.state("phase").unwrap(), json!("dragging"));
+                } else { assert_eq!(source.state("phase").unwrap(), json!("pressed")); }
+                assert_eq!(source.call("cancel", vec![], window, cx).unwrap(), json!(true));
+                assert_eq!(source.state("phase").unwrap(), json!("idle"));
+                assert_eq!(source.state("x").unwrap(), json!(0.5));
+                assert_eq!(source.take_events(), vec![("interactionCancel".into(), json!({"revision":"protocol-test"}))]);
+                assert_eq!(source.call("finish", vec![90.0.into(), 0.0.into(), 180.0.into(), 180.0.into(), false.into()], window, cx).unwrap(), json!(false));
+                assert!(source.take_events().is_empty(), "a late release cannot commit a cancelled proposal");
+                assert_eq!(source.call("begin", vec![false.into(), false.into()], window, cx).unwrap(), json!(true));
+                assert_eq!(source.state("phase").unwrap(), json!("pressed"), "the retired source can admit a new contact");
+                source.call("cancel", vec![], window, cx).unwrap(); source.take_events();
+            }
+            assert!(source.take_failures().is_empty());
         }).unwrap();
     }
 }

@@ -57,7 +57,8 @@ async function fixture(t, name, initial = {}) {
 runtimeTest('action pointer and assistive activation share accepted selection and disabled policy', async t => {
   const f = await fixture(t, 'action-control', { label: 'Mute', role: 'switch', selected: false, selectable: true });
   f.event('press.start'); assert.equal(f.x.pressed.get(), true);
-  f.event('press.commit'); assert.deepEqual(f.events, [{ name: 'activate', payload: { selected: true, revision: 'document:1', origin: 'press', key: '', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false } }]);
+  assert.equal(f.event('press.commit').defaultPrevented, true);
+  assert.deepEqual(f.events, [{ name: 'activate', payload: { selected: true, revision: 'document:1', origin: 'press', key: '', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false } }]);
   assert.equal(f.x.selected.get(), false);
   assert.deepEqual(f.semantics().states, { disabled: false, checked: false });
   f.update({ selected: true, revision: 'document:2' });
@@ -508,6 +509,7 @@ runtimeTest('scroll native key facts preserve modified shortcuts and independent
   assert.deepEqual(f.scrollRequests,[]);
   assert.equal(f.call('keyInput','End',false,true,false),false);
   assert.equal(f.call('keyInput','End',false,false,true),false);
+  f.event('host:focus');
   assert.equal(f.event('key.down',{key:'PageDown',shiftKey:true}).defaultPrevented,true);
   assert.deepEqual(f.scrollRequests,[{kind:'page',axis:'horizontal',direction:'after'}]);
 });
@@ -525,4 +527,86 @@ runtimeTest('submitted Enter retains physical-tail ownership across reentrant co
   assert.equal(f.event('key.down',{key:'Enter'}).defaultPrevented,false);
   f.event('press.start',{key:'Enter'});f.event('press.commit',{key:'Enter',shiftKey:true});
   assert.deepEqual(f.events.at(-1),{name:'activate',payload:{selected:true,revision:'document:2',origin:'keyboard',key:'Enter',shiftKey:true,ctrlKey:false,metaKey:false,altKey:false}});
+});
+
+runtimeTest('scroll region owns focused page/edge requests without trapping ordinary document focus', async t => {
+  const f = await fixture(t, 'scroll-region', { label: 'References' });
+  assert.equal(f.x.scopeActive.get(), false);
+  assert.equal(f.event('key.down', { key: 'ArrowDown' }).defaultPrevented, false);
+  assert.deepEqual(f.scrollRequests, []);
+  f.event('host:focus');
+  for (const [key, shiftKey] of [['ArrowDown', false], ['PageUp', false], [' ', true], ['Home', false], ['End', false]]) {
+    assert.equal(f.event('key.down', { key, shiftKey }).defaultPrevented, true);
+  }
+  assert.deepEqual(f.scrollRequests, [
+    { kind: 'by', axis: 'vertical', delta: 40 },
+    { kind: 'page', axis: 'vertical', direction: 'before' },
+    { kind: 'page', axis: 'vertical', direction: 'before' },
+    { kind: 'to', axis: 'vertical', position: 0 },
+    { kind: 'to-end', axis: 'vertical' },
+  ]);
+  await f.session.unmount(); assert.equal(f.x.scopeActive.get(), false); assert.equal(f.scrollDisposed, 1);
+  assert.equal(f.call('key', 'End', false), false);
+});
+
+runtimeTest('scroll opt-in trap and axes update without capturing descendant editing keys', async t => {
+  const f = await fixture(t, 'scroll-region', { trapFocus: true, axes: 'horizontal' });
+  assert.equal(f.x.scopeActive.get(), true);
+  f.event('host:focus');
+  assert.equal(f.event('key.down', { key: 'ArrowDown' }).defaultPrevented, false);
+  assert.equal(f.event('key.down', { key: 'ArrowRight' }).defaultPrevented, true);
+  assert.deepEqual(f.scrollRequests, [{ kind: 'by', axis: 'horizontal', delta: 40 }]);
+  f.update({ trapFocus: false, axes: 'both' });
+  assert.equal(f.x.scopeActive.get(), false);
+  f.event('host:focus');
+  assert.equal(f.event('key.down', { key: 'ArrowDown' }).defaultPrevented, true);
+  assert.deepEqual(f.scrollRequests.at(-1), { kind: 'by', axis: 'vertical', delta: 40 });
+  f.event('host:blur');
+  const count = f.scrollRequests.length;
+  for (const key of ['Home', 'End', 'ArrowDown', ' ']) {
+    assert.equal(f.event('key.down', { key }).defaultPrevented, false);
+  }
+  assert.equal(f.scrollRequests.length, count);
+});
+
+runtimeTest('compound scroll content can opt out of Tab without becoming inert', async t => {
+  const f = await fixture(t, 'scroll-region', { tabStop: false });
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'none');
+  f.event('host:focus'); f.call('key', 'PageDown', false);
+  assert.deepEqual(f.scrollRequests, [{ kind: 'page', axis: 'vertical', direction: 'after' }]);
+  f.update({ tabStop: true });
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'auto');
+  f.update({ tabStop: false });
+  await f.session.unmount(); await f.session.mount();
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'none');
+});
+
+runtimeTest('search list routes text shortcuts through source without consuming input or stale field callbacks', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'filterlist', cursor: 0 });
+  f.call('setItems', [1, 1, 1]);
+  assert.equal(f.semantics().role, 'listbox');
+  f.events.length = 0; // Source reconciliation/reveal has already completed.
+  for (const key of [' ', 'Home', 'End', 'ArrowLeft', 'Delete']) {
+    assert.equal(f.call('filterKey', key, false, false, false, true, 'document:1', false), false);
+  }
+  assert.deepEqual(f.events, []);
+  assert.equal(f.call('filterKey', 'ArrowDown', false, false, false, true, 'document:1', false), true);
+  assert.equal(f.events.filter(event => event.name === 'select').at(-1).payload.index, 1);
+  assert.equal(f.events.at(-1).payload.key, 'reveal');
+  assert.equal(f.x.cursor.get(), 1);
+  assert.equal(f.call('filterKey', 'Enter', false, false, false, true, 'document:1', false), true);
+  assert.equal(f.events.at(-1).name, 'activate');
+  assert.equal(f.call('filterKey', 'f', false, true, false, false, 'document:1', false), true);
+  assert.equal(f.events.at(-1).payload.key, 'focus-filter');
+  assert.equal(f.call('filterKey', 'ArrowDown', false, false, false, false, 'document:1', false), false);
+  f.update({ revision: 'filtered', cursor: 0 });
+  const before = f.events.length;
+  assert.equal(f.call('filterKey', 'Enter', false, false, false, true, 'document:1', false), false);
+  assert.equal(f.events.length, before);
+  // Form dismissal belongs to the enclosing compiled Overlay, while its text
+  // control and the filtered collection retain their independent authority.
+  const form = await fixture(t, 'overlay-control', { revision: 'filtered', cancelChoice: 0, choices: 2 });
+  assert.equal(form.event('key.down', { key: 'Escape' }).defaultPrevented, true);
+  assert.deepEqual(form.events, [{ name: 'response', payload: { index: 0, revision: 'filtered' } }]);
+  assert.equal(f.events.length, before);
 });

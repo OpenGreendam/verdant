@@ -280,11 +280,11 @@ export default definePrototype<Props>({
       let command = '';
       if (audio) {
         if ((event.key === 'Delete' || event.key === 'Backspace') && !secondary) command = event.shiftKey ? 'ripple-delete' : 'delete';
-        else if (event.key === 'i' && secondary) command = 'split';
-        else if (event.key === 'a' && secondary) command = 'select-all';
-        else if (event.key === 'j' && secondary) command = 'join';
-        else if (event.key === 'r' && !secondary && !event.altKey) command = 'range-tool';
-        else if (event.key === 'v' && !secondary && !event.altKey) command = 'select-tool';
+        else if ((event.key === 'i' || event.key === 'I') && secondary) command = 'split';
+        else if ((event.key === 'a' || event.key === 'A') && secondary) command = 'select-all';
+        else if ((event.key === 'j' || event.key === 'J') && secondary) command = 'join';
+        else if ((event.key === 'r' || event.key === 'R') && !secondary && !event.altKey) command = 'range-tool';
+        else if ((event.key === 'v' || event.key === 'V') && !secondary && !event.altKey) command = 'select-tool';
         else if (event.key === 'Escape') command = 'clear-range';
       }
       if (command === '' && (event.key !== 'Escape' || phase.get() === 'idle')) return;

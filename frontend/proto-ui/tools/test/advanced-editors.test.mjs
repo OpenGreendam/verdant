@@ -636,3 +636,30 @@ runtimeTest('audio editor shortcuts and Escape share the authored canvas cancell
   assert.equal(f.key('Delete').defaultPrevented,false);
   assert.equal(f.events.length,count);
 });
+
+runtimeTest('audio keyboard semantics share editing authority, cancellation and lifecycle', async t => {
+  const f = await fixture(t, 'editor-surface', { commandMode: 'audio' });
+  assert.equal(f.key('Delete', { repeat: true }).defaultPrevented, false);
+  assert.equal(f.key('r', { altKey: true }).defaultPrevented, false);
+  assert.deepEqual(f.events, []);
+  f.call('begin', 'Mouse', 0, 0);
+  assert.equal(f.key('Delete', { shiftKey: true }).defaultPrevented, true);
+  assert.equal(f.events.at(-1).payload.command, 'ripple-delete');
+  assert.equal(f.x.phase.get(), 'idle'); assert.equal(f.cancels().length, 1);
+  for (const [key, secondary, command] of [
+    ['i', true, 'split'], ['I', true, 'split'], ['a', true, 'select-all'], ['A', true, 'select-all'],
+    ['j', true, 'join'], ['J', true, 'join'], ['v', false, 'select-tool'], ['V', false, 'select-tool'],
+    ['r', false, 'range-tool'], ['R', false, 'range-tool'], ['Escape', false, 'clear-range'],
+  ]) {
+    assert.equal(f.key(key, { ctrlKey: secondary }).defaultPrevented, true);
+    assert.deepEqual(f.events.at(-1), { name: 'command', payload: { command, revision: 'document:1' } });
+  }
+  const commands = f.events.filter(event => event.name === 'command').length;
+  f.onEvent(name => { if (name === 'interactionCancel') f.update({ revision: 'new-document', disabled: true }); });
+  f.call('begin', 'Mouse', 0, 0);
+  assert.equal(f.key('Escape').defaultPrevented, false);
+  assert.equal(f.events.filter(event => event.name === 'command').length, commands, 'suspended cancellation cannot publish an old command into replacement authority');
+  await f.session.unmount();
+  assert.equal(f.key('a', { ctrlKey: true }).defaultPrevented, false);
+  assert.equal(f.events.filter(event => event.name === 'command').length, commands);
+});

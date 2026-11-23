@@ -244,3 +244,80 @@ mod tests {
         window.update(cx, |host,_,_| { assert_eq!(host.cursor,0); assert_eq!(host.scroll.0.borrow().base_handle.offset().y,px(0.)); }).unwrap();
     }
 }
+
+#[cfg(test)]
+mod incoming_admission_tests {
+    use super::*;
+    use gpui::{AppContext, TestAppContext, WindowHandle, div, px, size, uniform_list};
+
+    struct Harness {
+        selected: usize, activations: usize, revision: usize,
+        scroll: gpui::UniformListScrollHandle,
+        collection: Option<CollectionControlHandle>,
+    }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let entity = cx.entity(); let revision = format!("rows:{}", self.revision);
+            let draw: Draw = Rc::new(move |handle, _, engine, window, cx| {
+                let (scroll, selected, revision) = entity.update(cx, |view, _| {
+                    view.collection = Some(handle.clone());
+                    (view.scroll.clone(), view.selected, format!("rows:{}", view.revision))
+                });
+                reveal_uniform_item("collection-admission-reveal", handle, selected, &revision, 100, &scroll, window, cx);
+                let engine = engine.expect("the collection leases the virtual list's actual engine");
+                uniform_list("collection-test-rows", 100, |range, _, _| range.map(|index|
+                    div().h(px(30.)).child(format!("Row {index}"))).collect::<Vec<_>>())
+                    .track_scroll(&scroll).size_full()
+                    .on_scroll_wheel(move |_, window, cx| engine.notify_input(window, cx)).into_any_element()
+            });
+            let entity = cx.entity(); let basis = revision.clone();
+            let sink: Sink = Rc::new(move |name, payload, _, cx| {
+                if payload.get("revision").and_then(Value::as_str) != Some(basis.as_str()) { return; }
+                entity.update(cx, |view, cx| {
+                    let Some(index) = crate::proto_controls::source_index(payload.get("index")) else { return; };
+                    if name == "select" || name == "activate" {
+                        view.selected = index;
+                        if name == "activate" { view.activations += 1; }
+                        cx.notify();
+                    }
+                });
+            });
+            div().size_full().child(collection("collection-test", serde_json::json!({"mode":"listbox","label":"Virtual collection",
+                "cursor":self.selected,"revision":revision,"autoFocus":true}), vec![1;100], draw, sink)
+                .scroll_engine(Engine::Uniform(self.scroll.clone())))
+        }
+    }
+    fn open(cx: &mut TestAppContext) -> WindowHandle<Harness> {
+        let window = cx.open_window(size(px(320.), px(180.)), |_, _| {
+            let scroll = gpui::UniformListScrollHandle::new();
+            Harness { selected:0, activations:0, revision:1, scroll, collection:None }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx); window
+    }
+
+    #[gpui::test]
+    fn native_collection_page_navigation_reveals_the_existing_virtual_list_and_rejects_stale_rows(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |view, window, cx| { view.collection.as_ref().unwrap().call("focusSelf", vec![], window, cx).unwrap(); }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        cx.simulate_keystrokes(window.into(), "pagedown");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |view, _, cx| {
+            assert_eq!(view.selected, 20);
+            assert!(view.scroll.0.borrow().base_handle.offset().y < px(0.), "source traversal must reveal the selected native virtual row");
+            view.revision = 2; cx.notify();
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |view, window, cx| {
+            let handle = view.collection.as_ref().unwrap();
+            assert_eq!(handle.call("choose", vec![3.into(), false.into(), "rows:1".into()], window, cx).unwrap(), Value::Bool(false));
+            assert_eq!(handle.call("keyAt", vec![30.into(), "z".into(), false.into(), true.into(), "rows:2".into()], window, cx).unwrap(), Value::Bool(false));
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |view, _, _| { assert_eq!(view.selected, 20); assert_eq!(view.activations, 0); }).unwrap();
+        cx.simulate_keystrokes(window.into(), "end enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |view, _, _| { assert_eq!(view.selected, 99); assert_eq!(view.activations, 1); }).unwrap();
+    }
+}

@@ -117,6 +117,8 @@ impl NativePluginWindow {
     }
 
     fn note(&mut self, note: u8, pressed: bool, cx: &mut gpui::App) {
+        // The compiled key owns physical contacts and collapses an early
+        // release before deferred delivery. This set records sounding notes.
         let changed = if pressed { self.held_notes.insert(note) } else { self.held_notes.remove(&note) };
         if !changed { return; }
         let DeviceTarget::Track(track) = &self.target else { return; };
@@ -405,6 +407,12 @@ impl Render for NativePluginWindow {
                             });
                             window.prevent_default(); cx.stop_propagation();
                         }
+                    } else if key == "escape" {
+                        key_editor.update(cx, |ed, cx| {
+                            ed.cancel_device_drag_in(window.window_handle(), cx);
+                            if ed.menu.is_some() { ed.close_menu(window, cx); }
+                        });
+                        cx.stop_propagation();
                     }
                 })
                 .child(div().flex_none().min_h(px(48.)).py(px(6.)).px(px(16.)).flex().flex_wrap().items_center().gap(px(10.))
@@ -607,6 +615,9 @@ mod tests {
                         keystroke: gpui::Keystroke::parse("s").unwrap(), is_held: false, prefer_character_input: false,
                     }), cx);
                     assert!(crate::proto_performance_key::pressed(&format!("native-keyboard-{:?}",view.entity_id()),62,window,cx), "the authored key owns the second press before audio delivery");
+                    assert_eq!(performance_key(62, window).state("pressed").unwrap(), serde_json::json!(true),
+                        "the second physical key is accepted by the source before audio delivery");
+                    assert!(!view.read(cx).held_notes.contains(&62), "audio delivery is still deferred");
                 }
                 let before = { let view = view.read(cx); (view.tools_open, view.keyboard_open) };
                 toolbar_command(editor.downgrade(), view.downgrade(), action)(None, window, cx);

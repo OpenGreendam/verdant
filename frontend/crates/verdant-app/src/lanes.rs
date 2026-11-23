@@ -102,7 +102,8 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
         }
     }
     let durations = preview.as_deref().unwrap_or(&budget.durations_seconds);
-    let mut rows = crate::proto_scroll::viewport("phoneme-duration-rows", "音素时长", "vertical").max_h(px(180.0))
+    let rows_height = (budget.labels.len() as f32 * 22.0).min(180.0).max(22.0);
+    let mut rows = crate::proto_scroll::viewport("phoneme-duration-rows", "音素时长", "vertical").h(px(rows_height)).flex_none()
         .flex().flex_col().gap(px(3.0));
     for (index, (label, duration)) in budget.labels.iter().zip(durations).enumerate() {
         let scheduled = schedule.as_ref().and_then(|s| s.durations.get(index)).copied()
@@ -111,7 +112,7 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
             Some(seconds) => format!("{} · 预算 {:.1} ms · 计划 {:.1} ms", label, duration * 1000.0, seconds * 1000.0),
             None => format!("{} · 预算 {:.1} ms · 计划待预检", label, duration * 1000.0),
         };
-        rows = rows.child(gpui::div().text_xs().child(text));
+        rows = rows.child(gpui::div().flex_none().text_xs().child(text));
     }
     panel = panel.child(rows);
     if let Some(schedule) = schedule {

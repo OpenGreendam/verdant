@@ -189,7 +189,8 @@ impl MenuItem {
 }
 #[derive(Clone, Debug)]
 pub struct OpenMenu {
-    /// Distinguish repeated openings with identical content and anchor.
+    /// A dismissed menu cannot lend its callbacks to a later opening at the
+    /// same anchor, even when its content and document revision are identical.
     instance: String,
     pub window: gpui::AnyWindowHandle,
     pub anchor: Point<Pixels>,
@@ -544,19 +545,30 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
     let props = serde_json::json!({"mode":"menu", "label":"上下文菜单", "cursor":menu.selected,
         "expanded": expanded, "revision":revision, "autoFocus":true, "disabled":false});
     let draw_editor = cx.entity(); let snapshot = menu.clone(); let basis = revision.clone();
+    let source = std::rc::Rc::new(std::cell::RefCell::new(None::<(verdant_collection_control::CollectionControlHandle, crate::proto_scroll::EngineBinding)>));
+    let source_draw = source.clone();
     let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut gpui::App| {
-        draw_editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), engine.clone().expect("menu viewport binding"), window, cx).into_any_element())
+        let engine = engine.expect("menu viewport binding");
+        *source_draw.borrow_mut() = Some((handle.clone(), engine.clone()));
+        draw_editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), engine, window, cx).into_any_element())
     });
     let editor = cx.entity().downgrade();
     let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
         let _ = editor.update(cx, |ed, cx| {
             let Some(menu) = ed.menu.as_ref().filter(|menu| menu.window == window.window_handle()) else { return };
-            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(collection_revision(ed, menu).as_str()) { return; }
+            let revision = collection_revision(ed, menu);
+            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(revision.as_str()) { return; }
             let index = crate::proto_controls::source_integer(payload.get("index")).unwrap_or(-1);
             match name {
                 "close" => ed.close_menu(window, cx),
                 "activate" if index >= 0 => ed.activate_menu_item(index as usize, window, cx),
-                "select" if index >= 0 => { if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; } cx.notify(); },
+                "select" if index >= 0 => {
+                    if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; }
+                    if let Some((handle, engine)) = source.borrow().clone() {
+                        crate::proto_collection::reveal_item(handle, index as usize, revision, engine, false, window);
+                    }
+                    cx.notify();
+                },
                 "expand" => {
                     if let Some(menu) = ed.menu.as_mut() {
                         let previous_parent = menu.rows().enumerate().find_map(|(row, (source, child, _))|
@@ -721,6 +733,32 @@ mod native_menu_tests {
         crate::native_test_support::frames(window,cx);
         window.update(cx,|host,_,cx| {let ed=host.editor.read(cx);let menu=ed.menu.as_ref().unwrap();assert_eq!(menu.expanded,None);assert_eq!(menu.selected,0);}).unwrap();
     }
+    #[gpui::test]
+    fn native_menu_arrow_selection_reveals_the_selected_row_on_its_actual_engine(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| host.editor.update(cx, |ed, cx| {
+            let rows = (0..40).map(|index| MenuItem::file(format!("Row {index}"), FileAction::Open)).collect();
+            ed.show_menu(gpui::point(px(80.0), px(40.0)), rows, window, cx);
+        })).unwrap();
+        crate::native_test_support::frames(window, cx);
+        for _ in 0..24 {
+            cx.simulate_keystrokes(window.into(), "down");
+            crate::native_test_support::frames(window, cx);
+        }
+        window.update(cx, |host, window, cx| {
+            assert_eq!(host.editor.read(cx).menu.as_ref().unwrap().selected, 24);
+            let source = source(window);
+            let owner = source.owner.borrow();
+            assert_ne!(owner.modules.scroll.external_engine, 0);
+            let scroll = owner.modules.scroll.handle.as_ref().expect("menu leases its physical viewport");
+            assert!(scroll.offset().y < px(-100.0), "arrow selection reveals a row below the menu viewport");
+            let row = scroll.bounds_for_item(24).expect("selected physical menu row");
+            let viewport = scroll.bounds();
+            assert!(row.top() + scroll.offset().y >= viewport.top() - px(1.0));
+            assert!(row.bottom() + scroll.offset().y <= viewport.bottom() + px(1.0));
+        }).unwrap();
+    }
+
     #[gpui::test]
     fn native_menu_reopening_same_content_and_anchor_rejects_the_previous_instance(cx:&mut TestAppContext) {
         let window=open(cx);let before=window.update(cx,|_,window,_|revision(&source(window))).unwrap();

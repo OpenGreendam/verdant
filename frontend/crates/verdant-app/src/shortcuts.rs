@@ -1,6 +1,6 @@
 //! The live keyboard registry and its discoverable, platform-aware shortcut window.
-//! Rows describe application action bindings or the compiled TextField's real
-//! keyboard contract; native action bindings never shadow that editor contract.
+//! Application rows are installed action bindings. Text rows describe the
+//! mounted compiled TextField/TextControl, which owns its own native input.
 
 use std::cell::RefCell;
 
@@ -107,28 +107,37 @@ struct Shortcut {
     group: &'static str,
     label: &'static str,
     scope: Scope,
-    dispatch: ShortcutDispatch,
+    target: ShortcutTarget,
 }
 
 #[derive(Clone, Copy)]
-enum ShortcutDispatch {
+enum ShortcutTarget {
     Application(fn() -> Box<dyn Action>),
-    /// The mounted TextField/TextControl consumes this physical key. Installing
-    /// a second GPUI unit action would bypass composition and text undo.
-    CompiledText,
+    CompiledText(TextCommand),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TextCommand {
+    Submit, Advance, Retreat, Cancel, Undo, Redo, Space, Backspace, Delete,
+    Left, Right, SelectLeft, SelectRight, Home, End, SelectAll, Paste,
+}
+
+macro_rules! shortcut {
+    ($group:literal, ($keys:literal, $scope:ident, $label:literal, text::$command:ident)) => {
+        Shortcut { keys: $keys, group: $group, label: $label, scope: Scope::$scope,
+            target: ShortcutTarget::CompiledText(TextCommand::$command) }
+    };
+    ($group:literal, ($keys:literal, $scope:ident, $label:literal, $action:expr)) => {
+        Shortcut { keys: $keys, group: $group, label: $label, scope: Scope::$scope,
+            target: ShortcutTarget::Application(|| Box::new($action)) }
+    };
 }
 
 macro_rules! shortcuts {
-    ($($group:literal => [$(($keys:literal, $scope:ident, $label:literal, $action:expr)),* $(,)?]),* $(,)?) => {
+    ($($group:literal => [$($entry:tt),* $(,)?]),* $(,)?) => {
         // static keeps one canonical table: cheat_sheet rows are verified by
-        // pointer identity against these exact bindings.
-        static SHORTCUTS: &[Shortcut] = &[$($(Shortcut {
-            keys: $keys, group: $group, label: $label, scope: Scope::$scope,
-            dispatch: match Scope::$scope {
-                Scope::Text | Scope::Lyric => ShortcutDispatch::CompiledText,
-                _ => ShortcutDispatch::Application(|| Box::new($action)),
-            },
-        }),*),*];
+        // pointer identity against these exact action/source entries.
+        static SHORTCUTS: &[Shortcut] = &[$($(shortcut!($group, $entry)),*),*];
     };
 }
 
@@ -312,33 +321,43 @@ shortcuts![
     ("secondary-k s a", Workspace, "试听所选音高（参考正弦音）", WorkflowShortcut::AuditionSelection),
     ],
     "文本输入" => [
-    ("enter", Text, "提交文本", LyricConfirm),
-    ("tab", Lyric, "提交并编辑下一个音符", LyricNext),
-    ("shift-tab", Lyric, "提交并编辑上一个音符", LyricPrev),
-    ("escape", Text, "取消文本编辑", LyricCancel),
-    ("secondary-z", Text, "撤销文本输入", Undo),
-    ("secondary-shift-z", Text, "重做文本输入", Redo),
-    ("secondary-y", Text, "重做文本输入", Redo),
-    ("space", Text, "输入空格", LyricSpace),
-    ("backspace", Text, "删除前一个字符", Backspace),
-    ("delete", Text, "删除后一个字符", Delete),
-    ("left", Text, "光标左移", Left),
-    ("right", Text, "光标右移", Right),
-    ("shift-left", Text, "向左扩选文本", SelectLeft),
-    ("shift-right", Text, "向右扩选文本", SelectRight),
-    ("home", Text, "文本开头", Home),
-    ("end", Text, "文本末尾", End),
-    ("secondary-a", Text, "全选文本", SelectAllText),
-    ("secondary-v", Text, "粘贴文本", PasteText),
+    ("enter", Text, "提交文本", text::Submit),
+    ("tab", Lyric, "提交并编辑下一个音符", text::Advance),
+    ("shift-tab", Lyric, "提交并编辑上一个音符", text::Retreat),
+    ("escape", Text, "取消文本编辑", text::Cancel),
+    ("secondary-z", Text, "撤销文本编辑", text::Undo),
+    ("secondary-shift-z", Text, "重做文本输入", text::Redo),
+    ("secondary-y", Text, "重做文本输入", text::Redo),
+    ("space", Text, "输入空格", text::Space),
+    ("backspace", Text, "删除前一个字符", text::Backspace),
+    ("delete", Text, "删除后一个字符", text::Delete),
+    ("left", Text, "光标左移", text::Left),
+    ("right", Text, "光标右移", text::Right),
+    ("shift-left", Text, "向左扩选文本", text::SelectLeft),
+    ("shift-right", Text, "向右扩选文本", text::SelectRight),
+    ("home", Text, "文本开头", text::Home),
+    ("end", Text, "文本末尾", text::End),
+    ("secondary-a", Text, "全选文本", text::SelectAll),
+    ("secondary-v", Text, "粘贴文本", text::Paste),
     ],
 ];
 
 pub fn bindings(cx: &App) -> Vec<KeyBinding> {
     SHORTCUTS.iter().filter_map(|s| {
-        let ShortcutDispatch::Application(action) = s.dispatch else { return None };
+        let ShortcutTarget::Application(action) = s.target else { return None; };
         let predicate = KeyBindingContextPredicate::parse(s.scope.predicate()).expect("static shortcut context");
         Some(KeyBinding::load(s.keys, action(), Some(predicate.into()), false, None, cx).expect("static shortcut keys"))
     }).collect()
+}
+
+/// Test the displayed intrinsic commands against real native TextControl
+/// input, with the application's actual action bindings installed around it.
+#[cfg(test)]
+pub(crate) fn compiled_text_shortcuts() -> impl Iterator<Item = (TextCommand, &'static str)> {
+    SHORTCUTS.iter().filter_map(|shortcut| match shortcut.target {
+        ShortcutTarget::CompiledText(command) => Some((command, shortcut.keys)),
+        ShortcutTarget::Application(_) => None,
+    })
 }
 
 struct ShortcutRow {
@@ -346,8 +365,8 @@ struct ShortcutRow {
     keys: gpui::SharedString,
 }
 
-/// The window renders both installed application bindings and compiled editor
-/// routes from the same registry, preserving discoverability after migration.
+/// The window renders installed application bindings and native text routes
+/// from the same registry, preserving both discoverability and ownership.
 fn cheat_sheet(mac: bool) -> Vec<ShortcutRow> {
     SHORTCUTS.iter().map(|shortcut| ShortcutRow { shortcut, keys: display_keys(shortcut.keys, mac).into() }).collect()
 }

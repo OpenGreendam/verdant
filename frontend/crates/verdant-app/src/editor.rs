@@ -1502,7 +1502,7 @@ impl Editor {
                 else { self.import_project_path(path, window, cx); }
             }
             MenuAction::ExportProject => crate::files::export_dialog(self, window, cx),
-            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.is_focused(window) => {
+            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.contains_focused(window, cx) => {
                 use integrations::audio_edit_ui::AudioUiAction as A;
                 let action=match action{MenuAction::Cut=>A::Cut,MenuAction::Copy=>A::Copy,MenuAction::Paste=>A::Paste,MenuAction::DeleteSelection=>A::Delete,MenuAction::SelectAll=>A::SelectAll,_=>A::Duplicate};
                 if let Err(error)=self.run_audio_ui(action,window,cx){self.notice(error);cx.notify();}

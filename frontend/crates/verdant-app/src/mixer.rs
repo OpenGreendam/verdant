@@ -443,8 +443,8 @@ fn strip(
                         .rounded(px(6.0))
                         .hover(move |s| s.bg(th.hover))
                         .child(gpui::svg().path(crate::assets::icon("menu")).size(px(14.0)).text_color(th.text))
-                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, window, cx| {
-                            ed.track_menu(header_menu.clone(), window.mouse_position(), window, cx);
+                        .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, window, cx| {
+                            ed.track_menu(header_menu.clone(), event.position(), window, cx);
                             cx.stop_propagation();
                         })),
                 ),
@@ -871,15 +871,20 @@ mod pointer_boundary_tests {
         crate::native_test_support::frames(window, cx);
         window
     }
-    fn source(window: &Window) -> ContinuousControlHandle {
+    fn source(host: &Harness, window: &Window) -> ContinuousControlHandle {
+        let label = match (host.master, host.control) {
+            (false, MixerControl::Pan) => "轨道声像", (false, MixerControl::Fader) => "轨道推子",
+            (true, MixerControl::Pan) => "主声像", (true, MixerControl::Fader) => "主推子",
+        };
         let owner = all_owners().into_iter().find(|owner| {
             let owner = owner.borrow(); owner.mounted && owner.window_id == Some(window.window_handle().window_id())
                 && owner.declared_events.contains("interactionStart")
+                && owner.props.get("label").and_then(serde_json::Value::as_str) == Some(label)
         }).expect("mounted production mixer scalar");
         ContinuousControlHandle { owner }
     }
     fn down(host: &Harness, window: &mut Window, cx: &mut gpui::App) -> ContinuousControlHandle {
-        let source = source(window);
+        let source = source(host, window);
         let bounds = source.owner.borrow().native_hitbox.as_ref().expect("real native scalar target").bounds;
         assert!(bounds.size.width >= px(139.) && bounds.size.height >= px(119.), "canvas-only scalar root must fill the actual mixer control: {bounds:?}");
         window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
@@ -955,7 +960,7 @@ mod pointer_boundary_tests {
                 }).unwrap();
                 crate::native_test_support::frames(window, cx);
                 window.update(cx, |host, window, cx| {
-                    let source = source(window);
+                    let source = source(host, window);
                     assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"),
                         "integer audio preview must remain the current gesture after repaint");
                     let ed = host.editor.read(cx);
@@ -981,7 +986,7 @@ mod pointer_boundary_tests {
             }).unwrap();
             crate::native_test_support::frames(window, cx);
             window.update(cx, |host, window, cx| {
-                assert_eq!(source(window).state("phase").unwrap(), serde_json::json!("idle"));
+                assert_eq!(source(host, window).state("phase").unwrap(), serde_json::json!("idle"));
                 assert_eq!(host.editor.read(cx).revision().get(), 1);
             }).unwrap();
         } }

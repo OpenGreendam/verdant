@@ -195,7 +195,7 @@ fn native_track_headers(ed: &Editor, handle: &verdant_collection_control::Collec
             .child(div().flex().items_center().gap(px(5.0))
                 .child(div().text_size(px(10.5)).text_color(th.text_tertiary).w(px(15.0)).flex_none().child(format!("{:02}", i + 1)))
                 .child(crate::proto_controls::action("color", "切换轨道颜色").size(px(11.0)).rounded(px(3.0)).bg(th.track(track.color.as_deref()))
-                    .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| ed.cycle_color(&color, cx))))
+                    .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| { ed.cycle_color(&color, cx); cx.stop_propagation(); })))
                 .child(div().flex_1().truncate().text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).child(track.name.clone()))
                 .child(crate::ui_controls::selectable_command_button(ed, CommandId::ToggleTrackAutomation, CommandArg::Track(track.id.clone()), "A", SharedString::from(format!("auto-btn-{}", track.id)), auto_expanded, cx)
                     .h(hdr_h).w(px(23.0)).px(px(0.0)).rounded(px(4.0)).aria_label("展开/收起自动化曲线"))
@@ -848,6 +848,38 @@ mod source_keyboard_tests {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             div().size_full().child(region_lanes(self.editor.clone()))
         }
+    }
+
+    #[gpui::test]
+    fn region_press_becomes_a_drag_only_after_the_threshold(cx: &mut TestAppContext) {
+        let window = cx.open_window(size(px(320.0), px(140.0)), |window, cx| {
+            let editor = cx.new(|cx| {
+                let mut ed = Editor::for_native_test(Project::new_empty(), window, cx);
+                ed.needs_arrange_fit = false; ed.arrange.start_tick = 0.0; ed.arrange.px_per_tick = 1.0;
+                ed
+            });
+            Harness { editor }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |_, window, cx| {
+            let owner = verdant_editor_surface::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                let source = owner.borrow();
+                source.mounted && source.window_id == Some(window.window_handle().window_id())
+                    && source.exposes.contains_key("pointer")
+            }).expect("mounted production arrangement editing source");
+            let source = verdant_editor_surface::EditorSurfaceHandle { owner };
+            // Use the production region_lanes threshold and source transitions.
+            // The host test transports coordinates; it contains no threshold decision.
+            for (x, y, accepted) in [(12.0, 11.0, false), (13.0, 10.0, true), (10.0, 6.5, true)] {
+                assert_eq!(source.call("begin", vec!["threshold-test".into(), 10.0.into(), 10.0.into()], window, cx).unwrap(), serde_json::json!(true));
+                assert_eq!(source.state("phase").unwrap(), serde_json::json!("pressed"));
+                assert_eq!(source.call("sample", vec!["threshold-test".into(), x.into(), y.into()], window, cx).unwrap(), serde_json::json!(accepted));
+                assert_eq!(source.state("phase").unwrap(), serde_json::json!(if accepted { "dragging" } else { "pressed" }));
+                assert_eq!(source.call("cancel", vec![], window, cx).unwrap(), serde_json::json!(true));
+                assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
+            }
+        }).unwrap();
     }
 
     #[gpui::test]

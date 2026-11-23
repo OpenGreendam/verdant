@@ -409,6 +409,7 @@ impl Library {
                     .aria_label(if row.preset.favorite { "取消收藏预设" } else { "收藏预设" })
                     .on_click(cx.listener(move |view, _, _, cx| {
                         if let Some(row) = view.rows.iter().find(|row| row.id == favorite).cloned() { view.favorite(row, cx); }
+                        cx.stop_propagation();
                     }))));
         }
         if rows.is_empty() { list = list.child(div().p(px(24.)).text_sm().text_color(th.text_secondary).child("没有匹配的预设。试试其他类别、来源或搜索词。")); }

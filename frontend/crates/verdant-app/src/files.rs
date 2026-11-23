@@ -511,6 +511,10 @@ impl ScoreExportDialog {
     fn new(format:verdant_exchange::Format, options:verdant_exchange::ExportOptions, tracks:Vec<String>, send:async_channel::Sender<verdant_exchange::ExportOptions>, window:&mut Window, cx:&mut Context<Self>) -> Self {
         use ScoreOptionControl::*;
         use crate::proto_text::{Event, Field, Numeric, Options};
+        let mut options = options;
+        if format == verdant_exchange::Format::Ust && options.track.is_none() && !tracks.is_empty() {
+            options.track = Some(0);
+        }
         let mut controls = Vec::new();
         if format == verdant_exchange::Format::Ust { controls.extend([Utf8, Cp932]); }
         if format == verdant_exchange::Format::Midi { controls.push(Ppq); }
@@ -627,7 +631,10 @@ impl Render for ScoreExportDialog {
         });
         let entity = cx.entity().downgrade();
         let response = std::rc::Rc::new(move |index:usize, window:&mut Window, cx:&mut gpui::App| {
-            let _ = entity.update(cx, |view,cx| { if let Some(control) = view.controls.get(index).copied() { view.activate(control,window,cx); } });
+            let _ = entity.update(cx, |view,cx| {
+                if view.ppq.read(cx).is_composing() { return; }
+                if let Some(control) = view.controls.get(index).copied() { view.activate(control,window,cx); }
+            });
         });
         crate::proto_overlay::overlay("score-export-options", props, draw, response)
     }
