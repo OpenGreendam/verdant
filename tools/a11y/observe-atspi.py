@@ -78,6 +78,12 @@ def arguments():
     return args
 
 
+def canonical_role(role_number, platform_role):
+    # AT-SPI role 43 is the same button across GLib versions whose enum nick
+    # changed from "push-button" to "button". Keep the original nick as evidence.
+    return "push button" if role_number == 43 else platform_role
+
+
 class Observer:
     def __init__(self):
         address = os.environ.get("AT_SPI_BUS_ADDRESS")
@@ -117,27 +123,44 @@ class Observer:
             dbus.Int32(selection), dbus.Int32(start), dbus.Int32(end), timeout=3))
 
     def read_text(self, reference):
-        """Read the advertised platform Text interface, including real selection.
+        """Capture two equal platform observations; retain every raw read.
 
-        AT-SPI offsets count Unicode characters, not the editor's private UTF-16
-        offsets. A missing interface is a failed observation, never a guessed
-        value from the accessible name or an application test hook.
+        Text, caret and selection use separate D-Bus calls. Real typing can
+        advance between them. Only a changing tuple is retried; a stable
+        illegal range remains an error and is never clamped.
         """
-        node = self.read(reference)
-        if TEXT not in node["interfaces"]:
-            raise RuntimeError(f"Actual textbox does not advertise AT-SPI Text: {node['interfaces']}")
+        samples = []
+        deadline = time.monotonic() + 3
+        def rpc(method, *args):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("Platform Text capture deadline expired: " + repr(samples))
+            value = method(*args, timeout=remaining)
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Platform Text capture deadline expired: " + repr(samples))
+            return value
+        interfaces = plain(rpc(self.interface(reference, ACCESSIBLE).GetInterfaces))
+        if TEXT not in interfaces:
+            raise RuntimeError(f"Actual textbox does not advertise AT-SPI Text: {interfaces}")
         interface = self.interface(reference, TEXT)
-        text = str(interface.GetText(dbus.Int32(0), dbus.Int32(-1), timeout=3))
-        caret = int(self.interface(reference, PROPERTIES).Get(TEXT, "CaretOffset", timeout=3))
-        count = int(interface.GetNSelections(timeout=3))
-        if not 0 <= count <= 16:
-            raise RuntimeError(f"Unexpected number of platform selections: {count}")
-        selections = [plain(interface.GetSelection(dbus.Int32(index), timeout=3)) for index in range(count)]
-        if not 0 <= caret <= len(text) or any(len(item) != 2 or not 0 <= item[0] <= item[1] <= len(text) for item in selections):
-            confirmed = str(interface.GetText(dbus.Int32(0), dbus.Int32(-1), timeout=3))
-            raise RuntimeError("Platform Text offsets fall outside the observed Unicode string: "
-                               + repr({"text": text, "caret": caret, "selections": selections, "confirmedText": confirmed}))
-        return {"text": text, "caret": caret, "selections": selections}
+        properties = self.interface(reference, PROPERTIES)
+        while len(samples) < 8:
+            text = str(rpc(interface.GetText, dbus.Int32(0), dbus.Int32(-1)))
+            caret = int(rpc(properties.Get, TEXT, "CaretOffset"))
+            count = int(rpc(interface.GetNSelections))
+            if not 0 <= count <= 16:
+                raise RuntimeError(f"Unexpected number of platform selections: {count}")
+            selections = [plain(rpc(interface.GetSelection, dbus.Int32(index))) for index in range(count)]
+            current = {"text": text, "caret": caret, "selections": selections}
+            samples.append(current)
+            if len(samples) > 1 and samples[-1] == samples[-2]:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Platform Text capture deadline expired: " + repr(samples))
+                if not 0 <= caret <= len(text) or any(
+                        len(item) != 2 or not 0 <= item[0] <= item[1] <= len(text) for item in selections):
+                    raise RuntimeError("Stable platform Text offsets are invalid: " + repr(samples))
+                return {**current, "samples": samples}
+        raise RuntimeError("Platform Text did not stabilize within the capture budget: " + repr(samples))
 
     def read(self, reference):
         accessible = self.interface(reference, ACCESSIBLE)
@@ -151,9 +174,10 @@ class Observer:
         # registry and providers; use the installed AT-SPI enum vocabulary.
         role_number = int(accessible.GetRole(timeout=3))
         role = Atspi.Role.__enum_values__.get(role_number)
+        platform_role = role.value_nick.replace("-", " ") if role else f"unknown role {role_number}"
         node = {"reference": list(reference),
                 "name": str(properties.Get(ACCESSIBLE, "Name", timeout=3)),
-                "role": role.value_nick.replace("-", " ") if role else f"unknown role {role_number}",
+                "role": canonical_role(role_number, platform_role), "platformRole": platform_role,
                 "roleNumber": role_number,
                 "interfaces": interfaces, "stateBits": bits, "states": states,
                 "children": plain(accessible.GetChildren(timeout=3))}

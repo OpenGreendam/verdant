@@ -247,6 +247,87 @@ class DisplayFdProtocol(unittest.TestCase):
                 finally:
                     os.close(read_fd)
 
+class PlatformTextCapture(unittest.TestCase):
+    def capture(self, samples, rpc_seconds=0):
+        # Execute the real observer method with scripted D-Bus replies. GI is
+        # unnecessary for this transport race; no fake editor buffer is used.
+        import ast
+        import time
+        from types import SimpleNamespace
+        file = Path(__file__).resolve().parents[1] / 'a11y/observe-atspi.py'
+        tree = ast.parse(file.read_text())
+        observer = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'Observer')
+        method = next(node for node in observer.body if isinstance(node, ast.FunctionDef) and node.name == 'read_text')
+        clock = [0.0]
+        self.rpc_timeouts = []
+        scope = {'TEXT': 'Text', 'PROPERTIES': 'Properties', 'ACCESSIBLE': 'Accessible',
+                 'time': SimpleNamespace(monotonic=lambda: clock[0]),
+                 'dbus': SimpleNamespace(Int32=int), 'plain': lambda value: value}
+        timeouts = self.rpc_timeouts
+        exec(compile(ast.Module(body=[method], type_ignores=[]), str(file), 'exec'), scope)
+        class Replies:
+            index = -1
+            def delay(self, kwargs):
+                timeouts.append(kwargs['timeout'])
+                clock[0] += rpc_seconds
+            def GetInterfaces(self, **kwargs):
+                self.delay(kwargs)
+                return ['Text']
+            def GetText(self, *args, **kwargs):
+                self.delay(kwargs)
+                self.index += 1
+                self.current = samples[min(self.index, len(samples) - 1)]
+                return self.current['text']
+            def Get(self, *args, **kwargs):
+                self.delay(kwargs)
+                return self.current['caret']
+            def GetNSelections(self, **kwargs):
+                self.delay(kwargs)
+                return len(self.current['selections'])
+            def GetSelection(self, index, **kwargs):
+                self.delay(kwargs)
+                return self.current['selections'][index]
+        replies = Replies()
+        owner = SimpleNamespace(read=lambda _: {'interfaces': ['Text']}, interface=lambda *_: replies)
+        return scope['read_text'](owner, ('fixture', 'entry'))
+
+    def test_changed_text_reads_preserve_the_raw_race_until_two_equal_samples(self):
+        raw = [{'text': 'ab', 'caret': 3, 'selections': []},
+               {'text': 'abc', 'caret': 3, 'selections': []},
+               {'text': 'abc', 'caret': 3, 'selections': []}]
+        observed = self.capture(raw)
+        self.assertEqual(observed['text'], 'abc')
+        self.assertEqual(observed['caret'], 3)
+        self.assertEqual(observed['samples'], raw)
+
+    def test_stable_invalid_offsets_are_not_clamped_or_retried_as_success(self):
+        with self.assertRaisesRegex(RuntimeError, 'Stable platform Text offsets are invalid'):
+            self.capture([{'text': 'ab', 'caret': 3, 'selections': []}] * 2)
+
+    def test_unstable_text_exhausts_the_explicit_capture_budget(self):
+        with self.assertRaisesRegex(RuntimeError, 'did not stabilize'):
+            self.capture([{'text': str(index), 'caret': 1, 'selections': []} for index in range(8)])
+
+    def test_each_rpc_uses_remaining_budget_and_late_replies_never_pass(self):
+        with self.assertRaisesRegex(RuntimeError, 'deadline expired'):
+            self.capture([{'text': 'abc', 'caret': 3, 'selections': []}] * 2, rpc_seconds=0.5)
+        self.assertEqual(self.rpc_timeouts, [3.0, 2.5, 2.0, 1.5, 1.0, 0.5])
+
+
+class PlatformRoleVocabulary(unittest.TestCase):
+    def test_numeric_button_role_is_stable_without_relabeling_toggles(self):
+        import ast
+        file = Path(__file__).resolve().parents[1] / 'a11y/observe-atspi.py'
+        tree = ast.parse(file.read_text())
+        method = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'canonical_role')
+        scope = {}
+        exec(compile(ast.Module(body=[method], type_ignores=[]), str(file), 'exec'), scope)
+        canonical = scope['canonical_role']
+        for native in ('button', 'push button'):
+            self.assertEqual(canonical(43, native), 'push button')
+        self.assertEqual(canonical(62, 'toggle button'), 'toggle button')
+        self.assertEqual(canonical(62, 'button'), 'button')
+
 
 if __name__ == '__main__':
     unittest.main()

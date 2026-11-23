@@ -48,12 +48,16 @@ class ControlCases:
 
     def text(self, node, expected=None, selections=None):
         reference = tuple(node["reference"])
-        result = self.wait(lambda: self.observer.read_text(reference),
-                           lambda value: (expected is None or value["text"] == expected)
+        def read():
+            result = self.observer.read_text(reference)
+            # Keep intermediate stable prefixes as well as within-capture
+            # races. The predicate still requires the complete expected text.
+            self.log_input("atspi-observation", method="Text.GetText/GetSelection", reference=list(reference),
+                           value=result)
+            return result
+        result = self.wait(read, lambda value: (expected is None or value["text"] == expected)
                            and (selections is None or value["selections"] == selections),
                            f"real AT-SPI text={expected!r}, selections={selections!r}")
-        self.log_input("atspi-observation", method="Text.GetText/GetSelection", reference=list(reference),
-                       value=result)
         return {"reference": list(reference), **result}
 
     def type_unicode(self, value):
@@ -166,7 +170,7 @@ class ControlCases:
         self.type_unicode("😺")
         self.record("text-edited", control={"text": self.text(field, TEXT_ACCEPTED)})
         self.key("Tab")
-        cancel = self.node("取消", "button")
+        cancel = self.node("取消", "push button")
         cancel = self.wait(lambda: self.observer.read(tuple(cancel["reference"])),
                            lambda node: "focused" in node["states"], "one Tab to the dialog cancel button")
         self.record("text-focus-forward", control={"focused": cancel})
@@ -211,7 +215,7 @@ class ControlCases:
 
     def collection_scroll_cancel(self):
         before = self.persisted()
-        self.click(self.node("预设库", "button"))
+        self.click(self.node("预设库", "push button"))
         def frames():
             return [node for node in self.snapshot()["nodes"]
                     if node["role"] in ("frame", "window") and node["name"] == LIBRARY_TITLE]
@@ -382,6 +386,18 @@ def validate_control_trace(observations, final):
             node = tree_node(label, control["text"].get("reference"), "entry", name)
             require("org.a11y.atspi.Text" in node.get("interfaces", []),
                     f"{label}: actual entry lacks the platform Text interface")
+            value = control["text"]
+            samples = value.get("samples", [])
+            require(isinstance(samples, list) and 2 <= len(samples) <= 8
+                    and samples[-1] == samples[-2]
+                    and samples[-1] == {key: value.get(key) for key in ("text", "caret", "selections")},
+                    f"{label}: platform Text lacks two unchanged raw final samples")
+            caret, selected = value["caret"], value["selections"]
+            require(type(caret) is int and 0 <= caret <= len(value["text"])
+                    and isinstance(selected, list) and all(isinstance(item, list) and len(item) == 2
+                    and all(type(offset) is int for offset in item)
+                    and 0 <= item[0] <= item[1] <= len(value["text"]) for item in selected),
+                    f"{label}: stable platform Text offsets are invalid")
         if "focused" in control:
             focus = control["focused"]
             node = tree_node(label, focus.get("reference"), focus.get("role"), focus.get("name"))
@@ -445,7 +461,7 @@ def validate_control_trace(observations, final):
             and observed("text-assistive-selection").get("action") ==
                 {"method": "Text.SetSelection", "arguments": [0, 2, 4], "accepted": True},
             "The platform selection action did not change the real editor range")
-    for label, name, role in (("text-focus-forward", "取消", "button"),
+    for label, name, role in (("text-focus-forward", "取消", "push button"),
                               ("text-focus-back", "输入文字…", "entry")):
         focus = observed(label).get("focused", {})
         require(focus.get("name") == name and focus.get("role") == role and "focused" in focus.get("states", []),

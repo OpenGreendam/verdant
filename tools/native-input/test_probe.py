@@ -186,7 +186,7 @@ def synthetic_control_observations():
              'visible': 0 <= index * 12 - offset < 48} for index in range(20)]}
 
     entry = {'name': '输入文字…', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/input']}
-    cancel = {'name': '取消', 'role': 'button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
+    cancel = {'name': '取消', 'role': 'push button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
     search = {'name': SEARCH_NAME, 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/search']}
     sequence = [
         ('preflight', 0, {}, None, None),
@@ -226,6 +226,12 @@ def synthetic_control_observations():
             field = copy.deepcopy(search if label.startswith('collection-') else entry)
             field['interfaces'] = ['org.a11y.atspi.Text']
             control['text']['reference'] = field['reference']
+            text = control['text']
+            selected = text.setdefault('selections', [])
+            text['caret'] = selected[-1][1] if selected else (
+                2 if label in ('text-edited', 'text-focus-back') else len(text['text']))
+            sample = {key: copy.deepcopy(text[key]) for key in ('text', 'caret', 'selections')}
+            text['samples'] = [copy.deepcopy(sample), copy.deepcopy(sample)]
             nodes.append(field)
         if 'focused' in control:
             focus = copy.deepcopy(control['focused'])
@@ -374,6 +380,29 @@ class ControlEvidenceRefusals(unittest.TestCase):
                     next(node for node in nodes if node.get('role') == 'entry')['states'] = []
                 with self.assertRaisesRegex(RuntimeError, 'actual'):
                     validate_control_trace(self.observations, self.final)
+
+    def test_text_summary_requires_two_equal_unmodified_raw_final_samples(self):
+        for mutation in ('missing', 'changing', 'invalid', 'summary'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                value = self.detail('text-unicode')['control']['text']
+                if mutation == 'missing': value['samples'] = []
+                elif mutation == 'changing': value['samples'][-1]['caret'] = 0
+                elif mutation == 'invalid':
+                    value['caret'] = 99
+                    for sample in value['samples']: sample['caret'] = 99
+                else: value['caret'] = 0
+                with self.assertRaisesRegex(RuntimeError, 'platform Text'):
+                    validate_control_trace(self.observations, self.final)
+
+    def test_stable_search_prefix_with_no_rows_cannot_replace_the_complete_query(self):
+        value = self.detail('collection-search-empty')['control']['text']
+        value['text'] = SEARCH_MISSING[:-1]
+        value['caret'] = len(value['text'])
+        sample = {key: copy.deepcopy(value[key]) for key in ('text', 'caret', 'selections')}
+        value['samples'] = [copy.deepcopy(sample), copy.deepcopy(sample)]
+        with self.assertRaisesRegex(RuntimeError, 'Search did not remove'):
+            validate_control_trace(self.observations, self.final)
 
 
 if __name__ == '__main__':
