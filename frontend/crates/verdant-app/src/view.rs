@@ -2054,25 +2054,39 @@ impl Render for Editor {
                     ed.begin_lyric(id, w, cx);
                 }
             }))
-            .on_action(cx.listener(|ed, _: &Escape, w, cx| {
-                if ed.menu.is_some() {
-                    ed.close_menu(w, cx);
-                } else if ed.modal_dialog.is_some() {
-                    ed.close_modal_dialog(false, w, cx);
-                } else if ed.session.gesture.is_some()
-                    || ed.lane_stroke.is_some()
-                    || ed.mixer_drag.is_some()
-                    || ed.master_drag.is_some()
-                    || ed.note_creation.is_some()
-                    || ed.has_control_drag(cx)
-                    || crate::ruler_navigation::is_active(cx.entity_id(), cx)
-                {
-                    ed.cancel_edits(verdant_session::CancelReason::Escape, w, cx);
-                } else {
-                    ed.session.selection.clear();
-                    cx.notify();
+            .on_action({
+                let editor = cx.weak_entity();
+                move |_: &Escape, w: &mut Window, cx: &mut gpui::App| {
+                    // The application keymap may resolve Escape before the
+                    // prototype's key.down handler. Cancel its live lease before
+                    // borrowing Editor: the authored cancel drains back into it.
+                    let contact = editor.upgrade().and_then(|entity| {
+                        let ed = entity.read(cx);
+                        if ed.menu.is_some() || ed.modal_dialog.is_some() { return None; }
+                        ed.proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade)
+                    });
+                    if contact.is_some_and(|contact| contact.cancel_in_window(w, cx)) { return; }
+                    let _ = editor.update(cx, |ed, cx| {
+                        if ed.menu.is_some() {
+                            ed.close_menu(w, cx);
+                        } else if ed.modal_dialog.is_some() {
+                            ed.close_modal_dialog(false, w, cx);
+                        } else if ed.session.gesture.is_some()
+                            || ed.lane_stroke.is_some()
+                            || ed.mixer_drag.is_some()
+                            || ed.master_drag.is_some()
+                            || ed.note_creation.is_some()
+                            || ed.has_control_drag(cx)
+                            || crate::ruler_navigation::is_active(cx.entity_id(), cx)
+                        {
+                            ed.cancel_edits(verdant_session::CancelReason::Escape, w, cx);
+                        } else {
+                            ed.session.selection.clear();
+                            cx.notify();
+                        }
+                    });
                 }
-            }))
+            })
             .on_action(cx.listener(|ed, _: &NudgeLeft, w, cx| nudge(ed, -ed.session.snap.grid_ticks.max(1), 0, w, cx)))
             .on_action(cx.listener(|ed, _: &NudgeRight, w, cx| nudge(ed, ed.session.snap.grid_ticks.max(1), 0, w, cx)))
             .on_action(cx.listener(|ed, _: &NudgeUp, w, cx| nudge(ed, 0, 1, w, cx)))
