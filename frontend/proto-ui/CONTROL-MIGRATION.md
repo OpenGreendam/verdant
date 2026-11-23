@@ -49,6 +49,8 @@ Verdant 固定的 GPUI fork 提供平台文本选区通知 API，因此应用的
 
 源级测试覆盖受控值拒绝、重入更新、revision 替换、卸载、取消、文本组合和输入准入。GPUI 测试使用真实生成组件与事件，覆盖鼠标、键盘、AccessKit 动作、虚拟列表与实际音符表格、导出对话框、图形末次采样、触摸仲裁、持续演奏键和卸载后的迟到事件。图形测试还验证捕获丢失／同 hitbox 被重新取得后不得写入，旧清理不得释放新捕获。测试直接调用 Expose 方法与实际派发原生事件的证据分别保留。
 
-macOS 与 Windows 的 workflow 除原有 pointer/roll/参数链外，也运行 `proto_`、`devices::`、`table::`、`menu::`、`commands::`、`files::` 范围，Linux 运行完整 app 测试。真实 X11／Wayland 输入 job 继续依赖同一次构建的发布包，并绑定源身份与二进制摘要。
+Linux、macOS 与 Windows 的 workflow 均运行完整 `verdant-gui` suite，以及生成 SDK 的默认 test-support 和 modern-element + text-selection-notification 两种 feature 配置。#12 的 [Frontend #122](https://github.com/OpenGreendam/verdant/actions/runs/45212699291) 在每个平台分别通过 291/291、53/53、52/52，相关套件无 failed、ignored 或 filtered 用例。更广 workspace 的资源依赖用例保留其原日志范围。
+
+同次构建的 Linux 包完成 X11／windowed Wayland 各 11 项原有场景和各 3 项迁移控件场景，共 28/28；来源与二进制摘要见[主线验收记录](VALIDATION-MAINLINE-2026-11-23.json)。此记录是已完成 CI 的来源索引，没有把文档更新算作重新执行。
 
 每个验证结果以本变更对应提交的 CI Checks 为准；README 中保留的 #79 结果是迁移前基线。框架测试不能代替物理触摸、平台 IME、屏幕阅读器或所有平台的实际窗口验收，未运行的范围不能由覆盖清单推断为通过。

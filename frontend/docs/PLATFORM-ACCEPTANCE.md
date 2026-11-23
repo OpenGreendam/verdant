@@ -4,7 +4,11 @@
 
 ## 基线状态
 
-Linux 0.1.0 已有真实本地模型、断网合成、48 kHz 输出、Pride 外观及安装回滚记录。Windows x64／MSVC 与 macOS Apple Silicon 的打包代码已准备，原生构建、安装和运行验收仍待完成。每个新包逐项复验。
+Linux 0.1.0 已有真实本地模型、断网合成、48 kHz 输出、Pride 外观及安装回滚的历史记录；它们不能直接证明后续包的同项结果。
+
+[PR #12 的 Frontend #122](https://github.com/OpenGreendam/verdant/actions/runs/45212699291) 已完成 Linux、Windows x64／MSVC、macOS Apple Silicon 的原生构建、每平台完整 GUI 291/291、SDK 两种 feature 配置 53/53 与 52/52，以及各自包／源码检查。Linux 同次构建的包完成 X11／windowed Wayland 28/28 真实窗口输入场景。源码、job、原始 artifact 摘要与范围见[主线验收记录](../proto-ui/VALIDATION-MAINLINE-2026-11-23.json)。
+
+这些 CI 包均为 `voice_bundled: false`。Windows/macOS 实际桌面操作、声库安装／回滚、真实合成、物理设备和下表平台义务仍待完成；原生构建或 GUI 框架测试不替代它们。每个新包逐项复验。
 
 | 范围 | 需要的原生观察 |
 | --- | --- |

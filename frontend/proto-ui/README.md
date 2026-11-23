@@ -2,13 +2,23 @@
 
 Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生成原生组件，`rust-data-v1` 生成只依赖 Rust 标准库的类型化决策函数。保留的 Rust 源码全部由上游 compiler 发射；不要手改 `generated/`。版本、完整 GPUI 来源、工具链要求、共享 SDK 内容和各编译单元的目标由 [compiler.pin.json](compiler.pin.json) 绑定。
 
-## 本轮 Draft 整合状态
+## 已合入主线的整合状态
 
-当前候选选择性整合 Verdant [PR #7](https://github.com/OpenGreendam/verdant/pull/7) 与 [PR #8](https://github.com/OpenGreendam/verdant/pull/8) 的有效修复，继续保留 18 类交互对应 14 个编译入口、Adwaita 绘图、音乐领域层和完整验收门禁。此次整合进一步把编辑操作选择、连续值精度和输入生命周期放进作者源码；没有采用另一分支中退回原生滚动策略、删除既有快捷键保护或缩减完整 GUI 测试的改动。
+Verdant [PR #12](https://github.com/OpenGreendam/verdant/pull/12) 已于 2026-11-23 合入 `main`，合并提交为 `afd3eda361874f275422263473334daba7575b59`。本轮保留 18 类交互对应的 14 个编译入口、Adwaita 绘图和音乐领域层，并将编辑操作选择、连续值精度和输入生命周期放进作者源码。
 
-**当前远端恢复后的候选尚未完成严格 fresh producer、完整 Node、完整 GUI/SDK 与跨平台 CI 的重新验收。** 应用源码 commit、最终 compiler pin、生成 SDK 摘要和对应日志将在实际完成后写入 [本轮机器记录](VALIDATION-INTEGRATION-2026-11-23.json)。恢复前的 producer/203 项 Node 结果及下文上一轮 237 项 GUI 结果保留为历史检查点，不能转移到当前候选。
+**最终候选 `5e19b7de231894c921a6dd69f16e8820b35b8ec3` 已完成 fresh producer、完整 Node、三平台 GUI/SDK、打包以及全部 28 项 Linux 真实窗口输入验收。** [Frontend #122](https://github.com/OpenGreendam/verdant/actions/runs/45212699291) 实际测试 PR merge checkout `96691e1abdf722d573465ee2d32a4a1588a9191b`；结果固定到该来源，后续提交仍需各自验证。
 
-`gpui-source-v1` 仍是实验性 profile。本文记录实际源码和消费者边界，不将 Draft、profile 状态或未执行的平台验收描述为稳定承诺。
+| 已执行范围 | #122 的实际结果 |
+|---|---|
+| 固定编译器再生成 | 14 个单元、81 个制品；82 项 GPUI 规则 fixture；完整 Node 224/224、0 skip |
+| 独立 retained lane | 97 passed、127 个依赖上游的用例明确 skipped；不能替代上面的 fresh 结果 |
+| 无原生 UI 依赖的 session lane | 33 项 Rust 测试通过 |
+| Linux、Windows x64、macOS Apple Silicon | 每平台完整 GUI 291/291；SDK 两个 feature 配置分别 53/53、52/52；各自打包和来源检查通过 |
+| Linux X11 与 windowed Wayland | 原有 11 + 11、迁移控件 3 + 3，共 **28/28**；严格 finalizer 的 `errors = []` |
+
+完整来源、job、原始 artifact 摘要和未覆盖范围见[主线验收记录](VALIDATION-MAINLINE-2026-11-23.json)。上游固定到 `4e499ae25e825e130e740f16af66d70b23a743cf`，共享 SDK 内容摘要为 `e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35`。这些数字来自各自执行层，不能相加为总验收数量；较广 Cargo workspace 中既有资源依赖的 ignored/filtered 用例仍按原日志保留。
+
+[恢复期记录](VALIDATION-INTEGRATION-2026-11-23.json)、此前失败和历史通过记录保持原样，不把它们重标为最终通过。`gpui-source-v1` 仍是实验性 profile；系统 IME、物理触摸／触笔、完整读屏、物理音频和 Windows/macOS 实际窗口操作仍按[平台验收](../docs/PLATFORM-ACCEPTANCE.md)分别完成。CI 包未随附完整声库，不能据此宣称正式发行或新用户断网合成已经完成。
 
 ## 当前边界
 
@@ -108,7 +118,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --recover-publication
 
 ## 准入与证据
 
-本轮最终检查见 [整合机器记录](VALIDATION-INTEGRATION-2026-11-23.json)，当前仍待完整重跑。以下表格是**上一轮已执行的历史快照**，绑定应用源码快照 [`f325638d`](https://github.com/OpenGreendam/verdant/commit/f325638dcd7cb4169e52d9eff7796825eccd4ebb) 与编译器 [`5912f817`](https://github.com/Proto-UI/Proto-UI/commit/5912f817581f89785e75c26e324a76c97257dc60)。执行范围、来源身份和日志摘要见 [上一轮机器记录](VALIDATION-2026-11-23.json)，职责清单、证据层次和历史修复见 [迁移记录](MIGRATION-2026-11-23.md#验证与证据层次)。
+本轮最终执行与合入状态见[主线验收记录](VALIDATION-MAINLINE-2026-11-23.json)；[恢复期机器记录](VALIDATION-INTEGRATION-2026-11-23.json)保持其当时的 pending 状态。以下表格是**上一轮已执行的历史快照**，绑定应用源码快照 [`f325638d`](https://github.com/OpenGreendam/verdant/commit/f325638dcd7cb4169e52d9eff7796825eccd4ebb) 与编译器 [`5912f817`](https://github.com/Proto-UI/Proto-UI/commit/5912f817581f89785e75c26e324a76c97257dc60)。执行范围、来源身份和日志摘要见 [上一轮机器记录](VALIDATION-2026-11-23.json)，职责清单、证据层次和历史修复见 [迁移记录](MIGRATION-2026-11-23.md#验证与证据层次)。
 
 | 上一轮检查范围 | 该快照的实际结果 |
 |---|---|
@@ -120,7 +130,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --recover-publication
 | 实际 Rust source mutation | baseline 实测 0.55、variant 实测 0.6；variant 使用旧 0.55 预期时按要求断言失败，实验整体通过 |
 | 上游默认 GPUI 的托管 CI | [run 45071732309](https://github.com/Proto-UI/Proto-UI/actions/runs/45071732309) 在 macOS 15 和 Ubuntu 24.04 上分别通过原生消费者 39/39、数值辅助功能 8/8、SDK 27/27；两边均执行了旧版宿主的真实选区通知回归 |
 
-这些结果分别证明源码语义、生成 Rust、依赖边界和框架输入行为，不相加为“总验收项”。默认 GPUI 的 27 项 SDK 回归与 Verdant 现代 GPUI 的 26 项使用不同宿主 API 分支；后者不能代替前者。当前候选的逐屏视觉、打包后 OS 输入、物理触摸、系统 IME 与读屏验收仍按平台单独记录，不继承下面 #79 的历史成功状态。
+这些结果分别证明源码语义、生成 Rust、依赖边界和框架输入行为，不相加为“总验收项”。默认 GPUI 的 27 项 SDK 回归与 Verdant 现代 GPUI 的 26 项使用不同宿主 API 分支；后者不能代替前者。本轮已执行的 Linux 打包后 28 项 OS 输入结果见文首 #122；逐屏视觉、物理触摸、系统 IME、完整读屏和其他平台窗口操作仍分别记录，不继承下面 #79 的历史成功状态。
 
 上一轮旋钮集成的历史版本见 [首轮验收记录](VALIDATION-2026-11-22.md) 和 [后续修复验收](VALIDATION-COMPLETION-2026-11-22.md)。后文历史表固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。关联讨论位于 [PR #5](https://github.com/OpenGreendam/verdant/pull/5)。这些记录不随当前分支和后续文档提交改写。
 
@@ -172,7 +182,7 @@ Rust 各 crate 的数量是 Linux 总数中的子集，不重复相加。macOS/W
 
 ## 上游依据
 
-上一轮数值辅助功能修复 [PR #1710](https://github.com/Proto-UI/Proto-UI/pull/1710) 已合入上游 main；本次迁移的通用能力与修复通过 [PR #1730](https://github.com/Proto-UI/Proto-UI/pull/1730) 回馈。它们包括条件辅助功能、共享 Input 编辑、原生通知/焦点/初次 hover 生命周期、真实滚动引擎绑定，以及同时兼容默认与现代 GPUI 的文本选区通知，详见 [迁移记录](MIGRATION-2026-11-23.md#上游回馈)。上一轮 pin 将这些能力锁定到 `5912f817581f89785e75c26e324a76c97257dc60` 并完成当时的 fresh 检查。本轮继续整合 [PR #1731](https://github.com/Proto-UI/Proto-UI/pull/1731) 的适用修复；最终身份以当前 pin、receipts 和整合记录的实际重新生成为准，不能用旧 source audit 或历史运行替代。
+上一轮数值辅助功能修复 [PR #1710](https://github.com/Proto-UI/Proto-UI/pull/1710) 已合入上游 main；本次迁移的通用能力与修复通过 [PR #1730](https://github.com/Proto-UI/Proto-UI/pull/1730) 回馈。它们包括条件辅助功能、共享 Input 编辑、原生通知/焦点/初次 hover 生命周期、真实滚动引擎绑定，以及同时兼容默认与现代 GPUI 的文本选区通知，详见 [迁移记录](MIGRATION-2026-11-23.md#上游回馈)。上一轮 pin 将这些能力锁定到 `5912f817581f89785e75c26e324a76c97257dc60` 并完成当时的 fresh 检查。已合入的 #12 使用 [PR #1731](https://github.com/Proto-UI/Proto-UI/pull/1731) 中适用的修复，并固定到 `4e499ae25e825e130e740f16af66d70b23a743cf` 完成 fresh 重新生成。后续 compiler pin 更新仍需新的 receipts 与消费者验收，不能用旧 source audit 或历史运行替代。
 
 - [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/README.md)
 - [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/src/compile.ts)
