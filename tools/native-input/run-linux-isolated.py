@@ -222,6 +222,10 @@ def main(args):
                  '--binary', str(binary), '--worker-binary', str(worker), '--repo', str(repo),
                  '--output-dir', str(run / 'evidence'), '--backend', args.backend, '--suite', args.suite,
                  '--input-display', env['DISPLAY'], '--xdotool', xdotool]
+        if args.suite == 'controls':
+            writer, reader = ('xclip', 'xclip') if args.backend == 'x11' else ('wl-copy', 'wl-paste')
+            probe.extend(['--clipboard-writer', dependency('usr/bin/' + writer),
+                          '--clipboard-reader', dependency('usr/bin/' + reader)])
         if args.backend == 'wayland':
             weston = dependency('usr/bin/weston')
             debug = dependency('usr/bin/weston-debug')

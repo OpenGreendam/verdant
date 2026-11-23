@@ -134,7 +134,9 @@ class Observer:
             raise RuntimeError(f"Unexpected number of platform selections: {count}")
         selections = [plain(interface.GetSelection(dbus.Int32(index), timeout=3)) for index in range(count)]
         if not 0 <= caret <= len(text) or any(len(item) != 2 or not 0 <= item[0] <= item[1] <= len(text) for item in selections):
-            raise RuntimeError("Platform Text offsets fall outside the observed Unicode string")
+            confirmed = str(interface.GetText(dbus.Int32(0), dbus.Int32(-1), timeout=3))
+            raise RuntimeError("Platform Text offsets fall outside the observed Unicode string: "
+                               + repr({"text": text, "caret": caret, "selections": selections, "confirmedText": confirmed}))
         return {"text": text, "caret": caret, "selections": selections}
 
     def read(self, reference):

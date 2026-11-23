@@ -1,17 +1,20 @@
 """Production-control journeys driven through the OS and the AT-SPI tree.
 
 These cases run in a separate application/project from the original knob
-suite. Unicode key injection is deliberately not described as an IME test.
+suite. Unicode clipboard/key input is deliberately not described as an IME test.
 """
 
 import copy
 import math
+import os
+import signal
+import subprocess
 
 
 CONTROL_CASES = ("text-selection-focus", "collection-scroll-cancel", "mixer-pan")
 TEXT_INITIAL = "音😀AB"
-TEXT_ASSISTIVE = "音😀乐"
-TEXT_ACCEPTED = "音😺乐"
+TEXT_ASSISTIVE = "音😀Z"
+TEXT_ACCEPTED = "音😺Z"
 LIBRARY_TITLE = "插件预设库 — Verdant"
 SEARCH_NAME = "搜索名称、类别、作者、标签与用途"
 SEARCH_MISSING = "verdant-no-matching-preset-79f2"
@@ -56,9 +59,62 @@ class ControlCases:
     def type_unicode(self, value):
         if self.held:
             raise RuntimeError("Text journey must not release an unrelated held pointer")
+        if any(ord(character) > 0x7f for character in value):
+            self.paste_unicode(value)
+            return
         self.xdo("type", "--clearmodifiers", "--delay", 45, "--", value)
         self.log_input("text-route", route="XTest key events; no input-method composition", value=value)
         self.pause()
+
+    def paste_unicode(self, value):
+        # XTest's synthesized keymap dropped Unicode input on the observed
+        # X11 path. Use the actual private display's clipboard, never an
+        # editor expose method or a fake input-handler callback.
+        if not self.args.clipboard_writer or not self.args.clipboard_reader:
+            raise RuntimeError("Unicode clipboard transport requires observed native clipboard tools")
+        if self.args.backend == "x11":
+            write = [str(self.args.clipboard_writer), "-selection", "clipboard", "-in", "-quiet", "-target", "UTF8_STRING"]
+            read = [str(self.args.clipboard_reader), "-selection", "clipboard", "-out", "-target", "UTF8_STRING"]
+        else:
+            write = [str(self.args.clipboard_writer), "--foreground", "--type", "text/plain;charset=utf-8"]
+            read = [str(self.args.clipboard_reader), "--no-newline", "--type", "text/plain;charset=utf-8"]
+        log_name = f"clipboard-{len(self.clipboard_processes):02}.log"
+        stream = (self.output / log_name).open("wb")
+        child = subprocess.Popen(write, stdin=subprocess.PIPE, stdout=stream, stderr=stream,
+                                 env=self.input_env, start_new_session=True)
+        record = {"pid": child.pid, "ownedProcessGroup": child.pid, "command": write, "log": log_name}
+        self.clipboard_processes.append((child, stream, record))
+        self.report.setdefault("clipboardProcesses", []).append(record)
+        child.stdin.write(value.encode("utf-8"))
+        child.stdin.close()
+        def clipboard():
+            result = subprocess.run(read, env=self.input_env, capture_output=True, text=True, timeout=3)
+            if child.poll() is not None and result.returncode:
+                raise RuntimeError(f"Owned clipboard writer exited: {child.returncode}; inspect {log_name}")
+            return result
+        result = self.wait(clipboard, lambda item: item.returncode == 0 and item.stdout == value,
+                           "the real private display clipboard to contain the requested Unicode")
+        self.log_input("clipboard-observation", command=read, value=result.stdout, exitCode=result.returncode)
+        self.key("ctrl+v")
+        self.log_input("text-route", route="Native clipboard + XTest Ctrl+V; no input-method composition",
+                       backend=self.args.backend, value=value)
+        self.pause()
+
+    def cleanup_clipboards(self):
+        for child, stream, record in self.clipboard_processes:
+            try:
+                if child.poll() is None:
+                    os.killpg(child.pid, signal.SIGTERM)
+                    try:
+                        child.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(child.pid, signal.SIGKILL)
+                        child.wait(timeout=3)
+                record["returnCodeAfterCleanup"] = child.returncode
+            except (OSError, subprocess.SubprocessError) as error:
+                self.report.setdefault("cleanupErrors", []).append(f"Owned clipboard cleanup: {error}")
+            finally:
+                stream.close()
 
     def save_controls(self, name, pan, revision, before=None):
         saved = self.save(-8.0, revision)
@@ -101,7 +157,7 @@ class ControlCases:
             raise RuntimeError("AT-SPI rejected the real text selection action")
         self.record("text-assistive-selection", control={"text": self.text(field, TEXT_INITIAL, [[2, 4]]),
                     "action": {"method": "Text.SetSelection", "arguments": [0, 2, 4], "accepted": accepted}})
-        self.type_unicode("乐")
+        self.type_unicode("Z")
         self.record("text-assistive-edited", control={"text": self.text(field, TEXT_ASSISTIVE)})
         self.key("Home")
         self.key("Right")
@@ -126,8 +182,8 @@ class ControlCases:
         undone = self.save_controls(before["trackName"], before["panPermille"], before["revision"] + 2)
         self.record("text-single-undo", control={"undoCount": 1})
         field = self.rename_prompt()
-        self.type_unicode("不应保存")
-        self.text(field, "不应保存")
+        self.type_unicode("discarded-rename")
+        self.text(field, "discarded-rename")
         self.key("Escape")
         self.wait(lambda: self.nodes("轨道名称", "dialog"), lambda nodes: not nodes, "rename prompt cancellation")
         self.save_controls(before["trackName"], before["panPermille"], undone["revision"], undone)
