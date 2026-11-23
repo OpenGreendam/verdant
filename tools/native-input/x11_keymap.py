@@ -6,9 +6,169 @@ the key arrives. Install the required symbols before starting the compositor
 and application, then keep them for the lifetime of this private Xvfb server.
 """
 
+import ctypes
 import hashlib
+import json
+from pathlib import Path
 import re
 import subprocess
+
+
+RULE_FIELDS = ('rules', 'model', 'layout', 'variant', 'options')
+PRIVATE_LAYOUT = 'verdant_controls'
+
+
+def _component_body(keymap, kind):
+    """Extract an xkbcomp component, ignoring braces inside strings/comments."""
+    masked = re.sub(r'"(?:\\.|[^"\\])*"|/\*.*?\*/|//[^\n]*',
+                    lambda match: ' ' * len(match[0]), keymap, flags=re.DOTALL)
+    starts = list(re.finditer(r'\b' + re.escape(kind) + r'\s*\{', masked))
+    if len(starts) != 1:
+        raise RuntimeError(f'Expected one actual {kind} component in the observed XKB map')
+    start = starts[0].end()
+    depth = 1
+    for index in range(start, len(masked)):
+        depth += (masked[index] == '{') - (masked[index] == '}')
+        if depth == 0:
+            return keymap[start:index]
+    raise RuntimeError(f'Unclosed {kind} component in the observed XKB map')
+
+
+def prepare_named_keymap(keymap, run):
+    """Give Weston a rules-resolvable copy of the actual server components."""
+    root = run / 'x11-keymap-root'
+    components = {'keycodes': 'xkb_keycodes', 'types': 'xkb_types',
+                  'compat': 'xkb_compatibility', 'symbols': 'xkb_symbols'}
+    bodies = {directory: _component_body(keymap, kind)
+              for directory, kind in components.items()}
+    root.mkdir(mode=0o700)
+    for directory, kind in components.items():
+        (root / directory).mkdir(mode=0o700)
+        (root / directory / PRIVATE_LAYOUT).write_text(
+            f'default {kind} "basic" {{' + bodies[directory] + '};\n')
+    (root / 'rules').mkdir(mode=0o700)
+    (root / 'rules' / PRIVATE_LAYOUT).write_text(''.join(
+        f'! {"layout" if component == "symbols" else "model"} = {component}\n'
+        f'  {PRIVATE_LAYOUT} = {PRIVATE_LAYOUT}(basic)\n'
+        for component in components))
+    return root, dict(zip(RULE_FIELDS, (PRIVATE_LAYOUT, PRIVATE_LAYOUT, PRIVATE_LAYOUT, '', '')))
+
+
+def _library(name, env):
+    # The harness can use an extracted dependency prefix. Prefer that exact
+    # prefix over a similarly named host installation when loading its ABI.
+    for directory in env.get('LD_LIBRARY_PATH', '').split(':'):
+        if directory and (Path(directory) / name).is_file():
+            return ctypes.CDLL(str((Path(directory) / name).resolve()))
+    return ctypes.CDLL(name)
+
+
+def compile_named_keymap(root, names, env):
+    """Actually use xkbcommon's same RMLVO entry point as Weston 13/14."""
+    class RuleNames(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_char_p) for name in RULE_FIELDS]
+
+    xkb = _library('libxkbcommon.so.0', env)
+    xkb.xkb_context_new.argtypes = [ctypes.c_int]
+    xkb.xkb_context_new.restype = ctypes.c_void_p
+    xkb.xkb_context_include_path_append.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+    xkb.xkb_context_include_path_append.restype = ctypes.c_int
+    xkb.xkb_keymap_new_from_names.argtypes = [ctypes.c_void_p, ctypes.POINTER(RuleNames), ctypes.c_int]
+    xkb.xkb_keymap_new_from_names.restype = ctypes.c_void_p
+    xkb.xkb_keymap_get_as_string.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    xkb.xkb_keymap_get_as_string.restype = ctypes.c_void_p
+    xkb.xkb_keymap_unref.argtypes = [ctypes.c_void_p]
+    xkb.xkb_keymap_unref.restype = None
+    xkb.xkb_context_unref.argtypes = [ctypes.c_void_p]
+    xkb.xkb_context_unref.restype = None
+    libc = ctypes.CDLL(None)
+    libc.free.argtypes = [ctypes.c_void_p]
+    libc.free.restype = None
+    # NO_DEFAULT_INCLUDES: this proves the retained private files resolve the
+    # names; a host user/system layout cannot accidentally satisfy the check.
+    context = xkb.xkb_context_new(1)
+    if not context:
+        raise RuntimeError('Could not create the native XKB names compiler context')
+    keymap = serialized = None
+    try:
+        if not xkb.xkb_context_include_path_append(context, str(root).encode()):
+            raise RuntimeError('The private XKB include root was rejected')
+        requested = RuleNames(*(names[name].encode() for name in RULE_FIELDS))
+        keymap = xkb.xkb_keymap_new_from_names(context, ctypes.byref(requested), 0)
+        if not keymap:
+            raise RuntimeError('The observed XKB rules names did not compile')
+        serialized = xkb.xkb_keymap_get_as_string(keymap, 1)
+        if not serialized:
+            raise RuntimeError('Could not serialize the keymap compiled from observed names')
+        return ctypes.string_at(serialized).decode()
+    finally:
+        if serialized:
+            libc.free(serialized)
+        if keymap:
+            xkb.xkb_keymap_unref(keymap)
+        xkb.xkb_context_unref(context)
+
+
+def verify_rules_names(observed, expected):
+    required = b''.join(expected[name].encode() + b'\0' for name in RULE_FIELDS)
+    if observed != required:
+        raise RuntimeError('The X11 rules names differ from the private keyboard layout')
+    return dict(zip(RULE_FIELDS, (value.decode() for value in observed.split(b'\0')[:-1])))
+
+
+def install_rules_names(env, names):
+    """Set and read back only the newly owned Xvfb's native root property."""
+    x11 = _library('libX11.so.6', env)
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+    x11.XDefaultRootWindow.restype = ctypes.c_ulong
+    x11.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+    x11.XInternAtom.restype = ctypes.c_ulong
+    x11.XChangeProperty.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong,
+                                   ctypes.c_ulong, ctypes.c_int, ctypes.c_int,
+                                   ctypes.c_void_p, ctypes.c_int]
+    x11.XGetWindowProperty.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong,
+                                     ctypes.c_long, ctypes.c_long, ctypes.c_int, ctypes.c_ulong,
+                                     ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_int),
+                                     ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_ulong),
+                                     ctypes.POINTER(ctypes.c_void_p)]
+    x11.XGetWindowProperty.restype = ctypes.c_int
+    x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    x11.XFree.argtypes = [ctypes.c_void_p]
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    display = x11.XOpenDisplay(env['DISPLAY'].encode())
+    if not display:
+        raise RuntimeError('Could not open the harness-owned Xvfb to set its keyboard rules')
+    try:
+        root = x11.XDefaultRootWindow(display)
+        atom = x11.XInternAtom(display, b'_XKB_RULES_NAMES', 0)
+
+        def read():
+            actual, form, count, left = ctypes.c_ulong(), ctypes.c_int(), ctypes.c_ulong(), ctypes.c_ulong()
+            data = ctypes.c_void_p()
+            status = x11.XGetWindowProperty(display, root, atom, 0, 1024, 0, 31,
+                                           ctypes.byref(actual), ctypes.byref(form), ctypes.byref(count),
+                                           ctypes.byref(left), ctypes.byref(data))
+            try:
+                if status or left.value or (actual.value and (actual.value != 31 or form.value != 8)):
+                    raise RuntimeError('Could not read the complete native XKB STRING/8 property')
+                return ctypes.string_at(data, count.value) if actual.value else b''
+            finally:
+                if data:
+                    x11.XFree(data)
+
+        before = read()
+        payload = b''.join(names[name].encode() + b'\0' for name in RULE_FIELDS)
+        buffer = ctypes.create_string_buffer(payload)
+        x11.XChangeProperty(display, root, atom, 31, 8, 0, buffer, len(payload))
+        x11.XSync(display, 0)
+        observed = read()
+        actual_names = verify_rules_names(observed, names)
+        return actual_names, {'atom': '_XKB_RULES_NAMES', 'type': 'STRING', 'format': 8,
+                              'beforeHex': before.hex(), 'observedHex': observed.hex(), 'names': actual_names}
+    finally:
+        x11.XCloseDisplay(display)
 
 
 def prepare_unicode_keymap(keymap, inputs):
@@ -85,7 +245,23 @@ def install_unicode_keymap(xkbcomp, env, run, inputs):
                            capture_output=True, text=True, timeout=5)
     observed.write_text(after.stdout)
     verify_unicode_keymap(after.stdout, mappings)
+    # Weston 13's X11 backend reconstructs a keymap from _XKB_RULES_NAMES;
+    # successful server-map readback alone does not verify that consumer path.
+    root, requested_names = prepare_named_keymap(after.stdout, run)
+    names, property_evidence = install_rules_names(env, requested_names)
+    from_names = compile_named_keymap(root, names, env)
+    verify_unicode_keymap(from_names, mappings)
+    named = run / 'x11-keymap-from-names.xkb'
+    named.write_text(from_names)
+    rules_record = run / 'x11-keymap-rules.json'
+    rules_record.write_text(json.dumps(property_evidence, indent=2) + '\n')
+    # All descendants, including Weston, resolve these same private names.
+    env['XKB_CONFIG_ROOT'] = str(root)
     return {'scope': 'owned Xvfb only; installed before Weston and Verdant', 'display': env['DISPLAY'],
             'transport': 'XTest key events using persistent XKB symbols', 'mappings': mappings,
             'before': original.name, 'prepared': prepared.name, 'observed': observed.name,
-            'observedSha256': hashlib.sha256(after.stdout.encode()).hexdigest()}
+            'observedSha256': hashlib.sha256(after.stdout.encode()).hexdigest(),
+            'rulesNames': rules_record.name, 'includeRoot': root.name,
+            'fromNames': named.name, 'fromNamesSha256': hashlib.sha256(from_names.encode()).hexdigest(),
+            'namedFiles': {str(path.relative_to(run)): hashlib.sha256(path.read_bytes()).hexdigest()
+                           for path in sorted(root.rglob('*')) if path.is_file()}}

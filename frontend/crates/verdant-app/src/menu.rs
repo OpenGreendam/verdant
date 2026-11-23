@@ -547,10 +547,15 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
     let draw_editor = cx.entity(); let snapshot = menu.clone(); let basis = revision.clone();
     let source = std::rc::Rc::new(std::cell::RefCell::new(None::<(verdant_collection_control::CollectionControlHandle, crate::proto_scroll::EngineBinding)>));
     let source_draw = source.clone();
-    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut gpui::App| {
+    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, focus: &gpui::FocusHandle, engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut gpui::App| {
         let engine = engine.expect("menu viewport binding");
         *source_draw.borrow_mut() = Some((handle.clone(), engine.clone()));
-        draw_editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), engine, window, cx).into_any_element())
+        draw_editor.update(cx, |ed, cx| {
+            // Replacement menus reuse this compiled owner. Point show_menu at
+            // its mounted focus node instead of the editor's initial handle.
+            ed.focus_menu = focus.clone();
+            native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), engine, window, cx).into_any_element()
+        })
     });
     let editor = cx.entity().downgrade();
     let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
@@ -736,11 +741,22 @@ mod native_menu_tests {
     #[gpui::test]
     fn native_menu_arrow_selection_reveals_the_selected_row_on_its_actual_engine(cx: &mut TestAppContext) {
         let window = open(cx);
+        let retained_owner = window.update(cx, |_, window, _| {
+            let source = source(window);
+            assert_eq!(source.state("focused").unwrap(), serde_json::json!(true), "the first menu receives source-owned focus");
+            source.owner
+        }).unwrap();
         window.update(cx, |host, window, cx| host.editor.update(cx, |ed, cx| {
             let rows = (0..40).map(|index| MenuItem::file(format!("Row {index}"), FileAction::Open)).collect();
             ed.show_menu(gpui::point(px(80.0), px(40.0)), rows, window, cx);
         })).unwrap();
         crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, window, cx| {
+            let source = source(window);
+            assert!(std::rc::Rc::ptr_eq(&retained_owner, &source.owner), "replacement keeps the already-mounted collection");
+            assert!(host.editor.read(cx).focus_menu.is_focused(window), "show_menu focuses the mounted collection handle");
+            assert_eq!(source.state("focused").unwrap(), serde_json::json!(true), "replacement retains physical collection focus before arrow input");
+        }).unwrap();
         for _ in 0..24 {
             cx.simulate_keystrokes(window.into(), "down");
             crate::native_test_support::frames(window, cx);

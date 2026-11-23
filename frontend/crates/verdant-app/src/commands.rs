@@ -219,13 +219,12 @@ impl Render for HistoryPanel {
             });
         });
         let collection = crate::proto_collection::collection("history-list", serde_json::json!({
-            "mode":"listbox", "label":"撤销历史", "cursor":self.selected, "revision":revision, "autoFocus":true,
+            "mode":"listbox", "label":"撤销历史", "description":"上下键选择历史状态，Home/End 到开头或末尾，Enter 或空格跳转。点击条目立即跳转。",
+            "cursor":self.selected, "revision":revision, "autoFocus":true,
         }), vec![1;count + 1], draw, sink).scroll_engine(crate::proto_scroll::Engine::Uniform(self.scroll.clone()));
         div().id("undo-history").size_full().flex().flex_col().bg(th.surface).text_color(th.text).font_family(font)
             .child(div().p(px(12.0)).text_sm().child(format!("撤销历史 · {current}/{count}")))
-            .child(div().flex_1().min_h_0()
-                .aria_description("上下键选择历史状态，Home/End 到开头或末尾，Enter 或空格跳转。点击条目立即跳转。")
-                .child(collection))
+            .child(div().flex_1().min_h_0().child(collection))
             .child(div().p(px(12.0)).border_t_1().border_color(th.shade).text_xs().text_color(th.text_secondary)
                 .child("上下键选择，Home/End 到两端，Enter 或空格跳转。点击状态立即跳转；新编辑会清除后续历史。"))
             .into_any_element()
@@ -585,6 +584,7 @@ mod history_native_tests {
     use super::*;
     use gpui::{Entity, TestAppContext};
     use std::rc::Rc;
+    use verdant_collection_control::native::gpui_native_owner::{all_owners, resolved};
 
     fn transport_diagnostics(ed: &mut Editor) -> String {
         format!("revision={}, loading={}, callback_budget={}, retired_chain={}, applied_timeline={}, notices={:?}",
@@ -634,7 +634,15 @@ mod history_native_tests {
         wait_for_transport_ready(window, cx);
         cx.simulate_keystrokes(window.into(), "up");
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |panel, _, cx| {
+        window.update(cx, |panel, window, cx| {
+            let source = all_owners().into_iter().find(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.props.get("label").and_then(serde_json::Value::as_str) == Some("撤销历史")
+            }).expect("mounted compiled history collection");
+            let owner = source.borrow();
+            assert_eq!(owner.modules.accessible_text.get("description").map(|value| resolved(value).text()).as_deref(),
+                Some("上下键选择历史状态，Home/End 到开头或末尾，Enter 或空格跳转。点击条目立即跳转。"), "the compiled collection owns its accessible keyboard guidance");
             assert_eq!(panel.selected, 1, "one native key traverses exactly one authored row");
             assert_eq!(panel.editor.upgrade().unwrap().read(cx).store().undo_depth(), 2);
         }).unwrap();

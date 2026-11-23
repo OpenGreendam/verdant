@@ -352,7 +352,9 @@ impl Owner {
         let(event,epoch)={let mut o=owner.borrow_mut();if o.disposed||!o.present||o.bounds.is_none()||o.projection_revision!=revision||o.committed_revision==revision{return}o.committed_revision=revision;let event=if !o.mounted{o.mounted=true;o.epoch+=1;let epoch=o.epoch;if let Some(projection)=o.modules.focus.entry_projection.as_mut(){projection.binding.epoch=epoch;}"mounted"}else{"updated"};(event,o.epoch)};
         modules_commit(owner);
         {let o=owner.borrow();if o.disposed||!o.present||!o.mounted||o.epoch!=epoch||o.projection_revision!=revision||o.committed_revision!=revision{return}}
-        life(owner,event);native_hover_mounted(owner,epoch);
+        let outcome=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||life(owner,event)));
+        native_hover_mounted(owner,epoch);
+        if let Err(failure)=outcome{std::panic::resume_unwind(failure);}
     }
     pub fn dispose(owner:&OwnerRef){
         {let mut owner=owner.borrow_mut();if owner.disposed||owner.disposing{return}owner.disposing=true;}
@@ -370,7 +372,7 @@ impl Owner {
     }
     fn retire(owner:&OwnerRef){
         retire_entry_intent(owner);clear_scope_recipient(owner);
-        let mut o=owner.borrow_mut();o.disposed=true;o.present=false;o.mounted=false;o.bounds=None;o.native_hitbox=None;o.native_hover=NativeHoverState::default();o.projection=None;o.renderer=Value::Undefined;o.watchers.clear();o.listeners.clear();o.contributions.clear();o.subscriptions.clear();o.providers.clear();o.exposes.clear();o.states.clear();o.lifecycle.clear();o.slot.clear();o.authored=AuthoredHooks::default();o.public_values=PublicValues::default();o.atoms=NativeHostAtoms::default();o.modules=Modules::default();
+        let mut o=owner.borrow_mut();o.disposed=true;o.present=false;o.mounted=false;o.dirty=true;o.bounds=None;o.native_hitbox=None;o.native_hover=NativeHoverState::default();o.projection=None;o.renderer=Value::Undefined;o.watchers.clear();o.listeners.clear();o.contributions.clear();o.subscriptions.clear();o.providers.clear();o.exposes.clear();o.states.clear();o.lifecycle.clear();o.slot.clear();o.authored=AuthoredHooks::default();o.public_values=PublicValues::default();o.atoms=NativeHostAtoms::default();o.modules=Modules::default();
     }
     // Failed-created retirement extracts owned values inside one short borrow so
     // one destructor panic cannot abort the remaining terminal release attempts;
@@ -379,7 +381,7 @@ impl Owner {
     // therefore retire even when a callback capture's destructor panics.
     fn failed_created_retire(owner:&OwnerRef){
         retire_entry_intent(owner);clear_scope_recipient(owner);
-            let extracted={let mut o=owner.borrow_mut();o.disposed=true;o.present=false;o.mounted=false;o.bounds=None;o.native_hitbox=None;o.native_hover=NativeHoverState::default();
+            let extracted={let mut o=owner.borrow_mut();o.disposed=true;o.present=false;o.mounted=false;o.dirty=true;o.bounds=None;o.native_hitbox=None;o.native_hover=NativeHoverState::default();
             (std::mem::take(&mut o.projection),std::mem::take(&mut o.renderer),std::mem::take(&mut o.watchers),std::mem::take(&mut o.listeners),std::mem::take(&mut o.contributions),std::mem::take(&mut o.subscriptions),std::mem::take(&mut o.providers),std::mem::take(&mut o.exposes),std::mem::take(&mut o.states),std::mem::take(&mut o.lifecycle),std::mem::take(&mut o.slot),std::mem::take(&mut o.modules))};
         let(projection,renderer,watchers,listeners,contributions,subscriptions,providers,exposes,states,lifecycle,slot,modules)=extracted;
         attempt_failed_created_cleanup(||drop(projection));
@@ -1076,7 +1078,7 @@ pub fn global_key_down(event:&gpui::KeyDownEvent,window:&mut Window,cx:&mut App)
     if KEY_DISPATCHED.with(|dispatched|dispatched.replace(true)){return}
     let key=portable_key(&event.keystroke);let mut fields=event_fields("key.down");if let Some(key)=&key{fields.insert("key".into(),Json::String(key.clone()));}fields.insert("repeat".into(),Json::Bool(event.is_held));modifiers(&mut fields,event.keystroke.modifiers);
     let mut host_fields=None;
-    let target=KEY_TARGET.with(|target|target.borrow().as_ref().and_then(Weak::upgrade));let mut prevented=false;
+    let target=native_root_key_target(window);let mut prevented=false;
     for owner in owners_in(window,cx){
         if !matches!(key.as_deref(),Some("Enter"|" ")){owner.borrow_mut().suppress_click=false;}
         if has_listener(&owner,"host:keydown",true,false){prevented|=dispatch(&owner,"host:keydown",true,host_fields.get_or_insert_with(||press_fields("host:keydown",&fields)).clone());}
@@ -1307,8 +1309,8 @@ pub fn lexical_binding<T:Clone+'static>()->LexicalBinding<T> {
 fn clear_lexicals(owner:&OwnerRef){let slots=std::mem::take(&mut owner.borrow_mut().lexical_slots);for slot in slots{if let Some(slot)=slot.upgrade(){slot.clear();}}}
 
 #[derive(Default)]
-struct AuthoredHooks { entries:BTreeMap<String,Rc<RefCell<AuthoredEntry>>>, builtins:BTreeMap<String,(u64,Value)>, kinds:BTreeMap<String,bool>, frames:Vec<AuthoredFrame>, root_names:BTreeSet<String>, order:u64 }
-struct AuthoredFrame { id:u64, names:BTreeSet<String>, states:BTreeMap<String,Value>, methods:BTreeMap<String,Value>, children:Vec<Value> }
+struct AuthoredHooks { entries:BTreeMap<String,Rc<RefCell<AuthoredEntry>>>, builtins:BTreeMap<String,(u64,Value)>, kinds:BTreeMap<String,bool>, frames:Vec<AuthoredFrame>, root_names:BTreeSet<String>, state_names:BTreeMap<usize,String>, order:u64 }
+struct AuthoredFrame { id:u64, names:BTreeSet<String>, states:BTreeMap<String,Value>, methods:BTreeMap<String,Value>, children:Vec<Value>, effects:BTreeMap<String,Vec<Value>>, disposers:BTreeMap<String,Vec<Value>>, event_keys:BTreeMap<String,Value> }
 struct AuthoredEntry { order:u64, mode:&'static str, api:Value, result:Value, handle:Value, handle_set:bool }
 struct CaptureGuard { owner:OwnerWeak, open:bool }
 impl Drop for CaptureGuard { fn drop(&mut self){if self.open{if let Some(owner)=self.owner.upgrade(){owner.borrow_mut().authored.frames.pop();}}} }
@@ -1319,7 +1321,38 @@ fn claim_state_name(owner:&OwnerRef,name:&str)->String {
     if !names.insert(name.into()){value_error(&format!("[State] duplicate state name in setup frame: {name}"))}
     id.map(|id|format!("hook:{id}:{name}")).unwrap_or_else(||name.into())
 }
-fn capture_state(owner:&OwnerRef,name:String,state:Rc<State>){if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.states.insert(name,Value::BorrowedState(state));}}
+fn capture_state(owner:&OwnerRef,name:String,state:Rc<State>){
+    let mut owner=owner.borrow_mut();owner.authored.state_names.insert(Rc::as_ptr(&state)as usize,name.clone());
+    if let Some(frame)=owner.authored.frames.last_mut(){frame.states.insert(name,Value::BorrowedState(state));}
+}
+pub fn capture_introduced_state(owner:&OwnerWeak,state:Value){
+    let owner=setup(owner);let mut owner=owner.borrow_mut();
+    let projected=match &state{
+        Value::State(state)|Value::BorrowedState(state)=>owner.authored.state_names.get(&(Rc::as_ptr(state)as usize)).cloned().map(|name|(name,Value::BorrowedState(state.clone()))),
+        Value::Observed(_,"focus.focused")=>Some(("focused".into(),state.clone())),
+        Value::Observed(_,"focus.visible")=>Some(("focusVisible".into(),state.clone())),
+        Value::Observed(_,"focus.ready")=>Some(("focusable".into(),state.clone())),
+        _=>None,
+    };
+    if let (Some((name,state)),Some(frame))=(projected,owner.authored.frames.last_mut()){frame.states.insert(name,state);}
+}
+// These functions store receipts of already executed checked setup operations.
+// Bucket values remain opaque; no operation or behavior is interpreted here.
+pub fn capture_effect(owner:&OwnerWeak,bucket:&str,value:Value){
+    let owner=setup(owner);if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.effects.entry(bucket.into()).or_default().push(value);};
+}
+pub fn capture_disposer(owner:&OwnerWeak,group:&str,value:Value){
+    let owner=setup(owner);if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.disposers.entry(group.into()).or_default().push(value);};
+}
+pub fn capture_event_key(owner:&OwnerWeak,key:Value){
+    let owner=setup(owner);if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.event_keys.insert(key.text(),key);};
+}
+pub fn capture_rule(owner:&OwnerWeak,handle:Value)->Value{
+    let target=owner.clone();let captured=handle.clone();
+    let off=Value::Function(Rc::new(move |_|rule_dispose(&target,captured.clone())));
+    capture_effect(owner,"context",record(vec![("op",Value::string("rule")),("handle",handle.clone()),("off",off.clone())]));
+    capture_disposer(owner,"rule",off);handle
+}
 fn capture_method(owner:&OwnerRef,name:String,method:Value){if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.methods.insert(name,method);}}
 fn record_hook_child(owner:&OwnerRef,name:&str,mode:&str,order:u64,privileged:bool,result:Value,handle:Value){
     if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.children.push(freeze(record(vec![
@@ -1352,15 +1385,34 @@ pub fn native_builtin_hook(owner:&OwnerWeak,name:&str,install:impl FnOnce()->Val
     };
     record_hook_child(&owner_ref,name,"once",order,true,result.clone(),result.clone());result
 }
-fn finish_capture(frame:AuthoredFrame,render:Value)->Value {
-    let mut fields=BTreeMap::new();
-    if !frame.states.is_empty(){let states=freeze(record_map(frame.states));fields.insert("stateHandles".into(),states.clone());fields.insert("getState".into(),Value::Function(Rc::new(move|args|states.member(&arg(&args,0).text(),false))));}
-    if !frame.methods.is_empty(){let methods=frame.methods;fields.insert("getMethod".into(),Value::Function(Rc::new(move|args|methods.get(&arg(&args,0).text()).cloned().unwrap_or_default())));}
+fn finish_capture(owner:&OwnerWeak,frame:AuthoredFrame,render:Value)->Value {
+    let mut fields=BTreeMap::new();let mut artifacts=BTreeMap::new();
+    for (bucket,mut effects) in frame.effects { let value=if effects.len()==1{effects.pop().unwrap()}else{Value::Array(Rc::new(effects))};fields.insert(bucket,value); }
+    if !frame.states.is_empty(){
+        let states=freeze(record_map(frame.states));fields.insert("stateHandles".into(),states.clone());artifacts.insert("stateHandles".into(),states.clone());
+        fields.insert("getState".into(),Value::Function(Rc::new(move|args|states.member(&arg(&args,0).text(),false))));
+    }
+    if !frame.methods.is_empty(){
+        let methods=freeze(record_map(frame.methods));fields.insert("methods".into(),methods.clone());artifacts.insert("methods".into(),methods.clone());
+        fields.insert("getMethod".into(),Value::Function(Rc::new(move|args|methods.member(&arg(&args,0).text(),false))));
+    }
     if !frame.children.is_empty(){
-        let children=Rc::new(frame.children);let raw=children.clone();
+        let children=Rc::new(frame.children);let raw=children.clone();let array=Value::Array(children.clone());
+        fields.insert("asHooks".into(),array.clone());artifacts.insert("asHooks".into(),array);
         fields.insert("getAsHook".into(),Value::Function(Rc::new(move|args|{let name=arg(&args,0);raw.iter().find(|child|strict_equal(&child.member("name",false),&name)).cloned().unwrap_or_default()})));
         fields.insert("getAsHookHandle".into(),Value::Function(Rc::new(move|args|{let name=arg(&args,0);children.iter().find(|child|strict_equal(&child.member("name",false),&name)).map(|child|child.member("handle",false)).unwrap_or_default()})));
     }
+    if !frame.event_keys.is_empty(){artifacts.insert("eventKeys".into(),freeze(record_map(frame.event_keys)));}
+    if !artifacts.is_empty(){fields.insert("artifacts".into(),freeze(record_map(artifacts)));}
+    let mut groups=BTreeMap::new();let mut all=Vec::new();let mut disposers=frame.disposers;
+    for group in ["props","context","rule","event","feedback"] {
+        let Some(source)=disposers.remove(group) else{continue};if source.is_empty(){continue}
+        let wrapped:Vec<Value>=source.into_iter().map(|off|{
+            let owner=owner.clone();Value::Function(Rc::new(move |_|{setup(&owner);off.call_authored(vec![]);Value::Undefined}))
+        }).collect();
+        all.extend(wrapped.iter().cloned());groups.insert(group.into(),Value::Array(Rc::new(wrapped)));
+    }
+    if !all.is_empty(){groups.insert("all".into(),Value::Array(Rc::new(all)));fields.insert("disposers".into(),freeze(record_map(groups)));}
     if matches!(render,Value::Function(_)|Value::NativeFunction{..}|Value::Renderer(_)){fields.insert("render".into(),render);}
     freeze(record_map(fields))
 }
@@ -1382,11 +1434,11 @@ pub fn authored_hook(owner:&OwnerWeak,name:&str,mode:&'static str,input:Value,in
     let api=freeze(record(vec![("name",Value::string(name)),("order",Value::number(order as f64)),("store",record(vec![]))]));
     let entry=Rc::new(RefCell::new(AuthoredEntry{order,mode,api:api.clone(),result:Value::Undefined,handle:Value::Undefined,handle_set:false}));
     {let mut owner=owner_ref.borrow_mut();if mode!="multiple"{owner.authored.entries.insert(name.into(),entry.clone());}
-     owner.authored.frames.push(AuthoredFrame{id:order,names:BTreeSet::new(),states:BTreeMap::new(),methods:BTreeMap::new(),children:Vec::new()});}
+     owner.authored.frames.push(AuthoredFrame{id:order,names:BTreeSet::new(),states:BTreeMap::new(),methods:BTreeMap::new(),children:Vec::new(),effects:BTreeMap::new(),disposers:BTreeMap::new(),event_keys:BTreeMap::new()});}
     let mut guard=CaptureGuard{owner:owner.clone(),open:true};
     let render=install.call_authored(vec![definition_capability(owner),input.clone(),api.clone()]);
     let frame=owner_ref.borrow_mut().authored.frames.pop().expect("capture frame");guard.open=false;
-    let result=finish_capture(frame,render);
+    let result=finish_capture(owner,frame,render);
     // Capture succeeded even if projection subsequently throws. Preserve that
     // raw result for the already-owned registration, as the Core wrapper does.
     entry.borrow_mut().result=result.clone();
@@ -1565,6 +1617,115 @@ mod authored_renderer_identity_tests {
         assert!(!strict_equal(&captured,&other));
     }
 }
+#[cfg(all(test,feature="test-support"))]
+mod authored_capture_facade_tests {
+    use super::*;
+    fn owner()->OwnerRef {
+        Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary())
+    }
+    fn hook(owner:&OwnerWeak,name:&str,install:Value,project:Value)->Value {
+        authored_hook(owner,name,"once",Value::Undefined,install,project,Value::Undefined)
+    }
+    #[test]
+    fn capture_facade_preserves_shared_artifacts_raw_children_and_projected_handles() {
+        let owner=owner();let weak=Rc::downgrade(&owner);let target=weak.clone();
+        let read=Value::Function(Rc::new(|_|Value::string("seed")));let method=read.clone();
+        let render=Value::Function(Rc::new(|_|Value::string("text")));let render_child=render.clone();
+        let child=Value::Function(Rc::new(move |_|{
+            let state=create_state(&target,"string",Value::string("text"),Value::string("seed"),record(vec![]));
+            capture_effect(&target,"state",state.clone());
+            expose_method(&target,Value::string("read"),method.clone());
+            capture_effect(&target,"context",record(vec![("op",Value::string("expose.method")),("key",Value::string("read")),("fn",method.clone())]));
+            expose_event(&target,Value::string("changed"));capture_event_key(&target,Value::string("changed"));
+            capture_effect(&target,"event",record(vec![("op",Value::string("expose.event")),("key",Value::string("changed"))]));
+            render_child.clone()
+        }));
+        let projected=Value::Function(Rc::new(|args|{let raw=arg(&args,0);let mut fields=own_entries(raw);fields.insert("projected".into(),Value::boolean(true));freeze(record_map(fields))}));
+        let target=weak.clone();let raw_slot=Rc::new(RefCell::new(Value::Undefined));let raw_observed=raw_slot.clone();
+        let outer=Value::Function(Rc::new(move |_|{
+            let first=hook(&target,"child",child.clone(),projected.clone());
+            let again=hook(&target,"child",child.clone(),projected.clone());assert!(strict_equal(&first,&again));
+            *raw_observed.borrow_mut()=first;Value::Undefined
+        }));
+        let capture=hook(&weak,"outer",outer,Value::Undefined);let child=raw_slot.borrow().clone();
+        let descriptor=capture.member("getAsHook",false).call_authored(vec![Value::string("child")]);
+        let raw=descriptor.member("result",false);let handle=descriptor.member("handle",false);
+        assert!(strict_equal(&handle,&child));assert!(!strict_equal(&raw,&handle));
+        assert!(strict_equal(&descriptor,&capture.member("getAsHook",false).call_authored(vec![Value::string("child")])));
+        assert!(strict_equal(&handle,&capture.member("getAsHookHandle",false).call_authored(vec![Value::string("child")])));
+        assert!(capture.member("stateHandles",false).nullish(),"nested state is not flattened");
+        assert_eq!(capture.member("asHooks",false).items().len(),2);
+        assert!(strict_equal(&capture.member("asHooks",false),&capture.member("artifacts",false).member("asHooks",false)));
+        let states=raw.member("stateHandles",false);let methods=raw.member("methods",false);let artifacts=raw.member("artifacts",false);
+        assert!(strict_equal(&states,&artifacts.member("stateHandles",false)));
+        assert!(strict_equal(&methods,&artifacts.member("methods",false)));
+        assert!(strict_equal(&methods.member("read",false),&read));
+        assert!(strict_equal(&read,&raw.member("getMethod",false).call_authored(vec![Value::string("read")])));
+        assert!(strict_equal(&states.member("text",false),&raw.member("getState",false).call_authored(vec![Value::string("text")])));
+        assert!(matches!(states.member("text",false),Value::BorrowedState(_)));
+        assert!(strict_equal(&child.member("getState",false),&raw.member("getState",false)));
+        assert!(strict_equal(&child.member("getMethod",false),&raw.member("getMethod",false)),"projectHandle forwards the original captured getter");
+        assert!(strict_equal(&child.member("render",false),&render));
+        assert_eq!(artifacts.member("eventKeys",false).member("changed",false).text(),"changed");
+        assert_eq!(raw.member("getMethod",false).call_authored(vec![Value::string("read")]).call_authored(vec![]).text(),"seed");
+        assert!(raw.try_data().is_none(),"capabilities must never become portable JSON");
+        expose_value(&weak,Value::string("facade"),capture);Owner::finish(&owner,Value::Undefined);
+        let public=owner.borrow().exposes["facade"].clone();let public_child=public.member("getAsHook",false).call(vec![Value::string("child")]).unwrap();
+        assert!(strict_equal(&public_child,&public.member("asHooks",false).items()[0]),"getter lookup returns the same public child record");
+        let projected_public=public_child.member("handle",false);let raw_public=public_child.member("result",false);
+        // Public callbacks preserve their original receiver. The raw result and
+        // custom handle are separate receivers, while capture above retains
+        // the original getter identity before this outward guard boundary.
+        let projected_getter=projected_public.member("getMethod",false);
+        let raw_getter=raw_public.member("getMethod",false);
+        let again=public.member("getAsHook",false).call(vec![Value::string("child")]).unwrap();
+        assert!(strict_equal(&projected_public,&again.member("handle",false)));
+        assert!(strict_equal(&raw_public,&again.member("result",false)));
+        assert!(strict_equal(&projected_getter,&again.member("handle",false).member("getMethod",false)),"same projected receiver keeps its public getter");
+        assert!(strict_equal(&raw_getter,&again.member("result",false).member("getMethod",false)),"same raw receiver keeps its public getter");
+        let projected_read=projected_getter.call(vec![Value::string("read")]).unwrap();
+        let raw_read=raw_getter.call(vec![Value::string("read")]).unwrap();
+        assert!(strict_equal(&projected_read,&raw_read),"both getters return the same live public method");
+        assert_eq!(projected_read.call(vec![]).unwrap().text(),"seed");
+        assert_eq!(raw_read.call(vec![]).unwrap().text(),"seed");
+        Owner::dispose(&owner);
+        assert!(public.member("getAsHook",false).call(vec![Value::string("child")]).is_err());
+        for getter in [projected_getter,raw_getter] {
+            let error=getter.call(vec![Value::string("read")]).unwrap_err();
+            assert_eq!(error.member("code",false).text(),"OWNER_DISPOSED");
+        }
+        for method in [projected_read,raw_read] {
+            let error=method.call(vec![]).unwrap_err();
+            assert_eq!(error.member("code",false).text(),"OWNER_DISPOSED");
+        }
+    }
+    #[test]
+    fn capture_disposers_release_real_registrations_only_during_setup() {
+        let owner=owner();let weak=Rc::downgrade(&owner);let target=weak.clone();
+        let install=Value::Function(Rc::new(move |_|{
+            let off=watch_props(&target,None,false,Value::Function(Rc::new(|_|Value::Undefined)));
+            capture_effect(&target,"props",record(vec![("op",Value::string("watchAll")),("off",off.clone())]));
+            capture_disposer(&target,"props",off);Value::Undefined
+        }));
+        let capture=hook(&weak,"watcher",install,Value::Undefined);
+        let disposers=capture.member("disposers",false);let off=disposers.member("all",false).items()[0].clone();
+        assert!(strict_equal(&off,&disposers.member("props",false).items()[0]));
+        assert!(owner.borrow().watchers[0].active.get());off.call_authored(vec![]);assert!(!owner.borrow().watchers[0].active.get());
+        Owner::finish(&owner,Value::Undefined);
+        assert!(off.call(vec![]).is_err(),"captured disposer is setup-only");
+        Owner::dispose(&owner);assert!(off.call(vec![]).is_err());
+    }
+    #[test]
+    fn empty_capture_omits_absent_public_fields() {
+        let owner=owner();let weak=Rc::downgrade(&owner);
+        let capture=hook(&weak,"empty",Value::Function(Rc::new(|_|Value::Undefined)),Value::Undefined);
+        for key in ["props","state","context","event","feedback","stateHandles","methods","asHooks","artifacts","disposers","render","getState","getMethod","getAsHook","getAsHookHandle"] {
+            assert!(!has_own(&capture,&Value::string(key)).bool(),"unexpected empty field: {key}");
+        }
+        Owner::dispose(&owner);
+    }
+}
+
 
 #[derive(Default)]
 struct NativeHostAtoms {
@@ -2696,6 +2857,7 @@ pub struct TextModule {
     listeners:Vec<TextListener>,geometry:Option<Rc<TextGeometry>>,drag_anchor:Option<usize>,
     undo:Vec<TextEdit>,redo:Vec<TextEdit>,changed:bool,
     viewport:gpui::Point<Pixels>,reveal_caret:bool,focused:bool,
+    a11y:Option<Rc<TextA11yProjection>>,
 }
 pub struct TextGeometry {
     text:gpui::SharedString,style:gpui::TextStyle,font_size:Pixels,line_height:Pixels,
@@ -2778,13 +2940,13 @@ pub fn text_reset_value(owner:&OwnerWeak,value:Value)->Value{
     text.lease_epoch=text.lease_epoch.wrapping_add(1);text.value=next;
     text.editor=text.value.clone().into();text.selection=text.editor.len()..text.editor.len();
     text.reversed=false;text.marked=None;text.composing=false;text.drag_anchor=None;text.geometry=None;
-    text.undo.clear();text.redo.clear();text.changed=false;text.viewport=Default::default();text.reveal_caret=true;
+    text.undo.clear();text.redo.clear();text.changed=false;text.viewport=Default::default();text.reveal_caret=true;text.a11y=None;
     o.dirty=true;Value::boolean(accepted)
 }
 pub fn text_detach(owner:&OwnerRef){
     let mut o=owner.borrow_mut();let text=&mut o.modules.text;
     text.lease_epoch=text.lease_epoch.wrapping_add(1);text.composing=false;text.marked=None;text.drag_anchor=None;text.geometry=None;
-    text.viewport=Default::default();text.focused=false;text.reveal_caret=true;
+    text.viewport=Default::default();text.focused=false;text.reveal_caret=true;text.a11y=None;
     project_text_value(text);
 }
 pub fn text_supported(owner:&OwnerRef)->bool{owner.borrow().modules.text.supported}
@@ -2811,11 +2973,15 @@ fn text_notify_selection_changed(focus:&FocusHandle,window:&mut Window){
 /// Selection itself is permitted in readonly text, but cannot disturb a marked
 /// range, a disabled owner, another window, or a detached editing lease.
 pub fn text_select_utf16(owner:&OwnerRef,start:usize,end:usize,window:&mut Window,cx:&mut App)->bool{
+    let selection={let o=owner.borrow();utf16_range(&o.modules.text.editor,start..end.max(start))};
+    text_apply_selection(owner,selection,false,window,cx)
+}
+fn text_apply_selection(owner:&OwnerRef,selection:Range<usize>,reversed:bool,window:&mut Window,cx:&mut App)->bool{
     if !ready(owner)||!text_supported(owner)||text_disabled(owner){return false}
     let focus={let mut o=owner.borrow_mut();
         if o.window_id!=Some(window.window_handle().window_id()){return false}
         let text=&mut o.modules.text;if text.composing{return false}
-        text.selection=utf16_range(&text.editor,start..end.max(start));text.reversed=false;
+        text.selection=selection;text.reversed=reversed;
         text.drag_anchor=None;text.reveal_caret=true;o.dirty=true;o.modules.focus.native.clone()
     };
     if let Some(focus)=focus{text_notify_selection_changed(&focus,window);}
@@ -2829,6 +2995,91 @@ pub fn text_accessible(owner:&OwnerRef,node:&mut gpui::accesskit::Node){
     if bool_or(field(&text.patch,"disabled"),false){node.set_disabled();}
     if bool_or(field(&text.patch,"readOnly"),false){node.set_read_only();}
     if text.multiline&&node.role()==gpui::accesskit::Role::TextInput{node.set_role(gpui::accesskit::Role::MultilineTextInput);}
+}
+// AccessKit's Text interface requires TextRun descendants. A value on the
+// TextInput parent alone is not a text range. Keep one run per canonical LF
+// line, including the hard break and an empty final run when needed. This
+// projects text/selection; glyph geometry and visual soft-wrap runs are not
+// manufactured from logical character positions.
+struct TextA11yProjection {
+    root:gpui::accesskit::NodeId,window:gpui::WindowId,owner_epoch:u64,lease_epoch:u64,frame:u64,
+    hitbox:Option<gpui::HitboxId>,value:gpui::SharedString,
+    runs:Vec<(gpui::accesskit::NodeId,Range<usize>)>,
+    selection:gpui::accesskit::TextSelection,selectable:bool,
+}
+impl TextA11yProjection {
+    fn position(&self,byte:usize)->gpui::accesskit::TextPosition {
+        let byte=byte_boundary(&self.value,byte,false);
+        let(_,(id,range))=self.runs.iter().enumerate().find(|(index,(_,range))|byte<range.end||*index+1==self.runs.len()).expect("at least one text run");
+        gpui::accesskit::TextPosition{node:*id,character_index:self.value[range.start..byte.max(range.start).min(range.end)].chars().count()}
+    }
+    fn byte(&self,position:gpui::accesskit::TextPosition)->Option<usize>{
+        let(_,range)=self.runs.iter().find(|(id,_)|*id==position.node)?;
+        let run=&self.value[range.clone()];
+        if position.character_index>run.chars().count(){return None}
+        Some(range.start+run.char_indices().nth(position.character_index).map(|(byte,_)|byte).unwrap_or(run.len()))
+    }
+    fn nodes(&self)->Vec<(gpui::accesskit::NodeId,gpui::accesskit::Node)>{
+        self.runs.iter().map(|(id,range)|{
+            let value=&self.value[range.clone()];let mut node=gpui::accesskit::Node::new(gpui::accesskit::Role::TextRun);
+            node.set_value(value);
+            // Native IME/source UTF-16 requests can select Unicode scalar
+            // boundaries. AccessKit indices address these UTF-8 lengths, not
+            // UTF-16 units or bytes; platform adapters translate their indices.
+            node.set_character_lengths(value.chars().map(|ch|ch.len_utf8() as u8).collect::<Vec<_>>());
+            (*id,node)
+        }).collect()
+    }
+    fn project_parent(&self,parent:&mut gpui::accesskit::Node){
+        parent.set_text_selection(self.selection);
+        if self.selectable{parent.add_action(gpui::accesskit::Action::SetTextSelection);}
+    }
+}
+fn text_accessible_projection(owner:&OwnerRef,mut node_id:impl FnMut(u64,usize)->gpui::accesskit::NodeId)->Option<Rc<TextA11yProjection>>{
+    let o=owner.borrow();let text=&o.modules.text;
+    if o.disposed||!o.present||!text.supported||!text.declared||!text.initialized{return None}
+    let root=o.modules.a11y_node?;let window=o.window_id?;
+    let mut runs=Vec::new();let mut start=0;
+    for line in text.editor.split_inclusive('\n'){
+        let end=start+line.len();runs.push((node_id(text.lease_epoch,runs.len()),start..end));start=end;
+    }
+    if runs.is_empty()||text.editor.ends_with('\n'){runs.push((node_id(text.lease_epoch,runs.len()),start..start));}
+    let initial=gpui::accesskit::TextPosition{node:runs[0].0,character_index:0};
+    let mut projection=TextA11yProjection{root,window,owner_epoch:o.epoch,lease_epoch:text.lease_epoch,frame:o.modules.a11y_frame,
+        hitbox:o.native_hitbox.as_ref().map(|hitbox|hitbox.id),value:text.editor.clone(),runs,
+        selection:gpui::accesskit::TextSelection{anchor:initial,focus:initial},
+        selectable:!bool_or(field(&text.patch,"disabled"),false)&&!text.composing};
+    let start=projection.position(text.selection.start);let end=projection.position(text.selection.end);
+    projection.selection=if text.reversed{gpui::accesskit::TextSelection{anchor:end,focus:start}}else{gpui::accesskit::TextSelection{anchor:start,focus:end}};
+    Some(Rc::new(projection))
+}
+pub fn text_accessible_children(owner:&OwnerRef,builder:&mut gpui::A11ySubtreeBuilder){
+    let Some(projection)=text_accessible_projection(owner,|lease,index|builder.synthetic_node_id(("proto-ui-text-control",lease,index)))else{return};
+    let mut complete=true;for(id,node)in projection.nodes(){complete&=builder.push_child(id,node);}
+    if complete{projection.project_parent(builder.parent_node());owner.borrow_mut().modules.text.a11y=Some(projection);}
+    else{builder.parent_node().clear_text_selection();owner.borrow_mut().modules.text.a11y=None;}
+}
+fn text_a11y_current(owner:&OwnerRef,projection:&Rc<TextA11yProjection>,window:&Window)->bool{
+    let o=owner.borrow();let text=&o.modules.text;
+    !o.disposed&&o.present&&o.epoch==projection.owner_epoch&&text.lease_epoch==projection.lease_epoch
+        &&o.window_id==Some(projection.window)&&projection.window==window.window_handle().window_id()
+        &&o.modules.a11y_node==Some(projection.root)&&o.modules.a11y_frame==projection.frame&&o.modules.a11y_bindings==1
+        &&projection.hitbox.is_some()&&o.native_hitbox.as_ref().map(|hitbox|hitbox.id)==projection.hitbox
+        &&text.editor==projection.value&&text.a11y.as_ref().is_some_and(|current|Rc::ptr_eq(current,projection))
+}
+fn text_accessible_action(owner:&OwnerRef,projection:&Rc<TextA11yProjection>,data:Option<&gpui::accesskit::ActionData>,window:&mut Window,cx:&mut App)->bool{
+    if !text_a11y_current(owner,projection,window){return false}
+    let Some(gpui::accesskit::ActionData::SetTextSelection(selection))=data else{return false};
+    let(Some(anchor),Some(focus))=(projection.byte(selection.anchor),projection.byte(selection.focus))else{return false};
+    text_apply_selection(owner,anchor.min(focus)..anchor.max(focus),focus<anchor,window,cx)
+}
+fn text_bind_accessible_selection(owner:&OwnerRef,window:&mut Window){
+    let Some(projection)=owner.borrow().modules.text.a11y.clone()else{return};
+    if !projection.selectable||!text_a11y_current(owner,&projection,window){return}
+    let owner=Rc::downgrade(owner);
+    window.on_a11y_action(projection.root,gpui::accesskit::Action::SetTextSelection,move|data,window,cx|{
+        if let Some(owner)=owner.upgrade(){if text_accessible_action(&owner,&projection,data,window,cx){window.prevent_default();}}
+    });
 }
 fn text_editable(owner:&OwnerRef)->bool{
     let o=owner.borrow();let text=&o.modules.text;
@@ -3035,6 +3286,7 @@ impl gpui::Element for NativeTextElement {
     }
     fn paint(&mut self,_:Option<&gpui::GlobalElementId>,_:Option<&gpui::InspectorElementId>,bounds:Bounds<Pixels>,_:&mut (),geometry:&mut Rc<TextGeometry>,window:&mut Window,cx:&mut App){
         let owner=self.owner.upgrade().expect("live text owner");let(selection,epoch)={let o=owner.borrow();let text=&o.modules.text;(text.selection.clone(),text.lease_epoch)};
+        text_bind_accessible_selection(&owner,window);
         window.handle_input(&self.focus,NativeTextInput{owner:self.owner.clone(),epoch},cx);
         let origin=bounds.origin-geometry.viewport.get();
         window.with_content_mask(Some(gpui::ContentMask{bounds}),|window|{
@@ -3148,6 +3400,160 @@ mod text_owner_tests {
     }
     fn input(owner:&OwnerRef)->NativeTextInput{NativeTextInput{owner:Rc::downgrade(owner),epoch:owner.borrow().modules.text.lease_epoch}}
 
+    // These are real AccessKit nodes consumed by the same text-range engine
+    // that selects the AT-SPI Text interface. TestAppContext supplies the owner
+    // lease; it does not activate a platform accessibility connection.
+    fn text_a11y_tree(owner:&OwnerRef)->accesskit_consumer::Tree {
+        use gpui::accesskit::{Node,NodeId,Role,Tree,TreeId,TreeUpdate};
+        let root=owner.borrow().modules.a11y_node.unwrap_or(NodeId(100));
+        owner.borrow_mut().modules.a11y_node=Some(root);
+        let mut parent=Node::new(Role::TextInput);text_accessible(owner,&mut parent);
+        let projection=text_accessible_projection(owner,|lease,index|NodeId(root.0.wrapping_add(1000+lease*100+index as u64))).unwrap();
+        let mut nodes=projection.nodes();parent.set_children(nodes.iter().map(|(id,_)|*id).collect::<Vec<_>>());projection.project_parent(&mut parent);
+        owner.borrow_mut().modules.text.a11y=Some(projection);nodes.push((root,parent));
+        accesskit_consumer::Tree::new(TreeUpdate{nodes,tree:Some(Tree::new(root)),tree_id:TreeId::ROOT,focus:root},true)
+    }
+    #[gpui::test]
+    fn text_a11y_exposes_the_complete_canonical_text_to_the_consumer(cx:&mut TestAppContext){
+        let window=open(cx);window.update(cx,|_,window,_|{
+            let owner=text_owner(window,"a😀候e\u{301}");
+            let tree=text_a11y_tree(&owner);let node=tree.state().root();
+            assert!(node.supports_text_ranges(),"entry role/value alone must not stand in for the platform Text interface");
+            assert_eq!(node.document_range().text(),"a😀候e\u{301}");
+            assert_eq!(node.document_range().end().to_global_usv_index(),5);
+            Owner::dispose(&owner);
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn text_a11y_projects_utf16_selection_and_direction(cx:&mut TestAppContext){
+        let window=open(cx);window.update(cx,|_,window,cx|{
+            let owner=text_owner(window,"a😀候b");
+            assert!(text_select_utf16(&owner,1,4,window,cx));
+            owner.borrow_mut().modules.text.reversed=true;
+            let native=input(&owner).selected_text_range(false,window,cx).unwrap();
+            assert_eq!(native.range,1..4);assert!(native.reversed);
+            let tree=text_a11y_tree(&owner);let node=tree.state().root();
+            assert!(node.has_text_selection(),"the current editing selection must reach AccessKit");
+            assert_eq!(node.text_selection().unwrap().text(),"😀候");
+            assert_eq!(node.text_selection_anchor().unwrap().to_global_usv_index(),3);
+            assert_eq!(node.text_selection_focus().unwrap().to_global_usv_index(),1);
+            Owner::dispose(&owner);
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn text_a11y_keeps_empty_editors_readable_without_reading_the_placeholder(cx:&mut TestAppContext){
+        let window=open(cx);window.update(cx,|_,window,_|{
+            let owner=text_owner(window,"");
+            text_sync(&Rc::downgrade(&owner),record(vec![("placeholder",Value::string("hint"))]));
+            let tree=text_a11y_tree(&owner);let node=tree.state().root();
+            assert!(node.supports_text_ranges(),"empty controls need an empty TextRun as well");
+            assert_eq!(node.document_range().text(),"");
+            assert_eq!(node.text_selection_focus().unwrap().to_global_usv_index(),0);
+            Owner::dispose(&owner);
+        }).unwrap();
+    }
+
+    struct AccessibleField{owner:OwnerRef,focus:FocusHandle}
+    impl Render for AccessibleField{
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement{
+            crate::gpui_native_a11y::Semantics{
+                element:div().id("native-text-a11y").role(gpui::Role::TextInput).track_focus(&self.focus)
+                    .child(NativeTextElement::new(&self.owner,&self.focus,false)).into_element(),
+                owner:Rc::downgrade(&self.owner),role:None,
+            }
+        }
+    }
+    fn accessible_field(cx:&mut TestAppContext,value:&str)->WindowHandle<AccessibleField>{
+        let value=value.to_owned();
+        let window=cx.open_window(gpui::size(gpui::px(180.),gpui::px(72.)),move|window,cx|{
+            let owner=text_owner(window,&value);let focus=cx.focus_handle();
+            owner.borrow_mut().modules.focus.native=Some(focus.clone());window.focus(&focus,cx);
+            AccessibleField{owner,focus}
+        });
+        // The actual Semantics/NativeTextElement draw establishes the current
+        // parent node, window, frame and hitbox. The consumer helper supplies
+        // the accessibility publication because TestPlatform has no AT channel.
+        cx.update_window(window.into(),|_,window,cx|{window.refresh();window.draw(cx).clear(cx);window.simulate_next_frame(cx);}).unwrap();
+        window
+    }
+    fn selection_request(projection:&TextA11yProjection,anchor:usize,focus:usize)->gpui::accesskit::ActionData{
+        gpui::accesskit::ActionData::SetTextSelection(gpui::accesskit::TextSelection{anchor:projection.position(anchor),focus:projection.position(focus)})
+    }
+    #[gpui::test]
+    fn text_a11y_preserves_hard_breaks_and_the_empty_last_line(cx:&mut TestAppContext){
+        let window=open(cx);window.update(cx,|_,window,cx|{
+            let owner=text_owner(window,"");owner.borrow_mut().modules.text.multiline=true;
+            assert!(text_reset_value(&Rc::downgrade(&owner),Value::string("a😀\n候e\u{301}\n")).bool());
+            assert!(text_select_utf16(&owner,1,7,window,cx));
+            let tree=text_a11y_tree(&owner);let node=tree.state().root();
+            assert_eq!(node.role(),gpui::Role::MultilineTextInput);
+            assert_eq!(node.document_range().text(),"a😀\n候e\u{301}\n");
+            assert_eq!(node.text_selection().unwrap().text(),"😀\n候e\u{301}");
+            let projection=owner.borrow().modules.text.a11y.clone().unwrap();assert_eq!(projection.runs.len(),3);
+            assert_eq!(projection.nodes().last().unwrap().1.value(),Some(""));
+            assert!(text_select_utf16(&owner,8,8,window,cx));
+            let tree=text_a11y_tree(&owner);let node=tree.state().root();
+            assert_eq!(node.text_selection_focus().unwrap().to_global_usv_index(),7);
+            assert!(node.text_selection().unwrap().is_degenerate());
+            Owner::dispose(&owner);
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn text_a11y_selection_round_trips_through_the_live_native_editor(cx:&mut TestAppContext){
+        let window=accessible_field(cx,"a😀候b");
+        window.update(cx,|field,window,cx|{
+            let owner=&field.owner;let _tree=text_a11y_tree(owner);let projection=owner.borrow().modules.text.a11y.clone().unwrap();
+            let selection=selection_request(&projection,"a😀候".len(),1);
+            assert!(text_accessible_action(owner,&projection,Some(&selection),window,cx));
+            let actual=input(owner).selected_text_range(false,window,cx).unwrap();
+            assert_eq!(actual.range,1..4);assert!(actual.reversed);
+            let tree=text_a11y_tree(owner);let node=tree.state().root();
+            assert_eq!(node.text_selection().unwrap().text(),"😀候");
+            assert_eq!(node.text_selection_focus().unwrap().to_global_usv_index(),1);
+            let projection=owner.borrow().modules.text.a11y.clone().unwrap();
+            text_sync(&Rc::downgrade(owner),record(vec![("readOnly",Value::boolean(true))]));
+            assert!(text_accessible_action(owner,&projection,Some(&selection),window,cx),"readonly editors remain selectable");
+            text_sync(&Rc::downgrade(owner),record(vec![("disabled",Value::boolean(true))]));
+            assert!(!text_accessible_action(owner,&projection,Some(&selection),window,cx));
+            text_sync(&Rc::downgrade(owner),record(vec![("disabled",Value::boolean(false))]));
+            let wrong_node=gpui::accesskit::ActionData::SetTextSelection(gpui::accesskit::TextSelection{
+                anchor:gpui::accesskit::TextPosition{node:gpui::accesskit::NodeId(0),character_index:0},focus:projection.selection.focus});
+            assert!(!text_accessible_action(owner,&projection,Some(&wrong_node),window,cx));
+            let out_of_range=gpui::accesskit::ActionData::SetTextSelection(gpui::accesskit::TextSelection{
+                anchor:gpui::accesskit::TextPosition{node:projection.runs[0].0,character_index:999},focus:projection.selection.focus});
+            assert!(!text_accessible_action(owner,&projection,Some(&out_of_range),window,cx));
+            assert!(!text_accessible_action(owner,&projection,Some(&gpui::accesskit::ActionData::NumericValue(1.)),window,cx));
+            Owner::dispose(owner);
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn text_a11y_rejects_another_window_composition_and_retired_publications(cx:&mut TestAppContext){
+        let window=accessible_field(cx,"a😀候b");let other=open(cx);
+        let(owner,projection,selection)=window.update(cx,|field,_,_|{
+            let _tree=text_a11y_tree(&field.owner);let projection=field.owner.borrow().modules.text.a11y.clone().unwrap();
+            let selection=selection_request(&projection,0,1);(field.owner.clone(),projection,selection)
+        }).unwrap();
+        other.update(cx,|_,window,cx|{assert!(!text_accessible_action(&owner,&projection,Some(&selection),window,cx));}).unwrap();
+        window.update(cx,|_,window,cx|{
+            let _tree=text_a11y_tree(&owner);
+            assert!(!text_accessible_action(&owner,&projection,Some(&selection),window,cx),"an older publication cannot write after replacement");
+            let projection=owner.borrow().modules.text.a11y.clone().unwrap();
+            input(&owner).replace_and_mark_text_in_range(Some(0..1),"候",Some(1..1),window,cx);
+            let _tree=text_a11y_tree(&owner);let composing=owner.borrow().modules.text.a11y.clone().unwrap();
+            let request=selection_request(&composing,0,0);
+            assert!(!composing.selectable);assert!(!text_accessible_action(&owner,&composing,Some(&request),window,cx));
+            assert!(!text_accessible_action(&owner,&projection,Some(&selection),window,cx),"unpublished text changes invalidate old positions");
+            assert!(text_reset_value(&Rc::downgrade(&owner),Value::string("fresh")).bool());
+            assert!(!text_accessible_action(&owner,&composing,Some(&request),window,cx),"reset retires the composition's publication");
+            let _tree=text_a11y_tree(&owner);let current=owner.borrow().modules.text.a11y.clone().unwrap();
+            let request=selection_request(&current,0,1);
+            assert!(text_accessible_action(&owner,&current,Some(&request),window,cx));
+            detach_native_view(&owner);owner.borrow_mut().mounted=true;
+            assert!(!text_accessible_action(&owner,&current,Some(&request),window,cx),"a remount cannot revive an old text publication");
+            Owner::dispose(&owner);assert!(!text_accessible_action(&owner,&current,Some(&request),window,cx));
+        }).unwrap();
+    }
+
     #[cfg(not(feature="gpui-text-selection-notification"))]
     #[gpui::test]
     fn legacy_selection_notifies_the_live_native_input_and_respects_focus(cx:&mut TestAppContext){
@@ -3199,6 +3605,7 @@ mod text_owner_tests {
             Owner::dispose(&field.owner);
         }).unwrap();
     }
+
 
     #[gpui::test]
     fn source_selection_snaps_utf16_and_obeys_exact_live_owner(cx:&mut TestAppContext){
@@ -4005,8 +4412,9 @@ fn native_hover_current(owner:&OwnerRef,view:NativeHoverView,window:&Window)->bo
 }
 fn native_hover_mounted(owner:&OwnerRef,epoch:u64) {
     let mut o=owner.borrow_mut();
-    // Mark completion only after the authored lifecycle returned. A mounted
-    // callback can detach, dispose or replace this physical view synchronously.
+    // Mark completion after the authored lifecycle turn, including its error
+    // boundary. A failure cannot disable a still-live view's later input;
+    // synchronous detach, disposal or replacement still retires this epoch.
     if !o.disposed&&!o.disposing&&o.present&&o.mounted&&o.epoch==epoch {
         if o.native_hover.mounted_epoch!=Some(epoch){o.native_hover.needs_sync=true;}
         o.native_hover.mounted_epoch=Some(epoch);
@@ -4120,7 +4528,7 @@ mod native_hover_tests {
             root
         }
     }
-    fn owner(trace:Rc<RefCell<Vec<String>>>,retire_on_mount:bool)->OwnerRef {
+    fn owner(trace:Rc<RefCell<Vec<String>>>,retire_on_mount:bool,fail_on_mount:bool)->OwnerRef {
         let owner=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,
             |_|true,|_,_|true,crate::gpui_native_style::vocabulary());
         let weak=Rc::downgrade(&owner);
@@ -4142,11 +4550,14 @@ mod native_hover_tests {
                 if let Some(owner)=target.upgrade(){Owner::dispose(&owner)}Value::Undefined
             })));
         }
+        if fail_on_mount {
+            register_life(&weak,"mounted",Value::Function(Rc::new(|_|throw_value(Value::boolean(false)))));
+        }
         Owner::finish(&owner,Value::Undefined);owner
     }
     fn open(cx:&mut TestAppContext,trace:Rc<RefCell<Vec<String>>>,retire:bool)->WindowHandle<Host> {
         cx.open_window(size(px(160.),px(80.)),move |_,cx| {
-            let owner=owner(trace,retire);let content=cx.new(|_|Content);
+            let owner=owner(trace,retire,false);let content=cx.new(|_|Content);
             owner.borrow_mut().slot=vec![NativeSnapshot::native_view(content.clone().into())];
             Host{owner,focus:cx.focus_handle(),shown:false,_content:content}
         })
@@ -4229,6 +4640,27 @@ mod native_hover_tests {
         window.update(cx,|host,_,_| {
             assert!(host.owner.borrow().disposed);
             assert!(host.owner.borrow().native_hover.pending.is_none());
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn mounted_callback_failure_keeps_current_hover_and_exact_error(cx:&mut TestAppContext) {
+        let trace=Rc::new(RefCell::new(Vec::new()));let output=trace.clone();
+        let window=cx.open_window(size(px(160.),px(80.)),move |_,cx| {
+            let owner=owner(output,false,true);let content=cx.new(|_|Content);
+            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(content.clone().into())];
+            Host{owner,focus:cx.focus_handle(),shown:false,_content:content}
+        });
+        cold_mount(window,cx);
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
+            "an authored mount failure does not retire an otherwise current native view");
+        window.update(cx,|host,window,cx| {
+            let failures=take_native_failures(&host.owner);
+            assert_eq!(failures.len(),1);
+            assert!(matches!(failures[0].error,Value::Json(Json::Bool(false))));
+            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
+            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
+            assert_eq!(trace.borrow().len(),7,"the current view keeps real leave and enter delivery");
+            Owner::dispose(&host.owner);
         }).unwrap();
     }
     #[gpui::test]
@@ -4540,5 +4972,194 @@ mod native_content_selection_tests {
         for(standard,prefixed)in [("text","text"),("all","all"),("none","auto")]{
             assert!(std::panic::catch_unwind(||take_native_content_selection(&mut declarations(standard,prefixed))).is_err());
         }
+    }
+}
+
+// C-EVENT-TYPE-0002 separates portable intent from a host event alias. A
+// native descendant can consume a sample while its physical event still
+// bubbles. Do not promote that sample into the ancestor's root key/press
+// route. Read this fact before portable callbacks: their own default-action
+// request (for example Space scroll prevention) still permits the source's
+// normal activation intent. Raw host/global observations remain independent.
+// Key-up is deliberately not gated: terminal callbacks must release ordinary
+// source-owned key sessions as well as the SDK's Enter/Space press lease.
+fn native_root_key_target(window:&Window)->Option<OwnerRef> {
+    if window.default_prevented(){return None}
+    KEY_TARGET.with(|target|target.borrow().as_ref().and_then(Weak::upgrade))
+}
+
+#[cfg(all(test,feature="test-support"))]
+mod native_key_boundary_tests {
+    use super::*;
+    use gpui::{AppContext,Context,Entity,IntoElement,KeyDownEvent,KeyUpEvent,
+        Keystroke,PlatformInput,Render,Subscription,TestAppContext,WindowHandle,px,size};
+
+    struct NativeChild {
+        focus:FocusHandle, consume_down:Rc<Cell<bool>>, consume_up:Rc<Cell<bool>>,
+        trace:Rc<RefCell<Vec<String>>>,
+    }
+    impl Render for NativeChild {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            let down=self.consume_down.clone();let up=self.consume_up.clone();
+            let down_trace=self.trace.clone();let up_trace=self.trace.clone();
+            div().id("key-boundary-native-child").w(px(96.)).h(px(40.))
+                .track_focus(&self.focus)
+                .on_key_down(move|event,window,_|{
+                    down_trace.borrow_mut().push(format!("native.down:{}",event.keystroke.key));
+                    if down.get(){window.prevent_default();}
+                })
+                .on_key_up(move|event,window,_|{
+                    up_trace.borrow_mut().push(format!("native.up:{}",event.keystroke.key));
+                    if up.get(){window.prevent_default();}
+                })
+        }
+    }
+    struct Host {
+        owner:OwnerRef, focus:FocusHandle, child_focus:FocusHandle, outside:FocusHandle,
+        consume_down:Rc<Cell<bool>>, consume_up:Rc<Cell<bool>>,
+        trace:Rc<RefCell<Vec<String>>>, pressed:Rc<Cell<bool>>,
+        _child:Entity<NativeChild>, _blur:Subscription,
+    }
+    impl Render for Host {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            Owner::project(&self.owner);
+            let snapshot=self.owner.borrow().projection.clone().unwrap();
+            div().size_full().flex()
+                .child(paint_native_root(&snapshot,&self.owner,&self.focus,
+                    "key-boundary-root".into(),Rc::new(|_,_|{})))
+                .child(div().id("key-boundary-outside").track_focus(&self.outside).size(px(40.)))
+        }
+    }
+    fn open(cx:&mut TestAppContext,consume:bool)->WindowHandle<Host> {
+        let window=cx.open_window(size(px(240.),px(100.)),move|window,cx|{
+            let owner=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,
+                |_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+            let weak=Rc::downgrade(&owner);
+            as_focusable(&weak);
+            let trace=Rc::new(RefCell::new(Vec::new()));let pressed=Rc::new(Cell::new(false));
+            for kind in ["key.down","key.up","press.start","press.commit","press.end","press.cancel"] {
+                let observed=trace.clone();let active=pressed.clone();
+                listen(&weak,Value::string(kind),false,Value::Function(Rc::new(move|args|{
+                    let input=arg(&args,1);let key=input.member("key",false);
+                    observed.borrow_mut().push(format!("{}:{}",kind,if key.nullish(){String::new()}else{key.text()}));
+                    if kind=="press.start"||(kind=="key.down"&&key.text()=="a"){active.set(true);}
+                    if matches!(kind,"press.end"|"press.cancel")||(kind=="key.up"&&key.text()=="a"){active.set(false);}
+                    if kind=="key.down"&&key.text()==" "{prevent(input);}
+                    Value::Undefined
+                })),Value::Undefined);
+            }
+            let observed=trace.clone();
+            listen(&weak,Value::string("host:keydown"),false,Value::Function(Rc::new(move|args|{
+                observed.borrow_mut().push(format!("host.down:{}",arg(&args,1).member("key",false).text()));
+                Value::Undefined
+            })),Value::Undefined);
+            Owner::finish(&owner,Value::Undefined);
+            register_sequential_focus_owner(&owner,cx);
+            let focus=cx.focus_handle();let child_focus=cx.focus_handle();
+            let consume_down=Rc::new(Cell::new(consume));let consume_up=Rc::new(Cell::new(consume));
+            let child=cx.new(|_|NativeChild{focus:child_focus.clone(),consume_down:consume_down.clone(),consume_up:consume_up.clone(),trace:trace.clone()});
+            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(child.clone().into())];
+            let blur=cx.on_blur(&focus,window,|host:&mut Host,_,_|{native_press_blur(&host.owner);});
+            Host{owner,focus,child_focus,outside:cx.focus_handle(),consume_down,consume_up,trace,pressed,_child:child,_blur:blur}
+        });
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,window,cx|window.focus(&host.child_focus,cx)).unwrap();
+        frames(window,cx);window
+    }
+    fn frames(window:WindowHandle<Host>,cx:&mut TestAppContext) {
+        for _ in 0..3 {
+            cx.update_window(window.into(),|_,window,cx|{window.refresh();window.draw(cx).clear(cx);}).unwrap();
+            cx.run_until_parked();
+        }
+    }
+    fn key(window:WindowHandle<Host>,name:&str,down:bool,cx:&mut TestAppContext) {
+        cx.update_window(window.into(),|_,window,cx|{
+            let mut keystroke=Keystroke::parse(name).unwrap();
+            // This physical sample explicitly carries the printable text fact.
+            if name=="a"{keystroke.key_char=Some("a".into());}
+            window.dispatch_event(if down {
+                PlatformInput::KeyDown(KeyDownEvent{keystroke,is_held:false,prefer_character_input:false})
+            } else {PlatformInput::KeyUp(KeyUpEvent{keystroke})},cx);
+        }).unwrap();
+        cx.run_until_parked();
+    }
+    fn semantic_trace(host:&Host)->Vec<String> {
+        host.trace.borrow().iter().filter(|item|item.starts_with("key.")||item.starts_with("press.")).cloned().collect()
+    }
+
+    #[gpui::test]
+    fn native_child_cancellation_does_not_become_ancestor_keyboard_intent(cx:&mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,window,_|assert!(host.child_focus.is_focused(window))).unwrap();
+        for name in ["enter","escape","space"]{key(window,name,true,cx);key(window,name,false,cx);}
+        window.update(cx,|host,_,_|{
+            assert_eq!(semantic_trace(host),["key.up:Enter","key.up:Escape","key.up: "],
+                "canceled key-down cannot create root intent; terminal key-up stays observable");
+            for name in ["enter","escape","space"] {
+                assert!(host.trace.borrow().contains(&format!("native.down:{name}")));
+                assert!(host.trace.borrow().contains(&format!("native.up:{name}")));
+            }
+            for name in ["Enter","Escape"," "]{assert!(host.trace.borrow().contains(&format!("host.down:{name}")),"physical bubbling still reaches the raw host listener");}
+            assert!(host.owner.borrow().press.key.is_none());assert!(!host.pressed.get());
+        }).unwrap();
+        window.update(cx,|host,_,_|{host.trace.borrow_mut().clear();host.consume_down.set(false);host.consume_up.set(false);}).unwrap();
+        key(window,"enter",true,cx);key(window,"enter",false,cx);
+        window.update(cx,|host,_,_|{
+            assert_eq!(semantic_trace(host),["key.down:Enter","press.start:Enter","press.commit:Enter","key.up:Enter","press.end:Enter"]);
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn source_space_prevention_keeps_one_activation_and_canceled_up_retires_the_lease(cx:&mut TestAppContext) {
+        let window=open(cx,false);
+        key(window,"space",true,cx);
+        window.update(cx,|host,window,_|{
+            assert!(host.child_focus.is_focused(window));
+            assert!(host.pressed.get());assert_eq!(host.owner.borrow().press.key.as_deref(),Some(" "));
+            assert_eq!(semantic_trace(host),["key.down: ","press.start: ","press.commit: "]);
+            host.consume_up.set(true);
+        }).unwrap();
+        key(window,"space",false,cx);
+        window.update(cx,|host,_,_|{
+            assert!(host.trace.borrow().contains(&"native.up:space".into()));
+            assert_eq!(semantic_trace(host),["key.down: ","press.start: ","press.commit: ","key.up: ","press.end: "]);
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none(),"canceled key-up cannot retain an earlier live press");
+            host.trace.borrow_mut().clear();
+        }).unwrap();
+        // A non-activation key has no SDK press lease. Its source callback
+        // still owns a session that must receive the real terminal key-up.
+        key(window,"a",true,cx);
+        window.update(cx,|host,_,_|{
+            assert!(host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+        }).unwrap();
+        key(window,"a",false,cx);
+        window.update(cx,|host,_,_|{
+            assert_eq!(semantic_trace(host),["key.down:a","key.up:a"]);
+            assert!(!host.pressed.get(),"native cancellation cannot suppress source-owned terminal input");
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_focus_loss_cancels_a_held_root_press_before_late_key_up(cx:&mut TestAppContext) {
+        let window=open(cx,false);
+        window.update(cx,|host,window,cx|window.focus(&host.focus,cx)).unwrap();frames(window,cx);
+        key(window,"enter",true,cx);
+        window.update(cx,|host,window,cx|{
+            assert!(host.focus.is_focused(window));assert!(host.pressed.get());
+            assert_eq!(host.owner.borrow().press.key.as_deref(),Some("Enter"));
+            window.focus(&host.outside,cx);
+        }).unwrap();frames(window,cx);
+        window.update(cx,|host,_,_|{
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+            assert_eq!(semantic_trace(host).iter().filter(|item|item.starts_with("press.cancel:")).count(),1);
+            assert_eq!(semantic_trace(host).iter().filter(|item|item.starts_with("press.commit:")).count(),1);
+        }).unwrap();
+        key(window,"enter",false,cx);
+        window.update(cx,|host,_,_|{
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+            assert_eq!(semantic_trace(host).iter().filter(|item|item.starts_with("press.commit:")).count(),1);
+        }).unwrap();
     }
 }

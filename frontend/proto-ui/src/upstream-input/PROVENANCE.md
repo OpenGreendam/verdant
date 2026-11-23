@@ -2,7 +2,7 @@
 
 `root.proto.ts` and `types.ts` are exact copies of
 `packages/prototypes/base/src/input/` at Proto-UI commit
-[`a7e88435f943b9e8fe993e324d455a97dc5b3bb2`](https://github.com/Proto-UI/Proto-UI/tree/a7e88435f943b9e8fe993e324d455a97dc5b3bb2/packages/prototypes/base/src/input).
+[`3b0d2dab0555ef6a7c4869c2d2b45ec531b77861`](https://github.com/Proto-UI/Proto-UI/tree/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/prototypes/base/src/input).
 The accompanying MIT license is copied from that same commit.
 The compiler pin binds this identical immutable upstream revision.
 

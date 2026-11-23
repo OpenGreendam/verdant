@@ -49,12 +49,16 @@ class ControlCases:
 
     def text(self, node, expected=None, selections=None):
         reference = tuple(node["reference"])
-        result = self.wait(lambda: self.observer.read_text(reference),
-                           lambda value: (expected is None or value["text"] == expected)
+        def read():
+            result = self.observer.read_text(reference)
+            # Keep intermediate stable prefixes as well as within-capture
+            # races. The predicate still requires the complete expected text.
+            self.log_input("atspi-observation", method="Text.GetText/GetSelection", reference=list(reference),
+                           value=result)
+            return result
+        result = self.wait(read, lambda value: (expected is None or value["text"] == expected)
                            and (selections is None or value["selections"] == selections),
                            f"real AT-SPI text={expected!r}, selections={selections!r}")
-        self.log_input("atspi-observation", method="Text.GetText/GetSelection", reference=list(reference),
-                       value=result)
         return {"reference": list(reference), **result}
 
     def type_unicode(self, value):
@@ -144,8 +148,9 @@ class ControlCases:
 
     def collection_observation(self):
         options = self.library_options()
-        viewport = self.node("预设列表")["windowExtents"]
-        return {"viewport": viewport,
+        viewport_node = self.node("预设列表", "document frame")
+        viewport = viewport_node["windowExtents"]
+        return {"viewportReference": viewport_node["reference"], "viewport": viewport,
                 "options": [{"reference": node["reference"], "name": node["name"],
                              "selected": "selected" in node["states"], "bounds": node["windowExtents"],
                              "visible": intersects(node["windowExtents"], viewport)} for node in options]}
@@ -302,6 +307,82 @@ def validate_control_trace(observations, final):
         if not condition:
             raise RuntimeError(message)
 
+    def tree_node(label, reference, role, name=None):
+        detail = steps[label][0]
+        require(isinstance(reference, list) and len(reference) == 2,
+                f"{label}: missing platform node reference")
+        matches = [node for node in detail.get("tree", {}).get("nodes", [])
+                   if node.get("reference") == reference
+                   and node.get("windowReference") == detail.get("windowReference")]
+        require(len(matches) == 1, f"{label}: reference is absent or ambiguous in the actual window tree")
+        node = matches[0]
+        require(node.get("role") == role and (name is None or node.get("name") == name),
+                f"{label}: actual tree role/name differs")
+        return node
+
+    for label, (detail, _) in steps.items():
+        frame = detail.get("windowReference")
+        require(isinstance(frame, list) and len(frame) == 2
+                and any(node.get("reference") == frame and node.get("role") in ("frame", "window")
+                        for node in detail.get("tree", {}).get("nodes", [])),
+                f"{label}: actual tree lacks its recorded native frame")
+        expected_case = next((case for case in CONTROL_CASES if label.startswith(case.split('-')[0] + '-')), None)
+        require(detail.get("case") == expected_case, f"{label}: observation belongs to another case")
+        control = observed(label)
+        if "text" in control:
+            name = SEARCH_NAME if label.startswith("collection-") else "输入文字…"
+            node = tree_node(label, control["text"].get("reference"), "entry", name)
+            require("org.a11y.atspi.Text" in node.get("interfaces", []),
+                    f"{label}: actual entry lacks the platform Text interface")
+            value = control["text"]
+            samples = value.get("samples", [])
+            require(isinstance(samples, list) and 2 <= len(samples) <= 8
+                    and samples[-1] == samples[-2]
+                    and samples[-1] == {key: value.get(key) for key in ("text", "caret", "selections")},
+                    f"{label}: platform Text lacks two unchanged raw final samples")
+            caret, selected = value["caret"], value["selections"]
+            require(type(caret) is int and 0 <= caret <= len(value["text"])
+                    and isinstance(selected, list) and all(isinstance(item, list) and len(item) == 2
+                    and all(type(offset) is int for offset in item)
+                    and 0 <= item[0] <= item[1] <= len(value["text"]) for item in selected),
+                    f"{label}: stable platform Text offsets are invalid")
+        if "focused" in control:
+            focus = control["focused"]
+            node = tree_node(label, focus.get("reference"), focus.get("role"), focus.get("name"))
+            require("focused" in focus.get("states", []) and "focused" in node.get("states", []),
+                    f"{label}: focus summary differs from the actual tree")
+        if "viewport" in control:
+            node = tree_node(label, control.get("viewportReference"), "document frame", "预设列表")
+            require(node.get("windowExtents") == control["viewport"],
+                    f"{label}: viewport bounds differ from the actual tree")
+            actual = [node for node in detail["tree"]["nodes"]
+                      if node.get("windowReference") == frame and node.get("role") == "list item"]
+            references = [item.get("reference") for item in control["options"]]
+            require(all(isinstance(reference, list) and len(reference) == 2 for reference in references),
+                    f"{label}: invalid option reference")
+            require(len(references) == len({tuple(reference) for reference in references})
+                    and {tuple(reference) for reference in references} == {tuple(node["reference"]) for node in actual},
+                    f"{label}: option inventory differs from the actual tree")
+            for item in control["options"]:
+                node = tree_node(label, item.get("reference"), "list item", item.get("name"))
+                require(node.get("windowExtents") == item.get("bounds")
+                        and ("selected" in node.get("states", [])) is item.get("selected"),
+                        f"{label}: option state/bounds differ from the actual tree")
+        if label == "collection-search-empty":
+            require(not any(node.get("windowReference") == frame and node.get("role") == "list item"
+                            for node in detail["tree"]["nodes"]),
+                    f"{label}: actual tree still exposes unmatched options")
+        if "pan" in control:
+            pan = control["pan"]
+            node = tree_node(label, pan.get("reference"), "slider", "轨道声像")
+            require("org.a11y.atspi.Value" in node.get("interfaces", [])
+                    and node.get("value") == pan.get("value")
+                    and node.get("windowExtents") == pan.get("windowExtents"),
+                    f"{label}: pan Value/bounds differ from the actual tree")
+            if "width" in control:
+                require(control["width"] == node["windowExtents"][2],
+                        f"{label}: pan displacement uses a different platform width")
+
     baseline = document("preflight")
     require(baseline["revision"] == 0 and len(baseline["tracks"]) == 1, "Unexpected controls project baseline")
     require(baseline["tracks"][0]["instrument"]["params"]["gain"] == -8.0
@@ -335,6 +416,7 @@ def validate_control_trace(observations, final):
                 f"{label}: wrong physical focus target")
         require(any(node.get("reference") == focus.get("reference") and "focused" in node.get("states", [])
                     for node in steps[label][0]["tree"]["nodes"]), f"{label}: focus is absent from the actual tree")
+    require(document("text-focus-forward") == baseline, "Focus traversal changed the durable project")
     require(document("text-committed") == expected_project(1, name=TEXT_ACCEPTED), "Text commit changed another domain field")
     require(document("text-single-undo") == expected_project(2), "Text single undo did not restore the original domain state")
     require(document("text-canceled") == document("text-single-undo"), "Canceled text changed the saved project")

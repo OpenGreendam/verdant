@@ -2,7 +2,7 @@ import { definePrototype, tw, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable, asScrollSurface } from '@proto.ui/hooks';
 
 type Props = {
-  mode?: string; label?: string; cursor?: number; orientation?: string;
+  mode?: string; label?: string; description?: string; cursor?: number; orientation?: string;
   expanded?: number; revision?: string; disabled?: boolean; autoFocus?: boolean; columns?: number;
 };
 
@@ -13,6 +13,7 @@ export default definePrototype<Props>({
   setup(def) {
     def.props.define({
       mode: { type: 'string', default: 'listbox' }, label: { type: 'string', default: '' },
+      description: { type: 'string', default: '' },
       cursor: { type: 'number', default: 0 },
       orientation: { type: 'string', default: 'vertical' },
       expanded: { type: 'number', default: -1 }, revision: { type: 'string', default: '' },
@@ -23,12 +24,13 @@ export default definePrototype<Props>({
     const disabled = def.state.bool('disabled', false);
     const role = def.state.string('role', 'listbox');
     const label = def.state.string('label', '');
+    const description = def.state.string('description', '');
     const table = def.state.bool('table', false);
     const rows = def.state.numberDiscrete('rows', 0);
     const columns = def.state.numberDiscrete('columns', 0);
     const focus = asFocusable(); focus.configure({ disabled: false });
     const scroll = asScrollSurface(); scroll.configure({ axes: 'both', projection: 'system' });
-    const a11y = asAccessible(); a11y.role(role); a11y.name(label); a11y.state('disabled', disabled);
+    const a11y = asAccessible(); a11y.role(role); a11y.name(label); a11y.description(description); a11y.state('disabled', disabled);
     a11y.state('rowCount', rows, { when: table }); a11y.state('columnCount', columns, { when: table });
     def.expose.state('scrollPosition', scroll.vertical.position); def.expose.state('scrollAtEnd', scroll.vertical.atEnd);
     def.expose.state('horizontalPosition', scroll.horizontal.position);
@@ -269,6 +271,8 @@ export default definePrototype<Props>({
       if (epoch !== ticket || disposed) return;
       label.set(props.label ?? '', 'reason: collection name');
       if (epoch !== ticket || disposed) return;
+      description.set(props.description ?? '', 'reason: collection description');
+      if (epoch !== ticket || disposed) return;
       disabled.set(props.disabled ?? false, 'reason: collection policy');
       if (epoch !== ticket || disposed) return;
       focus.setDisabled(disabled.get());
@@ -293,7 +297,7 @@ export default definePrototype<Props>({
     };
     def.lifecycle.onCreated(sync);
     def.lifecycle.onMounted((run) => { if (!disposed) { attached = true; sync(run); if (run.props.get().autoFocus) focus.focusSelf(); } });
-    def.props.watch(['mode', 'label', 'cursor', 'expanded', 'revision', 'disabled', 'autoFocus', 'columns', 'orientation'], sync);
+    def.props.watch(['mode', 'label', 'description', 'cursor', 'expanded', 'revision', 'disabled', 'autoFocus', 'columns', 'orientation'], sync);
     def.lifecycle.onUnmounted(() => { ++epoch; attached = false; current = null; });
     def.lifecycle.onBeforeDispose(() => { ++epoch; disposed = true; attached = false; current = null; });
     def.feedback.style.use(tw('w-full h-full'));

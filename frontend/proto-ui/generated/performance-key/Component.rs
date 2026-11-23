@@ -719,7 +719,23 @@ pub struct GeneratedData0 {
               });
               notify_native_change(cx);
           });
-          vec![on_focus, on_blur]
+          // A native slot descendant can start this root's keyboard press
+          // while the root FocusHandle itself is not focused. Its departure
+          // from the physical subtree is distinct from the root's own blur.
+          let focus_out_owner = Rc::downgrade(&owner_ref);
+          let on_focus_out = cx.on_focus_out(&focus, window, move |view, _, window, cx| {
+              let Some(owner) = focus_out_owner.upgrade() else { return; };
+              native_host_callback(&owner, "focus-out", || {
+              let epoch = owner.borrow().epoch;
+              if !ready(&owner) || owner.borrow().window_id != Some(window.window_handle().window_id()) || view.focus.contains_focused(window, cx) { return; }
+              // This retires only an existing root press lease. Do not forge
+              // host:blur or change the root's own Focus observation here.
+              native_press_blur(&owner);
+              if ready(&owner) && owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
+              });
+              notify_native_change(cx);
+          });
+          vec![on_focus, on_blur, on_focus_out]
           } else { Vec::new() };
           let global_key_capture = subscribe_global_key_capture(&owner_ref, cx);
           let window_input = window_input_needed(&owner_ref).then(|| cx.focus_handle().tab_stop(false));
@@ -771,20 +787,25 @@ pub struct GeneratedData0 {
           });
           self._entry_readiness = Some((window_id, subscription));
       }
+      fn notify_after_turn(&self, cx: &mut Context<Self>) {
+          // GPUI suppresses Entity observer effects while a window is drawing,
+          // including its focus/blur phase. Keep authored state synchronous,
+          // then publish the host change after that physical draw lease ends.
+          // A weak target cannot keep a detached component alive for delivery.
+          notify_native_change(cx);
+      }
       pub fn drive(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Result<(), Value> {
-          let mut dirty = false;
           let result = catch_authored(|| {
-          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); dirty = true; return; }
+          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); return; }
           modules_drive(&self.owner, &self.focus, window, cx);
-          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); dirty = true; return; }
+          if self.owner.borrow().disposed { self._entry_readiness.take(); self._window_activation.take(); self._focus_subscriptions.clear(); self._focus_lost.take(); self._global_key_capture.take(); return; }
           self.focus = self.focus.clone().tab_stop(native_tab_participation(&self.owner));
           drive_queued_focus(&self.owner, window, cx);
-          dirty = std::mem::take(&mut self.owner.borrow_mut().dirty);
           });
-          // A render-time prop watcher or a terminal callback may publish an
-          // event even after ordinary drawing consumed dirty. Wake observers
-          // once after this native lease; do not request an authored render.
-          if !notify_native_events(&self.owner, cx) && dirty { cx.notify(); }
+          // A callback can publish before failing or retiring its owner. That
+          // output is independent from repaint dirtiness and an unread queue.
+          let dirty = std::mem::take(&mut self.owner.borrow_mut().dirty);
+          if !notify_native_events(&self.owner, cx) && dirty { self.notify_after_turn(cx); }
           result
       }
   }

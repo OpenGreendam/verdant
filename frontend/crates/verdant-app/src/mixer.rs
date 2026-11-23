@@ -1044,3 +1044,115 @@ mod collection_native_tests {
         window.update(cx,|host,_,cx|assert!(host.editor.read(cx).menu.is_some(),"source keyboard context uses the selected track")).unwrap();
     }
 }
+
+
+#[cfg(test)]
+mod escape_route_tests {
+    use super::*;
+    use gpui::{AppContext, TestAppContext, size};
+    use verdant_continuous_control::{ContinuousControlHandle, native::gpui_native_owner::resolved};
+
+    #[gpui::test]
+    fn native_editor_escape_cancels_mixer_contact_before_late_release(cx: &mut TestAppContext) {
+        let mut previous_window: Option<gpui::WindowHandle<Editor>> = None;
+        for (master, replace_capture) in [(false, false), (true, false), (false, true)] {
+            // The actual Editor keymap resolves Escape before a raw key.down
+            // handler. A bare scalar cannot exercise that application route.
+            let mut project = crate::native_test_support::instrument_project();
+            project.tracks.truncate(1);
+            let note = verdant_domain::Note::new(0, 480, 60);
+            let selected = note.id.clone();
+            project.tracks[0].notes.push(note);
+            let window = cx.open_window(size(px(1300.0), px(900.0)), |window, cx| {
+                let bindings = crate::shortcuts::bindings(cx);
+                cx.bind_keys(bindings);
+                let mut editor = Editor::for_native_test(project, window, cx);
+                editor.session.selection.insert(selected.clone());
+                editor.bottom = crate::editor::Bottom::Mixer;
+                editor.needs_fit = false;
+                editor
+            });
+            cx.update_window(window.into(), |_, window, _| window.activate_window()).unwrap();
+            crate::native_test_support::frames(window, cx);
+            let initial_revision = window.update(cx, |editor, _, _| editor.revision().get()).unwrap();
+            let (handle, accepted, start) = cx.update_window(window.into(), |_, window, cx| {
+                let label = if master { "主声像" } else { "轨道声像" };
+                // The numeric pill has the same name and a spinbutton role.
+                // Locate the actual pan slider in this single-track fixture.
+                let candidates = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter().filter(|owner| {
+                    let owner = owner.borrow();
+                    owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                        && owner.props.get("label").and_then(serde_json::Value::as_str) == Some(label)
+                        && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("slider")
+                }).collect::<Vec<_>>();
+                assert_eq!(candidates.len(), 1, "one Mixer slider: master={master} replace_capture={replace_capture} label={label}");
+                let owner = candidates.into_iter().next().unwrap();
+                let handle = ContinuousControlHandle { owner };
+                let accepted = handle.state("value").unwrap().as_f64().unwrap();
+                let start = handle.owner.borrow().bounds.expect("mounted pan bounds").center();
+                window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                    position: start, button: MouseButton::Left, ..Default::default()
+                }), cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: start + point(px(22.0), px(0.0)),
+                    pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                assert_eq!(handle.state("phase").unwrap(), serde_json::json!("dragging"));
+                assert_ne!(handle.state("value").unwrap().as_f64(), Some(accepted));
+                assert!(window.captured_hitbox().is_some());
+                (handle, accepted, start)
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            let contact = window.update(cx, |editor, _, _| {
+                assert!(editor.has_proto_pointer_contact());
+                assert!(if master { editor.master_drag.is_some() } else { editor.mixer_drag.is_some() },
+                    "preview buffer: master={master} replace_capture={replace_capture} props={:?}", handle.owner.borrow().props);
+                assert_eq!(editor.revision().get(), initial_revision, "preview never writes the project");
+                assert!(editor.session.selection.contains(&selected));
+                editor.proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade).unwrap()
+            }).unwrap();
+            if let Some(other) = previous_window {
+                cx.update_window(other.into(), |_, window, cx| {
+                    assert!(!contact.cancel_in_window(window, cx), "another window cannot cancel this contact");
+                }).unwrap();
+                assert!(contact.is_active());
+                assert_eq!(handle.state("phase").unwrap(), serde_json::json!("dragging"));
+            }
+            let replacement = replace_capture.then(|| cx.update_window(window.into(), |_, window, cx| {
+                // Reacquire the same hitbox under a new ownership generation.
+                // Escape must not release this newer native acquisition.
+                crate::host_pointer::OwnedPointerCapture::acquire(window.captured_hitbox().unwrap(), window, cx)
+            }).unwrap());
+            cx.simulate_keystrokes(window.into(), "escape");
+            crate::native_test_support::frames(window, cx);
+            cx.update_window(window.into(), |_, window, cx| {
+                assert_eq!(handle.state("phase").unwrap(), serde_json::json!("idle"),
+                    "production Mixer Escape must cancel the authored interaction; contexts={:?}", window.context_stack());
+                assert_eq!(handle.state("value").unwrap().as_f64(), Some(accepted));
+                assert_eq!(resolved(&handle.owner.borrow().accessible_states["valueNow"]).num(), accepted);
+                assert!(!contact.cancel_in_window(window, cx), "an idle contact does not claim another Escape");
+                if let Some(replacement) = replacement {
+                    assert!(replacement.is_current(window, cx), "cancel preserves a newer capture of the same hitbox");
+                    replacement.release(window, cx);
+                } else {
+                    assert!(window.captured_hitbox().is_none(), "cancel releases its owned capture before MouseUp");
+                }
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: start + point(px(22.0), px(0.0)), button: MouseButton::Left, ..Default::default()
+                }), cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |editor, _, _| {
+                assert!(editor.mixer_drag.is_none() && editor.master_drag.is_none());
+                assert!(!editor.has_proto_pointer_contact());
+                assert_eq!(editor.revision().get(), initial_revision, "Escape and late MouseUp cannot commit");
+                assert!(editor.session.selection.contains(&selected), "cancelling a live contact preserves note selection");
+            }).unwrap();
+            cx.simulate_keystrokes(window.into(), "escape");
+            window.update(cx, |editor, _, _| {
+                assert!(editor.session.selection.is_empty(), "an inactive contact falls through to the existing Escape action");
+            }).unwrap();
+            previous_window = Some(window);
+        }
+    }
+}

@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "b9cf07645c98130ca5ad0fdd3fa352df669af6e160017c15d51287a1c7954916",
+    "contentSha256": "a0e3c07acf8cc62a9d7b0afcf78470428367a306cb644dbe7c85e0aa7a7fdf02",
     "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
     "bundled": false
   },
@@ -91,17 +91,17 @@
       "sha256": "ddb91e63af42da867e8754638ff05f65a323c4b1d0059cfabc70e62c4cfb881f"
     }
   ],
-  "generatedSha256": "20633efc330d27c501654211c03c3efc514d1c6355ebda8fa5bc635fa2e11fed",
+  "generatedSha256": "b78e26f70a070faaadede5146896da00f945b9a42583d61ef1871ab63a527e97",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "20633efc330d27c501654211c03c3efc514d1c6355ebda8fa5bc635fa2e11fed"
+      "sha256": "b78e26f70a070faaadede5146896da00f945b9a42583d61ef1871ab63a527e97"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "2326a51e55d2d7acfbe0c9229bed240f55b2105ff7871ff36da9d57590f80627"
+      "sha256": "2cd86a53a059d321b5b745045839d7b38b7b77c3bfbbf71be347833c4ea3eceb"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",

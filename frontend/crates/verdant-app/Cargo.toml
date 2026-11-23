@@ -26,18 +26,18 @@ verdant-import = { path = "../verdant-import" }
 verdant-exchange = { path = "../verdant-exchange" }
 verdant-midi = { path = "../verdant-midi" }
 verdant-media = { path = "../verdant-media" }
-verdant-pitch-gesture-surface = { package = "generated-gpui-f19f511ca8c6bceb5f17c90938ba48de", path = "../../proto-ui/generated/pitch-gesture-surface" }
-verdant-normalized-knob = { package = "generated-gpui-d29517023fa4b2b2c16fd8301ad53a4c", path = "../../proto-ui/generated/normalized-knob" }
-verdant-action-control = { package = "generated-gpui-397f3cfb46fd5d0e624ae80ff587e175", path = "../../proto-ui/generated/action-control" }
-verdant-collection-control = { package = "generated-gpui-f8db0302890012902dee396d008d1f33", path = "../../proto-ui/generated/collection-control" }
-verdant-continuous-control = { package = "generated-gpui-93559bec28c3bc5caff4696c6d9cc36f", path = "../../proto-ui/generated/continuous-control" }
-verdant-editor-surface = { package = "generated-gpui-9800d693dc6d3f62201299f906964885", path = "../../proto-ui/generated/editor-surface" }
-verdant-performance-key = { package = "generated-gpui-e95918494ac0f7409151aed7b69b25b4", path = "../../proto-ui/generated/performance-key" }
-verdant-drag-source = { package = "generated-gpui-92373aa5943d19bf133fbad1a3dc86dc", path = "../../proto-ui/generated/drag-source" }
-verdant-overlay-control = { package = "generated-gpui-71764f0dced719c36100ffc79066b386", path = "../../proto-ui/generated/overlay-control" }
-verdant-text-field = { package = "generated-gpui-aaf5c12fc4f27237813ef6f0107d8b66", path = "../../proto-ui/generated/text-field" }
-verdant-graph-point = { package = "generated-gpui-da5e380658a63e64204869c34d30c650", path = "../../proto-ui/generated/graph-point" }
-verdant-scroll-region = { package = "generated-gpui-53a96fb6a83f771485674c6694b90829", path = "../../proto-ui/generated/scroll-region" }
+verdant-pitch-gesture-surface = { package = "generated-gpui-c77c3274cff416fb9f1443d0f0dbb6ef", path = "../../proto-ui/generated/pitch-gesture-surface" }
+verdant-normalized-knob = { package = "generated-gpui-4498881630ff6ed192d401c5efa20d08", path = "../../proto-ui/generated/normalized-knob" }
+verdant-action-control = { package = "generated-gpui-453d0654bb061524567e58b3f919af45", path = "../../proto-ui/generated/action-control" }
+verdant-collection-control = { package = "generated-gpui-7bc3e114ab2704031ff8f0e8ef72b0b4", path = "../../proto-ui/generated/collection-control" }
+verdant-continuous-control = { package = "generated-gpui-8896b9a832ba128a5e3e5aa6280c2b0d", path = "../../proto-ui/generated/continuous-control" }
+verdant-editor-surface = { package = "generated-gpui-56aecbc3a70b9ce072128c3ce6551e8a", path = "../../proto-ui/generated/editor-surface" }
+verdant-performance-key = { package = "generated-gpui-06be6e15d2484bcbf34a5dcbd8147005", path = "../../proto-ui/generated/performance-key" }
+verdant-drag-source = { package = "generated-gpui-cab661c69e21f84c6f0b8d42702bac16", path = "../../proto-ui/generated/drag-source" }
+verdant-overlay-control = { package = "generated-gpui-c95b53accf92907139eb07f9b02b4adf", path = "../../proto-ui/generated/overlay-control" }
+verdant-text-field = { package = "generated-gpui-59091ba4197b0c29e9b91c921377bf80", path = "../../proto-ui/generated/text-field" }
+verdant-graph-point = { package = "generated-gpui-c341222aeb0ae550fc52fc631f285414", path = "../../proto-ui/generated/graph-point" }
+verdant-scroll-region = { package = "generated-gpui-426fa7cf12293064eedce6664125b583", path = "../../proto-ui/generated/scroll-region" }
 serde.workspace = true
 serde_json.workspace = true
 semver.workspace = true

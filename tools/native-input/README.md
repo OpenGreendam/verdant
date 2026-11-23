@@ -189,6 +189,15 @@ AT-SPI text, character selections, focus, saved project and undo/cancel
 checks remain the acceptance evidence. This Unicode keyboard route does
 not claim input-method composition coverage or change a user's desktop map.
 
+Weston's X11 backend rebuilds its keyboard map from `_XKB_RULES_NAMES`, so
+the controls harness also writes the observed keycodes, types, compatibility
+and symbols into a private named layout. It sets and reads back that property
+on its own Xvfb, then actually recompiles those observed names with
+`libxkbcommon` and verifies every required symbol and keycode again. Weston
+inherits the same private `XKB_CONFIG_ROOT`. The property bytes, component
+files, compiled result and hashes are retained; an Xvfb-only readback cannot
+stand in for this check or for the complete 28 real-window cases.
+
 For an already prepared display/compositor and AT-SPI session, invoke the
 probe directly:
 
