@@ -34,7 +34,7 @@ pub struct TableFocus {
 }
 
 impl TableFocus {
-    fn sync(&mut self, track: &TrackId, note: Option<&Note>, revision: u64, window: &mut Window, table: &FocusHandle, scroll: &gpui::UniformListScrollHandle, cx: &mut Context<Editor>) {
+    fn sync(&mut self, track: &TrackId, note: Option<&Note>, revision: u64, window: &mut Window, table: &FocusHandle, cx: &mut Context<Editor>) {
         let same_note = match (&self.note, note) {
             (Some((old_track, old_note)), Some(note)) => old_track == track && old_note == &note.id,
             (None, None) => true,
@@ -50,7 +50,6 @@ impl TableFocus {
             self.handles.clear();
             self.cursor = None;
             self.cursor_index = 0;
-            scroll.scroll_to_item(0, gpui::ScrollStrategy::Nearest);
         }
         self.note = note.map(|n| (track.clone(), n.id.clone()));
         self.revision = Some(revision);
@@ -74,8 +73,6 @@ impl TableFocus {
         if focused.is_some() {
             if !same_note || retained.is_none() {
                 window.focus(table, cx);
-            } else {
-                scroll.scroll_to_item(self.cursor_index, gpui::ScrollStrategy::Nearest);
             }
         }
     }
@@ -85,82 +82,105 @@ impl TableFocus {
     }
 }
 
-pub fn note_table(ed: &mut Editor, entity: Entity<Editor>, window: &mut Window, cx: &mut Context<Editor>) -> impl IntoElement {
+fn table_revision(ed: &Editor) -> String {
+    format!("{}:{}:{}", ed.document_generation, ed.revision().get(), ed.session.track)
+}
+
+
+pub fn note_table(ed: &mut Editor, entity: Entity<Editor>, _window: &mut Window, _cx: &mut Context<Editor>) -> crate::proto_collection::Collection {
+    let count = ed.active_track().map_or(0, |track| track.notes.len());
+    let revision = table_revision(ed);
+    let props = serde_json::json!({"mode":"table", "label":"音符表", "cursor":ed.table_cursor,
+        "columns":5, "revision":revision, "autoFocus":false, "disabled":false});
+    let draw_editor = entity.clone(); let basis = revision.clone();
+    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, focus: &FocusHandle, engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut gpui::App| {
+        draw_editor.update(cx, |ed, cx| {
+            let was_focused = ed.focus_table.is_focused(window);
+            ed.focus_table = focus.clone();
+            if was_focused { window.focus(focus, cx); }
+            native_note_table(ed, cx.entity(), handle.clone(), basis.clone(), engine.clone().expect("note viewport binding"), window, cx).into_any_element()
+        })
+    });
+    let editor = entity.downgrade();
+    let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
+        let _ = editor.update(cx, |ed, cx| {
+            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(table_revision(ed).as_str()) { return; }
+            let index = crate::proto_controls::source_index(payload.get("index")).unwrap_or(0);
+            let extend = payload.get("extend").and_then(serde_json::Value::as_bool).unwrap_or(false);
+            match name {
+                "select" => ed.table_select(index, extend, cx),
+                "activate" => {
+                    ed.table_select(index, extend, cx);
+                    let id = ed.active_track().and_then(|track| track.notes.get(index)).map(|note| note.id.clone());
+                    if let Some(id) = id { ed.bottom = Bottom::Editor; ed.begin_lyric(id, window, cx); }
+                },
+                "command" => {
+                    match payload.get("key").and_then(serde_json::Value::as_str).unwrap_or("") {
+                        "Tab" => {
+                            if extend || ed.table_focus.order.is_empty() { window.focus(&ed.focus_arrange, cx); }
+                            else { focus_point(ed, ed.table_focus.cursor_index, window, cx); }
+                        },
+                        "Delete" | "Backspace" => ed.run_menu_action(MenuAction::DeleteSelection, window, cx),
+                        key @ ("ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight") => {
+                            let project = ed.store().snapshot();
+                            let ds = match key { "ArrowUp" => if extend { 12 } else { 1 }, "ArrowDown" => if extend { -12 } else { -1 }, _ => 0 };
+                            let grid = if extend { ed.project().ppq * 4 } else { ed.session.snap.grid_ticks.max(1) };
+                            let dt = match key { "ArrowLeft" => -grid, "ArrowRight" => grid, _ => 0 };
+                            let effects = ed.session.nudge_selection(&project, ed.revision(), dt, ds);
+                            ed.apply_effects(effects, window, cx);
+                        },
+                        _ => {},
+                    }
+                },
+                _ => {},
+            }
+        });
+    });
+    crate::proto_collection::collection("compiled-note-table", props, vec![1;count], draw, sink)
+        .scroll_engine(crate::proto_scroll::Engine::Uniform(ed.table_scroll.clone()))
+}
+
+fn native_note_table(ed: &mut Editor, entity: Entity<Editor>, handle: verdant_collection_control::CollectionControlHandle,
+    revision: String, engine: crate::proto_scroll::EngineBinding, window: &mut Window, cx: &mut Context<Editor>) -> gpui::AnyElement {
+
     let project = ed.store().snapshot();
     let note = project.track(&ed.session.track).and_then(|t| t.notes.get(ed.table_cursor));
-    let revision = ed.revision().get();
-    ed.table_focus.sync(&ed.session.track, note, revision, window, &ed.focus_table, &ed.point_scroll, cx);
+    let project_revision = ed.revision().get();
+    ed.table_focus.sync(&ed.session.track, note, project_revision, window, &ed.focus_table, cx);
     let count = ed.active_track().map(|t| t.notes.len()).unwrap_or(0);
+    crate::proto_collection::reveal_uniform_item("note-table-reveal",&handle,ed.table_cursor,&revision,count,&ed.table_scroll,window,cx);
     let track = ed.session.track.to_string();
     let notes = entity.clone();
     let point_note = note.map(|n| n.id.clone());
     let point_count = ed.table_focus.order.len();
     let points = entity;
-    div().id(SharedString::from(format!("note-table-{track}"))).role(Role::Table).aria_label("音符表")
+    let key_handle = handle.clone();
+    div().id(SharedString::from(format!("note-table-{track}")))
         .aria_description("上下键选择，Shift 扩展选择，Home/End 跳转，Ctrl 方向键移动音符，Enter 编辑歌词。Tab 进入当前音符控制点，Shift Tab 返回轨道区。")
-        .aria_row_count(count).aria_column_count(5).track_focus(&ed.focus_table).key_context("NoteTable")
+        .key_context("NoteTable")
         .size_full().flex().flex_col().bg(ed.theme.surface)
-        .on_key_down(cx.listener(table_key))
+        .on_key_down(move |event, window, cx| crate::proto_collection::key(&key_handle, event, window, cx))
         .child(div().h(px(32.0)).px(px(12.0)).flex().items_center().gap(px(20.0)).text_sm()
             .child(format!("音符表 · {count} 个音符"))
             .child("起点 / 长度 / 音高 / 歌词 · Enter 编辑 · Tab 控制点 · Shift Tab 轨道区"))
         .child(uniform_list(SharedString::from(format!("note-rows-{track}")), count, move |range, _, cx| {
-            notes.update(cx, |ed, cx| range.filter_map(|i| note_row(ed, i, cx)).collect::<Vec<_>>())
-        }).track_scroll(&ed.table_scroll).flex_1().min_h_0())
+            notes.update(cx, |ed, cx| range.filter_map(|i| note_row(ed, i, &handle, &revision, cx)).collect::<Vec<_>>())
+        }).track_scroll(&ed.table_scroll).on_scroll_wheel(move |_,window,cx| engine.notify_input(window,cx)).flex_1().min_h_0())
         .child(div().h(px(28.0)).px(px(12.0)).flex().items_center().text_xs().text_color(ed.theme.text_secondary)
             .child(format!("全部参数曲线 · {point_count} 点 · Tab / ←→ 选点 · ↑↓ 步进，Shift 精调 PIT/DYN · Esc 返回音符")))
-        .child(div().h(px(140.0)).min_h_0().child(uniform_list(
-            SharedString::from(format!("curve-points-{track}")), point_count, move |range, _, cx| {
-                points.update(cx, |ed, cx| range.filter_map(|i| point_row(ed, point_note.as_ref()?, i, cx)).collect::<Vec<_>>())
-            }).track_scroll(&ed.point_scroll).size_full()))
+        .child(div().h(px(140.0)).min_h_0().children(point_note.map(|note| point_collection(ed, points, note)))).into_any_element()
+
 }
 
-fn table_key(ed: &mut Editor, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Editor>) {
-    let key = event.keystroke.key.as_str();
-    let modifiers = event.keystroke.modifiers;
-    let secondary = modifiers.control || modifiers.platform;
-    if !matches!(key, "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown" | "enter" | "f2" | "delete" | "backspace" | "tab") { return; }
-    window.prevent_default(); cx.stop_propagation();
-    match key {
-        "tab" => {
-            if modifiers.shift || ed.table_focus.order.is_empty() {
-                window.focus(&ed.focus_arrange, cx);
-            } else {
-                focus_point(ed, ed.table_focus.cursor_index, window, cx);
-            }
-        }
-        "enter" | "f2" => {
-            let id = ed.active_track().and_then(|t| t.notes.get(ed.table_cursor)).map(|n| n.id.clone());
-            if let Some(id) = id { ed.bottom = Bottom::Editor; ed.begin_lyric(id, window, cx); }
-        }
-        "delete" | "backspace" => ed.run_menu_action(MenuAction::DeleteSelection, window, cx),
-        "up" | "down" | "left" | "right" if secondary => {
-            let project = ed.store().snapshot();
-            let ds = match key { "up" => if modifiers.shift { 12 } else { 1 }, "down" => if modifiers.shift { -12 } else { -1 }, _ => 0 };
-            let grid = if modifiers.shift { ed.project().ppq * 4 } else { ed.session.snap.grid_ticks.max(1) };
-            let dt = match key { "left" => -grid, "right" => grid, _ => 0 };
-            let effects = ed.session.nudge_selection(&project, ed.revision(), dt, ds);
-            ed.apply_effects(effects, window, cx);
-        }
-        "up" | "left" => ed.table_step(false, modifiers.shift, cx),
-        "down" | "right" => ed.table_step(true, modifiers.shift, cx),
-        "home" => ed.table_select(0, modifiers.shift, cx),
-        "end" => ed.table_select(ed.active_track().map(|t| t.notes.len().saturating_sub(1)).unwrap_or(0), modifiers.shift, cx),
-        "pageup" => ed.table_select(ed.table_cursor.saturating_sub(20), modifiers.shift, cx),
-        "pagedown" => ed.table_select(ed.table_cursor.saturating_add(20), modifiers.shift, cx),
-        _ => {},
-    }
-}
-
-fn note_row(ed: &Editor, index: usize, cx: &mut Context<Editor>) -> Option<gpui::Stateful<gpui::Div>> {
+fn note_row(ed: &Editor, index: usize, collection: &verdant_collection_control::CollectionControlHandle, revision: &str, cx: &mut Context<Editor>) -> Option<gpui::Stateful<gpui::Div>> {
     let note = ed.active_track()?.notes.get(index)?;
     let (id, name) = (note.id.clone(), verdant_domain::timing::note_name(note.midi_note));
     let current = index == ed.table_cursor;
     let selected = ed.session.selection.contains(&id);
-    let focus_id = id.clone();
-    let increment = id.clone();
-    let decrement = id.clone();
-    let click_id = id.clone();
+    let focus = collection.clone(); let focus_revision = revision.to_string();
+    let increment = collection.clone(); let increment_revision = revision.to_string();
+    let decrement = collection.clone(); let decrement_revision = revision.to_string();
+    let select = collection.clone(); let select_revision = revision.to_string();
     let reading = verdant_domain::pronunciation_display(&note.pronunciation);
     let label = format!("音符 {}，{}，起点 {} tick，长度 {} tick，歌词 {}，读音 {}{}", id, name, note.start_tick, note.duration_tick,
         note.lyric, reading, if ed.error_notes.contains(&id) { "，渲染预检错误" } else { "" });
@@ -170,15 +190,18 @@ fn note_row(ed: &Editor, index: usize, cx: &mut Context<Editor>) -> Option<gpui:
         .h(px(34.0)).px(px(12.0)).flex().items_center().gap(px(12.0)).text_sm()
         .bg(if selected { crate::theme::mix(ed.theme.surface, ed.theme.accent, 0.18) } else { ed.theme.surface })
         .border_b_1().border_color(ed.theme.shade)
-        .on_a11y_action(AccessibleAction::Focus, crate::view::a11y_listener(cx, move |ed, _, window, cx| {
-            if let Some(i) = ed.index.position(&focus_id) { ed.table_select(i, false, cx); window.focus(&ed.focus_table, cx); }
-        }))
-        .on_a11y_action(AccessibleAction::Increment, crate::view::a11y_listener(cx, move |ed, _, _, cx| ed.step_notes_pitch(vec![increment.clone()], 1, cx)))
-        .on_a11y_action(AccessibleAction::Decrement, crate::view::a11y_listener(cx, move |ed, _, _, cx| ed.step_notes_pitch(vec![decrement.clone()], -1, cx)))
-        .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, window, cx| {
-            if let Some(i) = ed.index.position(&click_id) { ed.table_select(i, ev.modifiers().shift, cx); }
-            window.focus(&ed.focus_table, cx);
-        }))
+        .on_a11y_action(AccessibleAction::Focus, move |_, window, cx| {
+            crate::proto_collection::call(&focus, "selectAndFocus", vec![index.into(), false.into(), focus_revision.clone().into()], window, cx);
+        })
+        .on_a11y_action(AccessibleAction::Increment, move |_, window, cx| {
+            crate::proto_collection::call(&increment, "keyAt", vec![index.into(), "ArrowUp".into(), false.into(), true.into(), increment_revision.clone().into()], window, cx);
+        })
+        .on_a11y_action(AccessibleAction::Decrement, move |_, window, cx| {
+            crate::proto_collection::call(&decrement, "keyAt", vec![index.into(), "ArrowDown".into(), false.into(), true.into(), decrement_revision.clone().into()], window, cx);
+        })
+        .on_click(move |event: &gpui::ClickEvent, window, cx| {
+            crate::proto_collection::call(&select, "selectAndFocus", vec![index.into(), event.modifiers().shift.into(), select_revision.clone().into()], window, cx);
+        })
         .child(div().id("start").role(Role::Cell).w(px(100.0)).child(note.start_tick.to_string()))
         .child(div().id("duration").role(Role::Cell).w(px(100.0)).child(note.duration_tick.to_string()))
         .child(crate::view::numeric_field(ed, NumericId::NotePitchSemitone, CommandArg::Note(id), "pitch", cx))
@@ -190,7 +213,6 @@ fn focus_point(ed: &mut Editor, index: usize, window: &mut Window, cx: &mut Cont
     let handle = ed.table_focus.handle(&key, cx);
     ed.table_focus.cursor = Some(key);
     ed.table_focus.cursor_index = index;
-    ed.point_scroll.scroll_to_item(index, gpui::ScrollStrategy::Nearest);
     window.focus(&handle, cx);
     cx.notify();
 }
@@ -200,62 +222,160 @@ fn focus_point_key(ed: &mut Editor, note: &NoteId, key: &PointKey, window: &mut 
     if let Some(&index) = ed.table_focus.positions.get(key) { focus_point(ed, index, window, cx); }
 }
 
-fn point_key(ed: &mut Editor, note: &NoteId, point: &PointKey, step: f64, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Editor>) {
-    let key = event.keystroke.key.as_str();
-    if !matches!(key, "up" | "down" | "+" | "=" | "-" | "left" | "right" | "home" | "end" | "pageup" | "pagedown" | "tab" | "escape" | "enter") { return; }
-    window.prevent_default(); cx.stop_propagation();
-    let Some(&index) = ed.table_focus.positions.get(point) else { return };
-    ed.table_focus.cursor = Some(point.clone());
-    ed.table_focus.cursor_index = index;
-    let last = ed.table_focus.order.len().saturating_sub(1);
-    match key {
-        "up" | "down" | "+" | "=" | "-" => {
-            let sign = if matches!(key, "up" | "+" | "=") { 1.0 } else { -1.0 };
-            let fine = event.keystroke.modifiers.shift && !point.param.is_expression();
-            ed.step_curve_point(note, &point.id, point.param, sign * step * if fine { 0.1 } else { 1.0 }, cx);
-        }
-        "left" => focus_point(ed, index.saturating_sub(1), window, cx),
-        "right" => focus_point(ed, index.saturating_add(1).min(last), window, cx),
-        "home" => focus_point(ed, 0, window, cx),
-        "end" => focus_point(ed, last, window, cx),
-        "pageup" => focus_point(ed, index.saturating_sub(4), window, cx),
-        "pagedown" => focus_point(ed, index.saturating_add(4).min(last), window, cx),
-        "tab" if event.keystroke.modifiers.shift && index > 0 => focus_point(ed, index - 1, window, cx),
-        "tab" if !event.keystroke.modifiers.shift && index < last => focus_point(ed, index + 1, window, cx),
-        "tab" | "escape" | "enter" => { window.focus(&ed.focus_table, cx); cx.notify(); }
-        _ => {},
-    }
+fn point_revision(ed: &Editor, note: &NoteId) -> String { format!("{}:{note}", table_revision(ed)) }
+
+fn point_collection(ed: &Editor, entity: Entity<Editor>, note: NoteId) -> crate::proto_collection::Collection {
+    let count = ed.table_focus.order.len();
+    let revision = point_revision(ed, &note);
+    let props = serde_json::json!({"mode":"points", "label":"曲线控制点", "cursor":ed.table_focus.cursor_index,
+        "revision":revision, "autoFocus":false, "disabled":false});
+    let draw_editor = entity.clone(); let draw_note = note.clone(); let basis = revision.clone();
+    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &FocusHandle, engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut gpui::App| {
+        let handle = handle.clone(); let editor = draw_editor.clone(); let note = draw_note.clone(); let revision = basis.clone();
+        let engine = engine.expect("point viewport binding");
+        draw_editor.update(cx, |ed, cx| {
+            crate::proto_collection::reveal_uniform_item("curve-point-reveal",&handle,ed.table_focus.cursor_index,&revision,count,&ed.point_scroll,window,cx);
+            uniform_list(SharedString::from(format!("compiled-point-rows-{note}")), count, move |range, _, cx| {
+                editor.update(cx, |ed, cx| range.filter_map(|index| point_row(ed, &note, index, &handle, &revision, cx)).collect::<Vec<_>>())
+            }).track_scroll(&ed.point_scroll).on_scroll_wheel(move |_,window,cx| engine.notify_input(window,cx)).size_full().into_any_element()
+        })
+    });
+    let editor = entity.downgrade();
+    let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
+        let _ = editor.update(cx, |ed, cx| {
+            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(point_revision(ed, &note).as_str()) { return; }
+            if name == "close" { window.focus(&ed.focus_table, cx); cx.notify(); }
+            if name == "select" || name == "activate" {
+                if let Some(index) = crate::proto_controls::source_index(payload.get("index")) { focus_point(ed, index, window, cx); }
+            }
+        });
+    });
+    crate::proto_collection::collection("compiled-curve-point-list", props, vec![1;count], draw, sink)
+        .scroll_engine(crate::proto_scroll::Engine::Uniform(ed.point_scroll.clone()))
 }
 
-fn point_row(ed: &mut Editor, note: &NoteId, index: usize, cx: &mut Context<Editor>) -> Option<gpui::Stateful<gpui::Div>> {
-    let n = ed.active_track().and_then(|t| ed.index.note(t, note))?;
+fn point_row(ed: &mut Editor, note: &NoteId, index: usize, collection: &verdant_collection_control::CollectionControlHandle,
+    revision: &str, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
+    use crate::proto_scalar::{self, EventKind, Sample, Spec};
+    let n = ed.active_track().and_then(|track| ed.index.note(track, note))?;
     let selected = ed.table_focus.order.get(index)?;
     let param = selected.param;
-    let (point, tick, value) = param.point_samples(n).into_iter().find(|p| p.0 == selected.id)?;
+    let (point, tick, value) = param.point_samples(n).into_iter().find(|point| point.0 == selected.id)?;
     let step = if param == Param::Dyn { 0.1 } else { 1.0 };
+    let fine_step = if param.is_expression() { step } else { step * 0.1 };
     let unit = match param { Param::Pit => "cents", Param::Dyn => "dB", _ => "/127" };
     let key = SharedString::from(format!("point-{note}-{}-{point}", param.short()));
     let identity = PointKey { param, id: point.clone() };
-    let handle = ed.table_focus.handle(&identity, cx);
-    let (inc_note, dec_note, key_note) = (note.clone(), note.clone(), note.clone());
-    let (inc, dec) = (point.clone(), point);
-    let (focus_note, click_note) = (note.clone(), note.clone());
-    let (focus_key, click_key) = (identity.clone(), identity.clone());
-    let label = if param == Param::Portamento { format!("POR 音符 {}，按音符起点生效", note) }
-        else { format!("{} 控制点，音符 {}，偏移 {} tick", param.short(), note, tick) };
-    let display = if param == Param::Portamento { format!("POR · 按音符起点生效 · {value:.0} {unit}") }
-        else { format!("{} · {tick} tick · {value:.1} {unit}", param.short()) };
-    Some(div().id(key.clone()).accessibility_id(key).role(Role::SpinButton)
-        .aria_label(label).aria_numeric_value(value)
-        .aria_numeric_value_step(step).aria_value(format!("{value:.1} {unit}"))
-        .aria_position_in_set(index + 1).aria_size_of_set(ed.table_focus.order.len())
-        .track_focus(&handle).key_context("NoteTablePoint")
-        .focus(|style| style.bg(crate::theme::mix(ed.theme.surface, ed.theme.accent, 0.18)))
-        .h(px(32.0)).px(px(12.0)).flex().items_center().gap(px(12.0)).text_sm()
-        .child(display)
-        .on_a11y_action(AccessibleAction::Focus, crate::view::a11y_listener(cx, move |ed, _, window, cx| focus_point_key(ed, &focus_note, &focus_key, window, cx)))
-        .on_a11y_action(AccessibleAction::Increment, crate::view::a11y_listener(cx, move |ed, _, _, cx| ed.step_curve_point(&inc_note, &inc, param, step, cx)))
-        .on_a11y_action(AccessibleAction::Decrement, crate::view::a11y_listener(cx, move |ed, _, _, cx| ed.step_curve_point(&dec_note, &dec, param, -step, cx)))
-        .on_click(cx.listener(move |ed, _, window, cx| { focus_point_key(ed, &click_note, &click_key, window, cx); cx.stop_propagation(); }))
-        .on_key_down(cx.listener(move |ed, ev: &KeyDownEvent, window, cx| point_key(ed, &key_note, &identity, step, ev, window, cx))))
+    let label = if param == Param::Portamento { format!("POR 音符 {note}，按音符起点生效") }
+        else { format!("{} 控制点，音符 {note}，偏移 {tick} tick", param.short()) };
+    let (min, max) = match param { Param::Pit => (-1200., 1200.), Param::Dyn => (-24., 6.), _ => (0., 127.) };
+    let mut spec = Spec::slider(value, min, max, label);
+    spec.role = "spinbutton"; spec.step = step; spec.fine_step = fine_step; spec.key_mode = "table-point";
+    spec.drag_mode = "relative"; spec.tap_action = "activate";
+    spec.disabled = !verdant_backend::params::support(param, ed.route(), ed.scheduler.capabilities.as_ref()).is_effective()
+        || (crate::editor::curves::region_parameter(param) && crate::editor::curves::lane_disabled(n, param));
+    let editor = cx.entity(); let focus_editor = editor.clone();
+    let action_note = note.clone(); let focus_note = note.clone(); let action_identity = identity.clone();
+    let valid_note = note.clone(); let valid_point = point.clone(); let track = ed.session.track.clone();
+    let key_collection = collection.clone(); let key_revision = revision.to_string(); let th = ed.theme;
+    Some(proto_scalar::scalar(editor, key.clone(), spec,
+        move |sample, _, initial| Sample { value: initial + sample.total_delta.x * step,
+            fine: initial + sample.total_delta.x * fine_step, jump: false },
+        move |display, actions, _, _| {
+            let collection = key_collection.clone(); let revision = key_revision.clone();
+            div().id(key.clone()).key_context("NoteTablePoint").h(px(32.)).px(px(12.)).flex().items_center().text_sm()
+                .bg(if display.focus_visible { crate::theme::mix(th.surface, th.accent, 0.18) } else { th.surface })
+                .child(if param == Param::Portamento { format!("POR · 按音符起点生效 · {:.0} {unit}", display.value) }
+                    else { format!("{} · {tick} tick · {:.1} {unit}", param.short(), display.value) })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if actions.key(event, window, cx) { return; }
+                    crate::proto_collection::key_at(&collection, index, &revision, event, window, cx);
+                }).into_any_element()
+        },
+        move |ed, event, window, cx| {
+            if event.kind == EventKind::Commit { ed.step_curve_point(&action_note, &point, param, event.value - value, cx); }
+            if event.kind == EventKind::Activate { focus_point_key(ed, &action_note, &action_identity, window, cx); }
+        })
+        .valid_when(move |ed| ed.session.track == track && ed.active_track().and_then(|track| ed.index.note(track, &valid_note))
+            .is_some_and(|note| param.point_samples(note).iter().any(|point| point.0 == valid_point)))
+        .on_focus_handle(move |focus, window, cx| {
+            focus_editor.update(cx, |ed, cx| {
+                if !ed.table_focus.note.as_ref().is_some_and(|(track, note)| track == &ed.session.track && note == &focus_note) { return; }
+                let previous = ed.table_focus.handles.insert(identity.clone(), focus.clone());
+                if previous.is_some_and(|previous| previous.is_focused(window) && previous != *focus) { window.focus(focus, cx); }
+            });
+        }).into_any_element())
+}
+
+#[cfg(test)]
+mod native_reveal_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, size};
+    use std::rc::Rc;
+    use verdant_collection_control::{CollectionControlHandle,native::gpui_native_owner::{all_owners,resolved}};
+
+    struct Harness {cursor:usize,scroll:gpui::UniformListScrollHandle,last_row:Rc<std::cell::RefCell<Option<gpui::Bounds<gpui::Pixels>>>>}
+    impl Render for Harness {
+        fn render(&mut self,_:&mut Window,cx:&mut Context<Self>)->impl IntoElement {
+            let entity=cx.entity();let draw_entity=entity.clone();
+            let draw:crate::proto_collection::Draw=Rc::new(move|source,_,engine,window,cx| {
+                draw_entity.update(cx,|host,cx| {
+                    crate::proto_collection::reveal_uniform_item("uniform-test-reveal",source,host.cursor,"native-table",64,&host.scroll,window,cx);
+                    let engine=engine.expect("same uniform engine");
+                    let last_row=host.last_row.clone();
+                    uniform_list("measured-native-rows",64,move|range,_,_|range.map(|index|div().relative().h(px(32.)).child(format!("Row {index}"))
+                        .when(index==63,|row| {let measured=last_row.clone();
+                            // Anchor the measuring canvas to the row; auto
+                            // insets would use its static position after text.
+                            row.child(gpui::canvas(move|bounds,_,_| {*measured.borrow_mut()=Some(bounds);},|_,_,_,_|{}).absolute().inset_0().size_full())})).collect::<Vec<_>>())
+                        .track_scroll(&host.scroll).on_scroll_wheel(move|_,window,cx|engine.notify_input(window,cx)).size_full().into_any_element()
+                })
+            });
+            let sink:crate::proto_collection::Sink=Rc::new(move|name,payload,_,cx| {
+                if name=="select" { if let Some(index)=crate::proto_controls::source_index(payload.get("index")) {
+                    entity.update(cx,|host,cx|{host.cursor=index;cx.notify();});
+                }}
+            });
+            crate::proto_collection::collection("native-table-reveal",serde_json::json!({"mode":"table","label":"Measured table reveal","cursor":self.cursor,"revision":"native-table"}),vec![1;64],draw,sink)
+                .scroll_engine(crate::proto_scroll::Engine::Uniform(self.scroll.clone()))
+        }
+    }
+    fn source(window:&Window)->CollectionControlHandle {
+        CollectionControlHandle{owner:all_owners().into_iter().find(|owner| {
+            let owner=owner.borrow();owner.mounted&&owner.window_id==Some(window.window_handle().window_id())
+                &&owner.modules.accessible_text.get("name").is_some_and(|name|resolved(name).text()=="Measured table reveal")
+        }).expect("mounted measured collection")}
+    }
+    #[gpui::test]
+    fn native_uniform_selection_reveal_uses_measured_offscreen_rows_and_source_policy(cx:&mut TestAppContext) {
+        let window=cx.open_window(size(px(280.),px(160.)),|_,_|Harness{cursor:0,scroll:gpui::UniformListScrollHandle::new(),last_row:Default::default()});
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();crate::native_test_support::frames(window,cx);
+        cx.update_window(window.into(),|_,window,cx| {
+            assert_eq!(source(window).call("selectIndex",vec![63.into(),false.into(),"native-table".into()],window,cx).unwrap(),serde_json::json!(true));
+        }).unwrap();crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,window,_| {
+            assert_eq!(host.cursor,63);
+            let state=host.scroll.0.borrow();let offset=state.base_handle.offset().y;
+            assert!(offset<px(-1800.),"offscreen row reveal is decided by the source on the real virtualizer engine");
+            assert!(state.deferred_scroll_to_item.is_none(),"no native ScrollStrategy is queued");
+            let row=host.last_row.borrow().expect("the formerly offscreen row is rendered by the native virtualizer");
+            let viewport=state.base_handle.bounds();
+            assert_eq!(row.size.height,px(32.),"the probe measures the complete native row");
+            assert!(row.top()>=viewport.top()-px(1.)&&row.bottom()<=viewport.bottom()+px(1.),
+                "the actual last-row bounds are inside the viewport: row={row:?}, viewport={viewport:?}, offset={offset:?}, max_offset={:?}, measured_size={:?}",
+                state.base_handle.max_offset(),state.last_item_size.map(|size|(size.item,size.contents)));
+            // ScrollSurface publishes a normalized fraction; raw pixel offset
+            // remains a native engine fact and is checked independently above.
+            let fraction=source(window).state("scrollPosition").unwrap().as_f64().unwrap();
+            let actual=f64::from(-offset.as_f32()/state.base_handle.max_offset().y.as_f32());
+            assert!((0.0..=1.0).contains(&fraction));
+            assert!((fraction-actual).abs()<1e-6,"source scroll fraction must reflect this exact native engine: source={fraction}, actual={actual}");
+        }).unwrap();
+        cx.update_window(window.into(),|_,window,cx| {
+            source(window).call("selectIndex",vec![0.into(),false.into(),"native-table".into()],window,cx).unwrap();
+        }).unwrap();crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,_,_| {
+            assert_eq!(host.cursor,0);assert_eq!(host.scroll.0.borrow().base_handle.offset().y,px(0.));
+        }).unwrap();
+    }
 }

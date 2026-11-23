@@ -2,7 +2,7 @@
 //! command line. Selection and drag previews are transient; every edit is one
 //! ordinary journal transaction and all media analysis runs off the UI thread.
 use std::{collections::BTreeSet,path::PathBuf};
-use gpui::{Context,IntoElement,KeyDownEvent,SharedString,Window,div,px,prelude::*};
+use gpui::{Context,IntoElement,SharedString,Window,div,px,prelude::*};
 use verdant_domain::{Revision,TrackId};
 use verdant_media::{AudioClip,FadeShape};
 use verdant_service::audio_edit::{AudioClipboard,AudioClipProperties,AudioClipRef,AudioEdit,AudioEditPlan};
@@ -51,31 +51,32 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
             ("范围","拖动选择时间与轨道范围",AudioUiAction::RangeTool,ed.integrations.audio_edit.range_tool),
             ("分割","在播放头或选区边界切分",AudioUiAction::Split,false),
             ("片段 ▾","剪切、淡化、变速与合并",AudioUiAction::Menu,false),
-        ].into_iter().map(|(label,description,action,selected)|div().id(SharedString::from(format!("audio-tool-{label}")))
-            .role(gpui::Role::Button).aria_label(description).aria_selected(selected)
+        ].into_iter().map(|(label,description,action,selected)|crate::proto_controls::action(SharedString::from(format!("audio-tool-{label}")),description)
+            .authority(format!("{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision())).aria_selected(selected)
             .h(px(26.0)).px(px(9.0)).flex().items_center().rounded(px(6.0)).cursor_pointer()
             .bg(if selected{th.control}else{th.surface}).hover(move|style|style.bg(th.hover))
             .child(label).on_click(cx.listener(move|ed,_,window,cx|{
-                window.focus(&ed.focus_arrange,cx);if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
+                crate::proto_editor_surface::focus_commands("audio",window,cx);if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
             }))))
         .child(div().flex_1().min_w_0().truncate().text_xs().text_color(th.text_secondary).child(detail))
 }
-pub fn key_down(ed:&mut Editor,event:&KeyDownEvent,window:&mut Window,cx:&mut Context<Editor>){
-    if !ed.focus_arrange.is_focused(window)||event.is_held{return;}
-    let modifiers=event.keystroke.modifiers;
-    let secondary=modifiers.control||modifiers.platform;
-    let action=match event.keystroke.key.as_str(){
-        "delete"|"backspace" if !secondary=>Some(if modifiers.shift{AudioUiAction::RippleDelete}else{AudioUiAction::Delete}),
-        "i" if secondary=>Some(AudioUiAction::Split),
-        "a" if secondary=>Some(AudioUiAction::SelectAll),
-        "j" if secondary=>Some(AudioUiAction::Join),
-        "r" if !secondary&&!modifiers.alt=>Some(AudioUiAction::RangeTool),
-        "v" if !secondary&&!modifiers.alt=>Some(AudioUiAction::SelectTool),
-        "escape"=>{ed.integrations.audio_edit.range=None;ed.integrations.audio_edit.range_drag=None;ed.arrange_drag=None;window.release_pointer();cx.notify();Some(AudioUiAction::SelectTool)},
-        _=>None,
+/// Application command effects admitted by the compiled arrangement surface.
+/// Native code does not interpret keys or retire pointer captures here.
+pub fn source_command(ed:&mut Editor,command:&str,window:&mut Window,cx:&mut Context<Editor>){
+    let action=match command{
+        "delete"=>AudioUiAction::Delete,
+        "ripple-delete"=>AudioUiAction::RippleDelete,
+        "split"=>AudioUiAction::Split,
+        "select-all"=>AudioUiAction::SelectAll,
+        "join"=>AudioUiAction::Join,
+        "range-tool"=>AudioUiAction::RangeTool,
+        "select-tool"=>AudioUiAction::SelectTool,
+        "clear-range"=>{ed.integrations.audio_edit.range=None;ed.integrations.audio_edit.range_drag=None;ed.arrange_drag=None;AudioUiAction::SelectTool},
+        _=>return,
     };
-    if let Some(action)=action{if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}cx.stop_propagation();}
+    if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
 }
+
 impl Editor{
     pub fn audio_selection(&self)->Vec<AudioClipRef>{
         let mut selected=self.integrations.audio_edit.selected.iter().filter(|reference|

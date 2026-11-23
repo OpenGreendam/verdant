@@ -1,0 +1,113 @@
+{
+  "schema": "verdant.proto-ui.receipt.v3",
+  "unit": "overlay-control",
+  "source": "frontend/proto-ui/src/overlay-control.proto.ts",
+  "sourceInputs": [
+    {
+      "path": "frontend/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/overlay-control.proto.ts",
+      "sha256": "cd2ab5f31d25e5301e3563727fd899acece373f9d2aa6e93d5df24bcce8b729c"
+    },
+    {
+      "path": "node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    }
+  ],
+  "upstream": {
+    "repository": "https://github.com/Proto-UI/Proto-UI",
+    "revision": "5912f817581f89785e75c26e324a76c97257dc60"
+  },
+  "packageVersions": {
+    "protoUi": "0.3.0-alpha.2",
+    "packageManager": "pnpm@10.32.1",
+    "nodeEngine": "24.x"
+  },
+  "toolchainRequirements": {
+    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "packages": {
+      "typescript": "5.9.3",
+      "tsx": "4.21.0"
+    }
+  },
+  "target": {
+    "profile": "gpui-source-v1",
+    "gpuiDependency": "workspace",
+    "componentName": "OverlayControl",
+    "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+  },
+  "gpu": {
+    "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
+    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+    "workspace": {
+      "name": "gpui",
+      "git": "https://github.com/cyjin-yl/z3rm",
+      "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "features": [],
+      "defaultFeatures": true
+    }
+  },
+  "sharedSdk": {
+    "owner": "pitch-gesture-surface",
+    "directory": ".proto-ui/gpui-native",
+    "package": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "features": [
+      "gpui-modern-element-api"
+    ],
+    "contentSha256": "27af6e2995e3c6d9a35ccbc4859a6273ed58b0c613ef4d3247284da1030b4691"
+  },
+  "artifacts": [
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "1dc1c826d285d1b543bb20a573a6fd91017e8822d439639692379eaf9b23f22b"
+    },
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "78caed8d6be279b8b05829b7b1108f3f7b721caa54462edce359f6bd5d356153"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "9d495797ebe91118d62e879450f7570dbce234ea881f233365fd3ad4af020212"
+    },
+    {
+      "path": "provenance.json",
+      "kind": "manifest",
+      "sha256": "78fbff7992b36809f93249f01fe96380e5c324c1172ffd5880446aebc858b4d5"
+    }
+  ]
+}

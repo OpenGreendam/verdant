@@ -111,7 +111,7 @@ struct Commit { value: f64, revision: String }
 #[serde(deny_unknown_fields)]
 struct Cancellation { revision: String }
 
-enum Output { Commit(Commit), Cancel(Cancellation) }
+enum Output { Commit(Commit), Cancel(Cancellation), ExactValue(Cancellation) }
 
 fn decode_events(events: Vec<(String, Value)>) -> Result<Vec<Output>, String> {
     events.into_iter().map(|(name, payload)| match name.as_str() {
@@ -123,6 +123,7 @@ fn decode_events(events: Vec<(String, Value)>) -> Result<Vec<Output>, String> {
             Ok(Output::Commit(commit))
         }
         "interactionCancel" => serde_json::from_value(payload).map(Output::Cancel).map_err(|error| error.to_string()),
+        "exactValueRequested" => serde_json::from_value(payload).map(Output::ExactValue).map_err(|error| error.to_string()),
         _ => Err(format!("normalized knob returned an unknown event or payload: {name}")),
     }).collect()
 }
@@ -174,6 +175,15 @@ fn drain(handle: &NormalizedKnobHandle, target: &Target, cx: &mut App) -> Draine
                 let _basis = revision;
                 cancel = true;
             }
+            Output::ExactValue(Cancellation { revision }) => {
+                let Some(editor) = target.editor.upgrade() else { continue };
+                let valid = target.host_allows_edit(editor.read(cx)) && target.current_desc(editor.read(cx))
+                    .is_some_and(|desc| target.revision(editor.read(cx), &desc) == revision);
+                if valid {
+                    crate::devices::open_parameter_value(&editor, target.track.clone(), target.slot, target.key, target.desc.clone(), cx);
+                }
+                cancel = true;
+            }
             Output::Commit(commit) => {
                 let accepted = target.editor.update(cx, |editor, cx| {
                     // Host policy can change before the next frame publishes
@@ -216,10 +226,10 @@ fn call(handle: &NormalizedKnobHandle, method: &str, arguments: Vec<Value>,
 
 #[derive(Default)]
 pub(crate) struct Contact {
-    generation: Cell<u64>,
-    input: Cell<Option<MoveGestureInput>>,
-    window: Cell<Option<gpui::AnyWindowHandle>>,
-    lease: RefCell<Option<std::rc::Weak<MoveGestureLease>>>,
+    pub(crate) generation: Cell<u64>,
+    pub(crate) input: Cell<Option<MoveGestureInput>>,
+    pub(crate) window: Cell<Option<gpui::AnyWindowHandle>>,
+    pub(crate) lease: RefCell<Option<std::rc::Weak<MoveGestureLease>>>,
 }
 
 impl Contact {
@@ -233,14 +243,14 @@ impl Contact {
         let lease = self.lease.borrow().as_ref().and_then(std::rc::Weak::upgrade);
         if let Some(lease) = lease { lease.cancel(MoveGestureCancelReason::HostCancel, window, cx); }
     }
-    fn begin(&self, input: MoveGestureInput) -> u64 {
+    pub(crate) fn begin(&self, input: MoveGestureInput) -> u64 {
         let next = self.generation.get().checked_add(1).expect("knob contact generation exhausted");
         self.generation.set(next);
         self.input.set(Some(input));
         next
     }
 
-    fn is_current(&self, generation: u64) -> bool { self.generation.get() == generation }
+    pub(crate) fn is_current(&self, generation: u64) -> bool { self.generation.get() == generation }
 }
 
 struct Binding {
@@ -333,6 +343,7 @@ impl MoveGestureBinding for Binding {
         if !matches!(sample.input, MoveGestureInput::Mouse | MoveGestureInput::Touch)
             || !self.sample_in_window(sample, window) { return false; }
         let target = self.target.borrow();
+        if crate::proto_editor_surface::has_contact(target.editor.entity_id(), cx) { return false; }
         let available = target.editor.upgrade().is_some_and(|entity| {
             let editor = entity.read(cx);
             let competing = editor.proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade)
@@ -484,11 +495,12 @@ impl RenderOnce for Knob {
         });
         let key = SharedString::from(format!("proto-knob-{:?}-{}-{}-{}", target.track, self.key.0, self.slot, desc.id));
         let initial_target = target.clone();
+        let parent = crate::proto_parent::current(); let initial_parent = parent.clone();
         let initial_props = props.clone();
         let initial_label = self.label.clone();
         let initial_desc = desc.clone();
         let mount = window.use_keyed_state(key, cx, move |window, cx| {
-            let root = NormalizedKnob::create(initial_props.clone(), None, window, cx)
+            let root = NormalizedKnob::create(initial_props.clone(), initial_parent, window, cx)
                 .unwrap_or_else(|error| panic!("compiled knob setup failed: {error:?}"));
             let handle = root.read(cx).handle();
             let double_click = Rc::new(Cell::new(false));
@@ -521,6 +533,9 @@ impl RenderOnce for Knob {
             Mount { root, drawing, target, lease, contact, props: initial_props, _changes: changes }
         });
         let root = mount.update(cx, |mount, cx| {
+            if crate::proto_parent::changed(&mount.root.read(cx).handle().owner, &parent) {
+                mount.root.update(cx, |root, cx| root.set_parent(parent, cx)).expect("compiled continuous parent");
+            }
             *mount.target.borrow_mut() = target.clone();
             if mount.props != props {
                 match mount.root.update(cx, |root, cx| root.set_props(props.clone(), window, cx)) {
@@ -553,32 +568,15 @@ impl RenderOnce for Knob {
             });
             mount.root.clone()
         });
-        let handle = root.read(cx).handle();
-        div().id(SharedString::from(format!("proto-knob-entry-{}-{}", target.key.0, target.desc.id)))
-            .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
-                match event.keystroke.key.as_str() {
-                    "enter" => open_exact_value(&handle, &target, window, cx),
-                    "backspace" => {
-                        cancel_source(&handle, &target, window, cx);
-                        match call(&handle, "begin", vec![true.into(), false.into()], window, cx) {
-                            Ok(_) => { drain(&handle, &target, cx); }
-                            Err(error) => { handle.take_events(); handle.take_failures(); report(&target, error, cx); }
-                        }
-                    }
-                    _ => return,
-                }
-                window.prevent_default();
-                cx.stop_propagation();
-            })
-            .child(root)
+        root
     }
 }
 
-fn open_exact_value(handle: &NormalizedKnobHandle, target: &Target, window: &mut Window, cx: &mut App) {
-    let Some(editor) = target.editor.upgrade() else { return };
-    if !target.host_allows_edit(editor.read(cx)) || target.current_desc(editor.read(cx)).is_none() { return; }
-    cancel_source(handle, target, window, cx);
-    crate::devices::open_parameter_value(&editor, target.track.clone(), target.slot, target.key, target.desc.clone(), cx);
+fn request_exact_value(handle: &NormalizedKnobHandle, target: &Target, window: &mut Window, cx: &mut App) {
+    match call(handle, "requestExactValue", vec![], window, cx) {
+        Ok(_) => { drain(handle, target, cx); }
+        Err(error) => { handle.take_events(); handle.take_failures(); report(target, error, cx); }
+    }
 }
 
 struct Drawing {
@@ -625,8 +623,7 @@ impl Render for Drawing {
         let (desc, th, size, double_click) = (self.desc.clone(), self.theme, self.size, self.double_click.clone());
         let value_text = format_value(&desc, from_norm(&desc, n));
         let (click_handle, click_target) = (self.handle.clone(), self.target.clone());
-        let (action_handle, action_target) = (self.handle.clone(), self.target.clone());
-        div().flex().flex_col().items_center().gap(gpui::rems(2.0 / 16.0)).w(gpui::rems((size + 26.0) / 16.0))
+        crate::proto_parent::slot(&self.handle.owner, div().flex().flex_col().items_center().gap(gpui::rems(2.0 / 16.0)).w(gpui::rems((size + 26.0) / 16.0))
             .child(canvas(|bounds, window, _| window.insert_hitbox(bounds, gpui::HitboxBehavior::Normal), move |bounds, hitbox, window, _| {
                 let o = bounds.origin;
                 let side = f64::from(bounds.size.width.min(bounds.size.height));
@@ -649,13 +646,11 @@ impl Render for Drawing {
                 });
             }).size(gpui::rems(size / 16.0)))
             .child(div().text_xs().text_color(th.text_secondary).child(self.label.clone()))
-            .child(div().id(SharedString::from(format!("knob-value-{}-{}", self.target.borrow().slot, self.desc.id)))
-                .role(gpui::Role::Button).aria_label(format!("精确输入 {}", self.desc.name)).cursor_text()
+            .child(crate::proto_controls::action(SharedString::from(format!("knob-value-{}-{}", self.target.borrow().slot, self.desc.id)), format!("精确输入 {}", self.desc.name)).cursor_text()
                 .text_sm().text_color(th.text).whitespace_nowrap().rounded(gpui::rems(3.0 / 16.0)).px(gpui::rems(3.0 / 16.0))
                 .hover(move |style| style.bg(th.control_pressed)).child(value_text)
-                .on_click(move |_, window, cx| open_exact_value(&click_handle, &click_target.borrow(), window, cx))
-                .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| open_exact_value(&action_handle, &action_target.borrow(), window, cx)))
-            .into_any_element()
+                .on_click(move |_, window, cx| request_exact_value(&click_handle, &click_target.borrow(), window, cx)))
+            .into_any_element())
     }
 }
 

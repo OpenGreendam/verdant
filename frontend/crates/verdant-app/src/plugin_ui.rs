@@ -12,10 +12,8 @@
 use super::*;
 use verdant_audio::engine::{ChainInput, MASTER_BUS};
 use verdant_plugins::{InsertHandle, InsertSlot, InsertSpec, InsertStatus, ParamDesc, PluginClient, PluginClientOpts};
-use gpui::{Bounds, ElementInputHandler, EntityInputHandler, IntoElement, Pixels, Point, Render,
-    SharedString, TextRun, UTF16Selection, WindowBounds, WindowOptions, canvas, div, fill,
-    point, prelude::*, px, size};
-use std::ops::Range;
+use gpui::{Bounds, IntoElement, Render, SharedString, WindowBounds, WindowOptions, canvas, div, fill, prelude::*, px, size};
+use crate::proto_text::{Field as TextField, Options as TextOptions, Event as TextEvent};
 use crate::devices::DeviceTarget;
 
 #[derive(Clone)]
@@ -43,11 +41,9 @@ struct PluginBrowserWindow {
     browser: verdant_plugins::insert::PluginBrowser,
     track: TrackId,
     slot: usize,
-    search: verdant_session::TextEditState,
-    focus: FocusHandle,
-    line: Option<gpui::ShapedLine>,
-    bounds: Option<Bounds<Pixels>>,
+    search: gpui::Entity<TextField>,
     scanning: bool,
+    selected: usize,
     message: String,
 }
 
@@ -61,69 +57,68 @@ impl Editor {
     }
 
     fn insert_parameter_row(&self, owner: InsertOwner, slot: usize, param: ParamDesc, busy: bool, cx: &mut Context<Self>) -> gpui::AnyElement {
+        use crate::proto_scalar::{Actions, EventKind, Sample, Spec, scalar};
         let th = self.theme;
-        let (inc_owner, dec_owner, click_inc_owner, click_dec_owner) = (owner.clone(), owner.clone(), owner.clone(), owner.clone());
-        let (inc, dec, click_inc, click_dec) = (param.clone(), param.clone(), param.clone(), param.clone());
         let valid = verdant_plugins::insert::parameter_editor_value(&param, param.value).is_ok();
-        let busy = busy || !valid;
-        let steps = if param.step_count > 0 { format!("步长 {}", (param.max - param.min) / param.step_count as f64) }
-            else { "连续 · Shift 微调".into() };
-        let default = self.live_owned_insert(&owner, slot).and_then(|handle| self.insert_runtime.defaults.get(&handle.key()))
-            .and_then(|defaults| defaults.get(&param.id)).copied();
-        let reset_param = param.clone();
-        let slider_owner = owner.clone();
-        let slider_param = param.clone();
-        let entity = cx.entity();
-        let mut row = div().id(SharedString::from(format!("parameter-{}", param.id))).role(gpui::Role::SpinButton).aria_label(param.name.clone())
-            .aria_numeric_value(param.value).aria_min_numeric_value(param.min).aria_max_numeric_value(param.max)
-            .aria_value(format!("{} {}", param.value, param.unit))
-            .a11y_synthetic_children(move |builder| { if busy { builder.parent_node().set_disabled(); } })
+        let mut row = div().id(SharedString::from(format!("parameter-{}", param.id)))
             .flex().flex_col().gap(px(4.)).border_b_1().border_color(th.shade).pb(px(8.))
             .child(div().flex().items_center().justify_between().gap(px(6.))
                 .child(div().text_sm().truncate().child(param.name.clone()))
-                .child(div().text_xs().font_family("monospace").child(format!("{:.3} {}", param.value, param.unit))))
-            .child(div().text_xs().text_color(th.text_secondary).child(if valid { format!("{} … {} · {steps}", param.min, param.max) } else { "插件返回了无效的参数范围".into() }))
-            .when(valid && param.max > param.min, |r| {
-                r.child(crate::dialogs::horizontal_slider(
-                    entity,
-                    format!("plug-slider-{slot}-{}", param.id),
-                    param.value,
-                    param.min,
-                    param.max,
-                    default,
-                    th,
-                    move |ed, next_val, commit, cx| {
-                        if !busy && commit {
-                            let snapped = if slider_param.step_count > 0 {
-                                let step = (slider_param.max - slider_param.min) / slider_param.step_count as f64;
-                                (slider_param.min + ((next_val - slider_param.min) / step).round() * step).clamp(slider_param.min, slider_param.max)
-                            } else {
-                                next_val.clamp(slider_param.min, slider_param.max)
-                            };
-                            ed.set_owned_plugin_param(slider_owner.clone(), slot, slider_param.clone(), snapped, cx);
-                        }
-                    },
-                ))
-            })
+                .child(div().text_xs().font_family("monospace").child(format!("{:.3} {}", param.value, param.unit))));
+        if !valid || param.max <= param.min {
+            return row.child(div().text_xs().text_color(th.text_secondary).child(if valid { "参数为固定值" } else { "插件返回了无效的参数范围" })).into_any_element();
+        }
+        let key = self.live_owned_insert(&owner, slot).map(|handle| handle.key());
+        let default = key.and_then(|key| self.insert_runtime.defaults.get(&key)).and_then(|defaults| defaults.get(&param.id)).copied();
+        let step = if param.step_count > 0 { (param.max-param.min) / param.step_count as f64 } else { (param.max-param.min)*0.01 };
+        let mut spec = Spec::slider(param.value, param.min, param.max, param.name.clone());
+        spec.step = step;
+        spec.fine_step = if param.step_count > 0 { step } else { step*0.1 };
+        spec.default_value = default.unwrap_or(param.value);
+        spec.double_action = if default.is_some() { "reset" } else { "none" };
+        spec.disabled = busy || key.is_none();
+        let actions: std::rc::Rc<std::cell::RefCell<Option<Actions>>> = Default::default();
+        let publish = actions.clone();
+        let (min,max) = (param.min,param.max);
+        let submit_owner = owner.clone();
+        let submit_param = param.clone();
+        let valid_owner = owner.clone();
+        let control_key = format!("plugin-parameter-{:?}-{slot}-{}-{key:?}", DeviceTarget::from(owner), param.id);
+        let control = scalar(cx.entity(), control_key, spec,
+            move |sample,bounds,initial| {
+                let width = (f64::from(bounds.size.width)-12.).max(1.);
+                let value = min+(sample.position.x-6.)/width*(max-min);
+                Sample { value, fine: initial+(value-initial)*0.1, jump: true }
+            },
+            move |display,source,_,_| {
+                *publish.borrow_mut() = Some(source);
+                canvas(|_,_,_|(), move |bounds,_,window,_| {
+                    let width = (f64::from(bounds.size.width)-12.).max(1.);
+                    let middle = f64::from(bounds.size.height)*0.5;
+                    let fraction = ((display.value-min)/(max-min)).clamp(0.,1.);
+                    let x = 6.+fraction*width;
+                    let origin = bounds.origin;
+                    window.paint_quad(gpui::quad(crate::paint::b(6.,middle-2.5,width,5.,origin),px(2.5),th.lcd,px(1.),th.separator,gpui::BorderStyle::Solid));
+                    window.paint_quad(fill(crate::paint::b(6.,middle-2.,(x-6.).max(0.),4.,origin),th.accent));
+                    window.paint_quad(gpui::quad(crate::paint::b(x-5.5,middle-5.5,11.,11.,origin),px(5.5),
+                        if display.active { th.accent } else { th.text },px(if display.focus_visible {2.} else {1.}),th.accent,gpui::BorderStyle::Solid));
+                }).size_full().into_any_element()
+            },
+            move |ed,event,_,cx| {
+                if event.kind == EventKind::Commit { ed.set_owned_plugin_param(submit_owner.clone(),slot,submit_param.clone(),event.value,cx); }
+            }).valid_when(move |ed| key.is_some_and(|key| !ed.plugin_busy.contains(&key) && ed.live_owned_insert(&valid_owner,slot).is_some_and(|handle| handle.key()==key)));
+        let down = actions.clone(); let up = actions.clone();
+        row = row.child(div().text_xs().text_color(th.text_secondary).child(format!("{min} … {max} · {}", if param.step_count > 0 { format!("步长 {step}") } else { "连续 · Shift 微调".into() })))
+            .child(div().h(px(20.)).w_full().child(control))
             .child(div().flex().items_center().gap(px(7.))
-                .child(browser_button("decrease", "−", false, th).on_click(cx.listener(move |ed, event: &gpui::ClickEvent, _, cx| {
-                    if !busy { ed.step_owned_plugin_param(click_dec_owner.clone(), slot, click_dec.clone(), -1., event.modifiers().shift, cx); }
-                })))
+                .child(browser_button("decrease", "−", false, th).disabled(busy).aria_label(format!("减小 {}", param.name))
+                    .on_click(move |event,window,cx| { if let Some(source)=down.borrow().clone() { source.invoke("adjust",vec![(-1.).into(),event.modifiers().shift.into()],window,cx); } }))
                 .child(div().flex_1().text_xs().text_color(th.text_secondary).child("拖拽滑块调节 · 双击滑块复位"))
-                .child(browser_button("increase", "+", false, th).on_click(cx.listener(move |ed, event: &gpui::ClickEvent, _, cx| {
-                    if !busy { ed.step_owned_plugin_param(click_inc_owner.clone(), slot, click_inc.clone(), 1., event.modifiers().shift, cx); }
-                }))))
-            .on_a11y_action(gpui::AccessibleAction::Increment, crate::view::a11y_listener(cx, move |ed, _, _, cx| {
-                if !busy { ed.step_owned_plugin_param(inc_owner.clone(), slot, inc.clone(), 1., false, cx); }
-            }))
-            .on_a11y_action(gpui::AccessibleAction::Decrement, crate::view::a11y_listener(cx, move |ed, _, _, cx| {
-                if !busy { ed.step_owned_plugin_param(dec_owner.clone(), slot, dec.clone(), -1., false, cx); }
-            }));
-        if let Some(default) = default {
-            row = row.child(browser_button("reset-default", format!("恢复默认值 {default}"), false, th)
-                .on_click(cx.listener(move |ed, _, _, cx| {
-                    if !busy { ed.set_owned_plugin_param(owner.clone(), slot, reset_param.clone(), default, cx); }
-                })));
+                .child(browser_button("increase", "+", false, th).disabled(busy).aria_label(format!("增大 {}", param.name))
+                    .on_click(move |event,window,cx| { if let Some(source)=up.borrow().clone() { source.invoke("adjust",vec![1.0.into(),event.modifiers().shift.into()],window,cx); } })));
+        if let Some(default)=default {
+            row=row.child(browser_button("reset-default",format!("恢复默认值 {default}"),false,th).disabled(busy)
+                .on_click(move |_,window,cx| { if let Some(source)=actions.borrow().clone() { source.invoke("reset",vec![],window,cx); } }));
         }
         row.into_any_element()
     }
@@ -139,22 +134,23 @@ impl Editor {
         }, move |window, cx| {
             window.set_window_title("插入效果浏览器 — Verdant");
             cx.new(|cx| {
-                let focus = cx.focus_handle();
-                window.focus(&focus, cx);
+                let search = TextField::with_options("按名称、厂商或标识搜索插件", "", Theme::for_appearance(window.appearance()),
+                    TextOptions { auto_focus: true, cancel_on_escape: true, ..Default::default() }, window, cx);
+                cx.subscribe_in(&search, window, |view: &mut PluginBrowserWindow, _, event, window, cx| {
+                    match event {
+                        TextEvent::Cancel => window.remove_window(),
+                        TextEvent::Failure(error) => { view.message = error.clone(); cx.notify(); },
+                        _ => cx.notify(),
+                    }
+                }).detach();
                 PluginBrowserWindow { editor, generation, browser: verdant_plugins::insert::PluginBrowser::new(client.catalog()),
-                    client, track, slot, search: verdant_session::TextEditState::new(""), focus,
-                    line: None, bounds: None, scanning: false, message: String::new() }
+                    client, track, slot, search, scanning: false, selected:0, message: String::new() }
             })
         }) { self.notice(format!("无法打开插件浏览器：{error}")); cx.notify(); }
     }
 }
 
 impl PluginBrowserWindow {
-    fn edit_search(&mut self, cx: &mut Context<Self>, edit: impl FnOnce(&mut verdant_session::TextEditState)) {
-        if !self.search.is_composing() { edit(&mut self.search); }
-        cx.notify();
-    }
-
     fn rescan(&mut self, cx: &mut Context<Self>) {
         if self.scanning { return; }
         self.scanning = true;
@@ -177,137 +173,96 @@ impl PluginBrowserWindow {
     }
 }
 
-fn browser_button(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> gpui::Stateful<gpui::Div> {
+fn browser_button(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
     let label = label.into();
-    div().id(id).role(gpui::Role::Button).aria_label(label.clone()).aria_selected(selected)
+    crate::proto_controls::action(id, label.clone())
         .px(px(9.)).py(px(6.)).rounded(px(4.)).bg(if selected { th.control_pressed } else { th.control })
         .text_sm().child(label)
 }
 
-impl Render for PluginBrowserWindow {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let th = Theme::for_appearance(window.appearance());
-        self.browser.query = self.search.text.clone();
-        let mut formats = div().flex().gap(px(6.));
-        for (label, format) in [("全部", None), ("CLAP", Some(verdant_plugins::PluginFormat::Clap)),
-            ("VST3", Some(verdant_plugins::PluginFormat::Vst3)), ("AUv2", Some(verdant_plugins::PluginFormat::Au)),
-            ("内置", Some(verdant_plugins::PluginFormat::Builtin))] {
-            formats = formats.child(browser_button(label, label, self.browser.format == format, th)
-                .on_click(cx.listener(move |view, _, _, cx| { view.browser.format = format; cx.notify(); })));
+impl PluginBrowserWindow {
+    fn catalog_revision(&self) -> String {
+        format!("{}:{}:{:?}:{:?}", self.generation, self.browser.query, self.browser.format,
+            self.browser.entries().iter().map(|entry|(entry.format.tag(),entry.id.as_str())).collect::<Vec<_>>())
+    }
+    fn insert_entry(&mut self,index:usize,window:&mut Window,cx:&mut Context<Self>) {
+        let Some(entry)=self.browser.entries().get(index).copied().cloned() else {return};
+        let (track,slot,generation)=(self.track.clone(),self.slot,self.generation);
+        match self.editor.update(cx,|ed,cx|ed.document_generation==generation && ed.add_insert_at(&track,slot,entry.format.tag(),&entry.id,cx)) {
+            Ok(true)=>window.remove_window(),
+            Ok(false)=>{self.message="暂时无法插入；请检查主窗口提示后重试".into();cx.notify();},
+            Err(_)=>{self.message="工程窗口已关闭".into();cx.notify();},
         }
-        let entries = self.browser.entries();
-        let count = entries.len();
-        let mut rows = div().id("plugin-browser-rows").flex_1().min_h_0().overflow_y_scroll().flex().flex_col().gap(px(6.));
-        for (index, desc) in entries.into_iter().enumerate() {
-            let (format, id) = (desc.format.tag().to_owned(), desc.id.clone());
-            rows = rows.child(div().id(SharedString::from(format!("plugin-row-{index}"))).flex_none().flex().items_center().gap(px(10.))
-                .p(px(10.)).rounded(px(5.)).bg(th.control)
+    }
+    fn rows(&self,handle:&verdant_collection_control::CollectionControlHandle,basis:&str,engine:crate::proto_scroll::EngineBinding,window:&Window,cx:&mut Context<Self>)->gpui::AnyElement {
+        let th=Theme::for_appearance(window.appearance()); let keyboard=handle.clone();
+        let mut rows=div().id("plugin-browser-rows").size_full().overflow_y_scroll().track_scroll(&engine.handle(cx)).flex().flex_col().gap(px(6.))
+            .on_scroll_wheel(move|_,window,cx|engine.notify_input(window,cx))
+            .on_key_down(move|event,window,cx|crate::proto_collection::key(&keyboard,event,window,cx));
+        let entries=self.browser.entries(); let count=entries.len();
+        for (index,desc) in entries.into_iter().enumerate() {
+            let choose=handle.clone();let choose_basis=basis.to_string();let select=handle.clone();let select_basis=basis.to_string();
+            rows=rows.child(div().id(SharedString::from(format!("plugin-row-{index}"))).role(gpui::Role::ListBoxOption)
+                .aria_label(desc.name.clone()).aria_selected(self.selected==index).flex_none().flex().items_center().gap(px(10.))
+                .p(px(10.)).rounded(px(5.)).bg(if self.selected==index{th.selection}else{th.control})
+                .on_click(move|_,window,cx| {
+                    if window.default_prevented(){return;}
+                    crate::proto_collection::call(&select,"selectAndFocus",vec![index.into(),false.into(),select_basis.clone().into()],window,cx);
+                    window.prevent_default();cx.stop_propagation();
+                })
                 .child(div().flex_1().min_w_0().flex().flex_col().gap(px(3.))
                     .child(div().text_sm().child(desc.name.clone()))
-                    .child(div().text_xs().text_color(th.text_secondary).child(format!("{} · {} · {}", desc.vendor, desc.format.tag().to_uppercase(), desc.version))))
-                .child(browser_button(SharedString::from(format!("plugin-insert-{index}")), "插入", false, th)
-                    .on_click(cx.listener(move |view, _, window, cx| {
-                        let track = view.track.clone();
-                        let slot = view.slot;
-                        match view.editor.update(cx, |ed, cx| ed.document_generation == view.generation && ed.add_insert_at(&track, slot, &format, &id, cx)) {
-                            Ok(true) => window.remove_window(),
-                            Ok(false) => { view.message = "暂时无法插入；请检查主窗口提示后重试".into(); cx.notify(); }
-                            Err(_) => { view.message = "工程窗口已关闭".into(); cx.notify(); }
-                        }
-                    }))));
+                    .child(div().text_xs().text_color(th.text_secondary).child(format!("{} · {} · {}",desc.vendor,desc.format.tag().to_uppercase(),desc.version))))
+                .child(browser_button(SharedString::from(format!("plugin-insert-{index}")),"插入",false,th)
+                    .aria_label(format!("插入 {}",desc.name))
+                    .on_click(move|_,window,cx|crate::proto_collection::call(&choose,"choose",vec![index.into(),false.into(),choose_basis.clone().into()],window,cx))));
         }
-        if count == 0 { rows = rows.child(div().text_sm().text_color(th.text_secondary).child("没有匹配的插件")); }
-        for (path, reason) in self.client.blacklisted() {
-            rows = rows.child(div().text_xs().text_color(th.warning).child(format!("无法载入 {}：{reason}", path.display())));
+        if count==0{rows=rows.child(div().text_sm().text_color(th.text_secondary).child("没有匹配的插件"));}
+        for(path,reason)in self.client.blacklisted(){rows=rows.child(div().text_xs().text_color(th.warning).child(format!("无法载入 {}：{reason}",path.display())));}
+        rows.into_any_element()
+    }
+    fn native_content(&mut self,window:&mut Window,cx:&mut Context<Self>)->gpui::AnyElement {
+        let th=Theme::for_appearance(window.appearance());
+        self.browser.query=self.search.read(cx).value().to_owned();
+        let choices=[("全部",None),("CLAP",Some(verdant_plugins::PluginFormat::Clap)),("VST3",Some(verdant_plugins::PluginFormat::Vst3)),
+            ("AUv2",Some(verdant_plugins::PluginFormat::Au)),("内置",Some(verdant_plugins::PluginFormat::Builtin))];
+        let mut formats=div().id("plugin-browser-formats").role(gpui::Role::TabList).flex().gap(px(6.));
+        for(index,(label,format))in choices.into_iter().enumerate(){
+            let view=cx.entity();
+            formats=formats.child(browser_button(label,label,self.browser.format==format,th).role(gpui::Role::Tab).aria_selected(self.browser.format==format)
+                .navigation(index,choices.len(),move|index,_,cx| {if let Some((_,format))=choices.get(index){view.update(cx,|view,cx|{view.browser.format=*format;view.selected=0;cx.notify();});}})
+                .on_click(cx.listener(move|view,_,_,cx|{view.browser.format=format;view.selected=0;cx.notify();})));
         }
-        let entity = cx.entity();
+        let count=self.browser.entries().len(); self.selected=self.selected.min(count.saturating_sub(1));
+        let revision=self.catalog_revision();let basis=revision.clone();let view=cx.entity();
+        let viewport=window.use_keyed_state("plugin-catalog-viewport",cx,|_,_|gpui::ScrollHandle::new());
+        let draw:crate::proto_collection::Draw=std::rc::Rc::new(move|handle,_,engine,window,cx|view.update(cx,|view,cx|view.rows(handle,&basis,engine.expect("catalog viewport"),window,cx)));
+        let view=cx.entity().downgrade();
+        let sink:crate::proto_collection::Sink=std::rc::Rc::new(move|name,payload,window,cx|{let _=view.update(cx,|view,cx|{
+            if payload.get("revision").and_then(serde_json::Value::as_str)!=Some(view.catalog_revision().as_str()){return;}
+            if name=="close"{window.remove_window();return;}
+            let Some(index)=crate::proto_controls::source_index(payload.get("index"))else{return};
+            match name{"select"=>{view.selected=index;cx.notify();},"activate"=>view.insert_entry(index,window,cx),_=>{}}
+        });});
+        let collection=crate::proto_collection::collection("plugin-catalog",serde_json::json!({"mode":"listbox","label":"插件目录","cursor":self.selected,"revision":revision}),vec![1;count],draw,sink)
+            .scroll_engine(crate::proto_scroll::Engine::Native(viewport));
         div().id("plugin-browser").size_full().p(px(18.)).bg(th.surface).text_color(th.text)
             .font_family(crate::theme::system_ui_font(&cx.text_system().all_font_names()))
-            .flex().flex_col().gap(px(10.)).key_context("LyricEditor").track_focus(&self.focus)
-            .on_action(cx.listener(|view, _: &crate::actions::LyricCancel, window, _| {
-                if !view.search.is_composing() { window.remove_window(); }
-            }))
-            .on_action(cx.listener(|view, _: &crate::actions::Backspace, _, cx| view.edit_search(cx, |s| s.backspace())))
-            .on_action(cx.listener(|view, _: &crate::actions::Delete, _, cx| view.edit_search(cx, |s| s.delete())))
-            .on_action(cx.listener(|view, _: &crate::actions::Left, _, cx| view.edit_search(cx, |s| s.left())))
-            .on_action(cx.listener(|view, _: &crate::actions::Right, _, cx| view.edit_search(cx, |s| s.right())))
-            .on_action(cx.listener(|view, _: &crate::actions::SelectLeft, _, cx| view.edit_search(cx, |s| s.select_left())))
-            .on_action(cx.listener(|view, _: &crate::actions::SelectRight, _, cx| view.edit_search(cx, |s| s.select_right())))
-            .on_action(cx.listener(|view, _: &crate::actions::Home, _, cx| view.edit_search(cx, |s| s.home())))
-            .on_action(cx.listener(|view, _: &crate::actions::End, _, cx| view.edit_search(cx, |s| s.end())))
-            .on_action(cx.listener(|view, _: &crate::actions::SelectAllText, _, cx| view.edit_search(cx, |s| s.select_all())))
-            .on_action(cx.listener(|view, _: &crate::actions::LyricSpace, _, cx| view.edit_search(cx, |s| s.replace_text_in_range(None, " "))))
-            .on_action(cx.listener(|view, _: &crate::actions::PasteText, _, cx| {
-                if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) { view.edit_search(cx, |s| s.replace_text_in_range(None, &text)); }
-            }))
-            .child(div().flex().items_center().gap(px(10.)).child(div().flex_1().text_lg().child(format!("插入效果 · 槽位 {}", self.slot + 1)))
-                .child(browser_button("rescan", if self.scanning { "扫描中…" } else { "重新扫描" }, false, th)
-                    .on_click(cx.listener(|view, _, _, cx| view.rescan(cx)))))
-            .child(div().id("plugin-search").role(gpui::Role::TextInput).aria_label("按名称、厂商或标识搜索插件")
-                .aria_value(self.search.text.clone()).h(px(36.)).flex_none().bg(th.control).border_1().border_color(th.accent).overflow_hidden()
-                .child(canvas(|_, _, _| (), move |bounds, _, window, cx| paint_browser_search(&entity, bounds, window, cx)).size_full()))
-            .child(formats).child(div().text_xs().text_color(th.text_secondary).child(format!("{count} 个插件 · 名称 / 厂商 / 格式")))
-            .child(rows).child(div().text_xs().text_color(th.warning).child(self.message.clone()))
+            .flex().flex_col().gap(px(10.)).key_context("LyricEditor")
+            .child(div().flex().items_center().gap(px(10.)).child(div().flex_1().text_lg().child(format!("插入效果 · 槽位 {}",self.slot+1)))
+                .child(browser_button("rescan",if self.scanning{"扫描中…"}else{"重新扫描"},false,th).disabled(self.scanning)
+                    .on_click(cx.listener(|view,_,_,cx|view.rescan(cx)))))
+            .child(self.search.clone()).child(formats)
+            .child(div().text_xs().text_color(th.text_secondary).child(format!("{count} 个插件 · 名称 / 厂商 / 格式")))
+            .child(div().flex_1().min_h_0().child(collection)).child(div().text_xs().text_color(th.warning).child(self.message.clone())).into_any_element()
     }
 }
-
-impl EntityInputHandler for PluginBrowserWindow {
-    fn text_for_range(&mut self, range: Range<usize>, actual: &mut Option<Range<usize>>, _: &mut Window, _: &mut Context<Self>) -> Option<String> {
-        let (text, adjusted) = self.search.text_for_range_utf16(range); *actual = Some(adjusted); Some(text)
+impl Render for PluginBrowserWindow {
+    fn render(&mut self,_:&mut Window,cx:&mut Context<Self>)->impl IntoElement {
+        let view=cx.entity();let draw:crate::proto_overlay::Draw=std::rc::Rc::new(move|_,_,window,cx|view.update(cx,|view,cx|view.native_content(window,cx)));
+        let response:crate::proto_overlay::Response=std::rc::Rc::new(|_,window,_|window.remove_window());
+        crate::proto_overlay::overlay("plugin-browser-dialog",serde_json::json!({"label":"插入效果浏览器","role":"dialog","open":true,"choices":1,"defaultChoice":-1,"cancelChoice":0}),draw,response)
     }
-    fn selected_text_range(&mut self, _: bool, _: &mut Window, _: &mut Context<Self>) -> Option<UTF16Selection> {
-        Some(UTF16Selection { range: self.search.range_to_utf16(&self.search.selection), reversed: self.search.reversed })
-    }
-    fn set_selected_text_range(&mut self, range: Range<usize>, window: &mut Window, cx: &mut Context<Self>) {
-        self.search.selection = self.search.range_from_utf16(&range); self.search.reversed = false;
-        window.notify_text_selection_changed(&self.focus); cx.notify();
-    }
-    fn text_length_utf16(&mut self, _: &mut Window, _: &mut Context<Self>) -> Option<usize> { Some(self.search.text.encode_utf16().count()) }
-    fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> { self.search.marked.as_ref().map(|range| self.search.range_to_utf16(range)) }
-    fn unmark_text(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.search.unmark_text(); window.notify_text_input_changed(&self.focus); cx.notify(); }
-    fn replace_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.search.replace_text_in_range(range, text); window.notify_text_input_changed(&self.focus); cx.notify();
-    }
-    fn replace_and_mark_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, selected: Option<Range<usize>>, window: &mut Window, cx: &mut Context<Self>) {
-        self.search.replace_and_mark_text_in_range(range, text, selected); window.notify_text_input_changed(&self.focus); cx.notify();
-    }
-    fn bounds_for_range(&mut self, range: Range<usize>, bounds: Bounds<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<Bounds<Pixels>> {
-        let line = self.line.as_ref()?; let range = self.search.range_from_utf16(&range);
-        Some(Bounds::from_corners(point(bounds.left() + px(6.) + line.x_for_index(range.start), bounds.top()),
-            point(bounds.left() + px(6.) + line.x_for_index(range.end), bounds.bottom())))
-    }
-    fn character_index_for_point(&mut self, point: Point<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<usize> {
-        let local = self.bounds?.localize(&point)?;
-        Some(self.search.offset_to_utf16(self.line.as_ref()?.closest_index_for_x(local.x - px(6.))))
-    }
-}
-
-fn paint_browser_search(entity: &gpui::Entity<PluginBrowserWindow>, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
-    let view = entity.read(cx);
-    let (state, focus) = (view.search.clone(), view.focus.clone());
-    let th = Theme::for_appearance(window.appearance());
-    window.handle_input(&focus, ElementInputHandler::new(bounds, entity.clone()), cx);
-    let placeholder = state.text.is_empty();
-    let shown: SharedString = if placeholder { "搜索名称、厂商或标识…".into() } else { state.text.clone().into() };
-    let base = TextRun { len: shown.len(), font: window.text_style().font(), color: if placeholder { th.text_tertiary.into() } else { th.text.into() },
-        background_color: None, underline: None, strikethrough: None };
-    let runs = if let Some(marked) = state.marked.as_ref().filter(|_| !placeholder) {
-        vec![TextRun { len: marked.start, ..base.clone() }, TextRun { len: marked.end - marked.start,
-            underline: Some(gpui::UnderlineStyle { color: Some(th.accent.into()), thickness: px(1.), wavy: false }), ..base.clone() },
-            TextRun { len: shown.len() - marked.end, ..base }]
-    } else { vec![base] };
-    let line = window.text_system().shape_line(shown, px(15.), &runs, None);
-    let origin = point(bounds.left() + px(6.), bounds.top() + px(8.));
-    if !placeholder && !state.selection.is_empty() {
-        let start = line.x_for_index(state.selection.start); let end = line.x_for_index(state.selection.end);
-        window.paint_quad(fill(Bounds::new(point(origin.x + start, origin.y), size(end - start, px(20.))), crate::theme::with_alpha(th.accent, 0.3)));
-    }
-    let _ = line.paint(origin, px(20.), gpui::TextAlign::Left, None, window, cx);
-    if focus.is_focused(window) && state.selection.is_empty() {
-        let x = if placeholder { px(0.) } else { line.x_for_index(state.cursor()) };
-        window.paint_quad(fill(Bounds::new(point(origin.x + x, origin.y), size(px(1.), px(20.))), th.accent));
-    }
-    entity.update(cx, |view, _| { view.line = Some(line); view.bounds = Some(bounds); });
 }
 
 fn encoded(specs: &[InsertSpec]) -> Vec<serde_json::Value> {
@@ -1153,12 +1108,6 @@ impl Editor {
         }
         self.insert_runtime.defaults.insert(key, defaults);
         self.plugin_params.insert(key, descriptors);
-    }
-
-    fn step_owned_plugin_param(&mut self, owner: InsertOwner, slot: usize, param: ParamDesc, direction: f64, fine: bool, cx: &mut Context<Self>) {
-        let step = if param.step_count > 0 { (param.max - param.min) / param.step_count as f64 }
-            else { (param.max - param.min) * if fine { 0.001 } else { 0.01 } };
-        self.set_owned_plugin_param(owner, slot, param.clone(), param.value + direction * step, cx);
     }
 
     fn set_owned_plugin_param(&mut self, owner: InsertOwner, slot: usize, param: ParamDesc, value: f64, cx: &mut Context<Self>) {

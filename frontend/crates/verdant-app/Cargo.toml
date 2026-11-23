@@ -24,8 +24,18 @@ verdant-import = { path = "../verdant-import" }
 verdant-exchange = { path = "../verdant-exchange" }
 verdant-midi = { path = "../verdant-midi" }
 verdant-media = { path = "../verdant-media" }
-verdant-pitch-gesture-surface = { package = "generated-gpui-cf24f4a63e06497c7d284f96518bbd7d", path = "../../proto-ui/generated/pitch-gesture-surface" }
-verdant-normalized-knob = { package = "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a", path = "../../proto-ui/generated/normalized-knob" }
+verdant-pitch-gesture-surface = { package = "generated-gpui-cdba73794bf1d0b84e05cf3fabf932a9", path = "../../proto-ui/generated/pitch-gesture-surface" }
+verdant-normalized-knob = { package = "generated-gpui-092735a95a631c10673be352ef2727fb", path = "../../proto-ui/generated/normalized-knob" }
+verdant-action-control = { package = "generated-gpui-12f265843b032780664abe37758defdf", path = "../../proto-ui/generated/action-control" }
+verdant-collection-control = { package = "generated-gpui-d4bb848fc8135f032f5a627b7c7eb542", path = "../../proto-ui/generated/collection-control" }
+verdant-continuous-control = { package = "generated-gpui-b9d6917fb64c34bd8f4f9df272b0d7a1", path = "../../proto-ui/generated/continuous-control" }
+verdant-editor-surface = { package = "generated-gpui-d5d93ee1c917bc2f18be4fcd27d76aaa", path = "../../proto-ui/generated/editor-surface" }
+verdant-performance-key = { package = "generated-gpui-6b96dcb296cd1f4df9b88e58b12c2fe4", path = "../../proto-ui/generated/performance-key" }
+verdant-drag-source = { package = "generated-gpui-d00520c9822e4bc6f1e770a5b8257a1f", path = "../../proto-ui/generated/drag-source" }
+verdant-overlay-control = { package = "generated-gpui-93e367306455db88d4b4e17feb41f316", path = "../../proto-ui/generated/overlay-control" }
+verdant-text-field = { package = "generated-gpui-ee58df3435ff047877e839155803cc77", path = "../../proto-ui/generated/text-field" }
+verdant-graph-point = { package = "generated-gpui-773e6af6be8d17bc599121edcc591606", path = "../../proto-ui/generated/graph-point" }
+verdant-scroll-region = { package = "generated-gpui-2fea81ca109aa8739881ab6d2b6786d8", path = "../../proto-ui/generated/scroll-region" }
 serde.workspace = true
 serde_json.workspace = true
 semver.workspace = true

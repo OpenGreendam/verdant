@@ -32,6 +32,13 @@ use crate::ui_controls::{
     splitter_bar,
 };
 
+fn select_parameter_lane(ed:&mut Editor,param:Param,window:&mut Window,cx:&mut Context<Editor>) {
+    ed.cancel_edits(verdant_session::CancelReason::Escape,window,cx);ed.point_selection.clear();
+    if let Some(slot)=ed.integrations.lanes.iter().position(|value|*value==param) {ed.integrations.active_panel=slot;}
+    else {let slot=ed.integrations.active_panel.min(ed.integrations.lanes.len()-1);ed.integrations.lanes[slot]=param;}
+    ed.param=param;cx.notify();
+}
+
 const RULER_H: f32 = 24.0;
 const KEYS_W: f32 = 52.0;
 
@@ -72,8 +79,6 @@ fn device_status_text(status: DeviceStatus) -> String {
 /// Timeline layout and drawing, cached independently of the surrounding controls.
 pub struct StaticEditor {
     editor: WeakEntity<Editor>,
-    lane_scroll: gpui::ScrollHandle,
-    active_lane: Option<(usize, Param)>,
 }
 
 impl StaticEditor {
@@ -81,7 +86,7 @@ impl StaticEditor {
         if let Some(owner) = editor.upgrade() {
             cx.observe(&owner, |_, _, cx| cx.notify()).detach();
         }
-        Self { editor, lane_scroll: gpui::ScrollHandle::new(), active_lane: None }
+        Self { editor }
     }
 }
 
@@ -90,17 +95,7 @@ impl Render for StaticEditor {
         let Some(editor) = self.editor.upgrade() else {
             return div().into_any_element();
         };
-        let active_lane = {
-            let ed = editor.read(cx);
-            (ed.bottom == Bottom::Editor).then_some((ed.integrations.active_panel, ed.param))
-        };
-        if self.active_lane != active_lane {
-            if let Some((slot, _)) = active_lane {
-                self.lane_scroll.scroll_to_item(slot);
-            }
-            self.active_lane = active_lane;
-        }
-        editor.update(cx, |ed, cx| ed.bottom_content(window, &self.lane_scroll, cx))
+        editor.update(cx, |ed, cx| ed.bottom_content(window, cx))
     }
 }
 
@@ -163,13 +158,12 @@ fn cached_view<V: Render>(view: &Entity<V>, style: StyleRefinement, a11y: bool) 
 
 fn th_for_frame(ed: &Editor) -> Theme { ed.theme }
 
-fn button(id: impl Into<SharedString>, label: impl Into<SharedString>, th: Theme) -> Stateful<Div> {
+fn button(id: impl Into<SharedString>, label: impl Into<SharedString>, th: Theme) -> crate::proto_controls::Action {
     selectable_button(id, label, false, th)
 }
 
-fn toggle(id: &'static str, name: &'static str, active: bool, size: f32, th: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
+fn toggle(id: &'static str, name: &'static str, active: bool, size: f32, th: Theme) -> crate::proto_controls::Action {
+    crate::proto_controls::action(id, name)
         .role(Role::Button)
         .aria_label(name)
         .aria_selected(active)
@@ -190,7 +184,7 @@ pub fn command_button(
     label: impl Into<SharedString>,
     key: impl Into<gpui::ElementId>,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     selectable_command_button(ed, cmd, arg, label, key, false, cx)
 }
 
@@ -202,7 +196,7 @@ fn command_icon(
     key: &'static str,
     active: bool,
     cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+) -> crate::proto_controls::Action {
     let th = ed.theme;
     crate::ui_controls::flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
         .aria_label(label)
@@ -300,9 +294,10 @@ pub(crate) fn switch(on: bool, th: Theme) -> Div {
 }
 
 /// AdwSwitchRow: title (and optional subtitle) with a switch; the whole row toggles.
-fn switch_row(ed: &Editor, cmd: Cmd, key: &'static str, title: &str, subtitle: Option<String>, on: bool, cx: &mut Context<Editor>) -> Stateful<Div> {
+fn switch_row(ed: &Editor, cmd: Cmd, key: &'static str, title: &str, subtitle: Option<String>, on: bool, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
     let th = ed.theme;
-    div().id(key).role(Role::Switch).aria_label(title.to_string()).aria_selected(on)
+    crate::proto_controls::action(key, title.to_string()).authority(format!("{}:{cmd:?}",crate::proto_controls::editor_authority(ed)))
+        .role(Role::Switch).aria_selected(on)
         .flex().items_center().gap(px(12.0)).cursor_pointer()
         .child(div().flex_1().min_w_0().flex().flex_col()
             .child(div().text_sm().text_color(th.text).child(title.to_string()))
@@ -352,10 +347,7 @@ impl Editor {
         };
 
         let top_menu_btn = |id: &'static str, label: &'static str| {
-            div()
-                .id(id)
-                .role(Role::Button)
-                .aria_label(label)
+            crate::proto_controls::action(id, label)
                 .h(px(btn))
                 .px(px(8.0))
                 .gap(px(4.0))
@@ -374,7 +366,7 @@ impl Editor {
             .and_then(|p| p.file_stem()).map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "未命名工程".into());
         let dirty = self.store().is_dirty();
-        let window_title = div().id("window-title").flex().flex_col().items_center().justify_center().min_w_0().max_w(px(220.0)).flex_shrink(1.0)
+        let window_title = crate::proto_controls::action("window-title", "渲染状态与声库").flex().flex_col().items_center().justify_center().min_w_0().max_w(px(220.0)).flex_shrink(1.0)
             .child(div().max_w_full().truncate().text_sm().font_weight(FontWeight::BOLD).text_color(th.text)
                 .child(if dirty { format!("• {title}") } else { title }))
             .child(div().max_w_full().truncate().text_xs().text_color(if errors > 0 { th.error } else { th.text_secondary })
@@ -385,17 +377,29 @@ impl Editor {
         // a captured parameter drag that up would commit its toolbar-position
         // sample before the view switch could cancel it. Semantic activation
         // must call the same command directly, without inventing pointer input.
-        let view_switcher = div().id("view-switcher").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
-            .child(toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, btn - 4.0, th).aria_label("钢琴卷帘 (E)")
+        let view_switcher = div().id("view-switcher").role(Role::TabList).aria_label("主要编辑视图").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+            .child(toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, btn - 4.0, th).aria_label("钢琴卷帘 (E)").role(Role::Tab)
+                .navigation(0, 4, { let editor = cx.entity(); move |index, window, cx| {
+                    if let Some(bottom) = [Bottom::Editor, Bottom::Mixer, Bottom::Table, Bottom::Devices].get(index) { editor.update(cx, |ed, cx| ed.show_bottom(*bottom, window, cx)); }
+                } })
                 .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx))))
-            .child(toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn - 4.0, th).aria_label("混音器 (X)")
+            .child(toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn - 4.0, th).aria_label("混音器 (X)").role(Role::Tab)
+                .navigation(1, 4, { let editor = cx.entity(); move |index, window, cx| {
+                    if let Some(bottom) = [Bottom::Editor, Bottom::Mixer, Bottom::Table, Bottom::Devices].get(index) { editor.update(cx, |ed, cx| ed.show_bottom(*bottom, window, cx)); }
+                } })
                 .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx))))
-            .child(toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn - 4.0, th).aria_label("音符表 (T)")
+            .child(toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn - 4.0, th).aria_label("音符表 (T)").role(Role::Tab)
+                .navigation(2, 4, { let editor = cx.entity(); move |index, window, cx| {
+                    if let Some(bottom) = [Bottom::Editor, Bottom::Mixer, Bottom::Table, Bottom::Devices].get(index) { editor.update(cx, |ed, cx| ed.show_bottom(*bottom, window, cx)); }
+                } })
                 .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))))
-            .child(toggle("devices-toggle", "sliders-horizontal", self.bottom == Bottom::Devices, btn - 4.0, th).aria_label("效果器链")
+            .child(toggle("devices-toggle", "sliders-horizontal", self.bottom == Bottom::Devices, btn - 4.0, th).aria_label("效果器链").role(Role::Tab)
+                .navigation(3, 4, { let editor = cx.entity(); move |index, window, cx| {
+                    if let Some(bottom) = [Bottom::Editor, Bottom::Mixer, Bottom::Table, Bottom::Devices].get(index) { editor.update(cx, |ed, cx| ed.show_bottom(*bottom, window, cx)); }
+                } })
                 .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
         let _ = top_menu_btn;
@@ -430,10 +434,7 @@ impl Editor {
             .child(command_icon(self, Cmd::TogglePlay, if playing { "pause" } else { "play" }, "播放 / 暂停 (Space)", "play", playing, cx).rounded_none())
             .child(command_icon(self, Cmd::Stop, "square", "停止", "stop", false, cx).rounded_none())
             .when(!phone, |bar| bar.child(
-                div()
-                    .id("transport-record")
-                    .role(Role::Button)
-                    .aria_label(if recording { "完成并提交 MIDI 录音" } else { "选择 MIDI 输入开始录音" })
+                crate::proto_controls::action("transport-record", if recording { "完成并提交 MIDI 录音" } else { "选择 MIDI 输入开始录音" })
                     .aria_selected(recording)
                     .size(px(btn))
                     .flex()
@@ -460,7 +461,7 @@ impl Editor {
                 .relative()
                 .when(errors > 0, |d| d.aria_label(format!("立即渲染（{errors} 处错误）")).child(
                     div().absolute().top(px(4.0)).right(px(4.0)).size(px(7.0)).rounded(px(3.5)).bg(th.error)))))
-            .child(div().id("primary-menu").role(Role::Button).aria_label("主菜单").size(px(btn)).flex().items_center().justify_center().rounded(px(6.0))
+            .child(crate::proto_controls::action("primary-menu", "主菜单").size(px(btn)).flex().items_center().justify_center().rounded(px(6.0))
                 .hover(move |s| s.bg(th.hover))
                 .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
                 .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| {
@@ -591,11 +592,9 @@ impl Editor {
             .bg(th.surface)
             .child(pane_header(th).px(px(16.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
             .child(
-                div()
-                    .id("left-panel-scroll")
+                crate::proto_scroll::viewport("left-panel-scroll", "轨道与选择检查器", "vertical")
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
                     .child(div().flex().flex_col().pb(px(18.0)).children(selection).child(track_section).child(mix_section)),
             )
             .into_any_element()
@@ -634,7 +633,11 @@ impl Editor {
             .child(div().id("dock-switcher").role(Role::TabList).flex_1().min_w_0().flex().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
                 .children(tabs.into_iter().map(|(t, ic, label)| {
                     let active = t == tab;
-                    div().id(SharedString::from(format!("dock-tab-{t:?}"))).role(Role::Tab).aria_label(label).aria_selected(active)
+                    let editor = cx.entity();
+                    crate::proto_controls::action(SharedString::from(format!("dock-tab-{t:?}")), label).role(Role::Tab).aria_selected(active)
+                        .navigation(tabs.iter().position(|(value, _, _)| *value == t).unwrap_or(0), tabs.len(), move |index, _, cx| {
+                            if let Some((tab, _, _)) = tabs.get(index) { editor.update(cx, |ed, cx| ed.open_right_dock(*tab, cx)); }
+                        })
                         .relative().flex_1().h(px(28.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
                         .when(active, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
                         .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
@@ -645,10 +648,7 @@ impl Editor {
                         .on_click(cx.listener(move |ed, _, _, cx| ed.open_right_dock(t, cx)))
                 })))
             .child(
-                div()
-                    .id("close-right-dock")
-                    .role(Role::Button)
-                    .aria_label("收起右侧面板")
+                crate::proto_controls::action("close-right-dock", "收起右侧面板")
                     .size(px(28.0))
                     .flex_none()
                     .rounded(px(6.0))
@@ -676,7 +676,7 @@ impl Editor {
             .flex_col()
             .bg(th.surface)
             .child(header)
-            .child(div().id("right-dock-scroll").flex_1().min_h_0().overflow_y_scroll().child(body))
+            .child(crate::proto_scroll::viewport("right-dock-scroll", "属性面板", "vertical").flex_1().min_h_0().child(body))
             .into_any_element()
     }
 
@@ -1049,10 +1049,7 @@ impl Editor {
                 let track_name = self.project().track(&diag_track).map(|t| t.name.clone()).unwrap_or_default();
                 let is_err = d.severity == Severity::Error;
                 diagnostics = diagnostics.child(
-                    div()
-                        .id(SharedString::from(format!("diagnostic-{i}")))
-                        .role(Role::Button)
-                        .aria_label(d.message.clone())
+                    crate::proto_controls::action(SharedString::from(format!("diagnostic-{i}")), d.message.clone())
                         .w_full()
                         .p(px(7.0))
                         .rounded(px(5.0))
@@ -1192,9 +1189,7 @@ impl Editor {
             let is_future = pos > cur_pos;
             let pid = proj_id.clone();
             history = history.child(
-                div()
-                    .id(SharedString::from(format!("insp-hist-{pos}")))
-                    .role(Role::Button)
+                crate::proto_controls::action(SharedString::from(format!("insp-hist-{pos}")), format!("历史 {pos}：{lbl}"))
                     .aria_selected(is_cur)
                     .h(px(BAR_BTN_H))
                     .px(px(8.0))
@@ -1287,15 +1282,13 @@ impl Editor {
             "音阶高亮".into()
         };
 
-        div()
-            .id("editor-header-scroll")
+        crate::proto_scroll::viewport("editor-header-scroll", "钢琴卷帘工具栏", "horizontal")
             .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
             .flex()
             .items_center()
-            .overflow_x_scroll()
             .whitespace_nowrap()
             .gap(px(5.0))
             .px(px(8.0))
@@ -1303,16 +1296,19 @@ impl Editor {
             .border_b_1()
             .border_color(th.shade)
             // Tools: an icon toggle group (labels are the tooltips / names).
-            .child(div().id("tool-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+            .child(div().id("tool-group").role(Role::RadioGroup).aria_label("编辑工具").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
                 .children([
                     (Cmd::SetToolPointer, Tool::Pointer, "mouse-pointer-2", "指针 (V)"),
                     (Cmd::SetToolPencil, Tool::Pencil, "pencil", "铅笔 (P)"),
                     (Cmd::SetToolEraser, Tool::Eraser, "eraser", "橡皮 (E)"),
                     (Cmd::SetToolPitch, Tool::Pitch, "spline", "音高笔"),
-                ].into_iter().map(|(cmd, tool, icon_name, label)| {
-                    let on = self.tool == tool;
+                ].into_iter().enumerate().map(|(index,(cmd, tool, icon_name, label))| {
+                    let on = self.tool == tool; let entity=cx.entity();
                     crate::ui_controls::flat_command_button(self, cmd, Arg::None, "", SharedString::from(format!("tool-{icon_name}")), on, cx)
-                        .aria_label(label).size(px(26.0)).px_0()
+                        .role(Role::RadioButton).aria_label(label).size(px(26.0)).px_0()
+                        .navigation(index,4,move|index,window,cx| {if let Some(command)=[Cmd::SetToolPointer,Cmd::SetToolPencil,Cmd::SetToolEraser,Cmd::SetToolPitch].get(index) {
+                            entity.update(cx,|ed,cx|controls::dispatch(ed,*command,Arg::None,window,cx));
+                        }})
                         .child(svg().path(icon(icon_name)).size(px(15.0)).text_color(th.text))
                 })))
             .child(numeric_pill(self, Num::SnapGridTicks, Arg::None, "snap", true, cx).flex_none())
@@ -1326,19 +1322,17 @@ impl Editor {
             .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleF0Overlay, "activity", "F0 对照", "show-f0", self.show_f0, cx).h(px(28.0)).flex_none())
     }
 
-    fn lane_tabs(&self, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> impl IntoElement {
+    fn lane_tabs(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let route = self.route();
         let caps = self.scheduler.capabilities.as_ref();
-        let mut tabs = div()
-            .id("lane-tabs-scroll")
+        let mut tabs = crate::proto_scroll::viewport("lane-tabs-scroll", "参数泳道标签", "horizontal")
             .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
             .flex()
             .items_center()
-            .overflow_x_scroll()
             .whitespace_nowrap()
             .gap(px(4.0))
             .px(px(8.0))
@@ -1346,8 +1340,8 @@ impl Editor {
             .border_t_1()
             .border_color(th.shade);
         // Parameter lanes: one toggle group (AdwToggleGroup).
-        let mut group = div().id("lane-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control);
-        for (param, has_data) in params::ALL.into_iter().zip(self.active_param_data()) {
+        let mut group = div().id("lane-group").role(Role::TabList).aria_label("参数泳道").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control);
+        for (index,(param, has_data)) in params::ALL.into_iter().zip(self.active_param_data()).enumerate() {
             let active = param == self.param;
             let shown = self.integrations.lanes.contains(&param);
             let supported = params::support(param, route, caps).is_effective();
@@ -1358,21 +1352,12 @@ impl Editor {
             }
             // A parameter shown in another lane is marked; clicking it goes there.
             if shown && !active { tab_btn = tab_btn.font_weight(FontWeight::SEMIBOLD); }
-            let lane_scroll = lane_scroll.clone();
-            group = group.child(tab_btn.h(px(24.0)).text_sm().on_click(cx.listener(move |ed, _, window, cx| {
-                ed.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
-                ed.point_selection.clear();
-                // Go to the lane that shows it, or show it in the active lane.
-                if let Some(slot) = ed.integrations.lanes.iter().position(|p| *p == param) {
-                    ed.integrations.active_panel = slot;
-                } else {
-                    let slot = ed.integrations.active_panel.min(ed.integrations.lanes.len() - 1);
-                    ed.integrations.lanes[slot] = param;
-                }
-                ed.param = param;
-                lane_scroll.scroll_to_item(ed.integrations.active_panel);
-                cx.notify();
-            })));
+            let entity=cx.entity();
+            group=group.child(tab_btn.role(Role::Tab).h(px(24.0)).text_sm()
+                .navigation(index,params::ALL.len(),move|index,window,cx| {if let Some(param)=params::ALL.get(index) {
+                    entity.update(cx,|ed,cx|select_parameter_lane(ed,*param,window,cx));
+                }})
+                .on_click(cx.listener(move|ed,_,window,cx|select_parameter_lane(ed,param,window,cx))));
         }
         tabs = tabs.child(group);
         tabs.child(div().flex_1()).child(
@@ -1382,15 +1367,13 @@ impl Editor {
 
     fn curve_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
-        div()
-            .id("curve-toolbar-scroll")
+        crate::proto_scroll::viewport("curve-toolbar-scroll", "曲线工具栏", "horizontal")
             .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
             .flex()
             .items_center()
-            .overflow_x_scroll()
             .whitespace_nowrap()
             .gap(px(5.0))
             .px(px(8.0))
@@ -1520,7 +1503,7 @@ impl Editor {
             .aria_description(arrangement_semantics.description)
             .key_context("Arrange")
             .track_focus(&self.focus_arrange)
-            .on_key_down(cx.listener(crate::editor::integrations::audio_edit_ui::key_down))
+            
             .on_action(cx.listener(|ed, _: &CopyNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Copy,window,cx){ed.notice(error);cx.notify();} }))
             .on_action(cx.listener(|ed, _: &CutNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Cut,window,cx){ed.notice(error);cx.notify();} }))
             .on_action(cx.listener(|ed, _: &PasteNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Paste,window,cx){ed.notice(error);cx.notify();} }))
@@ -1534,7 +1517,7 @@ impl Editor {
             // inspector's and the dock's.
             .child(pane_header(th)
                 .child(crate::ui_controls::flat_icon_command_button(self, Cmd::AddTrack, "plus", "人声轨", "add-track", false, cx).h(px(32.0)))
-                .child(div().id("add-instrument-track").role(Role::Button).aria_label("添加乐器轨").h(px(32.0)).px(px(9.0)).flex().items_center().gap(px(6.0))
+                .child(crate::proto_controls::action("add-instrument-track", "添加乐器轨").h(px(32.0)).px(px(9.0)).flex().items_center().gap(px(6.0))
                     .rounded(px(6.0)).text_sm().cursor_pointer().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed))
                     .child(svg().path(icon("instrument")).size(px(15.0)).flex_none().text_color(th.text)).child("乐器轨")
                     .on_click(cx.listener(|ed, _, _, cx| ed.add_instrument_track(cx))))
@@ -1557,11 +1540,9 @@ impl Editor {
                     ),
             )
             .child(
-                div()
-                    .id("arrangement-scroll")
+                crate::proto_scroll::viewport("arrangement-scroll", "编曲区", "vertical")
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
                     .child(
                         div()
                             .min_h(px(content_h as f32))
@@ -1594,7 +1575,7 @@ impl Editor {
             .into_any_element()
     }
 
-    fn bottom_content(&mut self, window: &mut Window, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> AnyElement {
+    fn bottom_content(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let th = self.theme;
         let entity = cx.entity();
         let locale = i18n::current(cx);
@@ -1693,7 +1674,7 @@ impl Editor {
                                                     .inset_0()
                                                     .key_context("PianoRoll")
                                                     .track_focus(&self.focus_roll)
-                                                    .child(self.compiled_roll.clone()),
+                                                    .child(crate::proto_roll::view(self.compiled_roll.clone())),
                                             )
                                             .child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Roll))),
                                     ),
@@ -1742,18 +1723,17 @@ impl Editor {
                     )
                     // Resizable Splitter between Roll and Parameter Lanes
                     .child(splitter_bar(entity.clone(), SplitterKind::LaneHeight, th))
-                    .child(self.lane_tabs(lane_scroll, cx))
+                    .child(self.lane_tabs(cx))
                     .child(self.curve_toolbar(cx))
-                    .child(div()
-                        .id("parameter-lanes-scroll")
+                    .child(crate::proto_scroll::viewport("parameter-lanes-scroll", "参数泳道", "vertical")
+                        .reveal_item(self.integrations.active_panel, format!("{}:{}:{:?}:{:?}",
+                            self.project().project_id, self.document_generation, self.integrations.lanes, self.param))
                         .h(px(self.layout.lane_height))
                         .max_h(gpui::relative(0.4))
                         .min_h_0()
                         .flex_none()
                         .flex()
                         .flex_col()
-                        .overflow_y_scroll()
-                        .track_scroll(lane_scroll)
                         // Headers scroll the lane stack; canvases retain their
                         // shared timeline wheel/zoom handling.
                         .children((0..slot_count).map(|slot| {
@@ -1783,7 +1763,7 @@ impl Editor {
                                     .border_color(th.shade)
                                     .text_xs()
                                     .child(div().font_weight(FontWeight::SEMIBOLD).child(param.short()))
-                                    .when(slot_count > 1, |d| d.child(div().id(("remove-lane", slot)).role(Role::Button).aria_label(format!("移除 {} 泳道", param.short()))
+                                    .when(slot_count > 1, |d| d.child(crate::proto_controls::action(("remove-lane", slot), format!("移除 {} 泳道", param.short()))
                                         .size(px(22.0)).rounded(px(11.0)).flex().items_center().justify_center().hover(move |s| s.bg(th.hover))
                                         .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
                                         .on_click(cx.listener(move |ed, _, _, cx| ed.remove_lane(slot, cx)))))
@@ -1914,7 +1894,7 @@ impl Editor {
                         .bg(if th.dark { gpui::rgb(0x3c3c40) } else { gpui::rgb(0x2e2e32) })
                         .text_color(gpui::rgb(0xffffff)).text_sm().shadow_lg()
                         .child(div().flex_1().min_w_0().child(notice.text.clone()))
-                        .child(div().id("toast-dismiss").role(Role::Button).aria_label("关闭通知").size(px(24.0)).rounded(px(12.0))
+                        .child(crate::proto_controls::action("toast-dismiss", "关闭通知").size(px(24.0)).rounded(px(12.0))
                             .flex().items_center().justify_center().hover(|s| s.bg(gpui::rgba(0xffffff26)))
                             .child(svg().path(icon("x")).size(px(13.0)).text_color(gpui::rgb(0xffffff)))
                             .on_click(cx.listener(|ed, _, _, cx| { ed.notices.clear(); cx.notify(); }))))

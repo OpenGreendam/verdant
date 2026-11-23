@@ -27,6 +27,10 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
         vec!["Verdant", "NoteTable", "NoteTablePoint"],
         vec!["Verdant", "LyricEditor"],
         vec!["Verdant", "TextPrompt"],
+        vec!["Verdant", "PianoRoll", "LyricEditor"],
+        vec!["Verdant", "PianoRoll", "TextPrompt"],
+        vec!["Verdant", "Arrange", "TextPrompt"],
+        vec!["Verdant", "NoteTable", "LyricEditor"],
     ];
     let contexts: Vec<Vec<KeyContext>> = focus_paths.iter().map(|path| {
         path.iter().map(|context| KeyContext::parse(context).expect("fixture key context")).collect()
@@ -53,7 +57,7 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
         }
 
         // These are the actual rows stored in Shortcuts and rendered without
-        // filtering. Identity proves no help-only rows or omitted bindings;
+        // filtering. Identity covers both application and compiled text routes;
         // the displayed platform modifiers and chord delimiters are also exact.
         let rows = cheat_sheet(mac);
         assert_eq!(rows.len(), SHORTCUTS.len());
@@ -70,7 +74,7 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
     assert_eq!(display_keys("secondary-shift-z", true), "⌘+Shift+z");
     assert_eq!(display_keys("secondary-k p n", false), "Ctrl+k → p → n");
 
-    // Every unit action must have a listener, not just a declaration that
+    // Every application action must have a listener, not just a declaration that
     // KeyBinding would happily accept. The custom enum has one typed listener
     // and an exhaustive resolver to existing editor intents.
     let view = compact(include_str!("view.rs"));
@@ -80,7 +84,18 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
         "Editor root must install the WorkflowShortcut dispatcher");
     let track = verdant_domain::TrackId::generate();
     for shortcut in SHORTCUTS {
-        let action = (shortcut.action)();
+        let ShortcutDispatch::Application(create) = shortcut.dispatch else {
+            assert!(matches!(shortcut.scope, Scope::Text | Scope::Lyric));
+            // These physical keys are exercised with this registry installed in
+            // proto_text::tests::native_editor_owns_the_registered_text_shortcuts.
+            // Source tests separately cover composition and terminal epoch gates.
+            assert!(matches!(shortcut.keys, "enter" | "tab" | "shift-tab" | "escape" | "secondary-z"
+                | "secondary-shift-z" | "secondary-y" | "space" | "backspace" | "delete" | "left" | "right"
+                | "shift-left" | "shift-right" | "home" | "end" | "secondary-a" | "secondary-v"),
+                "compiled text route needs a native behavioral case: {}", shortcut.keys);
+            continue;
+        };
+        let action = create();
         if let Some(workflow) = action.as_any().downcast_ref::<WorkflowShortcut>() {
             // Calling the exhaustive resolver also covers every bound enum
             // value, including all concrete score formats and part operations.

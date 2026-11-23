@@ -3,30 +3,80 @@ use super::*;
 use gpui::Render;
 
 #[derive(Clone)]
-pub(super) struct SourceDrag { key: InsertKey, generation: u64, source: usize }
-struct DragLabel { label: String, theme: Theme }
+pub(super) struct SourceDrag {
+    key: InsertKey, generation: u64, source: usize,
+    authority: String,
+    lease: Rc<std::cell::RefCell<Option<crate::proto_drag::Lease>>>,
+}
+struct DragLabel { label: String, theme: Theme, lease: Option<crate::proto_drag::Lease>, app: gpui::AsyncApp }
+impl Drop for DragLabel { fn drop(&mut self) { if let Some(lease)=self.lease.take() { lease.end(&self.app); } } }
 impl Render for DragLabel {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div().px(gpui::rems(12./16.)).py(gpui::rems(8./16.)).rounded(gpui::rems(8./16.)).bg(self.theme.control_pressed).text_color(self.theme.text).child(self.label.clone())
     }
 }
-
-pub(super) fn docked_sources(ed: &Editor, target: &Target) -> gpui::AnyElement {
+fn source_authority(ed:&Editor,target:&Target)->String {
+    format!("{}:{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision(),target.key.0)
+}
+pub(super) fn accept_source_drop(source:&SourceDrag,window:&mut Window,cx:&mut gpui::App)->bool {
+    let lease=source.lease.borrow().clone();
+    lease.is_some_and(|lease|lease.accept(window,cx))
+}
+fn source_chip(ed:&Editor,editor:&Entity<Editor>,target:&Target,source:usize,label:&str,docked:bool)->gpui::AnyElement {
+    let th=ed.theme;
+    let key=target.key;
+    let generation=ed.document_generation;
+    let authority=source_authority(ed,target);
+    let caption=label.to_string();
+    let name=format!("调制来源 {label}：拖动到参数，或按回车选择目标");
+    let draw_editor=editor.downgrade();let choose_editor=editor.downgrade();
+    let draw_target=target.clone();let choose_target=target.clone();
+    let choose_authority=authority.clone();let draw_authority=authority.clone();
+    let disabled=ed.menu.is_some()||ed.text_prompt.is_some()||ed.modal_dialog.is_some()||ed.plugin_busy.contains(&key);
+    let control=crate::proto_drag::source(format!("{:?}-{key:?}-{source}-{docked}",editor.entity_id()),name,authority,disabled,
+        move |input| {
+            let lease=Rc::new(std::cell::RefCell::new(None));
+            let payload=SourceDrag{key,generation,source,authority:draw_authority.clone(),lease};
+            let target=draw_target.clone();let editor=draw_editor.clone();let caption=caption.clone();
+            div().id(SharedString::from(format!("mod-source-{key:?}-{source}-{docked}"))).size_full().cursor_pointer()
+                .px(px(10.)).py(px(6.)).rounded(px(6.)).bg(th.control).text_size(px(12.)).child(caption.clone())
+                .on_drag(payload,move |payload,_,window,cx| {
+                    let current=editor.upgrade().is_some_and(|entity| {
+                        let ed=entity.read(cx);
+                        source_authority(ed,&target)==payload.authority&&ed.device_target_matches(&target.track,target.slot,key)
+                            &&ed.menu.is_none()&&ed.text_prompt.is_none()&&ed.modal_dialog.is_none()
+                    });
+                    let lease=if current {input.begin(window,cx)}else{None};
+                    *payload.lease.borrow_mut()=lease.clone();
+                    cx.new(|cx|DragLabel{label:caption.clone(),theme:th,lease,app:cx.to_async()})
+                }).into_any_element()
+        },move |window,cx| {
+            let _=choose_editor.update(cx,|ed,cx| {
+                if source_authority(ed,&choose_target)!=choose_authority {return;}
+                let Some(params)=current_params(ed,&choose_target)else{return;};
+                let Some(effect)=effect_id(ed,&choose_target)else{return;};
+                let Some(slot)=(1..=8).find(|slot|param(&params,&format!("mod{slot}_source")).is_some_and(|d|d.value==0.))else{
+                    ed.notice("8 个调制连线已用完，请先关闭一条连线");cx.notify();return;
+                };
+                use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
+                let items=available_targets(&effect,&params).into_iter().map(|(index,desc)|I::action(desc.name.clone(),M::SetDeviceParams{
+                    target:choose_target.track.clone(),slot:choose_target.slot,expected_key:Some(choose_target.key),
+                    values:vec![(format!("mod{slot}_source"),source as f64),(format!("mod{slot}_target"),index as f64),(format!("mod{slot}_amount"),25.)],
+                })).collect();
+                ed.show_menu(window.mouse_position(),items,window,cx);
+            });
+        });
+    div().flex_none().w(px(label.chars().count() as f32*12.+20.)).h(px(30.)).child(control).into_any_element()
+}
+pub(super) fn docked_sources(ed: &Editor, editor:&Entity<Editor>, target: &Target) -> gpui::AnyElement {
     if !workflow::read_workspace(ed, target).matrix_open { return div().into_any_element(); }
-    let th = ed.theme; let key = target.key; let generation = ed.document_generation;
-    div().id("native-modulation-sources").role(Role::Group).aria_label("拖动调制来源到参数")
-        .w_full().min_w_0().h(px(42.)).flex_none().overflow_x_scroll()
+    let th = ed.theme;
+    crate::proto_scroll::viewport("native-modulation-sources", "调制来源", "horizontal").role(Role::Group).aria_label("拖动调制来源到参数")
+        .w_full().min_w_0().h(px(42.)).flex_none()
         .bg(th.headerbar).border_b_1().border_color(th.shade)
         .child(div().h_full().flex().items_center().gap(px(6.)).px(px(16.)).children(
-            dsp::MOD_SOURCE_LABELS.iter().enumerate().skip(1).map(move |(source, label)| {
-                div().id(SharedString::from(format!("docked-source-{source}"))).role(Role::Button)
-                    .aria_label(format!("拖动 {label} 到参数旋钮")).flex_none().cursor_pointer()
-                    .px(px(10.)).py(px(6.)).rounded(px(6.)).bg(th.control).text_size(px(12.))
-                    .child((*label).to_string())
-                    .on_drag(SourceDrag { key, generation, source }, move |_, _, _, cx| {
-                        cx.new(|_| DragLabel { label: (*label).into(), theme: th })
-                    })
-            }))).into_any_element()
+            dsp::MOD_SOURCE_LABELS.iter().enumerate().skip(1).map(|(source,label)|source_chip(ed,editor,target,source,label,true))))
+        .into_any_element()
 }
 
 fn available_targets<'a>(effect: &str, params: &'a [ParamDesc]) -> Vec<(usize, &'a ParamDesc)> {
@@ -43,13 +93,14 @@ fn effect_id<'a>(ed: &'a Editor, target: &Target) -> Option<String> {
         ed.project().track(t)?.instrument()?.get("id")?.as_str().map(str::to_string)
     } else { ed.device_insert_specs(&target.track).get(target.slot).map(|s| s.id.clone()) }
 }
-pub(super) fn drop_source(ed: &mut Editor, target: &Target, id: &str, source: &SourceDrag, cx: &mut Context<Editor>) {
-    if source.key != target.key || source.generation != ed.document_generation { return; }
+pub(super) fn drop_source(ed: &mut Editor, target: &Target, id: &str, source: &SourceDrag, window:&mut Window, cx: &mut Context<Editor>) {
+    if source.key != target.key || source.generation != ed.document_generation || source.authority!=source_authority(ed,target) { return; }
     let Some(params) = current_params(ed, target) else { return };
     let Some(effect) = effect_id(ed, target) else { return };
     let Some(index) = available_targets(&effect, &params).into_iter().find(|(_, d)| d.id == id).map(|(i, _)| i) else { return };
     let slot = (1..=8).find(|slot| param(&params, &format!("mod{slot}_source")).is_some_and(|d| d.value == 0.));
     let Some(slot) = slot else { ed.notice("8 个调制连线已用完，请先关闭一条连线"); cx.notify(); return };
+    if !accept_source_drop(source,window,cx) {return;}
     write_if_current(ed, target, vec![(format!("mod{slot}_source"), source.source as f64), (format!("mod{slot}_target"), index as f64),
         (format!("mod{slot}_amount"), 25.)], cx);
 }
@@ -60,7 +111,7 @@ fn target_picker(ed: &Editor, target: &Target, effect: &str, params: &[ParamDesc
     let label = choices.iter().find(|(i, _)| *i == selected).map_or("选择目标".into(), |(_, d)| d.name.clone());
     let choices: Vec<_> = choices.into_iter().map(|(i, d)| (i, d.name.clone())).collect();
     let target = target.clone(); let id = id.to_string();
-    dropdown_button(format!("mod-target-{}-{id}", target.slot).into(), label, ed.theme, move |_| {
+    dropdown_button(format!("mod-target-{}-{id}", target.slot).into(), label, ed.theme, suite::action_authority(ed, &target), move |_| {
         use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
         choices.iter().map(|(i, name)| I::action(name.clone(), M::SetDeviceParams { target: target.track.clone(), slot: target.slot,
             expected_key: Some(target.key), values: vec![(id.clone(), *i as f64)] }).checked(*i == selected)).collect()
@@ -71,7 +122,7 @@ fn source_picker(ed: &Editor, target: &Target, params: &[ParamDesc], id: &str, c
     let selected = param(params, id).map_or(0, |p| p.value.round() as usize);
     let label = dsp::MOD_SOURCE_LABELS.get(selected).unwrap_or(&"关闭").to_string();
     let target = target.clone(); let id = id.to_string();
-    dropdown_button(format!("mod-source-choice-{}-{id}", target.slot).into(), label, ed.theme, move |_| {
+    dropdown_button(format!("mod-source-choice-{}-{id}", target.slot).into(), label, ed.theme, suite::action_authority(ed, &target), move |_| {
         use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
         dsp::MOD_SOURCE_LABELS.iter().enumerate().map(|(i, label)| I::action(*label, M::SetDeviceParams {
             target: target.track.clone(), slot: target.slot, expected_key: Some(target.key), values: vec![(id.clone(), i as f64)] }).checked(i == selected)).collect()
@@ -108,6 +159,7 @@ fn advanced_sources(ed: &Editor, editor: &Entity<Editor>, target: &Target, param
     let state = workflow::read_workspace(ed, target); let toggle_target = target.clone();
     let mut section = div().flex().flex_col().gap(gpui::rems(10./16.))
         .child(crate::ui_controls::selectable_button(format!("mod-advanced-{slot}"), "高级来源与 XLFO 步进编辑", state.modulation_advanced_open, th)
+            .authority(suite::action_authority(ed,target))
             .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
                 let mut state = workflow::read_workspace(ed, &toggle_target);
                 state.modulation_advanced_open = !state.modulation_advanced_open;
@@ -143,6 +195,7 @@ fn advanced_sources(ed: &Editor, editor: &Entity<Editor>, target: &Target, param
     let tabs = div().flex().flex_wrap().gap(gpui::rems(4./16.)).children((0..length).map(|step| {
         let target = target.clone();
         crate::ui_controls::selectable_button(format!("seq-detail-{slot}-{step}"), (step+1).to_string(), step == selected, th)
+            .authority(suite::action_authority(ed,&target))
             .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
                 let mut state = workflow::read_workspace(ed, &target); state.sequencer_step = step;
                 workflow::write_workspace(ed, &target, &state); cx.notify();
@@ -167,18 +220,14 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
     let used = (1..=8).filter(|n| param(params, &format!("mod{n}_source")).is_some_and(|d| d.value > 0.)).count();
     let mut panel = div().flex().flex_col().gap(gpui::rems(12./16.)).pt(gpui::rems(12./16.)).border_t_1().border_color(th.shade)
         .child(crate::ui_controls::selectable_button(format!("mod-open-{slot}"), format!("调制与 MIDI · {used} / 8 连线"), state.matrix_open, th)
+            .authority(suite::action_authority(ed,&target))
             .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
                 let mut state = workflow::read_workspace(ed, &toggle_target); state.matrix_open = !state.matrix_open;
                 workflow::write_workspace(ed, &toggle_target, &state); cx.notify();
             })));
     if !state.matrix_open { return panel.into_any_element(); }
-    let sources = div().flex().flex_wrap().gap(gpui::rems(6./16.)).children(dsp::MOD_SOURCE_LABELS.iter().enumerate().skip(1).map(|(source, label)| {
-        div().id(SharedString::from(format!("mod-source-{slot}-{source}"))).role(Role::Button).aria_label(format!("拖动 {label} 到参数旋钮"))
-            .cursor_pointer().px(gpui::rems(10./16.)).py(gpui::rems(7./16.)).rounded(gpui::rems(6./16.)).bg(th.control).text_sm().child((*label).to_string())
-            .on_drag(SourceDrag { key, generation: ed.document_generation, source }, move |_, _, _, cx| {
-                let label = (*label).to_string(); cx.new(|_| DragLabel { label, theme: th })
-            })
-    }));
+    let sources = div().flex().flex_wrap().gap(gpui::rems(6./16.)).children(
+        dsp::MOD_SOURCE_LABELS.iter().enumerate().skip(1).map(|(source,label)|source_chip(ed,editor,&target,source,label,false)));
     panel = panel.child(div().text_xs().text_color(th.text_secondary).child("拖动来源到参数旋钮，或使用下方来源与目标选择器。深度按参数全范围的百分比缩放。"))
         .child(sources);
     for index in 1..=8 {
@@ -217,6 +266,7 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             .child(target_picker(ed, &target, effect, params, &target_id, cx))
             .child(knob_row(editor, || target.clone(), params, &[&cc_id, &channel_id], th, 30.))
             .child(crate::ui_controls::selectable_button(format!("learn-{slot}-{index}"), "学习", false, th).tab_index(0)
+                .authority(suite::action_authority(ed,&target))
                 .on_click(cx.listener(move |ed, _, _, cx| {
                     ed.begin_device_midi_learn(learn_target.track.clone(), learn_target.slot, learn_target.key, index - 1, cx);
                 }))));
