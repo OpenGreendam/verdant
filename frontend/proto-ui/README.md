@@ -39,6 +39,8 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 
 辅助功能除了 Slider 的名称、范围、值和 disabled 状态，还声明 `increment`、`decrement`、`setValue` 动作。SDK 将 AccessKit `NumericValue` 解码为原型事件的有限数值；缺失、错类型或非有限数据不分发。原型中的写值动作也先取消旧预览，再走同一受控提交事件。Linux AT-SPI 当前通过 `Value.CurrentValue` setter 请求 SetValue；不能把检查到了 Slider role 或模拟一个 host event 计作实际平台写值通过。
 
+`text-field` 使用共享 SDK 的同一个宿主编辑器。其辅助功能投影提供真实 `TextRun`、规范化文本、Unicode 字符长度和 anchor/focus 选区，辅助技术的选区请求回到当前编辑 lease；旧 owner、旧帧、detach 或替换后的请求不能修改新编辑器。字符几何没有用控件外框伪造；字符边界、软换行、IME 和屏幕阅读器的完整平台体验仍须分别验收。真实 AT-SPI `Text` 读写与选区操作由 OS 场景核对，SDK 内部回调测试不能替代它。
+
 `verdant-ui-protocol` 只依赖稳定命名的 `verdant-note-gesture-data` 和 `verdant-control-gesture-data`；这两个生成 crate 均没有 Cargo 依赖。adapter 直接构造编译器生成的 guard 类型、调用类型化函数，并将完整结果预解码为枚举，检查未知效果、次序和所有权后再交给业务层执行。它不依赖 GPUI、native owner、serde 或 JSON，也没有另写 Rust 状态机。session 的完整可达 Cargo 图和实际构建都单独验收；原生组件的 props/event 编码留在 app 边界内。
 
 普通 roll 和曲线的原生 capture 由带 window/hitbox/generation 的 `OwnedPointerCapture` 管理。领域变更、取消、失焦、窗口离开和输入子树移除都会结束对应的会话；旧延迟清理不能释放新会话的 capture。touch 使用 GPUI touch arena，不冒充 mouse capture。终止事件在 capture phase 接收最终坐标/modifier，非有限或窗口 viewport 外的坐标取消，不能沿用过期 preview 提交。Pitch 和旋钮复用上游 MoveGesture lease，并与普通 roll/曲线按 contact 所有权互斥。lane、automation、mixer 和数值 scrub 的既有宿主路径也按各自 editor/target/pointer 所有权检查窗口边界、撤销预览并释放对应捕获；这些路径没有全部改成 `OwnedPointerCapture`。参数提交在写入前重新核对工程、revision、当前 track/master 目标、slot、parameter key 和权威参数值，不能只信任上一帧的 props。
@@ -80,7 +82,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
 
 工具链核验包含实际执行 Node/pnpm、实际加载的 TypeScript/tsx 版本、安装所用 package manager、完整已安装锁文件和上游锁文件内容。成功输出记录这次实际执行版本；receipt 记录可复现要求，不冒充某次机器执行证明。
 
-`native-input` CI job 依赖同一 run 的 Linux 打包结果，下载经过发布门禁的 app/worker。它用包内 `verdant-release` 检查 archive、解包后的内容和当前 checkout 的 source selection，再执行 X11 与 windowed Wayland 各 11 项真实输入场景。完整性门禁核对二进制字节、全部场景和原始记录，缺项或 skip 都失败；失败时仍保留原始证据。#79 的这条链已实际通过 22/22，见下方验收表和 [原生输入记录](NATIVE-INPUT-2026-11-22.json)。
+`native-input` CI job 依赖同一 run 的 Linux 打包结果，下载经过发布门禁的 app/worker。它用包内 `verdant-release` 检查 archive、解包后的内容和当前 checkout 的 source selection，再执行 X11 与 windowed Wayland 各 11 项既有场景及各 3 项 authored-controls 场景，共 28 项。新增场景覆盖文本框的 Unicode 选区、提交/取消和撤销，预设列表的键盘导航与滚动，以及 mixer pan 的最终松手采样、取消和撤销。完整性门禁核对二进制字节、全部场景、原始辅助功能节点与实际输入记录，缺项或 skip 都失败；失败时仍保留原始证据。实际执行结果绑定相应提交的 PR Checks，不能由脚本中的场景数量推断通过。#79 的历史链只有既有 22 项且已通过 22/22，见下方验收表和 [原生输入记录](NATIVE-INPUT-2026-11-22.json)。
 
 ## 来源闭包和共享 SDK
 
@@ -172,8 +174,8 @@ Rust 各 crate 的数量是 Linux 总数中的子集，不重复相加。macOS/W
 
 上一轮数值辅助功能修复 [PR #1710](https://github.com/Proto-UI/Proto-UI/pull/1710) 已合入上游 main；本次迁移的通用能力与修复通过 [PR #1730](https://github.com/Proto-UI/Proto-UI/pull/1730) 回馈。它们包括条件辅助功能、共享 Input 编辑、原生通知/焦点/初次 hover 生命周期、真实滚动引擎绑定，以及同时兼容默认与现代 GPUI 的文本选区通知，详见 [迁移记录](MIGRATION-2026-11-23.md#上游回馈)。上一轮 pin 将这些能力锁定到 `5912f817581f89785e75c26e324a76c97257dc60` 并完成当时的 fresh 检查。本轮继续整合 [PR #1731](https://github.com/Proto-UI/Proto-UI/pull/1731) 的适用修复；最终身份以当前 pin、receipts 和整合记录的实际重新生成为准，不能用旧 source audit 或历史运行替代。
 
-- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/compiler/README.md)
-- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/compiler/src/compile.ts)
-- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/compiler/src/rust-data.ts)
-- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/internal/compiler/gpui-accessibility-value.md)
-- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/prototypes/base/src/slider/root.proto.ts)
+- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/README.md)
+- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/src/compile.ts)
+- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/src/rust-data.ts)
+- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/internal/compiler/gpui-accessibility-value.md)
+- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/prototypes/base/src/slider/root.proto.ts)
