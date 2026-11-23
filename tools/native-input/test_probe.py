@@ -29,7 +29,68 @@ class PresetActionSelected(Exception):
     """Stop the offline case at the real accessibility transport boundary."""
 
 
+class TextFocusObserved(Exception):
+    """Stop after the actual selector and focus predicate accept a native node."""
+
+
+class CollectionEntrySelected(Exception):
+    """Stop before clicking the observed library entry in the native window."""
+
+
 class ProbeHelpers(unittest.TestCase):
+    def test_collection_entry_uses_the_native_push_button_in_its_own_window(self):
+        main, other = [':1.3', '/frame/0'], [':1.3', '/frame/1']
+        selected = {'reference': [':1.3', '/library'], 'name': '预设库',
+                    'role': 'push button', 'roleNumber': 43, 'windowReference': main}
+        snapshot = {'nodes': [selected,
+            {**selected, 'reference': [':1.3', '/other/library'], 'windowReference': other},
+            {**selected, 'reference': [':1.3', '/generic'], 'role': 'button'},
+        ]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = main
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        probe.persisted = lambda: {'revision': 2}
+        probe.click = Mock(side_effect=CollectionEntrySelected)
+        with self.assertRaises(CollectionEntrySelected):
+            probe.collection_scroll_cancel()
+        probe.click.assert_called_once_with(selected)
+
+    def test_text_journey_selects_the_native_push_button_after_tab(self):
+        frame = [':1.3', '/frame/0']
+        field = {'reference': [':1.3', '/input'], 'name': '输入文字…', 'role': 'entry',
+                 'states': ['focusable'], 'windowReference': frame}
+        cancel = {'reference': [':1.3', '/cancel'], 'name': '取消', 'role': 'push button',
+                  'roleNumber': 43, 'states': ['focusable', 'focused'], 'windowReference': frame}
+        decoy = {'reference': [':1.3', '/generic'], 'name': '取消', 'role': 'button',
+                 'states': ['focusable'], 'windowReference': frame}
+        snapshot = {'nodes': [field, cancel, decoy]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = frame
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        probe.persisted = lambda: {'revision': 0, 'panPermille': 0}
+        probe.rename_prompt = lambda: field
+        probe.type_unicode = Mock()
+        probe.text = Mock()
+        probe.key = Mock()
+        probe.log_input = Mock()
+        probe.observer = SimpleNamespace(
+            set_text_selection=Mock(return_value=True),
+            read=lambda reference: next(n for n in snapshot['nodes'] if tuple(n['reference']) == reference))
+
+        def record(label, **evidence):
+            if label == 'text-focus-forward':
+                self.assertEqual(evidence['control']['focused'], cancel)
+                raise TextFocusObserved()
+
+        probe.record = Mock(side_effect=record)
+        with self.assertRaises(TextFocusObserved):
+            probe.text_selection_focus()
+        self.assertEqual(probe.key.call_args.args, ('Tab',))
+
     def preset_probe(self, controls):
         main, native = [':1.3', '/frame/0'], [':1.3', '/frame/3']
         snapshot = {'nodes': [
@@ -186,7 +247,7 @@ def synthetic_control_observations():
              'visible': 0 <= index * 12 - offset < 48} for index in range(20)]}
 
     entry = {'name': '输入文字…', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/input']}
-    cancel = {'name': '取消', 'role': 'button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
+    cancel = {'name': '取消', 'role': 'push button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
     search = {'name': 'search', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/search']}
     sequence = [
         ('preflight', 0, {}, None, None),
@@ -266,6 +327,18 @@ class ControlEvidenceRefusals(unittest.TestCase):
     def test_focus_summary_cannot_replace_actual_tree_state(self):
         self.detail('text-focus-forward')['tree']['nodes'] = []
         with self.assertRaisesRegex(RuntimeError, 'actual tree'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_cancel_requires_the_platform_push_button_role_and_actual_focus(self):
+        # A real AT-SPI Button is role 43, named "push button". The original
+        # X11 trace had already focused it when the generic "button" query
+        # timed out. Keep role and physical focus checks independently strict.
+        self.detail('text-focus-forward')['control']['focused']['role'] = 'button'
+        with self.assertRaisesRegex(RuntimeError, 'wrong physical focus target'):
+            validate_control_trace(self.observations, self.final)
+        self.setUp()
+        self.detail('text-focus-forward')['control']['focused']['states'] = []
+        with self.assertRaisesRegex(RuntimeError, 'wrong physical focus target'):
             validate_control_trace(self.observations, self.final)
 
     def test_scroll_requires_changed_visible_rows_and_consistent_native_geometry(self):
