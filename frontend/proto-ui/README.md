@@ -1,43 +1,35 @@
 # Proto-UI 与 GPUI 集成
 
-Verdant 使用 Proto-UI Compiler 实现控件交互，并保留 GPUI 的 Adwaita 绘图和应用领域层。实验性 `gpui-source-v1` 生成原生组件，`rust-data-v1` 生成只依赖 Rust 标准库的类型化决策函数。保留的 Rust 源码必须由上游 compiler 发射；不要手改 `generated/`。发布使用的版本、完整 GPUI 来源、工具链要求、共享 SDK 内容和各编译单元的目标由 [compiler.pin.json](compiler.pin.json) 绑定。
+Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生成原生组件，`rust-data-v1` 生成只依赖 Rust 标准库的类型化决策函数。保留的 Rust 源码全部由上游 compiler 发射；不要手改 `generated/`。版本、完整 GPUI 来源、工具链要求、共享 SDK 内容和各编译单元的目标由 [compiler.pin.json](compiler.pin.json) 绑定。
 
 ## 当前边界
 
-本迁移的作者源码包含 **12 个 `gpui-source-v1` 原生编译单元和 2 个 `rust-data-v1` 决策单元，共 14 个编译单元**，具有原审计 18 类交互的实际消费路径。编译单元数与交互类别数不是同一种口径；一个共享控件会被多个界面复用。调用点、宿主职责和验收状态见 [完整控件迁移记录](MIGRATION-2026-11-23.md)。最终 pin、来源 receipts、生成目录和 Cargo 依赖必须与这份 14 单元清单一致；来源清单不能代替 producer 的最终 fresh 检查。
+本轮将其余应用交互扩展到 **12 个原生编译组件 + 2 个标准库决策单元**；完整的 18 类映射、宿主边界与验证范围见 [CONTROL-MIGRATION.md](CONTROL-MIGRATION.md)。下表保留原有四个基础单元的职责，新增的十个单元与它们共用生成、pin、receipt 和 CI 门禁。
 
-| 原生组件 | Proto 源码拥有的职责 | 主要原生消费者 |
+| 单元 | 原型拥有的职责 | Rust 宿主拥有的职责 |
 |---|---|---|
-| `pitch-gesture-surface` | 原生根、尺寸/裁剪、slot 与 pitch 手势入口；共享 SDK owner | `proto_roll.rs` |
-| `normalized-knob` | 值/phase、受控提交、复位、取消、键盘、焦点、Slider 辅助功能、精确输入请求 | `proto_knob.rs`、内置设备编辑器 |
-| `action-control` | 按压/激活、禁用、选择/展开、上下文请求、键盘与辅助功能操作；目标变化取消旧按压，实时标签更新保留相同命令 | `proto_controls.rs`、按钮、离散控件、Tabs、窗口标题操作 |
-| `collection-control` | 游标、选择、遍历、展开、搜索结果导航、上下文请求、滚动/最近边缘揭示与过期 revision 拒绝 | `proto_collection.rs`、菜单、音符表格、点列表、轨道/历史/浏览器列表 |
-| `continuous-control` | 数值预览/提交、细调、复位、取消、键盘与数值辅助功能 | `proto_scalar.rs`、推子/声像、数值字段、分隔条、时间线滚动条 |
-| `editor-surface` | 手势 phase/阈值/身份、取消、焦点、滚轮与缩放策略 | `proto_editor_surface.rs`、编曲/卷帘/曲线/自动化/标尺/EQ 绘制 |
-| `performance-key` | 按键触发、保持/重复、松开与失焦停止、辅助功能激活 | `proto_performance_key.rs`、参考键盘与演奏键盘 |
-| `drag-source` | 可消费一次的拖放 lease、revision、取消、键盘/辅助功能目的地选择 | `proto_drag.rs`、调制映射 |
-| `overlay-control` | 可见性、默认/取消响应、焦点进入/约束/恢复 | `proto_overlay.rs`、模态与导出窗口 |
-| `text-field` | 文本/IME/选区/撤销、焦点、提交/取消/前进与数值文本策略 | `proto_text.rs`、歌词、精确值、工作流、插件搜索 |
-| `graph-point` | 每个图形把手的双轴预览/提交、阈值/细调、复位、键盘轴切换与辅助功能 | `devices/graph_control.rs` |
-| `scroll-region` | 文档/视口滚动请求、页面/边缘按键、最近边缘揭示与可选焦点范围 | `proto_scroll.rs`、说明、表单、参数泳道及原生滚动引擎 |
+| `pitch-gesture-surface` | 原生根、尺寸/裁剪和 slot；共享 SDK 的 artifact owner | 卷帘绘图、音乐坐标、音高采样、领域预览与提交；上游 MoveGesture lease 的宿主绑定 |
+| `note-gesture-planner` | 移动、复制、resize、框选的纯决策函数和有序效果 | pointer identity、不可变守卫事实、revision、领域数据、效果执行和原生 capture |
+| `control-gesture-planner` | 曲线/连续参数的纯决策函数和归一化拖动计算 | 图形命中、坐标与参数单位、preview、最终采样和工程提交 |
+| `normalized-knob` | 每实例的值/phase、props 同步、取消、键盘、焦点、Slider 辅助功能语义和提交事件 | Adwaita 绘图 slot、移动距离、参数单位、当前目标/工程 revision 校验和领域提交 |
 
-`note-gesture-planner` 与 `control-gesture-planner` 继续由 `rust-data-v1` 生成标准库决策函数。`verdant-ui-protocol` 和 headless session 不链接 GPUI、组件 owner 或 JSON runtime；音乐守卫、事务和效果执行留在领域层。
+前三项属于 **Proto 编译的 gesture planner + native GPUI surface**。note/control 由上游 data target 生成独立的 Rust 函数，不创建组件实例、不执行组件 setup，也不链接 GPUI。`normalized-knob` 是真实有状态组件实例：它复用 control planner 的同一份 TS 来源，原型对交互和公开语义负责，宿主不再为该旋钮另存一份 phase 状态机。slot 和自绘是合法组成方式；是否由原型承担交互契约，不能由有无 slot 判断。
 
-宿主保留 Adwaita 绘图、音乐命中与单位换算、参数/工程事实、音频、撤销事务和操作系统窗口/指针/拖放运输。`proto_parent.rs` 在 native slot 的 layout/prepaint/paint 阶段提供显式逻辑父 owner，编译子根在实际 render 时绑定，避免把视觉嵌套误当成已经成立的焦点树。
+旋钮的 `props.value` 是宿主接受的归一化值；`defaultValue` 只表示重置目标。拖动时公开 `value` 可以显示预览，提交前恢复到已接受值，再发出 `{ value, revision }` 提案。宿主接受后通过 props 发布新值，拒绝时不会留下未接受的显示值。`revision` 是不透明的来源标识，宿主可将工程、store 与参数身份纳入其中。值、revision 或 disabled 改变会取消当前交互；键盘接管先取消指针预览，再从已接受值步进，Shift 使用十分之一的步长。公开状态、焦点和事件回调后的 epoch 检查防止重入更新被旧操作覆盖。
 
-滚动接入包含 **21 处应用 `proto_scroll::viewport` 调用点**，并保留 **5 处显式绑定真实引擎的原生滚动容器**：预设结果、混音轨道条、上下文菜单、插件结果和模态正文。数字按应用源码构造点计数，不是运行时实例数。`verdant-app/src` 已没有生产代码直接调用 `scroll_to_item`；音符、控制点、历史和参数泳道的显示位置由编译源的滚动策略决定。
+辅助功能除了 Slider 的名称、范围、值和 disabled 状态，还声明 `increment`、`decrement`、`setValue` 动作。SDK 将 AccessKit `NumericValue` 解码为原型事件的有限数值；缺失、错类型或非有限数据不分发。原型中的写值动作也先取消旧预览，再走同一受控提交事件。Linux AT-SPI 当前通过 `Value.CurrentValue` setter 请求 SetValue；不能把检查到了 Slider role 或模拟一个 host event 计作实际平台写值通过。
 
-虚拟列表通过上游 `attach_scroll_engine` lease 直接绑定 `UniformListScrollHandle` 的真实 `base_handle`。源组件的快照和请求使用同一引擎；编译根不再额外创建一个滚动视口。宿主滚轮回调只报告真实输入，原生布局提供可见及未实例化行的测量事实；不能在两个不同 ScrollHandle 之间复制位置来伪造接入。ScrollSurface 的公开 `position` 是 `[0, 1]` 归一化比例，原生像素 offset 另行核对。
+`verdant-ui-protocol` 只依赖稳定命名的 `verdant-note-gesture-data` 和 `verdant-control-gesture-data`；这两个生成 crate 均没有 Cargo 依赖。adapter 直接构造编译器生成的 guard 类型、调用类型化函数，并将完整结果预解码为枚举，检查未知效果、次序和所有权后再交给业务层执行。它不依赖 GPUI、native owner、serde 或 JSON，也没有另写 Rust 状态机。session 的完整可达 Cargo 图和实际构建都单独验收；原生组件的 props/event 编码留在 app 边界内。
 
-文本使用上游共享 `asInputEditor`，并保留[精确来源](src/upstream-input/PROVENANCE.md)与 [MIT 许可证](src/upstream-input/LICENSE)。它具有实际 Input 编辑语义；应用使用直接辅助功能命名。需要独立 Label 关联的完整 `asInputRoot` 仍保留真实 ControlLabel 协议，本文不宣称 GPUI 已支持该独立能力。
+普通 roll 和曲线的原生 capture 由带 window/hitbox/generation 的 `OwnedPointerCapture` 管理。领域变更、取消、失焦、窗口离开和输入子树移除都会结束对应的会话；旧延迟清理不能释放新会话的 capture。touch 使用 GPUI touch arena，不冒充 mouse capture。终止事件在 capture phase 接收最终坐标/modifier，非有限或窗口 viewport 外的坐标取消，不能沿用过期 preview 提交。Pitch 和旋钮复用上游 MoveGesture lease，并与普通 roll/曲线按 contact 所有权互斥。lane、automation、mixer 和数值 scrub 的既有宿主路径也按各自 editor/target/pointer 所有权检查窗口边界、撤销预览并释放对应捕获；这些路径没有全部改成 `OwnedPointerCapture`。参数提交在写入前重新核对工程、revision、当前 track/master 目标、slot、parameter key 和权威参数值，不能只信任上一帧的 props。
 
-临时预览与最终提交由编译源区分，宿主写入前再核对实际工程、目标和 revision；策略或目标变化、取消、卸载和同步回调可使旧操作失效。实时辅助功能名称或描述的更新不会单独替换命令身份。拖动中的临时值、列表选择和键盘/辅助功能动作都经过相应编译实例。复用旧编译单元的历史 OS 验收，不能替代这些新增控件的当前提交验证。
+旋钮的捕获拖动可以继续越过控件 hitbox。上游 press adapter 因 hover 离开而发出的 `press.cancel` 不结束这个独立的 move lease；失焦、detach、失去所有权等真正的 lease 取消通过公开 `cancel` 方法清理原型。
 
 曲线图在 prepaint 时另外保存这一帧对应的权威参数快照。若参数或 revision 在绘制后、按下前改变，旧帧的拖动、右键菜单和双击写入都会被拒绝；重绘后可以正常编辑。动画和预览值只决定绘制及命中位置，拖动起点必须来自已接受的权威参数，避免把动画中的旧值写回工程。
 
 ## 再生成与两类检查
 
-当前主线把 GUI binary 命名为 `verdant-gui`，`verdant` 是 CLI；下面的 app 测试命令使用 GUI target。后文 #79 的结果只属于上一轮旋钮集成的原始 checkout 与包格式，不代表本次完整控件迁移的最终候选。
+当前主线把 GUI binary 命名为 `verdant-gui`，`verdant` 是 CLI；下面的 app 测试命令使用 GUI target。#79 的实际结果仍绑定其原始 checkout 与包格式，后续主线集成的检查另见 PR Checks。
 
 使用 Node 24.x、pnpm 10.32.1，将 Proto-UI 检出到 pin 的完整 commit。以下命令从仓库根执行：
 
@@ -59,13 +51,13 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
 
 工具链核验包含实际执行 Node/pnpm、实际加载的 TypeScript/tsx 版本、安装所用 package manager、完整已安装锁文件和上游锁文件内容。成功输出记录这次实际执行版本；receipt 记录可复现要求，不冒充某次机器执行证明。
 
-`native-input` CI job 依赖同一 run 的 Linux 打包结果，下载经过发布门禁的 app/worker。它用包内 `verdant-release` 检查 archive、解包后的内容和当前 checkout 的 source selection，再执行 X11 与 windowed Wayland 各 11 项真实输入场景。完整性门禁核对二进制字节、全部场景和原始记录，缺项或 skip 都失败；失败时仍保留原始证据。历史 #79 的这条链实际通过 22/22，见后文历史验收表和 [原生输入记录](NATIVE-INPUT-2026-11-22.json)；新增控件不能继承该结果。
+`native-input` CI job 依赖同一 run 的 Linux 打包结果，下载经过发布门禁的 app/worker。它用包内 `verdant-release` 检查 archive、解包后的内容和当前 checkout 的 source selection，再执行 X11 与 windowed Wayland 各 11 项真实输入场景。完整性门禁核对二进制字节、全部场景和原始记录，缺项或 skip 都失败；失败时仍保留原始证据。#79 的这条链已实际通过 22/22，见下方验收表和 [原生输入记录](NATIVE-INPUT-2026-11-22.json)。
 
 ## 来源闭包和共享 SDK
 
 producer 按各单元的 target 调用上游 `compileFile` 或 `compileRustDataFile`，共用 `FileSourceGraph`，记录仓库边界内的入口、导入 helper、包解析输入以及未命中的候选路径；已有的仓库外来源会被拒绝。编译前后核对来源字节与解析图，避免只哈希入口却遗漏 helper 或 exports 变化。
 
-`pitch-gesture-surface` 发射唯一的 `.proto-ui/gpui-native`；其余 11 个原生组件通过上游 `nativeSdkPath` 引用它。两个 data 单元不使用 SDK。pin 绑定 owner、路径、package/version、ABI feature 和 SDK 内容摘要；data target 则绑定稳定 crate 名、公开方法和空依赖集合。增加原生单元时必须复用 SDK，不能复制同名 package，也不能改生成 Rust 来修 Cargo 冲突。
+`pitch-gesture-surface` 发射唯一的 `.proto-ui/gpui-native`；其他 11 个原生单元通过上游 `nativeSdkPath` 引用它。两个 data 单元不使用 SDK。pin 绑定 owner、路径、package/version、ABI feature 和 SDK 内容摘要；data target 则绑定稳定 crate 名、公开方法和空依赖集合。增加原生单元时必须复用 SDK，不能复制同名 package，也不能改生成 Rust 来修 Cargo 冲突。
 
 生成物替换先验证 receipt 的完整 inventory 和每个文件内容。额外文件、人工改动、符号链接和不完整 inventory 会被拒绝；它们不会被“目录里有 provenance”这一条件授权删除。发布使用互斥锁、唯一 staging、备份和恢复 journal。
 
@@ -85,21 +77,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --recover-publication
 
 ## 准入与证据
 
-本次迁移的源码、编译产物、依赖图和原生框架行为验证已完成，绑定应用源码快照 [`f325638d`](https://github.com/OpenGreendam/verdant/commit/f325638dcd7cb4169e52d9eff7796825eccd4ebb) 与编译器 [`5912f817`](https://github.com/Proto-UI/Proto-UI/commit/5912f817581f89785e75c26e324a76c97257dc60)。执行范围、来源身份和日志摘要见 [最终机器记录](VALIDATION-2026-11-23.json)，职责清单、证据层次和历史修复见 [迁移记录](MIGRATION-2026-11-23.md#验证与证据层次)。
-
-| 最终检查范围 | 实际结果 |
-|---|---|
-| 严格 producer | 14 个单元、81 个编译产物的 fresh 与 retained 检查均通过；保留完整来源 receipts、唯一 SDK 和 GPUI 身份 |
-| 应用工具与作者 Runtime | 82 项规则检查通过；完整 Node 测试 173/173，通过且 0 skip，其中作者 Runtime 88 项、工具回归 85 项 |
-| 上游源码与类型 | 聚焦源码回归 206/206；TypeScript 检查退出码 0 |
-| Verdant 使用的现代 GPUI | 原生 SDK 26/26；完整 `verdant-gui` suite 237/237，均无失败、忽略或筛选掉的测试 |
-| Cargo 图与 headless | 完整 locked/all-features resolve graph 通过，唯一 GPUI/SDK，session 原生依赖为 0；session、protocol 和两个 data crate 的本地测试共 33 项通过，此次本地运行不声明基础镜像隔离 |
-| 实际 Rust source mutation | baseline 实测 0.55、variant 实测 0.6；variant 使用旧 0.55 预期时按要求断言失败，实验整体通过 |
-| 上游默认 GPUI 的托管 CI | [run 45071732309](https://github.com/Proto-UI/Proto-UI/actions/runs/45071732309) 在 macOS 15 和 Ubuntu 24.04 上分别通过原生消费者 39/39、数值辅助功能 8/8、SDK 27/27；两边均执行了旧版宿主的真实选区通知回归 |
-
-这些结果分别证明源码语义、生成 Rust、依赖边界和框架输入行为，不相加为“总验收项”。默认 GPUI 的 27 项 SDK 回归与 Verdant 现代 GPUI 的 26 项使用不同宿主 API 分支；后者不能代替前者。当前候选的逐屏视觉、打包后 OS 输入、物理触摸、系统 IME 与读屏验收仍按平台单独记录，不继承下面 #79 的历史成功状态。
-
-上一轮旋钮集成的历史版本见 [首轮验收记录](VALIDATION-2026-11-22.md) 和 [后续修复验收](VALIDATION-COMPLETION-2026-11-22.md)。后文历史表固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。关联讨论位于 [PR #5](https://github.com/OpenGreendam/verdant/pull/5)。这些记录不随当前分支和后续文档提交改写。
+PR #5 首轮修复的历史版本和当时尚未完成的范围见 [首轮验收记录](VALIDATION-2026-11-22.md)，该轮后续修复结果见 [历史修复验收](VALIDATION-COMPLETION-2026-11-22.md)。下方历史结果固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。它们不证明后来新增的控件已通过。全部控件迁移的入口、职责与验收范围见 [迁移清单](CONTROL-MIGRATION.md)，运行结果必须绑定对应提交的 CI Checks。
 
 TOML admission 使用 parser，按实际 `package` 名检查普通/build/dev 和 target-specific 的所有依赖表，支持 alias、子表、多行和注释。它检查声明；另一个门禁调用完整 `cargo metadata --locked --all-features`，沿全部 workspace members 的 resolve graph 检查 GPUI package ID/source/rev 和唯一 SDK，同时按实际 workspace/manifest 身份追踪 session 的所有可达边，拒绝原生组件、GPUI、SDK 和图像支持。两个 data crate 必须可达且没有依赖；不能改个包名躲过路径核验。`--no-deps` 或扫描 Cargo.lock 字符串不能替代这一检查。
 
@@ -115,7 +93,7 @@ node frontend/proto-ui/tools/check-cargo-gpui.mjs --offline
 
 离线 Cargo graph 检查前，需要在 `frontend/` 中执行过 `cargo fetch --locked`。Rust 测试进入该目录执行，使 rustup 采用其中的固定工具链。
 
-设置 `PROTO_UI_UPSTREAM` 的测试覆盖真实 compiler 发射和来源变异，并把作者原型放进 pinned `createRuntimeSession`，通过受控 host capability 检查动作/集合、连续值、文本/IME、编辑表面、图形、拖放、滚动、拒绝更新、同步接受、重入取消和生命周期。这些 JavaScript Runtime 测试不经过 GPUI，也不代表 OS 输入测试；无 checkout 时相关用例会明确跳过，不能把跳过计作通过。完整 GUI Rust suite 另外覆盖类型化协议、宿主 capture 和实际挂载的生成组件；仅运行旧旋钮筛选集不足以验收本次迁移。
+设置 `PROTO_UI_UPSTREAM` 的测试覆盖真实 compiler 发射和来源变异，也将 authored knob 放进 pinned `createRuntimeSession`，通过受控 host capability 检查拒绝更新、同步接受、重入取消和生命周期。这些 JavaScript Runtime 测试不经过 GPUI，也不代表 OS 输入测试；无 checkout 时会明确跳过。上面的 Rust 测试另外覆盖类型化协议、宿主 capture 和 GPUI 组件实例。
 
 CI 还准备 baseline/variant 两套完整 data-target 编译产物，用同一类型化 Rust consumer 执行：TS 中 fine sensitivity 从 0.1 改到 0.2，Rust 函数的实测结果必须从 0.55 改到 0.6，旧期望必须失败。每个变体使用由生成源码摘要区分的 Cargo target 子目录，避免相同 package ID 和解包时间戳错误复用另一变体的构建缓存。这验证 TS 来源确实影响已编译的消费者行为，不涉及窗口输入。
 
@@ -126,7 +104,7 @@ node frontend/proto-ui/tools/check-native-source-mutation.mjs --run .ci/proto-ui
 
 保留字节一致、Cargo graph、Rust trace、GPUI 框架事件、OS 窗口输入和物理设备分别提供不同证据。哈希或截图不能代替取消/捕获正确性，GPUI 测试不能替代物理触摸、IME 或屏幕阅读器验收。跨平台剩余范围仍见 [PLATFORM-ACCEPTANCE.md](../docs/PLATFORM-ACCEPTANCE.md)。
 
-## 历史验收：上一轮旋钮集成 #79
+## 迁移前基线验收（#79）
 
 | 检查 | #79 的实际结果 |
 |---|---|
@@ -139,20 +117,18 @@ node frontend/proto-ui/tools/check-native-source-mutation.mjs --run .ci/proto-ui
 
 Rust 各 crate 的数量是 Linux 总数中的子集，不重复相加。macOS/Windows 运行 workflow 明列的测试范围，不代表各自执行了 Linux 的全部 206 项 app 测试。15 项 Linux ignored 涉及外部插件/宿主或用户自备声库等既有条件；不能当作它们已经通过。11 项离线 Python helper 回归与 22 项实际 OS 场景分别计数。
 
-该历史 OS 验收复用同一 run 的 Linux 包：archive SHA-256 为 `3ebb0439398289309d509170700ba5a51a3662d79afd840267ed86f5896e14a1`，实际 app 为 `273e3ea6fa8015d436ea885ccc7eaf721c4e80d71950ae60d1659d412793cf20`，worker 为 `c4542e8a6f151c7b2f9556e0008547646c4a55ce180eda3ffdf8e40963765033`。输入经过 XTest→X11 或 XTest→Weston→真实 Wayland；AT-SPI 写值经过实际 `Value.CurrentValue` setter。辅助功能数值读取、持久化、revision、单次撤销、捕获接管和取消都由原始观测核对；没有以直接调用 Editor/Proto 方法代替 OS 输入。
+本次 OS 验收复用同一 run 的 Linux 包：archive SHA-256 为 `3ebb0439398289309d509170700ba5a51a3662d79afd840267ed86f5896e14a1`，实际 app 为 `273e3ea6fa8015d436ea885ccc7eaf721c4e80d71950ae60d1659d412793cf20`，worker 为 `c4542e8a6f151c7b2f9556e0008547646c4a55ce180eda3ffdf8e40963765033`。输入经过 XTest→X11 或 XTest→Weston→真实 Wayland；AT-SPI 写值经过实际 `Value.CurrentValue` setter。辅助功能数值读取、持久化、revision、单次撤销、捕获接管和取消都由原始观测核对；没有以直接调用 Editor/Proto 方法代替 OS 输入。
 
-#68 的发布来源分类失败、#72 的原生关闭按钮消歧和 Weston 输出发现失败均保留在完成记录中；#79 在修复后重新运行了完整链。更早 `8fc5f4e` 的 344 项 Rust 和 18 项 OS 结果也保留为历史基线；两批历史结果均不能替代本分支最终 app/worker 的验证。原始 OS artifact 与摘要的独立读回、摘要和源身份校验见 [机器记录](NATIVE-INPUT-2026-11-22.json)；[CI 原始证据](https://github.com/OpenGreendam/verdant/actions/runs/45026004598/artifacts/14756497529) 当时按 14 天策略保留至 2026-12-06。
+#68 的发布来源分类失败、#72 的原生关闭按钮消歧和 Weston 输出发现失败均保留在完成记录中；#79 在修复后重新运行了完整链。早先 `8fc5f4e` 的 344 项 Rust 和 18 项 OS 结果保留为历史基线，不用来替代本次 app/worker 的验证。原始 OS artifact 与摘要的独立读回、摘要和源身份校验见 [机器记录](NATIVE-INPUT-2026-11-22.json)；[CI 原始证据](https://github.com/OpenGreendam/verdant/actions/runs/45026004598/artifacts/14756497529) 按 14 天策略保留至 2026-12-06。
 
-该历史真实窗口验收发生在 Linux；它不等于物理触摸设备、IME、屏幕阅读器或 macOS/Windows 的 OS 输入验收。当时的上游 PR #1710 记录验证了相关测试和真实数值链，同时记录了整仓 CI 尚未解决的失败和 draft 状态；该历史快照保持不变。#1710 现已合入上游 main，当前迁移的上游回馈和具体 CI 范围见下一节。Verdant 的通过结果不能证明上游整仓全绿。
+本次真实窗口验收发生在 Linux；它不等于物理触摸设备、IME、屏幕阅读器或 macOS/Windows 的 OS 输入验收。上游 PR #1710 的相关测试和真实数值链已经验证，该段记录仅对应 #79 当时的提交与运行；后续上游状态和本轮迁移验收应查看各自 PR 的最新 Checks，不能以历史结果替代。
 
-## 上游来源与历史依据
+## 上游依据
 
-上一轮数值辅助功能修复 [PR #1710](https://github.com/Proto-UI/Proto-UI/pull/1710) 已合入上游 main；本次迁移的通用能力与修复通过 [PR #1730](https://github.com/Proto-UI/Proto-UI/pull/1730) 回馈。它们包括条件辅助功能、共享 Input 编辑、原生通知/焦点/初次 hover 生命周期、真实滚动引擎绑定，以及同时兼容默认与现代 GPUI 的文本选区通知，详见 [迁移记录](MIGRATION-2026-11-23.md#上游回馈)。最终 `compiler.pin.json` 将这些能力锁定到 `5912f817581f89785e75c26e324a76c97257dc60`，14 个单元均经严格 fresh 检查；不能用旧 source audit 替代该来源身份。
+以下链接固定到本次 compiler pin；实验性目标的能力不能从当前 main 或旧 source audit 推断。
 
-以下链接固定到**历史 pin `5712266`**，用于定位上一轮集成的设计与实现，不能作为本次新增能力的完整依据：
-
-- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/compiler/README.md)
-- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/compiler/src/compile.ts)
-- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/compiler/src/rust-data.ts)
-- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/internal/compiler/gpui-accessibility-value.md)
-- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/5712266648fdbce2f6662636cb83f01eb849adb1/packages/prototypes/base/src/slider/root.proto.ts)
+- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/compiler/README.md)
+- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/compiler/src/compile.ts)
+- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/compiler/src/rust-data.ts)
+- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/internal/compiler/gpui-accessibility-value.md)
+- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/7d3e9e6329afebc3cd6c361cb665f9304ceb05ca/packages/prototypes/base/src/slider/root.proto.ts)

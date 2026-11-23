@@ -102,8 +102,7 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
         }
     }
     let durations = preview.as_deref().unwrap_or(&budget.durations_seconds);
-    let mut rows = crate::proto_scroll::viewport("phoneme-duration-rows", "音素时长", "vertical").max_h(px(180.0))
-        .flex().flex_col().gap(px(3.0));
+    let mut row_labels = Vec::with_capacity(budget.labels.len());
     for (index, (label, duration)) in budget.labels.iter().zip(durations).enumerate() {
         let scheduled = schedule.as_ref().and_then(|s| s.durations.get(index)).copied()
             .or_else(|| (!anchored).then_some(budget.durations_seconds[index]));
@@ -111,9 +110,13 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
             Some(seconds) => format!("{} · 预算 {:.1} ms · 计划 {:.1} ms", label, duration * 1000.0, seconds * 1000.0),
             None => format!("{} · 预算 {:.1} ms · 计划待预检", label, duration * 1000.0),
         };
-        rows = rows.child(gpui::div().text_xs().child(text));
+        row_labels.push(text);
     }
-    panel = panel.child(rows);
+    let rows_height = (row_labels.len() as f32 * 22.0).min(180.0).max(22.0);
+    panel = panel.child(gpui::div().h(px(rows_height)).child(crate::proto_scroll::native_content("phoneme-duration-region", "音素时长明细", move |scroll, _, _| {
+        gpui::div().id("phoneme-duration-rows").size_full().overflow_y_scroll().track_scroll(scroll)
+            .flex().flex_col().gap(px(3.0)).children(row_labels.iter().map(|text| gpui::div().flex_none().text_xs().child(text.clone()))).into_any_element()
+    })));
     if let Some(schedule) = schedule {
         panel = panel.child(gpui::div().text_xs().text_color(th.text_secondary).child(format!(
             "计划辅音先行 {:.1} ms · 让出尾部 {:.1} ms", schedule.prefix_seconds * 1000.0, schedule.tail_trim_seconds * 1000.0)));
@@ -190,7 +193,7 @@ fn native_phoneme_strip(editor: Entity<Editor>, input: crate::proto_editor_surfa
     }).size_full()
 }
 
-fn begin_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, x: f64, bounds: Bounds<Pixels>,
+fn begin_phoneme_drag(input: &crate::proto_editor_surface::Input, editor: &Entity<Editor>, pointer: PointerId, x: f64, bounds: Bounds<Pixels>,
     window: &mut Window, cx: &mut App) -> bool {
     if cx.global::<PhonemePanelState>().drag.is_some() { return false; }
     let (track, note, revision, boundary, position, total_seconds, lower_seconds, upper_seconds) = {
@@ -220,6 +223,9 @@ fn begin_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, x: f64, bound
             total_seconds * (left + minimum) as f64 / 1000.0,
             total_seconds * (right - minimum) as f64 / 1000.0)
     };
+    let accepted=editor.update(cx,|ed,cx|input.intent(ed,"phonemeGesture",vec![true.into(),true.into(),true.into()],window,cx)
+        .is_some_and(|intent|intent.kind=="phoneme-drag"));
+    if !accepted {return false;}
     let drag = PhonemeBoundaryDrag {
         editor: editor.entity_id(), track, note, revision, pointer, boundary, start_x: x,
         initial_seconds: position, position_seconds: position, total_seconds, lower_seconds, upper_seconds,
@@ -244,9 +250,9 @@ fn end_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, cancel: bool, w
     if !cx.global::<PhonemePanelState>().drag.as_ref().is_some_and(|drag|
         drag.editor == editor.entity_id() && drag.pointer == pointer) { return; }
     let Some(drag) = cx.global_mut::<PhonemePanelState>().drag.take() else { return };
-    
+
     editor.update(cx, |ed, cx| {
-        
+
         if cancel { cx.notify(); return; }
         if !drag.matches(editor, ed) { ed.notice("音符或工程已改变，已取消音素拖动"); cx.notify(); return; }
         if (drag.position_seconds - drag.initial_seconds).abs() < 1e-12 { cx.notify(); return; }
@@ -263,11 +269,11 @@ fn end_phoneme_drag(editor: &Entity<Editor>, pointer: PointerId, cancel: bool, w
 fn install_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox,
     input: &crate::proto_editor_surface::Input, window: &mut Window) {
     if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::ResizeLeftRight, hitbox); }
-    let e = editor.clone();
+    let e = editor.clone(); let policy=input.clone();
     crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
         use crate::proto_editor_surface::PointerPhase;
         match event.phase {
-            PointerPhase::Begin => begin_phoneme_drag(&e,event.pointer,event.x,bounds,window,cx),
+            PointerPhase::Begin => begin_phoneme_drag(&policy,&e,event.pointer,event.x,bounds,window,cx),
             PointerPhase::Sample => { move_phoneme_drag(&e,event.pointer,event.x,bounds,cx); true }
             PointerPhase::Finish => { end_phoneme_drag(&e,event.pointer,false,window,cx); true }
             PointerPhase::Context => { end_phoneme_drag(&e,event.pointer,true,window,cx); true }
@@ -332,9 +338,10 @@ fn region_controls(ed: &Editor, editor: Entity<Editor>, param: Param, slot: usiz
     let any_disabled = !selected.is_empty() && selected.iter().all(|n| ed.region_lane_disabled(n, param));
     let current_interp = selected.first().map(|n| n.curves.interpolation(param.short()));
     let (th, enabled) = (ed.theme, !any_disabled);
-    let button = move |key: &str, label: &str, active: bool| crate::proto_controls::action(
-        format!("region-{}-{slot}-{key}", param.short()), format!("{}：{label}", param.name()))
-        .authority(crate::proto_controls::editor_authority(ed))
+    let button = move |key: &str, label: &str, active: bool| gpui::div()
+        .id(gpui::SharedString::from(format!("region-{}-{slot}-{key}", param.short())))
+        .role(gpui::Role::Button)
+        .aria_label(format!("{}：{label}", param.name()))
         .aria_selected(active)
         .cursor_pointer()
         .h(px(20.0))
@@ -515,12 +522,12 @@ fn paint_tempo(editor: &Entity<Editor>, bounds: Bounds<Pixels>, drag: Option<&Te
     });
 }
 
-fn begin_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f64, y: f64, height: f64, modifiers: gpui::Modifiers, window: &mut Window, cx: &mut Context<Editor>) -> bool {
+fn begin_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f64, y: f64, height: f64, snap: bool, window: &mut Window, cx: &mut Context<Editor>) -> bool {
     if preview.borrow().is_some() || ed.session.gesture.is_some() || ed.lane_stroke.is_some() || !ed.commit_pending_lyric(cx) { return false; }
     let range = tempo_range(&ed.project().tempo_map);
     let hit = tempo_hit(ed, x, y, height, range);
     let raw_tick = ed.session.viewport.x_to_tick(x);
-    let tick = hit.unwrap_or_else(|| if modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick) }).max(0);
+    let tick = hit.unwrap_or_else(|| if snap { ed.session.snap.snap(raw_tick) } else { raw_tick.round() as i64 }).max(0);
     let original = ed.project().tempo_map.iter().find(|point| point.tick == tick);
     let source_tick = original.map(|point| point.tick);
     let micro_bpm = if hit.is_some() { original.unwrap().micro_bpm } else { tempo_value(y, height, range) };
@@ -528,31 +535,31 @@ fn begin_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f
         base: ed.revision(), project_id: ed.project().project_id.clone(), pointer, source_tick,
         tick, micro_bpm, start_tick: tick, start_bpm: micro_bpm, origin: (x, y), range, moved: false,
     });
-    
+
     cx.notify();
     true
 }
 
-fn move_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f64, y: f64, height: f64, modifiers: gpui::Modifiers, cx: &mut Context<Editor>) {
+fn move_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f64, y: f64, height: f64, intent: &crate::proto_editor_surface::MotionIntent, cx: &mut Context<Editor>) {
     let mut preview = preview.borrow_mut();
     let Some(drag) = preview.as_mut().filter(|drag| drag.pointer == pointer) else { return };
     if drag.base != ed.revision() || drag.project_id != ed.project().project_id { preview.take(); cx.notify(); return; }
     let (dx, dy) = (x - drag.origin.0, y - drag.origin.1);
-    if !drag.moved && dx.abs().max(dy.abs()) < 3.0 { return; }
+    if !drag.moved && !intent.move_x && !intent.move_y { return; }
     drag.moved = true;
     drag.tick = drag.start_tick;
     drag.micro_bpm = drag.start_bpm;
-    if drag.source_tick != Some(0) && dx.abs() >= 3.0 {
+    if drag.source_tick != Some(0) && intent.move_x {
         let raw_tick = drag.start_tick as f64 + dx / ed.session.viewport.px_per_tick;
-        let tick = if modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick) };
+        let tick = if intent.snap { ed.session.snap.snap(raw_tick) } else { raw_tick.round() as i64 };
         let points = &ed.project().tempo_map;
         let low = points.iter().rev().find(|point| point.tick < drag.start_tick).map_or(0, |point| point.tick.saturating_add(1));
         let high = points.iter().find(|point| point.tick > drag.start_tick).map_or(i64::MAX, |point| point.tick.saturating_sub(1));
         drag.tick = tick.clamp(low, high);
     }
-    if dy.abs() >= 3.0 {
+    if intent.move_y {
         let delta_bpm = -dy * (drag.range.1 - drag.range.0) / (height - TEMPO_TOP - PAD).max(1.0)
-            * if modifiers.shift { 0.1 } else { 1.0 };
+            * intent.fine;
         drag.micro_bpm = (((drag.start_bpm as f64 / 1e6 + delta_bpm).max(0.000001) * 10.0).round() * 100_000.0).max(1.0) as u64;
     }
     cx.notify();
@@ -561,7 +568,7 @@ fn move_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, x: f6
 fn end_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
     if !preview.borrow().as_ref().is_some_and(|drag| drag.pointer == pointer) { return; }
     let drag = preview.borrow_mut().take().unwrap();
-    
+
     if drag.base != ed.revision() || drag.project_id != ed.project().project_id { cx.notify(); return; }
     let mut commands = Vec::with_capacity(2);
     if let Some(tick) = drag.source_tick.filter(|tick| *tick != drag.tick) {
@@ -575,7 +582,7 @@ fn end_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, window
 fn cancel_tempo(preview: &TempoPreview, pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
     if !preview.borrow().as_ref().is_some_and(|drag| drag.pointer == pointer) { return; }
     preview.borrow_mut().take();
-    
+
     cx.notify();
 }
 
@@ -593,22 +600,38 @@ fn tempo_context(ed: &mut Editor, x: f64, y: f64, height: f64, window: &mut Wind
 fn install_tempo_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: &Hitbox,
     preview: &TempoPreview, input: &crate::proto_editor_surface::Input, window: &mut Window) {
     if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::Crosshair, hitbox); }
-    let (e,state) = (editor.clone(),preview.clone());
+    let (e,state,policy) = (editor.clone(),preview.clone(),input.clone());
     let height = f64::from(bounds.size.height);
     crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
         use crate::proto_editor_surface::PointerPhase;
         e.update(cx, |ed,cx| match event.phase {
             PointerPhase::Begin => {
-                if event.clicks >= 2 {
+                let hit=tempo_hit(ed,event.x,event.y,height,tempo_range(&ed.project().tempo_map));
+                let Some(intent)=policy.intent(ed,"pointGesture",vec!["tempo".into(),hit.is_some().into(),false.into(),
+                    (event.clicks as u64).into(),event.modifiers.alt.into()],window,cx) else{return false;};
+                if intent.kind=="edit-tempo" {
                     let tick = tempo_hit(ed,event.x,event.y,height,tempo_range(&ed.project().tempo_map))
                         .unwrap_or_else(||ed.session.snap.snap(ed.session.viewport.x_to_tick(event.x)).max(0));
                     ed.run_workflow(crate::editor::WorkflowAction::EditTempo(tick),window,cx);
                     false
-                } else { begin_tempo(ed,&state,event.pointer,event.x,event.y,height,event.modifiers,window,cx) }
+                } else if matches!(intent.kind.as_str(),"move-tempo"|"create-tempo") { begin_tempo(ed,&state,event.pointer,event.x,event.y,height,intent.snap,window,cx) }
+                else {false}
             }
-            PointerPhase::Sample => { move_tempo(ed,&state,event.pointer,event.x,event.y,height,event.modifiers,cx); true }
+            PointerPhase::Sample => {
+                if let Some(intent)=policy.motion(ed,event.x,event.y,event.modifiers,window,cx) {
+                    move_tempo(ed,&state,event.pointer,event.x,event.y,height,&intent,cx);
+                }
+                true
+            }
             PointerPhase::Finish => { end_tempo(ed,&state,event.pointer,window,cx); true }
-            PointerPhase::Context => { state.borrow_mut().take(); tempo_context(ed,event.x,event.y,height,window,cx); true }
+            PointerPhase::Context => {
+                let hit=tempo_hit(ed,event.x,event.y,height,tempo_range(&ed.project().tempo_map));
+                if policy.intent(ed,"pointGesture",vec!["tempo".into(),hit.is_some().into(),true.into(),
+                    (event.clicks as u64).into(),event.modifiers.alt.into()],window,cx).is_some_and(|intent|intent.kind=="point-menu") {
+                    state.borrow_mut().take(); tempo_context(ed,event.x,event.y,height,window,cx);
+                }
+                false
+            }
         })
     });
 }
@@ -727,18 +750,17 @@ fn paint_lane(editor:&Entity<Editor>,bounds:Bounds<Pixels>,param:Param,window: &
     text.push((scale, gpui::point(o.x + px((w - scale_width).max(6.0) as f32), o.y + px(3.0)), 10.0, th.text_tertiary));
 }
 
-fn down(ed:&mut Editor,param:Param,slot:usize,pointer: PointerId, x: f64, y: f64, height: f64, modifiers: gpui::Modifiers, window: &mut Window, cx: &mut Context<Editor>) -> bool {
+fn down(input:&crate::proto_editor_surface::Input,ed:&mut Editor,param:Param,slot:usize,pointer: PointerId, x: f64, y: f64, height: f64, modifiers: gpui::Modifiers, window: &mut Window, cx: &mut Context<Editor>) -> bool {
     if ed.lane_stroke.is_some(){return false;}
     if ed.param!=param{ed.point_selection.clear();}ed.param=param;ed.integrations.active_panel=slot;
     if !verdant_backend::params::support(ed.param, ed.route(), ed.scheduler.capabilities.as_ref()).is_effective() { return false; }
-    let erase = ed.lane_tool == LaneTool::Eraser || ed.tool == Tool::Eraser;
     let tick = ed.session.viewport.x_to_tick(x);
     if !ed.region_lane_editable(param, tick, tick) {
         ed.notice("先选择此音符区域并启用曲线，再编辑控制点"); cx.notify(); return false;
     }
-    let value = if erase && param == Param::Pit { 0. } else { value_at(ed.param, y, height, ed.pit_range_cents) };
     let mut point = None;
-    if ed.lane_tool==LaneTool::Select && !erase && !matches!(ed.param, Param::Vibrato | Param::Portamento) {
+    let points = !matches!(ed.param, Param::Vibrato | Param::Portamento);
+    if points {
         if let Some(track) = ed.active_track() {
             let slack = 8.0 / ed.session.viewport.px_per_tick;
             for n in ed.index.notes_in_range(track, (tick - slack) as i64, (tick + slack) as i64 + 1) {
@@ -751,27 +773,35 @@ fn down(ed:&mut Editor,param:Param,slot:usize,pointer: PointerId, x: f64, y: f64
             }
         }
     }
+    let selected=point.as_ref().is_some_and(|(note,point,_,_)|ed.point_selection.contains(&(note.clone(),point.clone())));
+    let tool=match ed.lane_tool {LaneTool::Pencil=>"pencil",LaneTool::Line=>"line",LaneTool::Smooth=>"smooth",LaneTool::Eraser=>"eraser",LaneTool::Select=>"select"};
+    let Some(intent)=input.intent(ed,"curveGesture",vec![tool.into(),(ed.tool==Tool::Eraser).into(),point.is_some().into(),selected.into(),points.into(),
+        (param==Param::Portamento).into(),modifiers.shift.into(),modifiers.alt.into()],window,cx) else{return false;};
+    let tool=match intent.kind.as_str(){"curve-point"|"curve-select"=>LaneTool::Select,"curve-line"=>LaneTool::Line,
+        "curve-smooth"=>LaneTool::Smooth,"curve-erase"=>LaneTool::Eraser,"curve-pencil"=>LaneTool::Pencil,_=>return false};
+    let erase=intent.kind=="curve-erase";
+    let value = if erase && param == Param::Pit { 0. } else { value_at(ed.param, y, height, ed.pit_range_cents) };
+    let point=if intent.kind=="curve-point" {point}else{None};
     let (note, point, tick, value) = match point {
         Some((note, point, tick, value)) => {
-            if modifiers.shift { if !ed.point_selection.insert((note.clone(),point.clone())){ed.point_selection.remove(&(note.clone(),point.clone()));} }
-            else if !ed.point_selection.contains(&(note.clone(),point.clone())){ed.point_selection=[(note.clone(),point.clone())].into();}
+            if intent.selection=="toggle" { if !ed.point_selection.insert((note.clone(),point.clone())){ed.point_selection.remove(&(note.clone(),point.clone()));} }
+            else if intent.selection=="replace"{ed.point_selection=[(note.clone(),point.clone())].into();}
             ed.session.selection.insert(note.clone());(Some(note),Some(point),tick,value)
         },
-        None => (None, None, if modifiers.alt || ed.param == Param::Portamento || ed.lane_tool != LaneTool::Select { tick } else { ed.session.snap.snap(tick) as f64 }, value),
+        None => (None, None, if intent.snap { ed.session.snap.snap(tick) as f64 } else { tick }, value),
     };
-    if !ed.begin_curve(ed.param, pointer, note, point, false, tick, value, (x, y), erase) { return false; }
+    if !ed.begin_curve(ed.param, pointer, note, point, false, tick, value, (x, y), erase, tool) { return false; }
      cx.notify(); true
 }
-fn moved(ed:&mut Editor,param:Param,pointer: PointerId, x: f64, y: f64, height: f64, modifiers: gpui::Modifiers, cx: &mut Context<Editor>) {
+fn moved(ed:&mut Editor,param:Param,pointer: PointerId, x: f64, y: f64, height: f64, intent:&crate::proto_editor_surface::MotionIntent, cx: &mut Context<Editor>) {
     if !ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && !s.roll && s.param==param) { return; }
     let tick = ed.session.viewport.x_to_tick(x);
     let value=value_at(param,y,height,ed.pit_range_cents);
-    let drawing = ed.lane_stroke.as_ref().is_some_and(|s| s.point.is_none() && s.tool != LaneTool::Select);
-    ed.curve_sample(pointer, tick, value, (x, y), modifiers.shift, modifiers.alt || drawing); cx.notify();
+    ed.curve_sample(pointer, tick, value, intent); cx.notify();
 }
 fn up(ed:&mut Editor,param:Param,pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
     if !ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == pointer && !s.roll && s.param==param) { return; }
-    
+
     {
         let (from, to) = ed.lane_stroke.as_ref().unwrap().samples.iter()
             .fold((f64::INFINITY, f64::NEG_INFINITY), |(from, to), sample| (from.min(sample.0), to.max(sample.0)));
@@ -814,19 +844,21 @@ fn cancel_lane_pointer(ed: &mut Editor, param: Param, slot: usize, pointer: Poin
     if ed.integrations.active_panel != slot || !ed.lane_stroke.as_ref()
         .is_some_and(|stroke| stroke.pointer == pointer && !stroke.roll && stroke.param == param) { return; }
     ed.lane_stroke = None;
-    
+
     cx.notify();
 }
 
 fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,param:Param,slot:usize,
     input:&crate::proto_editor_surface::Input,window:&mut Window,_:&mut App) {
     if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::Crosshair,hitbox); }
-    let e=editor.clone(); let height=f64::from(bounds.size.height);
+    let e=editor.clone(); let height=f64::from(bounds.size.height);let policy=input.clone();
     crate::proto_editor_surface::install_pointer_input(input,bounds,hitbox,window,move |event,window,cx| {
         use crate::proto_editor_surface::PointerPhase;
         e.update(cx,|ed,cx| match event.phase {
-            PointerPhase::Begin => down(ed,param,slot,event.pointer,event.x,event.y,height,event.modifiers,window,cx),
-            PointerPhase::Sample => { if ed.integrations.active_panel==slot { moved(ed,param,event.pointer,event.x,event.y,height,event.modifiers,cx); } true }
+            PointerPhase::Begin => down(&policy,ed,param,slot,event.pointer,event.x,event.y,height,event.modifiers,window,cx),
+            PointerPhase::Sample => { if ed.integrations.active_panel==slot {
+                if let Some(intent)=policy.motion(ed,event.x,event.y,event.modifiers,window,cx) {moved(ed,param,event.pointer,event.x,event.y,height,&intent,cx);}
+            } true }
             PointerPhase::Finish => { if ed.integrations.active_panel==slot { up(ed,param,event.pointer,window,cx); } true }
             PointerPhase::Context => { ed.param=param; ed.integrations.active_panel=slot; context(ed,ed.session.viewport.x_to_tick(event.x) as i64,window,cx); true }
         })

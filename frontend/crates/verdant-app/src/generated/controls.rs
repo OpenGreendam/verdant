@@ -3,7 +3,8 @@
 // This checked-in Rust module is the source for the application controls.
 
 #![allow(dead_code)]
-use gpui::{prelude::*, div, px, ClickEvent, Context, ElementId, Hsla, SharedString, Window};
+use gpui::{prelude::*, div, px, Context, ElementId, Hsla, SharedString, Window};
+use crate::proto_controls::Activation;
 use verdant_domain::{NoteId, TrackId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -244,11 +245,10 @@ pub fn command_button<T: CommandTarget>(cmd: CommandId, arg: CommandArg, label: 
     key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> crate::proto_controls::Action {
     assert_eq!(command(cmd).arg, arg.kind(), "generated command argument mismatch");
     let label: SharedString = label.into();
-    crate::proto_controls::action(key, label.clone()).authority(format!("{cmd:?}:{arg:?}"))
-        .flex().items_center().justify_center().px(px(6.0)).py(px(3.0))
+    crate::proto_controls::action(key, label.clone()).flex().items_center().justify_center().px(px(6.0)).py(px(3.0))
         .rounded(px(3.0)).text_xs().text_color(fg).bg(bg).hover(move |s| s.bg(hover))
         .child(label)
-        .on_click(cx.listener(move |target, _: &ClickEvent, window, cx| dispatch(target, cmd, arg.clone(), window, cx)))
+        .on_click(cx.listener(move |target, _: &Activation, window, cx| dispatch(target, cmd, arg.clone(), window, cx)))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -402,12 +402,12 @@ pub fn select_control<T: SelectTarget>(id: SelectId, arg: CommandArg, current_op
     let spec = select(id);
     assert_eq!(spec.arg, arg.kind(), "generated select argument mismatch");
     let resolved = spec.option_or_default(current_option);
-    crate::proto_controls::action(key, spec.label).authority(format!("{id:?}:{arg:?}:{current_option}"))
-        .role(gpui::Role::ComboBox).flex().items_center().px(px(8.0)).py(px(4.0))
+    crate::proto_controls::action(key, spec.label).role(gpui::Role::ComboBox).flex().items_center().px(px(8.0)).py(px(4.0))
         .rounded(px(5.0)).text_xs().text_color(fg).bg(bg).hover(move |s| s.bg(hover))
         .child(div().flex_1().min_w_0().truncate().child(resolved.label))
-        .on_click(cx.listener(move |target, ev: &ClickEvent, window, cx| {
-            target.open_select(id, arg.clone(), ev.position(), window, cx);
+        .on_click(cx.listener(move |target, ev: &Activation, window, cx| {
+            let position = ev.position();
+            target.open_select(id, arg.clone(), position, window, cx);
         }))
 }
 

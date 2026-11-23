@@ -30,7 +30,8 @@ pub(crate) struct Spec {
     pub drag_mode: &'static str,
     pub double_action: &'static str,
     pub tap_action: &'static str,
-    pub key_mode: &'static str,
+    /// Point collections retain horizontal/page traversal and Enter/Escape.
+    pub keyboard_mode: &'static str,
     /// The host has a transient draft/viewport that echoes emitted previews.
     /// Such an echo is distinct from a new project revision or external value.
     pub preview_echo: bool,
@@ -41,7 +42,7 @@ impl Spec {
     pub fn slider(value: f64, min: f64, max: f64, label: impl Into<String>) -> Self {
         Self { value, min, max, step: (max-min)/100.0, fine_step: (max-min)/1000.0,
             default_value: value, label: label.into(), role: "slider", drag_mode: "absolute",
-            double_action: "reset", tap_action: "none", key_mode: "scalar", preview_echo: false, disabled: false, mixer_preview: false }
+            double_action: "reset", tap_action: "none", keyboard_mode: "full", preview_echo: false, disabled: false, mixer_preview: false }
     }
 }
 
@@ -131,24 +132,6 @@ fn cancel_source(handle: &ContinuousControlHandle, target: &Target, window: &mut
 #[derive(Clone)]
 pub(crate) struct Actions { handle: ContinuousControlHandle, target: Rc<RefCell<Target>> }
 impl Actions {
-    /// Native spelling/modifiers are physical facts. The authored source owns
-    /// whether this scalar or its surrounding collection handles the key.
-    pub fn key(&self, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) -> bool {
-        let name = match event.keystroke.key.as_str() {
-            "up" => "ArrowUp", "down" => "ArrowDown", "left" => "ArrowLeft", "right" => "ArrowRight",
-            "home" => "Home", "end" => "End", "pageup" => "PageUp", "pagedown" => "PageDown",
-            "enter" => "Enter", "space" => " ", "escape" => "Escape", "backspace" => "Backspace", other => other,
-        };
-        let mods = event.keystroke.modifiers; let target = self.target.borrow().clone();
-        match call(&self.handle, "key", vec![name.into(), mods.shift.into(), (mods.control || mods.platform).into(), mods.alt.into()], window, cx) {
-            Ok(handled) => {
-                drain(&self.handle, &target, window, cx);
-                if handled { window.prevent_default(); cx.stop_propagation(); }
-                handled
-            },
-            Err(error) => { self.handle.take_events(); report(&target, error, cx); false },
-        }
-    }
     pub fn invoke(&self, method: &str, args: Vec<Value>, window: &mut Window, cx: &mut App) {
         let target = self.target.borrow().clone();
         match call(&self.handle, method, args, window, cx) {
@@ -216,18 +199,24 @@ impl MoveGestureBinding for Binding {
         let consumed = self.invoke("begin", vec![mapped.value.into(), mapped.jump.into(), sample.modifiers.alt.into(), double.into()], window, cx);
         if !consumed || state::<String>(&self.handle, "phase").is_ok_and(|phase| phase == "idle") {
             self.contact.input.set(None);
-        } else if let Some(hitbox) = self.handle.owner.borrow().native_hitbox.as_ref() {
+        } else if sample.input == MoveGestureInput::Mouse && let Some(hitbox) = self.handle.owner.borrow().native_hitbox.as_ref() {
             *self.capture.borrow_mut() = Some(crate::host_pointer::OwnedPointerCapture::acquire(hitbox.id, window, cx));
         }
     }
     fn on_move(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         if self.contact.input.get() != Some(sample.input) { return; }
+        if sample.input == MoveGestureInput::Mouse && !self.capture.borrow().as_ref().is_some_and(|capture| capture.is_current(window, cx)) {
+            self.cancel(window, cx); return;
+        }
         let Some(mapped) = self.sample(sample, window) else { self.cancel(window, cx); return; };
         self.invoke("sample", vec![mapped.value.into(), mapped.fine.into(),
             (sample.total_delta.x.hypot(sample.total_delta.y) >= 3.0).into(), sample.modifiers.shift.into()], window, cx);
     }
     fn on_end(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         if self.contact.input.get() != Some(sample.input) { return; }
+        if sample.input == MoveGestureInput::Mouse && !self.capture.borrow().as_ref().is_some_and(|capture| capture.is_current(window, cx)) {
+            self.cancel(window, cx); return;
+        }
         self.contact.input.set(None);
         if let Some(capture) = self.capture.borrow_mut().take() { capture.release(window, cx); }
         let Some(mapped) = self.sample(sample, window) else { self.cancel(window, cx); return; };
@@ -298,7 +287,8 @@ impl RenderOnce for Scalar {
         let props = json!({ "value": spec.value, "min": spec.min, "max": spec.max, "step": spec.step,
             "fineStep": spec.fine_step, "defaultValue": spec.default_value, "label": spec.label,
             "disabled": spec.disabled, "revision": token, "role": spec.role, "dragMode": spec.drag_mode,
-            "doubleAction": spec.double_action, "tapAction": spec.tap_action, "previewEcho": spec.preview_echo, "keyMode": spec.key_mode });
+            "doubleAction": spec.double_action, "tapAction": spec.tap_action, "keyboardMode": spec.keyboard_mode,
+            "previewEcho": spec.preview_echo });
         let parent = crate::proto_parent::current(); let initial_parent = parent.clone();
         let initial_props = props.clone();
         let initial_target = target.clone();
@@ -328,6 +318,10 @@ impl RenderOnce for Scalar {
                 let (handle, target, lease, contact) = (mount.root.read(cx).handle(), mount.target.borrow().clone(), mount.lease.clone(), mount.contact.clone());
                 let expected = contact.generation.get();
                 cx.defer(move |cx| { let _ = window_handle.update(cx, |_, window, cx| {
+                    // A delayed observer belongs to this acquisition. It may
+                    // neither consume a replacement's outputs nor dispatch
+                    // them through the callback captured for the old target.
+                    if !contact.is_current(expected) { return; }
                     let good = drain(&handle, &target, window, cx);
                     if contact.is_current(expected) && (!good || state::<String>(&handle, "phase").is_ok_and(|phase| phase == "idle")) {
                         lease.cancel(MoveGestureCancelReason::HostCancel, window, cx);
@@ -340,7 +334,6 @@ impl RenderOnce for Scalar {
             if crate::proto_parent::changed(&mount.root.read(cx).handle().owner, &parent) {
                 mount.root.update(cx, |root, cx| root.set_parent(parent, cx)).expect("compiled continuous parent");
             }
-            *mount.target.borrow_mut() = target;
             *mount.geometry.borrow_mut() = self.geometry;
             if mount.props != props {
                 match mount.root.update(cx, |root, cx| root.set_props(props.clone(), window, cx)) {
@@ -353,6 +346,7 @@ impl RenderOnce for Scalar {
                     mount.lease.cancel(MoveGestureCancelReason::HostCancel, window, cx);
                 }
             }
+            *mount.target.borrow_mut() = target;
             mount.drawing.update(cx, |drawing, cx| { drawing.visual = self.visual; cx.notify(); });
             mount.root.clone()
         });

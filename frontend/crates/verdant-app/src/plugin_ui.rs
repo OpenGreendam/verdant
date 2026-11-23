@@ -43,7 +43,6 @@ struct PluginBrowserWindow {
     slot: usize,
     search: gpui::Entity<TextField>,
     scanning: bool,
-    selected: usize,
     message: String,
 }
 
@@ -144,13 +143,42 @@ impl Editor {
                     }
                 }).detach();
                 PluginBrowserWindow { editor, generation, browser: verdant_plugins::insert::PluginBrowser::new(client.catalog()),
-                    client, track, slot, search, scanning: false, selected:0, message: String::new() }
+                    client, track, slot, search, scanning: false, message: String::new() }
             })
         }) { self.notice(format!("无法打开插件浏览器：{error}")); cx.notify(); }
     }
 }
 
 impl PluginBrowserWindow {
+    fn render_entries(&mut self, th: Theme, _: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let entries = self.browser.entries();
+        let count = entries.len();
+        let mut rows = div().w_full().flex().flex_col().gap(px(6.));
+        for (index, desc) in entries.into_iter().enumerate() {
+            let (format, id) = (desc.format.tag().to_owned(), desc.id.clone());
+            rows = rows.child(div().id(SharedString::from(format!("plugin-row-{index}"))).flex_none().flex().items_center().gap(px(10.))
+                .p(px(10.)).rounded(px(5.)).bg(th.control)
+                .child(div().flex_1().min_w_0().flex().flex_col().gap(px(3.))
+                    .child(div().text_sm().child(desc.name.clone()))
+                    .child(div().text_xs().text_color(th.text_secondary).child(format!("{} · {} · {}", desc.vendor, desc.format.tag().to_uppercase(), desc.version))))
+                .child(browser_button(SharedString::from(format!("plugin-insert-{index}")), "插入", false, th)
+                    .on_click(cx.listener(move |view, _, window, cx| {
+                        let track = view.track.clone();
+                        let slot = view.slot;
+                        match view.editor.update(cx, |ed, cx| ed.document_generation == view.generation && ed.add_insert_at(&track, slot, &format, &id, cx)) {
+                            Ok(true) => window.remove_window(),
+                            Ok(false) => { view.message = "暂时无法插入；请检查主窗口提示后重试".into(); cx.notify(); }
+                            Err(_) => { view.message = "工程窗口已关闭".into(); cx.notify(); }
+                        }
+                    }))));
+        }
+        if count == 0 { rows = rows.child(div().text_sm().text_color(th.text_secondary).child("没有匹配的插件")); }
+        for (path, reason) in self.client.blacklisted() {
+            rows = rows.child(div().text_xs().text_color(th.warning).child(format!("无法载入 {}：{reason}", path.display())));
+        }
+        rows.into_any_element()
+    }
+
     fn rescan(&mut self, cx: &mut Context<Self>) {
         if self.scanning { return; }
         self.scanning = true;
@@ -175,93 +203,41 @@ impl PluginBrowserWindow {
 
 fn browser_button(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
     let label = label.into();
-    crate::proto_controls::action(id, label.clone())
+    crate::proto_controls::action(id, label.clone()).aria_selected(selected)
         .px(px(9.)).py(px(6.)).rounded(px(4.)).bg(if selected { th.control_pressed } else { th.control })
         .text_sm().child(label)
 }
 
-impl PluginBrowserWindow {
-    fn catalog_revision(&self) -> String {
-        format!("{}:{}:{:?}:{:?}", self.generation, self.browser.query, self.browser.format,
-            self.browser.entries().iter().map(|entry|(entry.format.tag(),entry.id.as_str())).collect::<Vec<_>>())
-    }
-    fn insert_entry(&mut self,index:usize,window:&mut Window,cx:&mut Context<Self>) {
-        let Some(entry)=self.browser.entries().get(index).copied().cloned() else {return};
-        let (track,slot,generation)=(self.track.clone(),self.slot,self.generation);
-        match self.editor.update(cx,|ed,cx|ed.document_generation==generation && ed.add_insert_at(&track,slot,entry.format.tag(),&entry.id,cx)) {
-            Ok(true)=>window.remove_window(),
-            Ok(false)=>{self.message="暂时无法插入；请检查主窗口提示后重试".into();cx.notify();},
-            Err(_)=>{self.message="工程窗口已关闭".into();cx.notify();},
-        }
-    }
-    fn rows(&self,handle:&verdant_collection_control::CollectionControlHandle,basis:&str,engine:crate::proto_scroll::EngineBinding,window:&Window,cx:&mut Context<Self>)->gpui::AnyElement {
-        let th=Theme::for_appearance(window.appearance()); let keyboard=handle.clone();
-        let mut rows=div().id("plugin-browser-rows").size_full().overflow_y_scroll().track_scroll(&engine.handle(cx)).flex().flex_col().gap(px(6.))
-            .on_scroll_wheel(move|_,window,cx|engine.notify_input(window,cx))
-            .on_key_down(move|event,window,cx|crate::proto_collection::key(&keyboard,event,window,cx));
-        let entries=self.browser.entries(); let count=entries.len();
-        for (index,desc) in entries.into_iter().enumerate() {
-            let choose=handle.clone();let choose_basis=basis.to_string();let select=handle.clone();let select_basis=basis.to_string();
-            rows=rows.child(div().id(SharedString::from(format!("plugin-row-{index}"))).role(gpui::Role::ListBoxOption)
-                .aria_label(desc.name.clone()).aria_selected(self.selected==index).flex_none().flex().items_center().gap(px(10.))
-                .p(px(10.)).rounded(px(5.)).bg(if self.selected==index{th.selection}else{th.control})
-                .on_click(move|_,window,cx| {
-                    if window.default_prevented(){return;}
-                    crate::proto_collection::call(&select,"selectAndFocus",vec![index.into(),false.into(),select_basis.clone().into()],window,cx);
-                    window.prevent_default();cx.stop_propagation();
+impl Render for PluginBrowserWindow {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let th = Theme::for_appearance(window.appearance());
+        self.browser.query = self.search.read(cx).value().to_owned();
+        let mut formats = div().flex().gap(px(6.));
+        let choices = [None, Some(verdant_plugins::PluginFormat::Clap), Some(verdant_plugins::PluginFormat::Vst3),
+            Some(verdant_plugins::PluginFormat::Au), Some(verdant_plugins::PluginFormat::Builtin)];
+        for (index, (label, format)) in ["全部", "CLAP", "VST3", "AUv2", "内置"].into_iter().zip(choices).enumerate() {
+            let entity = cx.entity();
+            formats = formats.child(browser_button(label, label, self.browser.format == format, th)
+                .role(gpui::Role::Tab).navigation(index, choices.len(), move |index, _, cx| {
+                    if let Some(format) = choices.get(index) { entity.update(cx, |view, cx| { view.browser.format = *format; cx.notify(); }); }
                 })
-                .child(div().flex_1().min_w_0().flex().flex_col().gap(px(3.))
-                    .child(div().text_sm().child(desc.name.clone()))
-                    .child(div().text_xs().text_color(th.text_secondary).child(format!("{} · {} · {}",desc.vendor,desc.format.tag().to_uppercase(),desc.version))))
-                .child(browser_button(SharedString::from(format!("plugin-insert-{index}")),"插入",false,th)
-                    .aria_label(format!("插入 {}",desc.name))
-                    .on_click(move|_,window,cx|crate::proto_collection::call(&choose,"choose",vec![index.into(),false.into(),choose_basis.clone().into()],window,cx))));
+                .on_click(cx.listener(move |view, _, _, cx| { view.browser.format = format; cx.notify(); })));
         }
-        if count==0{rows=rows.child(div().text_sm().text_color(th.text_secondary).child("没有匹配的插件"));}
-        for(path,reason)in self.client.blacklisted(){rows=rows.child(div().text_xs().text_color(th.warning).child(format!("无法载入 {}：{reason}",path.display())));}
-        rows.into_any_element()
-    }
-    fn native_content(&mut self,window:&mut Window,cx:&mut Context<Self>)->gpui::AnyElement {
-        let th=Theme::for_appearance(window.appearance());
-        self.browser.query=self.search.read(cx).value().to_owned();
-        let choices=[("全部",None),("CLAP",Some(verdant_plugins::PluginFormat::Clap)),("VST3",Some(verdant_plugins::PluginFormat::Vst3)),
-            ("AUv2",Some(verdant_plugins::PluginFormat::Au)),("内置",Some(verdant_plugins::PluginFormat::Builtin))];
-        let mut formats=div().id("plugin-browser-formats").role(gpui::Role::TabList).flex().gap(px(6.));
-        for(index,(label,format))in choices.into_iter().enumerate(){
-            let view=cx.entity();
-            formats=formats.child(browser_button(label,label,self.browser.format==format,th).role(gpui::Role::Tab).aria_selected(self.browser.format==format)
-                .navigation(index,choices.len(),move|index,_,cx| {if let Some((_,format))=choices.get(index){view.update(cx,|view,cx|{view.browser.format=*format;view.selected=0;cx.notify();});}})
-                .on_click(cx.listener(move|view,_,_,cx|{view.browser.format=format;view.selected=0;cx.notify();})));
-        }
-        let count=self.browser.entries().len(); self.selected=self.selected.min(count.saturating_sub(1));
-        let revision=self.catalog_revision();let basis=revision.clone();let view=cx.entity();
-        let viewport=window.use_keyed_state("plugin-catalog-viewport",cx,|_,_|gpui::ScrollHandle::new());
-        let draw:crate::proto_collection::Draw=std::rc::Rc::new(move|handle,_,engine,window,cx|view.update(cx,|view,cx|view.rows(handle,&basis,engine.expect("catalog viewport"),window,cx)));
-        let view=cx.entity().downgrade();
-        let sink:crate::proto_collection::Sink=std::rc::Rc::new(move|name,payload,window,cx|{let _=view.update(cx,|view,cx|{
-            if payload.get("revision").and_then(serde_json::Value::as_str)!=Some(view.catalog_revision().as_str()){return;}
-            if name=="close"{window.remove_window();return;}
-            let Some(index)=crate::proto_controls::source_index(payload.get("index"))else{return};
-            match name{"select"=>{view.selected=index;cx.notify();},"activate"=>view.insert_entry(index,window,cx),_=>{}}
-        });});
-        let collection=crate::proto_collection::collection("plugin-catalog",serde_json::json!({"mode":"listbox","label":"插件目录","cursor":self.selected,"revision":revision}),vec![1;count],draw,sink)
-            .scroll_engine(crate::proto_scroll::Engine::Native(viewport));
+        let count = self.browser.entries().len();
+        let entity = cx.entity();
+        let rows = div().flex_1().min_h_0().min_w_0().child(crate::proto_scroll::region(
+            "plugin-browser-rows", serde_json::json!({"label":"可用插件", "role":"list"}),
+            std::rc::Rc::new(move |_, _, window, cx| entity.update(cx, |view, cx| view.render_entries(th, window, cx))),
+        ));
         div().id("plugin-browser").size_full().p(px(18.)).bg(th.surface).text_color(th.text)
             .font_family(crate::theme::system_ui_font(&cx.text_system().all_font_names()))
             .flex().flex_col().gap(px(10.)).key_context("LyricEditor")
-            .child(div().flex().items_center().gap(px(10.)).child(div().flex_1().text_lg().child(format!("插入效果 · 槽位 {}",self.slot+1)))
-                .child(browser_button("rescan",if self.scanning{"扫描中…"}else{"重新扫描"},false,th).disabled(self.scanning)
-                    .on_click(cx.listener(|view,_,_,cx|view.rescan(cx)))))
-            .child(self.search.clone()).child(formats)
-            .child(div().text_xs().text_color(th.text_secondary).child(format!("{count} 个插件 · 名称 / 厂商 / 格式")))
-            .child(div().flex_1().min_h_0().child(collection)).child(div().text_xs().text_color(th.warning).child(self.message.clone())).into_any_element()
-    }
-}
-impl Render for PluginBrowserWindow {
-    fn render(&mut self,_:&mut Window,cx:&mut Context<Self>)->impl IntoElement {
-        let view=cx.entity();let draw:crate::proto_overlay::Draw=std::rc::Rc::new(move|_,_,window,cx|view.update(cx,|view,cx|view.native_content(window,cx)));
-        let response:crate::proto_overlay::Response=std::rc::Rc::new(|_,window,_|window.remove_window());
-        crate::proto_overlay::overlay("plugin-browser-dialog",serde_json::json!({"label":"插入效果浏览器","role":"dialog","open":true,"choices":1,"defaultChoice":-1,"cancelChoice":0}),draw,response)
+            .child(div().flex().items_center().gap(px(10.)).child(div().flex_1().text_lg().child(format!("插入效果 · 槽位 {}", self.slot + 1)))
+                .child(browser_button("rescan", if self.scanning { "扫描中…" } else { "重新扫描" }, false, th)
+                    .on_click(cx.listener(|view, _, _, cx| view.rescan(cx)))))
+            .child(self.search.clone())
+            .child(formats).child(div().text_xs().text_color(th.text_secondary).child(format!("{count} 个插件 · 名称 / 厂商 / 格式")))
+            .child(rows).child(div().text_xs().text_color(th.warning).child(self.message.clone()))
     }
 }
 

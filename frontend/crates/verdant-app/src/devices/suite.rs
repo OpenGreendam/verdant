@@ -128,10 +128,6 @@ pub(super) fn command_button(button: crate::proto_controls::Action, command: Sem
     semantic_click(button, command)
 }
 
-pub(super) fn action_authority(ed: &Editor, target: &Target) -> String {
-    format!("{}:{:?}:{}:{}", crate::proto_controls::editor_authority(ed), target.track, target.slot, target.key.0)
-}
-
 pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey, effect: &str, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = Target { track: owner.clone(), slot, key };
@@ -142,13 +138,11 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
         let label = if index == 0 { "A" } else { "B" };
         let selected = comparison.active == index;
         compare = compare.child(command_button(presentation::button(format!("compare-{slot}-{index}"), label, selected, th)
-            .authority(action_authority(ed, &target)).disabled(busy)
             .aria_label(format!("切换到参数组 {label}")).tab_index(0).when(busy, |button| button.opacity(0.5)),
             command(ed, target.clone(), SuiteAction::Compare(index), cx)));
     }
     let copy_label = if comparison.active == 0 { "A → B" } else { "B → A" };
     compare = compare.child(command_button(presentation::button(format!("compare-copy-{slot}"), copy_label, false, th)
-        .authority(action_authority(ed, &target)).disabled(busy)
         .aria_label("复制当前参数到另一比较组").tab_index(0).when(busy, |button| button.opacity(0.5)),
         command(ed, target.clone(), SuiteAction::CopyComparison, cx)));
     let preset_params = params.to_vec();
@@ -156,7 +150,7 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
     let effect = effect.to_string();
     let library_effect = effect.clone();
     let wet_lock = workflow::read_workspace(ed, &target).wet_lock;
-    let preset = dropdown_button(format!("device-presets-{slot}").into(), "预设".into(), th, action_authority(ed, &target), move |_| {
+    let preset = dropdown_button(format!("device-presets-{slot}").into(), "预设".into(), th, move |_| {
         use crate::editor::MenuAction as M;
         use crate::menu::MenuItem as I;
         let mut rows = vec![I::header("起始设置")];
@@ -176,14 +170,13 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
     }, cx);
     div().flex().flex_wrap().items_center().gap(gpui::rems(6.0/16.)).pb(gpui::rems(8.0/16.)).border_b_1().border_color(th.shade)
         .child(preset)
-        .child(command_button(presentation::button(format!("device-library-{slot}"), "预设库", false, th).authority(action_authority(ed, &target)).tab_index(0),
+        .child(command_button(presentation::button(format!("device-library-{slot}"), "预设库", false, th).tab_index(0),
             command(ed, target.clone(), SuiteAction::Library(library_effect), cx)))
         .when(param(params, "mix").is_some(), |row| row.child(command_button(presentation::button(format!("wet-lock-{slot}"), "锁定干湿", wet_lock, th)
-            .authority(action_authority(ed, &target))
             .role(Role::Switch).aria_selected(wet_lock).tab_index(0),
             command(ed, target.clone(), SuiteAction::ToggleWetLock, cx))))
         .child(div().flex_1()).child(presentation::tabs(ed, &target, cx)).child(compare)
-        .child(command_button(presentation::button(format!("device-reset-{slot}"), "重置", false, th).authority(action_authority(ed, &target)).tab_index(0),
+        .child(command_button(presentation::button(format!("device-reset-{slot}"), "重置", false, th).tab_index(0),
             command(ed, target, SuiteAction::Reset, cx)))
         .into_any_element()
 }
@@ -408,7 +401,6 @@ fn band_tabs(ed: &Editor, owner: &DeviceTarget, key: InsertKey, slot: usize, cou
         let label = format!("{prefix} {}", index + 1);
         let navigate: Vec<_> = (0..count).map(|index| command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx)).collect();
         command_button(crate::ui_controls::selectable_button(format!("band-tab-{slot}-{index}"), label, index == selected, th)
-            .authority(action_authority(ed, &Target { track: owner.clone(), key, slot }))
             .role(Role::Tab).tab_index(0).border_color(with_alpha(band_color(index), 0.8)),
             command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx))
             .navigation(index, count, move |index, window, cx| { if let Some(command) = navigate.get(index) { command(None, window, cx); } })
@@ -458,7 +450,7 @@ pub(super) fn eq_dynamic(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTar
     let solo = param(params, "solo").is_some_and(|p| p.value.round() as usize == selected + 1);
     let target = Target { track: owner.clone(), slot, key };
     let mut rows = div().flex().flex_wrap().items_center().gap(gpui::rems(8.0/16.))
-        .child(command_button(crate::ui_controls::selectable_button(format!("eq-solo-{slot}"), "独听频段", solo, th).authority(format!("{}:{selected}", action_authority(ed, &target))),
+        .child(command_button(crate::ui_controls::selectable_button(format!("eq-solo-{slot}"), "独听频段", solo, th),
             command(ed, target, SuiteAction::ToggleSolo(selected), cx)));
     for d in extras { rows = rows.child(control(ed, editor, owner, slot, key, dsp::EQ_ID, params, d, cx)); }
     div().flex().flex_col().gap(gpui::rems(8.0/16.))
@@ -744,7 +736,6 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
     let tabs = div().flex().flex_wrap().gap(gpui::rems(4./16.)).children((0..=dsp::DELAY_TAPS).map(|tap| {
         let navigate: Vec<_> = (0..=dsp::DELAY_TAPS).map(|index| command(ed, target(), SuiteAction::SelectBand(index), cx)).collect();
         command_button(crate::ui_controls::selectable_button(format!("delay-tap-{slot}-{tap}"), if tap == 0 { "主".to_string() } else { tap.to_string() }, selected == tap, th)
-            .authority(action_authority(ed, &target()))
             .role(Role::Tab).tab_index(0).aria_label(if tap == 0 { "主抽头".to_string() } else { format!("抽头 {tap}") }),
             command(ed, target(), SuiteAction::SelectBand(tap), cx))
             .navigation(tap, dsp::DELAY_TAPS + 1, move |index, window, cx| { if let Some(command) = navigate.get(index) { command(None, window, cx); } })

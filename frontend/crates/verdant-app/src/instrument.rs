@@ -172,7 +172,7 @@ pub(crate) fn preset_button(ed: &Editor, track: &TrackId, id: &str, key: InsertK
         .and_then(|spec| spec.get("preset")).and_then(serde_json::Value::as_str).unwrap_or("");
     let label = if preset.is_empty() { "自定义" } else { preset }.to_string();
     let track = track.clone();
-    crate::devices::dropdown_button(SharedString::from("synth-preset"), label, ed.theme, crate::proto_controls::editor_authority(ed), move |_| {
+    crate::devices::dropdown_button(SharedString::from("synth-preset"), label, ed.theme, move |_| {
         use crate::editor::MenuAction as M;
         use crate::menu::MenuItem as I;
         let mut items = vec![I::header("音色")];
@@ -188,7 +188,7 @@ pub fn instrument_card(ed: &mut Editor, editor: &Entity<Editor>, track: &TrackId
     let spec = t.instrument()?.clone();
     let name = spec.get("name").and_then(serde_json::Value::as_str).unwrap_or("乐器").to_string();
     let chooser_track = track.clone();
-    let chooser = crate::devices::dropdown_button(SharedString::from("instrument-choose"), "换乐器".into(), th, crate::proto_controls::editor_authority(ed), move |ed| instrument_menu(ed, &chooser_track), cx);
+    let chooser = crate::devices::dropdown_button(SharedString::from("instrument-choose"), "换乐器".into(), th, move |ed| instrument_menu(ed, &chooser_track), cx);
     let Some(params) = synth_params(t) else {
         let format = spec.get("format").and_then(serde_json::Value::as_str).unwrap_or("").to_uppercase();
         return Some(div().id("instrument-card").role(Role::Group).aria_label(format!("乐器：{name}"))

@@ -20,6 +20,7 @@ pub(crate) fn choose(handle: &OverlayControlHandle, index: usize, revision: &str
     }
 }
 pub(crate) fn key(handle: &OverlayControlHandle, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) {
+    if window.default_prevented() { return; }
     let name = match event.keystroke.key.as_str() { "enter" => "Enter", "escape" => "Escape", _ => return };
     match handle.call("key", vec![name.into()], window, cx) {
         Ok(Value::Bool(true)) => { window.prevent_default(); cx.stop_propagation(); },
@@ -49,6 +50,7 @@ impl RenderOnce for Overlay {
             let changes = cx.observe(&root, move |mount: &mut Mount, _, cx| {
                 let handle = mount.root.read(cx).handle(); let events = handle.take_events(); let failures = handle.take_failures();
                 let revision = mount.props.get("revision").cloned(); let response = mount.response.clone();
+                let epoch = handle.owner.borrow().epoch; let owner = handle.owner;
                 let weak = weak.clone();
                 cx.defer(move |cx| {
                     let Some(mount) = weak.upgrade() else { return };
@@ -56,6 +58,8 @@ impl RenderOnce for Overlay {
                     let _ = host.update(cx, |_, window, cx| {
                         if !failures.is_empty() { eprintln!("compiled overlay failed: {failures:?}"); return; }
                         for (name, payload) in events {
+                            let live = { let owner = owner.borrow(); owner.present && owner.mounted && !owner.disposed && owner.epoch == epoch };
+                            if !live { return; }
                             if name != "response" || payload.get("revision") != revision.as_ref() { continue; }
                             if let Some(index) = crate::proto_controls::source_index(payload.get("index")) { response(index, window, cx); }
                         }
@@ -78,18 +82,20 @@ impl RenderOnce for Overlay {
             mount.drawing.update(cx, |drawing, cx| { drawing.draw = self.draw; cx.notify(); });
             mount.root.clone()
         });
-        let source = root.read(cx).handle();
-        // A native slot may contain an independent compiled child root. The
-        // host bubbles only keys that child left unhandled; policy stays in
-        // OverlayControl and accepted child activation prevents this fallback.
-        gpui::div().absolute().inset_0().on_key_down(move |event, window, cx| key(&source, event, window, cx)).child(root)
+        let keyboard = root.read(cx).handle();
+        gpui::div().absolute().inset_0()
+            // Native descendant keys bubble through this physical boundary.
+            // The source chooses default/cancel, after any focused text or
+            // action source has consumed the sample (including marked text).
+            .on_key_down(move |event, window, cx| key(&keyboard, event, window, cx))
+            .child(root)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{AppContext, TestAppContext, WindowHandle, div, px, size};
+    use gpui::{TestAppContext, WindowHandle, div, px, size};
     use verdant_action_control::{ActionControlHandle, native::gpui_native_owner::{all_owners, resolved}};
     use verdant_overlay_control::native::gpui_native_owner::focus_members;
 

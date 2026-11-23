@@ -1,5 +1,9 @@
 //! Compiled points over the existing native device graph. Only parameter units,
 //! graph geometry and the durable multi-parameter transaction remain native.
+
+#[cfg(test)]
+#[path = "graph_control_tests.rs"]
+mod tests;
 use super::*;
 use std::cell::{Cell,RefCell};
 use gpui::{App,AppContext,AnyElement,Render,RenderOnce,Subscription,WeakEntity};
@@ -29,8 +33,8 @@ impl PointTarget {
         let params=&self.basis.as_ref()?.params;let mut values=Vec::new();
         for (coordinate,axis) in [(x,&self.point.x),(y,&self.point.y)] {
             if let Some((id,axis))=axis {
-                let desc=param(params,id)?;
-                values.push((id.clone(),bounded_graph_value(desc,*axis,coordinate)));
+                let desc=param(params,id)?;let plain=axis.value(coordinate).clamp(desc.min,desc.max);
+                values.push((id.clone(),from_norm(desc,to_norm(desc,plain))));
             }
         }
         values.extend(self.point.also.iter().cloned());
@@ -60,15 +64,30 @@ fn preview(handle:&GraphPointHandle,target:&PointTarget,cx:&mut App){
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Commit {x:f64,y:f64,reset:bool,revision:String}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BasisEvent {revision:String}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExactEvent {axis:String,revision:String}
+fn valid_output(name:&str,payload:&Value)->bool {
+    match name {
+        "valueCommit"=>serde_json::from_value::<Commit>(payload.clone()).is_ok_and(|value|
+            value.x.is_finite()&&value.y.is_finite()&&(0.0..=1.0).contains(&value.x)&&(0.0..=1.0).contains(&value.y)),
+        "interactionCancel"|"selected"|"context"=>serde_json::from_value::<BasisEvent>(payload.clone()).is_ok(),
+        "exact"=>serde_json::from_value::<ExactEvent>(payload.clone()).is_ok_and(|value|matches!(value.axis.as_str(),"x"|"y")),
+        _=>false,
+    }
+}
 fn drain(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window,cx:&mut App)->bool {
     let failures=handle.take_failures();let events=handle.take_events();
     if !failures.is_empty(){clear_preview(target,window,cx);report(target,format!("图形控件交互失败：{failures:?}"),cx);return false;}
     // Validate every prospective write before delivering any event in a batch.
-    if events.iter().any(|(name,payload)|name=="valueCommit"&&serde_json::from_value::<Commit>(payload.clone()).ok()
-        .is_none_or(|commit|!commit.x.is_finite()||!commit.y.is_finite()||!(0.0..=1.0).contains(&commit.x)||!(0.0..=1.0).contains(&commit.y))){
+    if events.iter().any(|(name,payload)|!valid_output(name,payload)){
         clear_preview(target,window,cx);report(target,"图形控件返回无效的原子提议",cx);return false;
     }
     for (name,payload) in events {
+        if payload.get("revision").and_then(Value::as_str)!=Some(target.revision().as_str()){continue;}
         match name.as_str(){
             "interactionCancel"=>clear_preview(target,window,cx),
             "selected"=>{let _=target.editor.update(cx,|ed,cx|{if target.current(ed,cx){if let Control::Band(index)=target.point.control{select_band(ed,target.target.key,index);cx.notify();}}});},
@@ -80,15 +99,20 @@ fn drain(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window,cx:&mut
                 let _=target.editor.update(cx,|ed,cx|{
                     if !target.current(ed,cx){return;}
                     if let Some(mut drag)=ed.device_drag.take(){if let Some(capture)=drag.capture.take(){capture.release(window,cx);}}
+                    // Every accepted source proposal addresses this band,
+                    // including keyboard and assistive edits without a press.
+                    if let Control::Band(index)=target.point.control{select_band(ed,target.target.key,index);}
                     write_if_current(ed,&target.target,values,cx);cx.notify();
                 });
             },
             "context"=>{
                 if payload.get("revision").and_then(Value::as_str)!=Some(target.revision().as_str()){continue;}
                 let Some(menu)=target.menu.clone()else{continue;};
+                let anchor=handle.owner.borrow().bounds.map(|bounds|bounds.bottom_left())
+                    .unwrap_or_else(||window.mouse_position());
                 let _=target.editor.update(cx,|ed,cx|{if target.current(ed,cx){
                     if let Control::Band(index)=target.point.control{select_band(ed,target.target.key,index);}
-                    let items=menu(ed,target.index);ed.show_menu(window.mouse_position(),items,window,cx);
+                    let items=menu(ed,target.index);ed.show_menu(anchor,items,window,cx);
                 }});
             },
             "exact"=>{
@@ -96,7 +120,10 @@ fn drain(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window,cx:&mut
                 let axis=if payload.get("axis").and_then(Value::as_str)==Some("x"){&target.point.x}else{&target.point.y};
                 if let Some((id,_))=axis {
                     if let Some(editor)=target.editor.upgrade(){
-                        if target.current(editor.read(cx),cx){if let Some(desc)=target.basis.as_ref().and_then(|basis|param(&basis.params,id)).cloned(){open_parameter_value(&editor,target.target.track.clone(),target.target.slot,target.target.key,desc,cx);}}
+                        if target.current(editor.read(cx),cx){if let Some(desc)=target.basis.as_ref().and_then(|basis|param(&basis.params,id)).cloned(){
+                            if let Control::Band(index)=target.point.control{editor.update(cx,|ed,cx|{select_band(ed,target.target.key,index);cx.notify();});}
+                            open_parameter_value(&editor,target.target.track.clone(),target.target.slot,target.target.key,desc,cx);
+                        }}
                     }
                 }
             },_=>{},
@@ -113,6 +140,7 @@ fn cancel_source(handle:&GraphPointHandle,target:&PointTarget,window:&mut Window
 #[derive(Clone)]
 pub(super) struct Retirement {handle:GraphPointHandle,contact:Rc<crate::proto_knob::Contact>,window:gpui::AnyWindowHandle}
 impl Retirement {
+    pub(super) fn window(&self)->gpui::AnyWindowHandle { self.window }
     pub(super) fn cancel(&self,cx:&mut App){
         let expected=self.contact.generation.get();self.contact.input.set(None);
         let this=self.clone();cx.defer(move |cx|{
@@ -128,6 +156,14 @@ impl Retirement {
 struct Binding {handle:GraphPointHandle,target:Rc<RefCell<PointTarget>>,double:Rc<Cell<bool>>,
     contact:Rc<crate::proto_knob::Contact>,window:gpui::AnyWindowHandle,app:gpui::AsyncApp}
 impl Binding {
+    fn acquisition_current(&self,target:&PointTarget,input:MoveGestureInput,window:&Window,cx:&App)->bool{
+        target.editor.upgrade().is_some_and(|entity|{
+            let ed=entity.read(cx);
+            target.current(ed,cx)&&ed.device_drag.as_ref().is_some_and(|drag|
+                target.owns(drag)&&(input!=MoveGestureInput::Mouse
+                    ||drag.capture.as_ref().is_some_and(|capture|capture.is_current(window,cx))))
+        })
+    }
     fn inside(&self,sample:&MoveGestureSample,window:&Window)->bool{
         self.handle.owner.borrow().native_hitbox.as_ref().is_some_and(|hitbox|crate::host_pointer::contains_window_point(window,
             (f64::from(hitbox.bounds.origin.x)+sample.position.x,f64::from(hitbox.bounds.origin.y)+sample.position.y)))
@@ -159,19 +195,23 @@ impl MoveGestureBinding for Binding {
         let x=state(&self.handle,"x").and_then(|v|v.as_f64()).unwrap_or(0.);
         let y=state(&self.handle,"y").and_then(|v|v.as_f64()).unwrap_or(0.);
         let initial=target.values(x,y).unwrap_or_default();
-        let capture=crate::host_pointer::OwnedPointerCapture::acquire(hitbox,window,cx);
+        // Touch owns the native gesture arena. Only a mouse acquisition may
+        // claim GPUI's mouse capture; an unrelated mouse release must not end
+        // or replace a touch edit.
+        let capture=(sample.input==MoveGestureInput::Mouse)
+            .then(||crate::host_pointer::OwnedPointerCapture::acquire(hitbox,window,cx));
         let retirement=Retirement{handle:self.handle.clone(),contact:self.contact.clone(),window:self.window};
         let _=target.editor.update(cx,|ed,cx|{
             if !target.current(ed,cx){return;}
             ed.device_drag=Some(DeviceDrag{track:target.target.track.clone(),slot:target.target.slot,key:target.target.key,
-                control:target.point.control.clone(),phase:GesturePhase::Armed,capture:Some(capture),surface:target.surface.clone(),basis,
+                control:target.point.control.clone(),phase:GesturePhase::Armed,capture,surface:target.surface.clone(),basis,
                 scope:target.scope,preview:initial,source:Some(retirement)});cx.notify();
         });
     }
     fn on_move(&self,sample:&MoveGestureSample,window:&mut Window,cx:&mut App){
         if self.contact.input.get()!=Some(sample.input){return;}
         let target=self.target.borrow().clone();
-        if !self.inside(sample,window)||!target.editor.upgrade().is_some_and(|e|target.current(e.read(cx),cx)){
+        if !self.inside(sample,window)||!self.acquisition_current(&target,sample.input,window,cx){
             self.contact.input.set(None);cancel_source(&self.handle,&target,window,cx);return;
         }
         self.call("sample",self.arguments(sample),window,cx);preview(&self.handle,&target,cx);
@@ -179,7 +219,7 @@ impl MoveGestureBinding for Binding {
     fn on_end(&self,sample:&MoveGestureSample,window:&mut Window,cx:&mut App){
         if self.contact.input.replace(None)!=Some(sample.input){return;}
         let target=self.target.borrow().clone();
-        if !self.inside(sample,window)||!target.editor.upgrade().is_some_and(|e|target.current(e.read(cx),cx)){cancel_source(&self.handle,&target,window,cx);return;}
+        if !self.inside(sample,window)||!self.acquisition_current(&target,sample.input,window,cx){cancel_source(&self.handle,&target,window,cx);return;}
         self.call("finish",self.arguments(sample),window,cx);clear_preview(&target,window,cx);
     }
     fn on_cancel(&self,_:MoveGestureCancelReason,context:Option<MoveGestureCancelContext<'_>>){
@@ -195,7 +235,7 @@ impl Render for Drawing {
     fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement{
         let focused=state(&self.handle,"focusVisible").and_then(|v|v.as_bool()).unwrap_or(false);
         let double=self.double.clone();let handle=self.handle.clone();let target=self.target.clone();let th=self.theme;
-        let drawing=canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move|bounds,hitbox,window,_|{
+        canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move|bounds,hitbox,window,_|{
             if focused{window.paint_quad(quad(bounds,px(13.),gpui::transparent_black(),px(2.),th.accent,gpui::BorderStyle::Solid));}
             window.on_mouse_event(move|event:&MouseDownEvent,phase,window,cx|{
                 if !hitbox.is_hovered(window){return;}
@@ -204,8 +244,7 @@ impl Render for Drawing {
                     let _=handle.call("openContext",vec![],window,cx);drain(&handle,&target.borrow(),window,cx);cx.stop_propagation();
                 }
             });
-        }).size_full();
-        crate::proto_parent::slot(&self.handle.owner,drawing.into_any_element())
+        }).size_full()
     }
 }
 struct Mount {root:Entity<GraphPoint>,drawing:Entity<Drawing>,target:Rc<RefCell<PointTarget>>,contact:Rc<crate::proto_knob::Contact>,lease:Rc<MoveGestureLease>,props:Value,_changes:Subscription}
@@ -254,7 +293,13 @@ impl RenderOnce for Point {
                 mount.root.update(cx,|root,cx|root.set_parent(parent,cx)).expect("compiled graph parent");
             }
             if mount.props!=props{
-                let _=mount.root.update(cx,|root,cx|root.set_props(props.clone(),window,cx));
+                if let Err(error)=mount.root.update(cx,|root,cx|root.set_props(props.clone(),window,cx)){
+                    let target=mount.target.borrow().clone();
+                    report(&target,format!("图形控件属性更新失败：{error:?}"),cx);
+                    mount.lease.cancel(MoveGestureCancelReason::HostCancel,window,cx);
+                    clear_preview(&target,window,cx);
+                    return mount.root.clone();
+                }
                 let handle=mount.root.read(cx).handle();drain(&handle,&mount.target.borrow(),window,cx);
                 if idle(&handle){mount.lease.cancel(MoveGestureCancelReason::HostCancel,window,cx);}
                 mount.props=props;
@@ -284,6 +329,10 @@ impl RenderOnce for Frame{
             let _=weak.update(cx,|ed,cx|{if ed.device_drag.as_ref().is_some_and(|drag|drag.surface.same(&surface)){ed.cancel_device_drag(cx);}});
         });
         let plot=Rc::new(Cell::new(Plot{o:gpui::point(px(0.),px(0.)),w:1.,h:1.}));
+        // Input is bound to this frame's accepted authority, independently of
+        // animated drawing descriptors. Old frame callbacks cannot adopt a
+        // newer parameter refresh just because its project revision is equal.
+        let input_basis=self.target.basis(self.editor.read(cx));
         let points:Vec<_>=self.handles.iter().enumerate().map(|(index,handle)|{
             let target=PointTarget{editor:self.editor.downgrade(),target:self.target.clone(),scope:DeviceScope::for_window(window),point:handle.clone(),basis:None,
                 plot:plot.clone(),surface:surface.clone(),menu:self.menu.clone(),index};
@@ -291,18 +340,14 @@ impl RenderOnce for Frame{
                 .ml(px((GRAPH_PAD*(1.-2.*handle.at.0)-13.)as f32)).mt(px((GRAPH_PAD*(2.*handle.at.1-1.)-13.)as f32))
                 .size(px(26.)).child(Point{target,theme:self.theme})
         }).collect();
-        div().relative().size_full().child(paint_surface(self.editor,self.target,self.params,self.theme,self.painter,self.handles,self.double,self.input,plot,surface)).children(points)
+        div().relative().size_full().child(paint_surface(self.editor,self.target,self.params,self.theme,self.painter,self.handles,self.double,self.input,plot,input_basis,surface)).children(points)
     }
 }
 #[allow(clippy::too_many_arguments)]
 fn paint_surface(editor:Entity<Editor>,target:Target,params:Vec<ParamDesc>,th:Theme,painter:Painter,handles:Vec<Handle>,double:Option<DoubleClick>,
-    input:crate::proto_editor_surface::Input,plot_cell:Rc<Cell<Plot>>,surface:crate::host_pointer::SurfaceToken)->impl IntoElement{
+    input:crate::proto_editor_surface::Input,plot_cell:Rc<Cell<Plot>>,basis:Option<DeviceBasis>,surface:crate::host_pointer::SurfaceToken)->impl IntoElement{
     let key=target.key;
-    let frame_editor=editor.clone();let frame_target=target.clone();
-    canvas(move|bounds,window,cx|{
-        let basis=frame_target.basis(frame_editor.read(cx));
-        (window.insert_hitbox(bounds,HitboxBehavior::Normal),basis)
-    },move|bounds,(hitbox,basis),window,cx|{
+    canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move|bounds,hitbox,window,cx|{
             let plot = Plot { o: bounds.origin, w: f64::from(bounds.size.width), h: f64::from(bounds.size.height) };
             plot_cell.set(plot);
             let mut texts = Texts::new();
@@ -353,21 +398,13 @@ fn paint_surface(editor:Entity<Editor>,target:Target,params:Vec<ParamDesc>,th:Th
             window.on_mouse_event(move|event:&MouseDownEvent,phase,window,cx|{
                 if !phase.bubble()||event.button!=MouseButton::Left||!hitbox.is_hovered(window)||near(event.position).is_some(){return;}
                 let Some(double)=double.as_ref()else{return;};
-                let Some(basis)=basis.as_ref()else{return;};
-                // The blank graph and its captured domain action share the
-                // frame's accepted parameters, including refreshes that do
-                // not advance the project revision. Never adopt a new basis
-                // while retaining this frame's double-click closure.
-                let available={let ed=editor.read(cx);surface.is_live()&&DeviceScope::for_window(window).allows(&target.track,ed)
-                    &&may_begin_device_input(ed)&&target.basis(ed).as_ref()==Some(basis)};
+                let available={let ed=editor.read(cx);surface.is_live()&&basis.is_some()
+                    &&DeviceScope::for_window(window).allows(&target.track,ed)&&may_begin_device_input(ed)&&target.basis(ed)==basis};
                 if !available||!input.double_activate(event.click_count,window,cx){return;}
                 let (x,y)=(f64::from(event.position.x-plot.o.x),f64::from(event.position.y-plot.o.y));
                 let normalized=(((x-GRAPH_PAD)/plot.inner_w()).clamp(0.,1.),((plot.h-GRAPH_PAD-y)/plot.inner_h()).clamp(0.,1.));
                 editor.update(cx,|ed,cx|{
-                    // Source focus/observers may synchronously replace the
-                    // target or retire the surface before domain evaluation.
-                    if !surface.is_live()||!DeviceScope::for_window(window).allows(&target.track,ed)
-                        ||!may_begin_device_input(ed)||target.basis(ed).as_ref()!=Some(basis){return;}
+                    if !surface.is_live()||target.basis(ed)!=basis{return;}
                     if let Some((writes,selected))=double(normalized){if let Some(index)=selected{select_band(ed,target.key,index);}write_if_current(ed,&target,writes,cx);}
                     else{ed.notice("所有频段都已在使用；右键频段可关闭它");cx.notify();}
                 });cx.stop_propagation();

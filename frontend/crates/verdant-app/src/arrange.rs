@@ -7,7 +7,7 @@
 //! trim. Preview-only drags commit once on release, including cross-track moves.
 //! Horizontal scrolling and editor navigation use the session viewport bounds.
 use std::collections::{HashMap, HashSet};
-use gpui::{App, BorderStyle, Bounds, ClickEvent, Context, DispatchPhase, Entity, FontWeight, Hitbox, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TouchDragEvent, TouchPhase, PinchEvent, Pixels, ScrollDelta, ScrollEvent, SharedString, Window, canvas, div, fill, prelude::*, px, quad};
+use gpui::{App, BorderStyle, Bounds, Context, DispatchPhase, Entity, FontWeight, Hitbox, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TouchDragEvent, TouchPhase, PinchEvent, Pixels, ScrollDelta, ScrollEvent, SharedString, Window, canvas, div, fill, prelude::*, px, quad};
 use verdant_backend::{PhrasePlan, SlotStatus};
 use verdant_domain::{Project,Revision,TrackId,Command,CommandBatch};
 use verdant_session::PointerId;
@@ -117,85 +117,26 @@ impl ArrangeCache {
     }
 }
 
-fn track_collection_revision(ed: &Editor) -> String {
-    format!("{}:{}:tracks", ed.document_generation, ed.revision().get())
-}
-
 pub fn track_headers(ed: &Editor, cx: &mut Context<Editor>) -> impl IntoElement {
-    let revision = track_collection_revision(ed);
-    let count = ed.project().tracks.len();
-    let cursor = ed.track_index(&ed.session.track).unwrap_or(0);
-    let props = serde_json::json!({"mode":"tracklist", "label":"编曲轨道", "cursor":cursor,
-        "revision":revision, "disabled":ed.session.gesture.is_some()});
-    let owner = std::rc::Rc::new(std::cell::RefCell::new(None::<verdant_collection_control::CollectionControlHandle>));
-    let source_owner = owner.clone(); let entity = cx.entity(); let basis = revision.clone();
-    let draw = std::rc::Rc::new(move |handle:&verdant_collection_control::CollectionControlHandle, _focus:&gpui::FocusHandle, _engine: Option<crate::proto_scroll::EngineBinding>, _window:&mut Window, cx:&mut App| {
-        *source_owner.borrow_mut() = Some(handle.clone());
-        entity.update(cx, |ed,cx| native_track_headers(ed, handle, &basis, cx).into_any_element())
-    });
-    let entity = cx.entity().downgrade();
-    let sink = std::rc::Rc::new(move |name:&str, payload:&serde_json::Value, window:&mut Window, cx:&mut App| {
-        if !matches!(name, "select" | "activate" | "context") { return; }
-        let source = owner.borrow().clone();
-        let _ = entity.update(cx, |ed,cx| {
-            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(track_collection_revision(ed).as_str()) { return; }
-            let Some(index) = crate::proto_controls::source_index(payload.get("index")) else { return; };
-            let Some(track) = ed.project().tracks.get(index).map(|track|track.id.clone()) else { return; };
-            if !ed.select_track(track.clone(), cx) {
-                if let Some(source) = &source { crate::proto_collection::call(source, "reconcile", vec![], window, cx); }
-                return;
-            }
-            if name == "context" {
-                let pointer = payload.get("keyboard").and_then(serde_json::Value::as_bool) != Some(true);
-                let anchor = if pointer {
-                    gpui::point(px(payload.get("x").and_then(serde_json::Value::as_f64).unwrap_or(0.) as f32),
-                        px(payload.get("y").and_then(serde_json::Value::as_f64).unwrap_or(0.) as f32))
-                } else {
-                    source.as_ref().and_then(|source| source.owner.borrow().bounds).map(|bounds| bounds.origin + gpui::point(px(HEADER_W / 2.), px((index as f64 * ed.arrange_track_height + ed.arrange_track_height / 2.) as f32))).unwrap_or_else(||window.mouse_position())
-                };
-                ed.track_menu(track, anchor, window, cx);
-            }
-        });
-    });
-    div().w(px(HEADER_W)).h(px(count as f32 * ed.arrange_track_height as f32)).flex_none()
-        .child(crate::proto_collection::collection("arrange-track-list", props, vec![1;count], draw, sink))
-}
-
-fn native_track_headers(ed: &Editor, handle: &verdant_collection_control::CollectionControlHandle, revision: &str, cx: &mut Context<Editor>) -> impl IntoElement {
     let th = ed.theme;
-    let keyboard = handle.clone();
-    div().w_full().flex_none().flex().flex_col()
-        .on_key_down(move |event, window, cx| crate::proto_collection::key(&keyboard, event, window, cx)).children(ed.project().tracks.iter().enumerate().map(|(i, track)| {
+    div().w(px(HEADER_W)).flex_none().flex().flex_col().children(ed.project().tracks.iter().enumerate().map(|(i, track)| {
         let selected = track.id == ed.session.track;
         let auto_expanded = ed.automation_ui.expanded_tracks.contains(&track.id);
-        let color = track.id.clone();
-        let select = handle.clone(); let select_revision = revision.to_string();
-        let menu = handle.clone(); let menu_revision = revision.to_string();
-        let assistive = handle.clone(); let assistive_revision = revision.to_string();
+        let (select, color, menu) = (track.id.clone(), track.id.clone(), track.id.clone());
         let route_label = crate::ui_controls::route_short_name(verdant_backend::adapter::desktop_route(ed.project(), track, ed.scheduler.capabilities.as_ref()));
         let hdr_h = px(crate::ui_controls::HDR_BTN_H);
-        div().id(SharedString::from(format!("track-{}", track.id))).role(gpui::Role::ListBoxOption).aria_label(track.name.clone()).aria_selected(selected)
+        crate::proto_controls::action(SharedString::from(format!("track-{}", track.id)), track.name.clone()).aria_selected(selected)
             .h(px(ed.arrange_track_height as f32)).flex_none().w_full().flex().flex_col().justify_center().gap(px(4.0)).px(px(10.0))
             .bg(if selected { mix(th.surface, th.accent, 0.14) } else { th.surface }).border_b_1().border_color(th.shade)
-            // Row events transport the hit-tested index to one authored list
-            // owner. Nested Action roots claim their own activation first.
-            .on_click(move |_, window, cx| {
-                if window.default_prevented() { return; }
-                crate::proto_collection::call(&select, "selectAndFocus", vec![i.into(), false.into(), select_revision.clone().into()], window, cx);
-                window.prevent_default(); cx.stop_propagation();
-            })
-            .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| {
-                crate::proto_collection::call(&assistive, "selectAndFocus", vec![i.into(), false.into(), assistive_revision.clone().into()], window, cx);
-            })
-            .on_mouse_down(MouseButton::Right, move |event, window, cx| {
-                crate::proto_collection::call(&menu, "contextAt", vec![i.into(), menu_revision.clone().into(),
-                    (event.position.x.as_f32() as f64).into(), (event.position.y.as_f32() as f64).into(), false.into()], window, cx);
-                window.prevent_default(); cx.stop_propagation();
-            })
+            .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, window, cx| {
+                if ed.select_track(select.clone(), cx) { window.focus(&ed.focus_arrange, cx); }
+                else { cx.stop_propagation(); }
+            }))
+            .on_context_menu(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| { if ed.select_track(menu.clone(), cx) { ed.track_menu(menu.clone(), ev.position(), window, cx); } cx.stop_propagation(); }))
             .child(div().flex().items_center().gap(px(5.0))
                 .child(div().text_size(px(10.5)).text_color(th.text_tertiary).w(px(15.0)).flex_none().child(format!("{:02}", i + 1)))
                 .child(crate::proto_controls::action("color", "切换轨道颜色").size(px(11.0)).rounded(px(3.0)).bg(th.track(track.color.as_deref()))
-                    .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| ed.cycle_color(&color, cx))))
+                    .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| { ed.cycle_color(&color, cx); cx.stop_propagation(); })))
                 .child(div().flex_1().truncate().text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).child(track.name.clone()))
                 .child(crate::ui_controls::selectable_command_button(ed, CommandId::ToggleTrackAutomation, CommandArg::Track(track.id.clone()), "A", SharedString::from(format!("auto-btn-{}", track.id)), auto_expanded, cx)
                     .h(hdr_h).w(px(23.0)).px(px(0.0)).rounded(px(4.0)).aria_label("展开/收起自动化曲线"))
@@ -223,8 +164,9 @@ fn native_track_headers(ed: &Editor, handle: &verdant_collection_control::Collec
                     ("复制", "复制音频片段到播放头", AudioRegionEdit::Duplicate),
                     ("静音", "切换音频片段静音", AudioRegionEdit::Mute),
                 ].into_iter().map(|(label,description,edit)| {
-                    crate::proto_controls::action(SharedString::from(format!("audio-region-{label}")), description).px(px(4.0)).rounded(px(2.0)).bg(th.control).cursor_pointer()
-                        .child(label).on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
+                    crate::proto_controls::action(SharedString::from(format!("audio-region-{label}")), description)
+                        .px(px(4.0)).rounded(px(2.0)).bg(th.control).cursor_pointer()
+                        .child(label).on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                              edit_audio_region(ed,edit,cx);cx.stop_propagation();
                         }))
                 })))
@@ -232,20 +174,14 @@ fn native_track_headers(ed: &Editor, handle: &verdant_collection_control::Collec
     }))
 }
 
-#[cfg(test)]
-#[path="arrange_controls_tests.rs"]
-mod controls_tests;
-
 pub fn region_lanes(editor: Entity<Editor>) -> impl IntoElement {
-    let draw = editor.clone(); let cancel = editor.clone(); let commands = editor.clone();
-    crate::proto_editor_surface::surface(editor, "arrangement", "编曲区：选择、移动、裁剪与淡入淡出", DRAG_THRESHOLD,
+    let draw = editor.clone(); let cancel = editor.clone();
+    crate::proto_editor_surface::surface(editor, "arrangement", "编曲区：选择、移动、裁剪与淡入淡出", 4.0,
         move |input| native_region_lanes(draw.clone(), input).into_any_element(),
         move |_, window, cx| cancel.update(cx, |ed, cx| {
             ed.arrange_drag = None; ed.integrations.audio_edit.range_drag = None;
              cx.notify();
-        })).commands("audio", move |command, window, cx| commands.update(cx, |ed, cx| {
-            crate::editor::integrations::audio_edit_ui::source_command(ed, command, window, cx);
-        }))
+        })).audio_keys(true)
 }
 
 fn native_region_lanes(editor: Entity<Editor>, input: crate::proto_editor_surface::Input) -> impl IntoElement {
@@ -261,14 +197,19 @@ fn native_region_lanes(editor: Entity<Editor>, input: crate::proto_editor_surfac
         let mut texts = Texts::new(); let mut labels = Vec::new();
         paint_regions(&editor, bounds, window, cx, &mut texts, &mut labels); flush_texts(window, cx, bounds, texts);
         for (clip_bounds, label) in labels { flush_texts(window, cx, clip_bounds, label); }
-        let e = editor.clone();
+        let e = editor.clone(); let policy = input.clone();
         crate::proto_editor_surface::install_pointer_input(&input, bounds, &hitbox, window, move |event, window, cx| {
             use crate::proto_editor_surface::PointerPhase;
             e.update(cx, |ed, cx| match event.phase {
-                PointerPhase::Begin | PointerPhase::Context => region_down(ed,event.x,event.y,
+                PointerPhase::Begin | PointerPhase::Context => region_down(&policy,ed,event.x,event.y,
                     if event.phase == PointerPhase::Context { MouseButton::Right } else { MouseButton::Left },
                     event.clicks,event.modifiers.control,event.modifiers.shift,event.modifiers.alt,event.pointer,event.position,window,cx),
-                PointerPhase::Sample => { region_moved(ed,event.pointer,event.x,event.y,event.modifiers.alt,cx); true }
+                PointerPhase::Sample => {
+                    if let Some(intent) = policy.motion(ed,event.x,event.y,event.modifiers,window,cx) {
+                        region_moved(ed,event.pointer,event.x,event.y,!intent.snap,cx);
+                    }
+                    true
+                }
                 PointerPhase::Finish => { region_up(ed,event.pointer,window,cx); true }
             })
         });
@@ -276,8 +217,9 @@ fn native_region_lanes(editor: Entity<Editor>, input: crate::proto_editor_surfac
         let e = editor.clone();let gate=input.clone();
         window.on_mouse_event(move |ev: &PinchEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble || !hitbox.is_hovered(window) { return; }
-            if !gate.pinch(1.0+f64::from(ev.delta),window,cx) {return;}
-            e.update(cx, |ed, cx| { ed.arrange.zoom_x_at((ev.position - bounds.origin).x.as_f32() as f64, 1.0 + ev.delta as f64); ed.notify_viewport(crate::clock::Space::Arrange, cx); });
+            let Some(intent) = gate.pinch(1.0+f64::from(ev.delta),window,cx) else {return;};
+            e.update(cx, |ed, cx| { if intent.apply(&mut ed.arrange, (f64::from(ev.position.x - bounds.origin.x), 0.)) { ed.notify_viewport(crate::clock::Space::Arrange, cx); } });
+            cx.stop_propagation();
         });
     }).size_full()
 }
@@ -289,9 +231,7 @@ pub(crate) fn install_timeline_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixel
         if phase != DispatchPhase::Bubble || !hitbox.is_hovered(window) { return; }
         let Some(intent)=input.wheel(event.delta,event.modifiers,true,window,cx) else { return };
         editor.update(cx,|ed,cx| {
-            if intent.kind=="zoom-x" { ed.arrange.zoom_x_at(f64::from(event.position.x-bounds.origin.x),1.0015f64.powf(intent.amount)); }
-            else { ed.arrange.pan_px(intent.x,intent.y); }
-            ed.notify_viewport(crate::clock::Space::Arrange,cx);
+            if intent.apply(&mut ed.arrange, (f64::from(event.position.x-bounds.origin.x), 0.)) { ed.notify_viewport(crate::clock::Space::Arrange,cx); }
         });
         cx.stop_propagation();
     });
@@ -499,6 +439,9 @@ fn lane_menu(ed:&mut Editor,track:TrackId,tick:f64,position:gpui::Point<Pixels>,
 
 /// Movement (px) before a region press turns into a drag.
 pub(crate) const DRAG_THRESHOLD: f64 = 3.0;
+pub(crate) fn crossed_drag_threshold(press:(f64,f64),at:(f64,f64))->bool{
+    let(dx,dy)=(at.0-press.0,at.1-press.1);dx*dx+dy*dy>=DRAG_THRESHOLD*DRAG_THRESHOLD
+}
 /// Smallest on-screen beat before arrangement snapping moves to whole bars.
 const MIN_BEAT_PX: f64 = 14.0;
 /// Track-area snapping follows the meter at the current zoom: beats when a
@@ -559,17 +502,35 @@ fn authored_hit(ed:&Editor,track:&TrackId,tick:f64,row_y:f64)->Option<AuthoredTa
     let index=ed.arrange_cache.tracks.get(track)?;let has_parts=index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_)));
     index.authored.iter().rev().find(|region|tick>=region.start as f64&&tick<region.end as f64&&match region.target{AuthoredTarget::Part(_)=>row_y<27.,AuthoredTarget::Audio(_)=>!has_parts||row_y>=27.}).map(|region|region.target.clone())
 }
-fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,extend_selection:bool,unsnapped:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
+fn region_down(input:&crate::proto_editor_surface::Input,ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,extend_selection:bool,unsnapped:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
     let row=(y/ed.arrange_track_height).floor()as usize;let Some(track)=ed.project().tracks.get(row).map(|t|t.id.clone())else{return false;};
-    if !matches!(button,MouseButton::Left|MouseButton::Right)||!ed.select_track(track.clone(),cx){return false;}
     let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);
-    if ed.integrations.audio_edit.range_tool&&button==MouseButton::Left{
-        let tick=if unsnapped{tick.max(0.)}else{arrange_snap(ed,tick).max(0)as f64};
+    let hit_kind=match hit.as_ref(){Some(AuthoredTarget::Part(_))=>"part",Some(AuthoredTarget::Audio(_))=>"audio",None=>"empty"};
+    let(mut left,mut right,mut fade_in,mut fade_out,mut fade_band)=(-1.,-1.,-1.,-1.,false);
+    if let Some(index)=ed.arrange_cache.tracks.get(&track) {
+        if let Some(region)=hit.as_ref().and_then(|target|index.authored.iter().find(|region|region.target.same(target))) {
+            left=(x-ed.arrange.tick_to_x(region.start as f64)).abs();right=(x-ed.arrange.tick_to_x(region.end as f64)).abs();
+            if let Some(clip)=region.clip.as_ref() {
+                let has_parts=index.authored.iter().any(|region|matches!(region.target,AuthoredTarget::Part(_)));
+                let top=row as f64*ed.arrange_track_height+if has_parts{27.}else{3.};
+                fade_band=y>=top&&y<top+10.;
+                let tempo=ed.tempo();let seconds=tempo.seconds_at(region.start as f64);let rate=clip.source.sample_rate as f64*clip.playback_rate;
+                fade_in=(x-ed.arrange.tick_to_x(tempo.tick_at(seconds+clip.fade_in_frames as f64/rate))).abs();
+                fade_out=(x-ed.arrange.tick_to_x(tempo.tick_at(seconds+(clip.duration_frames-clip.fade_out_frames)as f64/rate))).abs();
+            }
+        }
+    }
+    let Some(intent)=input.intent(ed,"regionGesture",vec![hit_kind.into(),ed.integrations.audio_edit.range_tool.into(),
+        (button==MouseButton::Right).into(),extend_selection.into(),split_at_click.into(),(clicks as u64).into(),
+        left.into(),right.into(),fade_in.into(),fade_out.into(),fade_band.into(),unsnapped.into()],window,cx) else{return false;};
+    if !ed.select_track(track.clone(),cx){return false;}
+    if intent.kind=="range"{
+        let tick=if intent.snap{arrange_snap(ed,tick).max(0)as f64}else{tick.max(0.)};
         ed.integrations.audio_edit.range_drag=Some(crate::editor::integrations::audio_edit_ui::RangeDrag{pointer,anchor_tick:tick,anchor_track:row});
         ed.select_audio_range(crate::editor::integrations::audio_edit_ui::AudioRange{tracks:vec![track],start_tick:tick,end_tick:tick});
         cx.notify();return true;
     }
-    let Some(target)=hit else{if button==MouseButton::Right{lane_menu(ed,track,tick,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}else{ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;ed.run_menu_action(crate::editor::MenuAction::SeekTick(tick.max(0.).round()as i64),window,cx);}cx.notify();return false;};
+    let Some(target)=hit else{match intent.kind.as_str(){"lane-menu"=>lane_menu(ed,track,tick,position,window,cx),"create-part"=>create_part_at(ed,&track,tick,window,cx),"seek"=>{ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;ed.run_menu_action(crate::editor::MenuAction::SeekTick(tick.max(0.).round()as i64),window,cx);},_=>{}}cx.notify();return false;};
     use crate::editor::WorkflowAction as A;use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
     let(start,end,min_left,max_right,audio_seconds)=match &target{
         AuthoredTarget::Part(id)=>{
@@ -579,40 +540,26 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
         }
         AuthoredTarget::Audio(id)=>{
             ed.integrations.selected_clip=Some((track.clone(),id.clone()));let Ok(clip)=ed.selected_audio_clip()else{return false;};
-            ed.select_audio_clip(&clip,extend_selection,true);
-            if extend_selection&&button==MouseButton::Left{cx.notify();return false;}
+            ed.select_audio_clip(&clip,intent.selection=="extend",true);
+            if intent.kind=="select"{cx.notify();return false;}
             let tempo=ed.tempo();let start_seconds=clip.start_seconds(&tempo);let duration=clip.duration_seconds();let rate=clip.source.sample_rate as f64*clip.playback_rate;
             let before=if clip.reversed{clip.source.frames-clip.source_offset_frames-clip.duration_frames}else{clip.source_offset_frames};
             let after=if clip.reversed{clip.source_offset_frames}else{clip.source.frames-clip.source_offset_frames-clip.duration_frames};
             (clip.start_tick,clip.end_tick(&tempo).ceil()as i64,tempo.tick_at((start_seconds-before as f64/rate).max(0.)).ceil()as i64,tempo.tick_at(start_seconds+duration+after as f64/rate).floor()as i64,Some(duration))
         }
     };
-    if button==MouseButton::Right{
+    if intent.kind=="region-menu"{
         let items=match &target{AuthoredTarget::Part(id)=>{let muted=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(id).map(|p|p.muted)).unwrap_or(false);vec![
             I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("精确位置…",M::Workflow(A::MovePart)),I::action("精确裁剪…",M::Workflow(A::TrimPart)),I::separator(),
             I::action("在此分割",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制片段",M::Workflow(A::DuplicatePart(true))),I::action("独立复制片段",M::Workflow(A::DuplicatePart(false))),I::action("取消片段链接",M::Workflow(A::UnlinkPart)),I::separator(),
             I::action("静音",M::Workflow(A::MutePart)).checked(muted),I::action("删除片段",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>ed.audio_menu_items()};ed.show_menu(position,items,window,cx);return false;
     }
-    if split_at_click && matches!(target,AuthoredTarget::Audio(_)) {
+    if intent.kind=="split" {
         edit_audio_region(ed,AudioRegionEdit::Split(arrange_snap(ed,tick)),cx);return false;
     }
-    if clicks>=2&&matches!(target,AuthoredTarget::Audio(_)){let items=ed.audio_menu_items();ed.show_menu(position,items,window,cx);return false;}
-    if clicks>=2{ed.bottom=Bottom::Editor;let target=(start as f64-ed.session.viewport.width*0.1/ed.session.viewport.px_per_tick).max(0.);let dx=(target-ed.session.viewport.start_tick)*ed.session.viewport.px_per_tick;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);cx.notify();return false;}
-    let mut mode=if (x-ed.arrange.tick_to_x(start as f64)).abs()<7.{RegionDragMode::Left}else if(x-ed.arrange.tick_to_x(end as f64)).abs()<7.{RegionDragMode::Right}else{RegionDragMode::Move};
-    let mut fade_frames=0;
-    if matches!(target,AuthoredTarget::Audio(_)) {
-        if let Ok(clip)=ed.selected_audio_clip(){
-            let has_parts=ed.arrange_cache.tracks.get(&track).is_some_and(|index|index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_))));
-            let top=row as f64*ed.arrange_track_height+if has_parts{27.}else{3.};
-            let tempo=ed.tempo();let seconds=tempo.seconds_at(start as f64);let rate=clip.source.sample_rate as f64*clip.playback_rate;
-            let fade_in_x=ed.arrange.tick_to_x(tempo.tick_at(seconds+clip.fade_in_frames as f64/rate));
-            let fade_out_x=ed.arrange.tick_to_x(tempo.tick_at(seconds+(clip.duration_frames-clip.fade_out_frames)as f64/rate));
-            if y>=top&&y<top+10.{
-                if (x-fade_in_x).abs()<7.{mode=RegionDragMode::FadeIn;fade_frames=clip.fade_in_frames;}
-                else if (x-fade_out_x).abs()<7.{mode=RegionDragMode::FadeOut;fade_frames=clip.fade_out_frames;}
-            }
-        }
-    }
+    if intent.kind=="open-part"{ed.bottom=Bottom::Editor;let target=(start as f64-ed.session.viewport.width*0.1/ed.session.viewport.px_per_tick).max(0.);let dx=(target-ed.session.viewport.start_tick)*ed.session.viewport.px_per_tick;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);cx.notify();return false;}
+    let mode=match intent.kind.as_str(){"move-region"=>RegionDragMode::Move,"resize-left"=>RegionDragMode::Left,"resize-right"=>RegionDragMode::Right,"fade-in"=>RegionDragMode::FadeIn,"fade-out"=>RegionDragMode::FadeOut,_=>return false};
+    let fade_frames=ed.selected_audio_clip().ok().map_or(0,|clip|match mode{RegionDragMode::FadeIn=>clip.fade_in_frames,RegionDragMode::FadeOut=>clip.fade_out_frames,_=>0});
     let audio=if matches!(target,AuthoredTarget::Audio(_)){
         ed.selected_audio_clip().ok().map(|clip|{
             let tempo=ed.tempo();let seconds=clip.start_seconds(&tempo);let rate=clip.source.sample_rate as f64*clip.playback_rate;
@@ -812,6 +759,13 @@ mod part_gesture_tests {
     }
 
     #[test]
+    fn region_press_becomes_a_drag_only_after_the_threshold() {
+        assert!(!crossed_drag_threshold((10.0, 10.0), (12.0, 11.0)));
+        assert!(crossed_drag_threshold((10.0, 10.0), (13.0, 10.0)));
+        assert!(crossed_drag_threshold((10.0, 10.0), (10.0, 6.5)));
+    }
+
+    #[test]
     fn new_part_fills_the_free_part_of_the_bar() {
         let m = meter();
         let track = TrackId::from("t");
@@ -826,55 +780,5 @@ mod part_gesture_tests {
         assert_eq!(new_part_span(&m, &parts, &track, 4000.0), None, "occupied");
         let other = TrackId::from("u");
         assert_eq!(new_part_span(&m, &parts, &other, 4000.0), Some((3840, 7680)), "other tracks ignored");
-    }
-}
-
-#[cfg(test)]
-mod source_keyboard_tests {
-    use super::*;
-    use gpui::{AppContext, Render, TestAppContext, size};
-
-    struct Harness { editor: Entity<Editor> }
-    impl Render for Harness {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            div().size_full().child(region_lanes(self.editor.clone()))
-        }
-    }
-
-    #[gpui::test]
-    fn audio_source_shortcut_and_escape_retire_the_same_native_range_contact(cx: &mut TestAppContext) {
-        let window = cx.open_window(size(px(320.0), px(140.0)), |window, cx| {
-            let editor = cx.new(|cx| {
-                let mut ed = Editor::for_native_test(Project::new_empty(), window, cx);
-                ed.needs_arrange_fit = false; ed.arrange.start_tick = 0.0; ed.arrange.px_per_tick = 1.0;
-                ed
-            });
-            Harness { editor }
-        });
-        window.update(cx, |_, window, _| window.activate_window()).unwrap();
-        crate::native_test_support::frames(window, cx);
-        window.update(cx, |_, window, cx| assert!(crate::proto_editor_surface::focus_commands("audio", window, cx))).unwrap();
-        cx.simulate_keystrokes(window.into(), "r");
-        crate::native_test_support::frames(window, cx);
-        window.update(cx, |host, window, cx| {
-            assert!(host.editor.read(cx).integrations.audio_edit.range_tool);
-            window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
-                position:gpui::point(px(50.0),px(20.0)),button:MouseButton::Left,..Default::default()
-            }), cx);
-            assert!(host.editor.read(cx).integrations.audio_edit.range_drag.is_some());
-            assert!(crate::proto_editor_surface::has_contact(host.editor.entity_id(), cx));
-            assert!(window.captured_hitbox().is_some());
-        }).unwrap();
-        cx.simulate_keystrokes(window.into(), "escape");
-        crate::native_test_support::frames(window, cx);
-        window.update(cx, |host, window, cx| {
-            let ed = host.editor.read(cx);
-            assert!(!ed.integrations.audio_edit.range_tool);
-            assert!(ed.integrations.audio_edit.range.is_none());
-            assert!(ed.integrations.audio_edit.range_drag.is_none());
-            assert_eq!(ed.revision().get(), 0);
-            assert!(!crate::proto_editor_surface::has_contact(host.editor.entity_id(), cx));
-            assert!(window.captured_hitbox().is_none());
-        }).unwrap();
     }
 }

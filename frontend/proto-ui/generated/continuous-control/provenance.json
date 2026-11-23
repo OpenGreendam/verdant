@@ -2,7 +2,7 @@
   "source": {
     "file": "frontend/proto-ui/src/continuous-control.proto.ts",
     "exportName": "default",
-    "sha256": "3ebcb522fd7dec85202c5a04b1e78cb418b78fb1aefc09cc60af4f9e1e0cf3ab"
+    "sha256": "15e239f4a432d6c7e8460cc1fd6b1fc119dd1fcf65e7e8da408aa02726133e5f"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "27af6e2995e3c6d9a35ccbc4859a6273ed58b0c613ef4d3247284da1030b4691",
+    "contentSha256": "fa06806ac4d3860f457786700ed6870fb8bd7761857b8128ecaac070c5f748e2",
     "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
     "bundled": false
   },
@@ -88,30 +88,30 @@
   "sourceFiles": [
     {
       "file": "frontend/proto-ui/src/continuous-control.proto.ts",
-      "sha256": "4d0ba3fc9212204073263d7e572938ab8e609e9099c5937ab231f44e163c905d"
+      "sha256": "534e82f3a28160ccc1965274c2965640d2950b7ae6297b7c9d32ba6076b032b7"
     }
   ],
-  "generatedSha256": "0f83a643f08f6d49aeee1de4f382c6a29f685b1d17beb68f749bbfca0ab29e34",
+  "generatedSha256": "b389212226194558bb79f232e38f5fcb9d6a0fcfde0a92b27bf903bb63200945",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "0f83a643f08f6d49aeee1de4f382c6a29f685b1d17beb68f749bbfca0ab29e34"
+      "sha256": "b389212226194558bb79f232e38f5fcb9d6a0fcfde0a92b27bf903bb63200945"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "cb97a7d239a42acd9324d7d702c36ebf473120633514fba6a9e850dd42a43a38"
+      "sha256": "e7a946c54d84eee4c68a6c00b4f188fc4a5bccd70e9aff733da40d55f0b7256f"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "758bed537c6f6467a0ed3ed480495d96c7e5ed8dd00b9386c8cdb825eb870f02"
+      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "6067672580250adaad69e577c1315985cb809c219465de09202823e512c271a7"
+      "sha256": "fe12598861c4e8f999867060f147464f7f9d8a0e523d34da3bdf10f2fe916777"
     }
   ]
 }

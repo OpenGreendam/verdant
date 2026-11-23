@@ -5,24 +5,19 @@ use gpui::{App, AppContext, Bounds, Render, WeakEntity, WindowBounds, WindowOpti
 
 pub(super) fn tools(ed: &Editor, editor: &Entity<Editor>, target: Target, effect: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    let authority=suite::action_authority(ed,&target);
     let mut row = div().flex().flex_wrap().items_center().gap(gpui::rems(8./16.));
     if effect == dsp::EQ_ID {
         let sketch_editor = editor.clone(); let sketch_target = target.clone();
         row = row.child(crate::ui_controls::selectable_button(format!("eq-sketch-{}", target.slot), "绘制 EQ", false, th)
-            .authority(authority.clone())
             .on_click(move |_, _, cx| open_sketch(sketch_editor.clone(), sketch_target.clone(), cx)));
         let match_editor = editor.clone(); let match_target = target.clone();
         row = row.child(crate::ui_controls::selectable_button(format!("eq-match-{}", target.slot), "参考频谱与匹配", false, th)
-            .authority(authority.clone())
             .on_click(move |_, _, cx| open_references(match_editor.clone(), match_target.clone(), cx)));
         let grab_target = target.clone();
         row = row.child(crate::ui_controls::selectable_button(format!("eq-grab-{}", target.slot), "抓取频谱峰值", false, th)
-            .authority(authority.clone())
             .on_click(cx.listener(move |ed, _, _, cx| grab_peak(ed, &grab_target, cx))));
     } else if effect == dsp::REVERB_ID {
         row = row.child(crate::ui_controls::selectable_button(format!("reverb-ir-{}", target.slot), "从 IR 拟合", false, th)
-            .authority(authority)
             .on_click(cx.listener(move |ed, _, _, cx| import_ir(ed, &target, cx))));
     }
     row.into_any_element()
@@ -253,11 +248,11 @@ impl ReferenceWindow {
             smoothing_octaves:[0.,1./6.,1./3.,1.][self.smoothing.min(3)],remove_level_offset:self.remove_level})
     }
 }
-impl Render for ReferenceWindow {
- fn render(&mut self,window:&mut Window,cx:&mut Context<Self>)->impl IntoElement{
+impl ReferenceWindow {
+ fn render_references(&mut self,window:&mut Window,cx:&mut Context<Self>)->gpui::AnyElement {
   let Some(editor)=self.editor.upgrade()else{window.remove_window();return div().into_any_element()};
   let ed=editor.read(cx);if ed.document_generation!=self.generation{window.remove_window();return div().into_any_element()}
-  let th=self.th;let mut rows=crate::proto_scroll::viewport("references", "参考音源频谱", "vertical").flex_1().min_h_0().flex().flex_col().gap(px(8.));
+  let th=self.th;let mut rows=div().w_full().flex().flex_col().gap(px(8.));
   let mut owners:Vec<_>=ed.project().tracks.iter().map(|t|(DeviceTarget::Track(t.id.clone()),t.name.clone())).collect();owners.push((DeviceTarget::Master,"主总线".into()));
   for(owner,bus)in owners{
    for(slot,spec)in ed.device_insert_specs(&owner).iter().enumerate(){
@@ -304,6 +299,17 @@ impl Render for ReferenceWindow {
       }))));
    }
   }
+  rows.into_any_element()
+ }
+}
+impl Render for ReferenceWindow {
+ fn render(&mut self,window:&mut Window,cx:&mut Context<Self>)->impl IntoElement{
+  let Some(editor)=self.editor.upgrade()else{window.remove_window();return div().into_any_element()};
+  let ed=editor.read(cx);if ed.document_generation!=self.generation{window.remove_window();return div().into_any_element()}
+  let th=self.th;let owner=cx.entity();
+  let rows=div().flex_1().min_h_0().child(crate::proto_scroll::content("references", "参考频谱实例", move |window,cx| {
+    owner.update(cx,|view,cx|view.render_references(window,cx))
+  }));
   let field=|label:&'static str,entity:Entity<TextField>|div().flex_1().min_w_0().flex().flex_col().gap(px(4.)).child(div().text_xs().text_color(th.text_secondary).child(label)).child(entity);
   let mut smoothing=div().flex().flex_wrap().items_center().gap(px(4.)).child(div().text_xs().text_color(th.text_secondary).child("平滑"));
   for (index,label) in ["关闭","1/6 oct","1/3 oct","1 oct"].into_iter().enumerate() {

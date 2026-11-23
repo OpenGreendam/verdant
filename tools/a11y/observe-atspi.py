@@ -27,6 +27,7 @@ ACCESSIBLE = "org.a11y.atspi.Accessible"
 VALUE = "org.a11y.atspi.Value"
 ACTION = "org.a11y.atspi.Action"
 COMPONENT = "org.a11y.atspi.Component"
+TEXT = "org.a11y.atspi.Text"
 PROPERTIES = "org.freedesktop.DBus.Properties"
 ROOT = ("org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root")
 
@@ -107,6 +108,34 @@ class Observer:
 
     def interface(self, reference, interface):
         return dbus.Interface(self.bus.get_object(*reference, introspect=False), interface)
+
+    def set_text_selection(self, reference, selection, start, end):
+        """Ask the real Text service to modify an existing selection."""
+        if not all(isinstance(value, int) for value in (selection, start, end)) or min(selection, start, end) < 0:
+            raise ValueError("Selection coordinates must be non-negative integers")
+        return bool(self.interface(reference, TEXT).SetSelection(
+            dbus.Int32(selection), dbus.Int32(start), dbus.Int32(end), timeout=3))
+
+    def read_text(self, reference):
+        """Read the advertised platform Text interface, including real selection.
+
+        AT-SPI offsets count Unicode characters, not the editor's private UTF-16
+        offsets. A missing interface is a failed observation, never a guessed
+        value from the accessible name or an application test hook.
+        """
+        node = self.read(reference)
+        if TEXT not in node["interfaces"]:
+            raise RuntimeError(f"Actual textbox does not advertise AT-SPI Text: {node['interfaces']}")
+        interface = self.interface(reference, TEXT)
+        text = str(interface.GetText(dbus.Int32(0), dbus.Int32(-1), timeout=3))
+        caret = int(self.interface(reference, PROPERTIES).Get(TEXT, "CaretOffset", timeout=3))
+        count = int(interface.GetNSelections(timeout=3))
+        if not 0 <= count <= 16:
+            raise RuntimeError(f"Unexpected number of platform selections: {count}")
+        selections = [plain(interface.GetSelection(dbus.Int32(index), timeout=3)) for index in range(count)]
+        if not 0 <= caret <= len(text) or any(len(item) != 2 or not 0 <= item[0] <= item[1] <= len(text) for item in selections):
+            raise RuntimeError("Platform Text offsets fall outside the observed Unicode string")
+        return {"text": text, "caret": caret, "selections": selections}
 
     def read(self, reference):
         accessible = self.interface(reference, ACCESSIBLE)

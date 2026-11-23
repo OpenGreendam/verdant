@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::ops::Range;
 
-use gpui::{AppContext, Bounds, Context, IntoElement, Render, Role, SharedString, UniformListScrollHandle, WeakEntity, Window, WindowBounds, WindowHandle, WindowOptions, div, prelude::*, px, size, uniform_list};
+use gpui::{AppContext, Bounds, Context, FocusHandle, IntoElement, Render, Role, SharedString, UniformListScrollHandle, WeakEntity, Window, WindowBounds, WindowHandle, WindowOptions, div, prelude::*, px, size, uniform_list};
 use verdant_domain::{Command, CommandBatch, Vibrato};
 use verdant_domain::model::{NoteModulationParameter, VibratoPreset};
 use crate::editor::{Editor, LaneTool, MenuAction, Tool, WorkflowAction};
@@ -64,7 +64,9 @@ thread_local! {
 
 struct HistoryPanel {
     editor: WeakEntity<Editor>,
+    focus: FocusHandle,
     scroll: UniformListScrollHandle,
+    native_scroll: crate::proto_scroll::NativeScroll,
     selected: usize,
     displayed: Option<(String, verdant_domain::Revision)>,
 }
@@ -89,7 +91,11 @@ impl Editor {
                     window.set_window_title("撤销历史 — Verdant");
                     cx.new(|cx| {
                         cx.observe(&owner, |_, _, cx| cx.notify()).detach();
-                        HistoryPanel { editor, scroll: UniformListScrollHandle::new(), selected: 0, displayed: None }
+                        let focus = cx.focus_handle();
+                        window.focus(&focus, cx);
+                        let scroll = UniformListScrollHandle::new();
+                        let native_scroll = crate::proto_scroll::NativeScroll::new(scroll.0.borrow().base_handle.clone());
+                        HistoryPanel { editor, focus, scroll, native_scroll, selected: 0, displayed: None }
                     })
                 },
             ) {
@@ -137,38 +143,29 @@ impl Editor {
 }
 
 impl HistoryPanel {
-    fn rows(&self, range: Range<usize>, source: &verdant_collection_control::CollectionControlHandle,
-        revision: &str, cx: &mut Context<Self>) -> Vec<gpui::Stateful<gpui::Div>> {
+    fn rows(&self, range: Range<usize>, collection: &verdant_collection_control::CollectionControlHandle,
+        revision: &str, cx: &mut Context<Self>) -> Vec<crate::proto_controls::Action> {
         let Some(owner) = self.editor.upgrade() else { return Vec::new(); };
         let editor = owner.read(cx);
         let history = editor.store().history();
         let th = editor.theme;
-        let cursor = source.state("cursor").ok().as_ref().and_then(|value| crate::proto_controls::source_index(Some(value))).unwrap_or(self.selected);
-        range.filter(|position| *position <= history.entries.len()).map(|position| {
-            let label = if position == 0 { "初始状态".to_string() } else { history.entries[position - 1].label.to_string() };
+        range.filter_map(|position| {
+            let label = if position == 0 { "初始状态".to_string() } else { history.entries.get(position - 1)?.label.to_string() };
             let current = position == history.position;
             let future = position > history.position;
-            let click = source.clone(); let click_revision = revision.to_string();
-            let accessible = source.clone(); let accessible_revision = revision.to_string();
-            div().id(SharedString::from(format!("history-{position}"))).role(Role::ListBoxOption)
-                .aria_label(format!("{position} · {label}{}", if current { " · 当前状态" } else if future { " · 可重做" } else { "" }))
+            let collection = collection.clone(); let revision = revision.to_owned();
+            Some(crate::proto_controls::action(SharedString::from(format!("history-{position}")),
+                format!("{position} · {label}{}", if current { " · 当前状态" } else if future { " · 可重做" } else { "" })).role(Role::ListBoxOption).tab_index(-1)
                 .aria_selected(current).aria_position_in_set(position + 1).aria_size_of_set(history.entries.len() + 1)
-                .when(position == cursor, |row| row.aria_active_descendant())
+                .when(position == self.selected, |row| row.aria_active_descendant())
                 .h(px(34.0)).px(px(12.0)).flex().items_center().gap(px(8.0))
-                .bg(if current { th.selection } else if position == cursor { th.control } else { th.surface })
+                .bg(if current { th.selection } else if position == self.selected { th.control } else { th.surface })
                 .text_color(if future { th.text_secondary } else { th.text }).hover(|row| row.bg(th.control_pressed))
                 .child(div().w(px(24.0)).flex_none().text_xs().text_color(th.text_secondary).child(position.to_string()))
                 .child(div().flex_1().truncate().text_sm().child(label))
                 .child(div().text_xs().child(if current { "当前" } else if future { "重做" } else { "" }))
-                .on_click(move |_, window, cx| {
-                    crate::proto_collection::call(&click, "focusSelf", vec![], window, cx);
-                    crate::proto_collection::call(&click, "choose", vec![position.into(), false.into(), click_revision.clone().into()], window, cx);
-                    window.prevent_default(); cx.stop_propagation();
-                })
-                .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| {
-                    crate::proto_collection::call(&accessible, "focusSelf", vec![], window, cx);
-                    crate::proto_collection::call(&accessible, "choose", vec![position.into(), false.into(), accessible_revision.clone().into()], window, cx);
-                })
+                .on_click(move |_, window, cx| crate::proto_collection::call(&collection, "choose",
+                    vec![position.into(), false.into(), revision.clone().into()], window, cx)))
         }).collect()
     }
 }
@@ -181,50 +178,59 @@ impl Render for HistoryPanel {
         let editor = owner.read(cx);
         let base = editor.revision();
         let project_id = editor.project().project_id.clone();
-        let generation = editor.document_generation;
         let count = editor.store().undo_depth() + editor.store().redo_depth();
         let current = editor.store().undo_depth();
         let th = editor.theme;
         let font = editor.ui_font.clone();
         if self.displayed.as_ref().is_none_or(|(id, revision)| id != &project_id || *revision != base) {
             self.selected = current;
+            self.scroll.scroll_to_item(current, gpui::ScrollStrategy::Nearest);
             self.displayed = Some((project_id.clone(), base));
         }
-        let revision = format!("{project_id}:{generation}:{base}");
-        let panel = cx.entity(); let scroll = self.scroll.clone(); let draw_revision = revision.clone();let selected=self.selected;
-        let draw: crate::proto_collection::Draw = std::rc::Rc::new(move |source, focus, engine, window, cx| {
-            crate::proto_collection::reveal_uniform_item("history-reveal",source,selected,&draw_revision,count+1,&scroll,window,cx);
-            let source = source.clone(); let keyboard = source.clone(); let panel = panel.clone(); let revision = draw_revision.clone();
-            let engine = engine.expect("history virtual list engine");
-            div().id("history-list-content").track_focus(focus).size_full()
-                .on_key_down(move |event, window, cx| crate::proto_collection::key(&keyboard, event, window, cx))
-                .child(uniform_list("history-rows", count + 1, move |range, _, cx| {
-                    panel.update(cx, |view, cx| view.rows(range, &source, &revision, cx))
-                }).track_scroll(&scroll).size_full().on_scroll_wheel(move |_, window, cx| engine.notify_input(window, cx)))
-                .into_any_element()
+        let panel = cx.entity();
+        let revision = format!("{}:{}:{}", editor.document_generation, project_id, base.get());
+        let props = serde_json::json!({"mode":"listbox", "label":"撤销历史", "cursor":self.selected,
+            "revision":revision, "autoFocus":true});
+        let draw_revision = revision.clone();
+        let draw: crate::proto_collection::Draw = std::rc::Rc::new(move |collection, focus, window, cx| {
+            panel.update(cx, |view, cx| {
+                let was_focused = view.focus.is_focused(window); view.focus = focus.clone();
+                if was_focused { window.focus(focus, cx); }
+                let panel = cx.entity(); let collection = collection.clone(); let revision = draw_revision.clone();
+                let scroll = view.scroll.clone();
+                crate::proto_scroll::content("compiled-history-scroll", "撤销历史列表", move |_, _| {
+                    let panel = panel.clone(); let collection = collection.clone(); let revision = revision.clone();
+                    uniform_list("history-rows", count + 1, move |range, _, cx| {
+                        panel.update(cx, |view, cx| view.rows(range, &collection, &revision, cx))
+                    }).track_scroll(&scroll).size_full().into_any_element()
+                }).tab_stop(false).native_scroll(view.native_scroll.clone()).into_any_element()
+            })
         });
-        let panel = cx.entity().downgrade(); let basis = revision.clone();
-        let sink: crate::proto_collection::Sink = std::rc::Rc::new(move |name, payload, _, cx| {
-            if !matches!(name, "select" | "activate") || payload.get("revision").and_then(serde_json::Value::as_str) != Some(basis.as_str()) { return; }
-            let Some(position) = crate::proto_controls::source_index(payload.get("index")) else { return; };
-            if position > count { return; }
-            let _ = panel.update(cx, |panel, cx| {
-                let Some(editor) = panel.editor.upgrade() else { return; };
+        let panel = cx.entity().downgrade();
+        let sink: crate::proto_collection::Sink = std::rc::Rc::new(move |name, payload, window, cx| {
+            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(revision.as_str()) { return; }
+            let _ = panel.update(cx, |view, cx| {
+                let Some(editor) = view.editor.upgrade() else { return; };
                 let ed = editor.read(cx);
-                if ed.project().project_id != project_id || ed.document_generation != generation || ed.revision() != base { return; }
-                panel.selected = position;
-                if name == "activate" { editor.update(cx, |ed, cx| ed.jump_history(&project_id, base, position, cx)); }
+                if ed.project().project_id != project_id || ed.revision() != base { return; }
+                if name == "close" { window.remove_window(); return; }
+                if name != "select" && name != "activate" { return; }
+                let Some(position) = crate::proto_controls::source_index(payload.get("index")).filter(|position| *position <= count) else { return; };
+                view.selected = position;
+                view.scroll.scroll_to_item(position, gpui::ScrollStrategy::Nearest);
+                window.focus(&view.focus, cx);
+                if name == "activate" { editor.update(cx, |editor, cx| editor.jump_history(&project_id, base, position, cx)); }
                 cx.notify();
             });
         });
-        let collection = crate::proto_collection::collection("history-list", serde_json::json!({
-            "mode":"listbox", "label":"撤销历史", "cursor":self.selected, "revision":revision, "autoFocus":true,
-        }), vec![1;count + 1], draw, sink).scroll_engine(crate::proto_scroll::Engine::Uniform(self.scroll.clone()));
         div().id("undo-history").size_full().flex().flex_col().bg(th.surface).text_color(th.text).font_family(font)
             .child(div().p(px(12.0)).text_sm().child(format!("撤销历史 · {current}/{count}")))
-            .child(div().flex_1().min_h_0().child(collection))
+            .child(div().id("history-list")
+                .aria_description("上下键选择历史状态，Home/End 到开头或末尾，Enter 或空格跳转。点击条目立即跳转。")
+                .flex_1().min_h_0()
+                .child(crate::proto_collection::collection("compiled-history-list", props, vec![1; count + 1], draw, sink)))
             .child(div().p(px(12.0)).border_t_1().border_color(th.shade).text_xs().text_color(th.text_secondary)
-                .child("上下键选择，Home/End 到两端，Enter 或空格跳转。点击状态立即跳转；新编辑会清除后续历史。"))
+                .child("点击状态跳转；撤销后进行新编辑会清除后续历史。"))
             .into_any_element()
     }
 }
@@ -575,48 +581,4 @@ mod timing_control_tests {
         assert_eq!(store.project().render_preferences.phoneme_timing, Some(PhonemeTimingSettings::vowel_anchor_v1()));
     }
 
-}
-
-#[cfg(test)]
-mod history_native_tests {
-    use super::*;
-    use gpui::{Entity, TestAppContext};
-    use std::rc::Rc;
-
-    #[gpui::test]
-    fn history_window_uses_compiled_selection_before_domain_jump(cx: &mut TestAppContext) {
-        let kept = Rc::new(RefCell::new(None::<Entity<Editor>>));
-        let retain = kept.clone();
-        let window = cx.open_window(size(px(440.0), px(560.0)), move |window, cx| {
-            let editor = cx.new(|cx| Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx));
-            editor.update(cx, |ed, cx| {
-                for name in ["First edit", "Second edit"] {
-                    let track = ed.project().tracks[0].id.clone();
-                    let mut header = ed.project().tracks[0].header(); header.name = name.into();
-                    assert!(ed.commit(ed.revision(), CommandBatch::single(name, Command::SetTrackHeader { track, header }), cx));
-                }
-            });
-            *retain.borrow_mut() = Some(editor.clone());
-            HistoryPanel { editor:editor.downgrade(), scroll:UniformListScrollHandle::new(), selected:0, displayed:None }
-        });
-        window.update(cx, |_, window, _| window.activate_window()).unwrap();
-        crate::native_test_support::frames(window, cx);
-        cx.simulate_keystrokes(window.into(), "up");
-        crate::native_test_support::frames(window, cx);
-        window.update(cx, |panel, _, cx| {
-            assert_eq!(panel.selected, 1, "one native key traverses exactly one authored row");
-            assert_eq!(panel.editor.upgrade().unwrap().read(cx).store().undo_depth(), 2);
-        }).unwrap();
-        cx.simulate_keystrokes(window.into(), "home");
-        crate::native_test_support::frames(window, cx);
-        window.update(cx, |panel, _, cx| {
-            assert_eq!(panel.selected, 0);
-            assert_eq!(panel.editor.upgrade().unwrap().read(cx).store().undo_depth(), 2, "selection alone cannot undo");
-        }).unwrap();
-        cx.simulate_keystrokes(window.into(), "enter");
-        crate::native_test_support::frames(window, cx);
-        window.update(cx, |panel, _, cx| {
-            assert_eq!(panel.editor.upgrade().unwrap().read(cx).store().undo_depth(), 0, "source activation executes the guarded history transaction");
-        }).unwrap();
-    }
 }

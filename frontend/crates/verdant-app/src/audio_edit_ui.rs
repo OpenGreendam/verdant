@@ -2,7 +2,7 @@
 //! command line. Selection and drag previews are transient; every edit is one
 //! ordinary journal transaction and all media analysis runs off the UI thread.
 use std::{collections::BTreeSet,path::PathBuf};
-use gpui::{Context,IntoElement,SharedString,Window,div,px,prelude::*};
+use gpui::{Context,IntoElement,KeyDownEvent,SharedString,Window,div,px,prelude::*};
 use verdant_domain::{Revision,TrackId};
 use verdant_media::{AudioClip,FadeShape};
 use verdant_service::audio_edit::{AudioClipboard,AudioClipProperties,AudioClipRef,AudioEdit,AudioEditPlan};
@@ -52,29 +52,31 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
             ("分割","在播放头或选区边界切分",AudioUiAction::Split,false),
             ("片段 ▾","剪切、淡化、变速与合并",AudioUiAction::Menu,false),
         ].into_iter().map(|(label,description,action,selected)|crate::proto_controls::action(SharedString::from(format!("audio-tool-{label}")),description)
-            .authority(format!("{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision())).aria_selected(selected)
+            .when(matches!(action,AudioUiAction::SelectTool|AudioUiAction::RangeTool),|button|button.aria_selected(selected))
             .h(px(26.0)).px(px(9.0)).flex().items_center().rounded(px(6.0)).cursor_pointer()
             .bg(if selected{th.control}else{th.surface}).hover(move|style|style.bg(th.hover))
             .child(label).on_click(cx.listener(move|ed,_,window,cx|{
-                crate::proto_editor_surface::focus_commands("audio",window,cx);if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
+                window.focus(&ed.focus_arrange,cx);if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
             }))))
         .child(div().flex_1().min_w_0().truncate().text_xs().text_color(th.text_secondary).child(detail))
 }
-/// Application command effects admitted by the compiled arrangement surface.
-/// Native code does not interpret keys or retire pointer captures here.
-pub fn source_command(ed:&mut Editor,command:&str,window:&mut Window,cx:&mut Context<Editor>){
-    let action=match command{
-        "delete"=>AudioUiAction::Delete,
-        "ripple-delete"=>AudioUiAction::RippleDelete,
-        "split"=>AudioUiAction::Split,
-        "select-all"=>AudioUiAction::SelectAll,
-        "join"=>AudioUiAction::Join,
-        "range-tool"=>AudioUiAction::RangeTool,
-        "select-tool"=>AudioUiAction::SelectTool,
-        "clear-range"=>{ed.integrations.audio_edit.range=None;ed.integrations.audio_edit.range_drag=None;ed.arrange_drag=None;AudioUiAction::SelectTool},
-        _=>return,
+pub fn key_down(ed:&mut Editor,event:&KeyDownEvent,window:&mut Window,cx:&mut Context<Editor>){
+    let Some((command, retired)) = crate::proto_editor_surface::audio_key(ed, cx.entity_id(), event, window, cx) else { return; };
+    if retired || command == "escape" {
+        ed.integrations.audio_edit.range_drag = None; ed.arrange_drag = None;
+        if command == "escape" { ed.integrations.audio_edit.range = None; }
+        cx.notify();
+    }
+    let action = match command.as_str() {
+        "delete" => Some(AudioUiAction::Delete), "ripple-delete" => Some(AudioUiAction::RippleDelete),
+        "split" => Some(AudioUiAction::Split), "select-all" => Some(AudioUiAction::SelectAll),
+        "join" => Some(AudioUiAction::Join), "range-tool" => Some(AudioUiAction::RangeTool),
+        "select-tool" | "escape" => Some(AudioUiAction::SelectTool), _ => None,
     };
-    if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
+    if let Some(action) = action {
+        if let Err(error) = ed.run_audio_ui(action,window,cx) { ed.notice(error); cx.notify(); }
+        window.prevent_default(); cx.stop_propagation();
+    }
 }
 
 impl Editor{

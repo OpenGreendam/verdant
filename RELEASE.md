@@ -39,7 +39,7 @@ selection_sha=$("$release" select-source --repo . --output build/source.json | j
 | 目录 | 已分类的 Python 源码 |
 |---|---|
 | `tools/a11y/` | `observe-atspi.py`、`run-isolated.py` |
-| `tools/native-input/` | `ci.py`、`probe.py`、`run-linux-isolated.py`、`x11_screenshot.py`、`test_ci.py`、`test_probe.py` |
+| `tools/native-input/` | `ci.py`、`probe.py`、`controls.py`、`run-linux-isolated.py`、`x11_screenshot.py`、`test_ci.py`、`test_probe.py` |
 | `frontend/scripts/` | `generate-agent-skills.py`、`generate-factory-presets.py`、`verify-ffp-corpus.py` |
 
 两个验证工具目录中的 `README.md` 按既有 Markdown 文档规则纳入。公开的验证 Markdown/JSON 记录也必须先提交，再由 `select-source` 从实际 HEAD 选择；未跟踪文档、已选择文件的工作树改动，以及未分类的新增 Python 路径都会被拒绝。选择清单记录每个文件的 Git blob、SHA-256、大小和 mode，并由嵌套源码检查重新核对。运行日志、截图、依赖与缓存仍受既有排除规则约束。

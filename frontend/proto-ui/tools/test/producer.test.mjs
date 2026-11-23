@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,6 +66,114 @@ test('shared consumers cannot redirect their SDK path or add another owner', (t)
   pin.units.find((unit) => unit.name === 'normalized-knob').target.nativeSdkPath = './.proto-ui/gpui-native';
   writeFileSync(filename, JSON.stringify(pin));
   assert.throws(() => loadPin(filename, root), code(EXIT.pin));
+});
+
+test('every application authored entry and generated Cargo consumer is pinned', (t) => {
+  const root = fixture(t);
+  const filename = path.join(root, 'frontend/proto-ui/compiler.pin.json');
+  const original = json(filename);
+  const omitted = structuredClone(original);
+  omitted.units = omitted.units.filter((unit) => unit.name !== 'action-control');
+  writeFileSync(filename, JSON.stringify(omitted));
+  assert.throws(() => loadPin(filename, root), (error) => code(EXIT.pin)(error) && /Authored entry.*action-control/.test(error.message));
+  writeFileSync(filename, JSON.stringify(original));
+  const orphan = path.join(root, 'frontend/proto-ui/generated/unpinned-control');
+  mkdirSync(orphan);
+  writeFileSync(path.join(orphan, 'Cargo.toml'), '[package]\nname="orphan"\nversion="0.1.0"\n');
+  assert.throws(() => loadPin(filename, root), (error) => code(EXIT.pin)(error) && /Generated Cargo consumer.*unpinned-control/.test(error.message));
+});
+
+async function rejectsInventoryPath(root) {
+  const invalid = (error) => code(EXIT.pin)(error) && /[Ss]ymbolic|regular file/.test(error.message);
+  assert.throws(() => loadPin(path.join(root, 'frontend/proto-ui/compiler.pin.json'), root), invalid);
+  // Both lanes must reject the path before consulting an upstream checkout.
+  for (const mode of ['--check', '--check-retained']) {
+    await assert.rejects(runProducer([mode, ...absentUpstream(root)], root), invalid);
+  }
+}
+
+for (const [name, target] of [
+  ['unpinned live source link', 'action-control.proto.ts'],
+  ['unpinned dangling source link', 'absent.proto.ts'],
+  ['pinned source link', 'helpers/original.proto.ts'],
+  ['source entry directory', null],
+]) {
+  test(`inventory rejects ${name}`, async (t) => {
+    const root = fixture(t);
+    const source = path.join(root, 'frontend/proto-ui/src');
+    const entry = path.join(source, name === 'pinned source link' ? 'action-control.proto.ts' : 'unpinned-control.proto.ts');
+    if (name === 'pinned source link') {
+      mkdirSync(path.join(source, 'helpers'));
+      renameSync(entry, path.join(source, target));
+    }
+    if (target === null) mkdirSync(entry);
+    else symlinkSync(target, entry, 'file');
+    await rejectsInventoryPath(root);
+  });
+}
+
+for (const [name, target] of [
+  ['unpinned generated consumer link', '../../unregistered-consumer'],
+  ['dangling generated consumer link', '../../absent-consumer'],
+  ['pinned generated consumer link', '../../unregistered-consumer'],
+]) {
+  test(`inventory rejects ${name}`, async (t) => {
+    const root = fixture(t);
+    const generated = path.join(root, 'frontend/proto-ui/generated');
+    const entry = path.join(generated, name.startsWith('pinned') ? 'action-control' : 'unpinned-control');
+    if (name.startsWith('pinned')) renameSync(entry, path.join(root, 'frontend/unregistered-consumer'));
+    else if (!name.startsWith('dangling')) {
+      mkdirSync(path.join(root, 'frontend/unregistered-consumer/src'), { recursive: true });
+      writeFileSync(path.join(root, 'frontend/unregistered-consumer/Cargo.toml'), '[package]\nname="orphan"\nversion="0.1.0"\n');
+      writeFileSync(path.join(root, 'frontend/unregistered-consumer/src/lib.rs'), 'pub fn orphan() {}\n');
+    }
+    symlinkSync(target, entry, 'dir');
+    await rejectsInventoryPath(root);
+  });
+}
+
+for (const relative of ['frontend', 'frontend/proto-ui', 'frontend/proto-ui/src', 'frontend/proto-ui/generated']) {
+  test(`inventory rejects a symbolic ${relative} root`, async (t) => {
+    const root = fixture(t);
+    const directory = path.join(root, relative);
+    renameSync(directory, `${directory}-real`);
+    symlinkSync(`${path.basename(directory)}-real`, directory, 'dir');
+    await rejectsInventoryPath(root);
+  });
+}
+
+for (const relative of ['frontend/proto-ui/src', 'frontend/proto-ui/generated']) {
+  test(`inventory rejects a dangling ${relative} root`, async (t) => {
+    const root = fixture(t);
+    const directory = path.join(root, relative);
+    rmSync(directory, { recursive: true });
+    symlinkSync('absent-directory', directory, 'dir');
+    await rejectsInventoryPath(root);
+  });
+}
+
+test('inventory rejects a symbolic repository root', async (t) => {
+  const root = fixture(t);
+  const alias = path.join(root, 'repository-alias');
+  symlinkSync('.', alias, 'dir');
+  await rejectsInventoryPath(alias);
+});
+
+test('inventory permits ordinary helper files and nested vendored prototype sources', async (t) => {
+  const root = fixture(t);
+  const source = path.join(root, 'frontend/proto-ui/src');
+  writeFileSync(path.join(source, 'helper.ts'), 'export const helper = 1;\n');
+  mkdirSync(path.join(source, 'vendor/nested'), { recursive: true });
+  writeFileSync(path.join(source, 'vendor/nested/imported.proto.ts'), 'export const helper = 2;\n');
+  const pin = loadPin(path.join(root, 'frontend/proto-ui/compiler.pin.json'), root);
+  assert.equal(pin.units.some((unit) => unit.source.endsWith('imported.proto.ts')), false);
+  assert.equal((await runProducer(['--check-retained'], root)).freshCompilation, false);
+});
+
+test('inventory permits an absent generated root before first publication', (t) => {
+  const root = fixture(t);
+  rmSync(path.join(root, 'frontend/proto-ui/generated'), { recursive: true });
+  assert.doesNotThrow(() => loadPin(path.join(root, 'frontend/proto-ui/compiler.pin.json'), root));
 });
 
 test('each data unit pins selected pure methods, a stable package and an empty dependency closure', (t) => {

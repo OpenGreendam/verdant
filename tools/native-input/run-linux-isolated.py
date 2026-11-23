@@ -20,7 +20,7 @@ import sys
 import time
 from xml.sax.saxutils import escape
 
-from probe import CASES
+from probe import CASES, CONTROL_CASES
 
 
 def arguments():
@@ -31,6 +31,7 @@ def arguments():
     parser.add_argument('--binary', required=True, type=Path)
     parser.add_argument('--worker-binary', required=True, type=Path)
     parser.add_argument('--backend', required=True, choices=('x11', 'wayland'))
+    parser.add_argument('--suite', choices=('original', 'controls'), default='original')
     parser.add_argument('--run-dir', required=True, type=Path, help='New, short evidence/socket path')
     parser.add_argument('--python', type=Path, default=Path('/usr/bin/python3'),
                         help='Python matching the selected dbus/GI extension ABI')
@@ -145,7 +146,7 @@ def main(args):
     private_icd = run / 'lavapipe.json'
     private_icd.write_text(json.dumps(icd, indent=2) + '\n')
     env['VK_DRIVER_FILES'] = env['VK_ICD_FILENAMES'] = str(private_icd)
-    record = {'format': 'verdant.isolated-native-run.v1', 'backend': args.backend,
+    record = {'format': 'verdant.isolated-native-run.v1', 'backend': args.backend, 'suite': args.suite,
               'runDirectory': str(run), 'dependencies': str(deps),
               'binarySha256': sha256(binary), 'workerSha256': sha256(worker),
               'cpuAffinity': cpus, 'perProcessAddressSpaceLimitBytes': address_limit,
@@ -205,7 +206,7 @@ def main(args):
         record['inputDisplay'] = env['DISPLAY']
         probe = [str(python), str(repo / 'tools/native-input/probe.py'),
                  '--binary', str(binary), '--worker-binary', str(worker), '--repo', str(repo),
-                 '--output-dir', str(run / 'evidence'), '--backend', args.backend,
+                 '--output-dir', str(run / 'evidence'), '--backend', args.backend, '--suite', args.suite,
                  '--input-display', env['DISPLAY'], '--xdotool', xdotool]
         if args.backend == 'wayland':
             weston = dependency('usr/bin/weston')
@@ -257,11 +258,12 @@ def main(args):
         result = json.loads((run / 'evidence/result.json').read_text()) if (run / 'evidence/result.json').exists() else None
         record['ok'] = status == 0 and result is not None and result.get('ok') is True
         if record['ok'] and not args.probe_options:
+            cases = CASES if args.suite == 'original' else CONTROL_CASES
             complete = result.get('skipSetValue') is False and result.get('cases') == [
-                {'name': name, 'status': 'passed'} for name in CASES]
+                {'name': name, 'status': 'passed'} for name in cases]
             if not complete:
                 record['ok'] = False
-                record['error'] = 'An unfiltered run must pass every case, including both Value writes and both native-window cases'
+                record['error'] = 'An unfiltered run must pass every case in its declared suite'
         save()
         print(json.dumps({'ok': record['ok'], 'backend': args.backend, 'runDirectory': str(run),
                           'cases': result.get('cases') if result else None,

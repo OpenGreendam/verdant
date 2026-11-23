@@ -348,12 +348,9 @@ pub fn appearance_controls(editor: &crate::editor::Editor, cx: &mut gpui::Contex
             ("appearance-system", "随系统", AppearancePreference::System),
             ("appearance-light", "浅色", AppearancePreference::Light),
             ("appearance-dark", "深色", AppearancePreference::Dark),
-        ].into_iter().enumerate().map(|(index,(id, label, preference))| {
-            let active = selected == preference; let entity = cx.entity();
+        ].into_iter().map(|(id, label, preference)| {
+            let active = selected == preference;
             crate::proto_controls::action(id, format!("外观：{label}")).role(gpui::Role::RadioButton)
-                .navigation(index,3,move|index,window,cx| { if let Some(preference)=[AppearancePreference::System,AppearancePreference::Light,AppearancePreference::Dark].get(index) {
-                    entity.update(cx,|ed,cx|ed.set_appearance_preference(*preference,window,cx));
-                }})
                 .aria_selected(active).cursor_pointer().h(px(crate::ui_controls::BAR_BTN_H)).px(px(8.0)).flex().items_center().justify_center().rounded(px(5.0))
                 .bg(if active { theme.accent } else { theme.control })
                 .text_color(if active { theme.accent_text } else { theme.text })
@@ -374,12 +371,9 @@ pub fn pride_controls(editor: &crate::editor::Editor, cx: &mut gpui::Context<cra
             ("pride-auto", "自动", PridePreference::Auto),
             ("pride-on", "开", PridePreference::On),
             ("pride-off", "关", PridePreference::Off),
-        ].into_iter().enumerate().map(|(index,(id, label, preference))| {
-            let active = selected == preference; let entity = cx.entity();
+        ].into_iter().map(|(id, label, preference)| {
+            let active = selected == preference;
             crate::proto_controls::action(id, format!("Pride 彩虹主题：{label}")).role(gpui::Role::RadioButton)
-                .navigation(index,3,move|index,window,cx| { if let Some(preference)=[PridePreference::Auto,PridePreference::On,PridePreference::Off].get(index) {
-                    entity.update(cx,|ed,cx|ed.set_pride_preference(*preference,window,cx));
-                }})
                 .aria_selected(active).cursor_pointer().h(px(crate::ui_controls::BAR_BTN_H)).px(px(8.0))
                 .flex().items_center().justify_center().rounded(px(5.0))
                 .bg(if active { theme.accent } else { theme.control })

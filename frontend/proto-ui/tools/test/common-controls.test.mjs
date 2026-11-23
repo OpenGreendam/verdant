@@ -57,7 +57,8 @@ async function fixture(t, name, initial = {}) {
 runtimeTest('action pointer and assistive activation share accepted selection and disabled policy', async t => {
   const f = await fixture(t, 'action-control', { label: 'Mute', role: 'switch', selected: false, selectable: true });
   f.event('press.start'); assert.equal(f.x.pressed.get(), true);
-  f.event('press.commit'); assert.deepEqual(f.events, [{ name: 'activate', payload: { selected: true, revision: 'document:1' } }]);
+  assert.equal(f.event('press.commit').defaultPrevented, true);
+  assert.deepEqual(f.events, [{ name: 'activate', payload: { selected: true, revision: 'document:1', origin: 'press', key: '', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false } }]);
   assert.equal(f.x.selected.get(), false);
   assert.deepEqual(f.semantics().states, { disabled: false, checked: false });
   f.update({ selected: true, revision: 'document:2' });
@@ -65,48 +66,33 @@ runtimeTest('action pointer and assistive activation share accepted selection an
   f.update({ disabled: true }); f.event('press.start'); f.event('press.commit'); f.call('requestActivate');
   assert.equal(f.events.length, 2); assert.equal(f.x.pressed.get(), false); assert.equal(f.semantics().states.disabled, true);
 });
+runtimeTest('action preserves source modifiers and separates keyboard assistive and method activation', async t => {
+  const f = await fixture(t, 'action-control');
+  assert.equal(f.event('press.commit', { key: 'Enter', shiftKey: true, altKey: true }).defaultPrevented, true);
+  assert.deepEqual(f.events.at(-1).payload, { selected: true, revision: 'document:1', origin: 'keyboard', key: 'Enter', shiftKey: true, ctrlKey: false, metaKey: false, altKey: true });
+  f.event('press.commit', { ctrlKey: true, metaKey: true });
+  assert.deepEqual(f.events.at(-1).payload, { selected: true, revision: 'document:1', origin: 'press', key: '', shiftKey: false, ctrlKey: true, metaKey: true, altKey: false });
+  f.event('host:verdant-action-activate'); assert.equal(f.events.at(-1).payload.origin, 'assistive');
+  f.call('requestActivate'); assert.equal(f.events.at(-1).payload.origin, 'programmatic');
+});
+runtimeTest('context-menu actions share mouse keyboard assistive policy without making left click open the menu', async t => {
+  const f = await fixture(t, 'action-control', { contextMenu: true, contextOnly: true });
+  assert.equal(f.event('context.menu', { shiftKey: true }).defaultPrevented, true);
+  assert.equal(f.events.at(-1).name, 'context'); assert.equal(f.events.at(-1).payload.shiftKey, true);
+  assert.equal(f.event('key.down', { key: 'F10', shiftKey: true }).defaultPrevented, true);
+  assert.equal(f.events.at(-1).payload.origin, 'keyboard');
+  assert.equal(f.event('key.down', { key: 'ContextMenu' }).defaultPrevented, true);
+  f.event('host:verdant-action-activate'); assert.equal(f.events.at(-1).name, 'context'); assert.equal(f.events.at(-1).payload.origin, 'assistive');
+  f.event('press.commit'); assert.equal(f.events.at(-1).name, 'activate');
+  f.event('press.commit', { key: 'Enter' }); assert.equal(f.events.at(-1).name, 'context');
+  f.update({ disabled: true }); const count = f.events.length;
+  f.event('context.menu'); f.event('key.down', { key: 'ContextMenu' }); assert.equal(f.events.length, count);
+});
 runtimeTest('action reentrant accepted props are not overwritten by suspended sync', async t => {
   const f = await fixture(t, 'action-control', { label: 'Before', selected: false, role: 'tab' });
   const stop = f.x.selected.subscribe(event => { if (event.type === 'next' && event.next === true) f.update({ selected: false, disabled: true, label: 'After', revision: 'document:3' }); });
   f.update({ selected: true, label: 'Suspended', revision: 'document:2' }); stop();
   assert.equal(f.x.selected.get(), false); assert.equal(f.x.disabled.get(), true); assert.equal(f.semantics().name.value, 'After');
-});
-runtimeTest('action retires a held press when the same label receives new domain authority', async t => {
-  const f = await fixture(t, 'action-control', { label: 'Remove' });
-  f.event('press.start'); assert.equal(f.x.pressed.get(), true);
-  f.update({ revision: 'document:2' }); assert.equal(f.x.pressed.get(), false);
-  f.event('press.end'); f.event('press.commit'); assert.equal(f.events.length, 0);
-  f.event('press.start'); f.event('press.end'); f.event('press.commit');
-  assert.deepEqual(f.events, [{ name: 'activate', payload: { selected: true, revision: 'document:2' } }]);
-  f.event('key.up', { key: 'Enter' }); f.event('press.commit'); assert.equal(f.events.length, 1);
-  f.event('host:verdant-action-activate'); assert.equal(f.events.length, 2, 'assistive activation is a fresh source request');
-});
-runtimeTest('action live accessible text preserves an admitted press without changing command authority', async t => {
-  const f=await fixture(t,'action-control',{label:'Position 0',description:'Playback stopped'});
-  f.event('press.start');f.update({label:'Position 1',description:'Playback running'});
-  assert.equal(f.x.pressed.get(),true);assert.equal(f.semantics().name.value,'Position 1');
-  assert.equal(f.semantics().description.value,'Playback running');
-  f.event('press.end');f.event('press.commit');
-  assert.deepEqual(f.events,[{name:'activate',payload:{selected:true,revision:'document:1'}}]);
-  f.event('press.start');f.update({label:'Position 2',revision:'document:2'});
-  f.event('press.commit');assert.equal(f.events.length,1,'new command authority still retires a held press');
-});
-runtimeTest('action reentrant retirement cannot revive a suspended press or emit a replacement command', async t => {
-  const f = await fixture(t, 'action-control', { label: 'Remove' });
-  const stop = f.x.pressed.subscribe(event => {
-    if (event.type === 'next' && event.next === true) f.update({ revision: 'document:2', disabled: true });
-  });
-  f.event('press.start'); stop();
-  assert.equal(f.x.pressed.get(), false); assert.equal(f.x.disabled.get(), true);
-  f.update({ disabled: false }); f.event('press.commit'); assert.equal(f.events.length, 0);
-  f.event('press.start'); f.event('press.cancel'); f.event('press.commit'); assert.equal(f.events.length, 0);
-});
-runtimeTest('action focus loss retires contact while hover follows the physical pointer route', async t => {
-  const f=await fixture(t,'action-control');
-  f.event('pointer.enter');f.event('press.start');f.event('host:blur');
-  assert.equal(f.x.pressed.get(),false);assert.equal(f.x.hovered.get(),true);
-  f.event('press.commit');assert.equal(f.events.length,0);
-  f.event('pointer.leave');assert.equal(f.x.hovered.get(),false);
 });
 runtimeTest('action keyboard group navigation proposes selection and detached roots cannot act', async t => {
   const f = await fixture(t, 'action-control', { role: 'tab', selected: true, position: 0, count: 3 });
@@ -143,6 +129,46 @@ runtimeTest('collection activation emits once even with synchronous owner accept
   f.update({ cursor: 2, disabled: false, revision: 'document:3' }); stop();
   assert.equal(f.x.cursor.get(), 0); assert.equal(f.semantics().states.disabled, true);
   const n = f.events.length; f.event('key.down', { key: 'Enter' }); assert.equal(f.events.length, n);
+});
+
+runtimeTest('explicit current-row selection selects an initial row and collapses a range while hover stays deduplicated', async t => {
+  for (const mode of ['table', 'listbox']) {
+    const f = await fixture(t, 'collection-control', { mode, cursor: 0 });
+    f.call('setItems', [1, 1, 1]);
+    assert.equal(f.call('selectIndex', 0, false, 'document:1'), true);
+    assert.deepEqual(f.events, [], 'an unchanged hover cursor does not select the first row');
+    assert.equal(f.call('selectAndFocus', 0, false, 'document:1'), true);
+    assert.equal(f.call('selectAndFocus', 2, true, 'document:1'), true);
+    assert.equal(f.call('selectAndFocus', 2, false, 'document:1'), true);
+    assert.deepEqual(f.events.map(({ name, payload }) => [name, payload.index, payload.extend]), [
+      ['select', 0, false], ['select', 2, true], ['select', 2, false],
+    ], 'plain click at the current range endpoint must be a new selection intent');
+    assert.equal(f.call('selectIndex', 2, false, 'document:1'), true);
+    assert.equal(f.events.length, 3, 'repeat hover remains deduplicated after explicit selection');
+    assert.equal(f.call('selectAndFocus', 2, false, 'stale'), false);
+    f.update({ disabled: true });
+    assert.equal(f.call('selectAndFocus', 2, false, 'document:1'), false);
+    assert.equal(f.events.length, 3, 'explicit intent retains revision and disabled guards');
+  }
+});
+
+runtimeTest('current-row keyboard navigation remains an explicit selection intent at boundaries', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'table', cursor: 0 });
+  f.call('setItems', [1, 1, 1]);
+  const keys = [
+    { key: 'Home' },
+    { key: 'End', shiftKey: true },
+    { key: 'End' },
+    { key: 'Home', shiftKey: true },
+    { key: 'ArrowUp' },
+  ];
+  for (const key of keys) assert.equal(f.event('key.down', key).defaultPrevented, true);
+  assert.deepEqual(f.events.map(({ name, payload }) => [name, payload.index, payload.extend]), [
+    ['select', 0, false], ['select', 2, true], ['select', 2, false],
+    ['select', 0, true], ['select', 0, false],
+  ], 'Home/End and an unmodified edge arrow must collapse selection even without cursor movement');
+  assert.equal(f.call('selectIndex', 0, false, 'document:1'), true);
+  assert.equal(f.events.length, keys.length, 'hover does not gain keyboard semantics');
 });
 
 runtimeTest('table semantics and addressed row commands reject stale and reentrant authority', async t => {
@@ -190,9 +216,12 @@ runtimeTest('reentrant modal visibility acceptance cannot reopen a dismissed sco
   assert.equal(f.x.open.get(), false); assert.equal(f.x.scopeActive.get(), false);
 });
 
-runtimeTest('scroll region owns keyboard page/edge requests and releases its native lease on detach', async t => {
+runtimeTest('scroll region owns focused page/edge requests without trapping ordinary document focus', async t => {
   const f = await fixture(t, 'scroll-region', { label: 'References' });
-  assert.equal(f.x.scopeActive.get(), true);
+  assert.equal(f.x.scopeActive.get(), false);
+  assert.equal(f.call('key', 'ArrowDown', false), false);
+  assert.deepEqual(f.scrollRequests, []);
+  f.event('host:focus');
   for (const [name, shift] of [['ArrowDown', false], ['PageUp', false], [' ', true], ['Home', false], ['End', false]]) f.call('key', name, shift);
   assert.deepEqual(f.scrollRequests, [
     { kind: 'by', axis: 'vertical', delta: 40 },
@@ -204,6 +233,35 @@ runtimeTest('scroll region owns keyboard page/edge requests and releases its nat
   await f.session.unmount(); assert.equal(f.x.scopeActive.get(), false); assert.equal(f.scrollDisposed, 1);
   assert.equal(f.call('key', 'End', false), false);
 });
+
+runtimeTest('scroll opt-in trap and axes update without capturing descendant editing keys', async t => {
+  const f = await fixture(t, 'scroll-region', { trapFocus: true, axes: 'horizontal' });
+  assert.equal(f.x.scopeActive.get(), true);
+  f.event('host:focus');
+  assert.equal(f.call('key', 'ArrowDown', false), false);
+  assert.equal(f.call('key', 'ArrowRight', false), true);
+  assert.deepEqual(f.scrollRequests, [{ kind: 'by', axis: 'horizontal', delta: 40 }]);
+  f.update({ trapFocus: false, axes: 'both' });
+  assert.equal(f.x.scopeActive.get(), false);
+  f.event('host:focus');
+  f.call('key', 'ArrowDown', false);
+  assert.deepEqual(f.scrollRequests.at(-1), { kind: 'by', axis: 'vertical', delta: 40 });
+  f.event('host:blur');
+  const count = f.scrollRequests.length;
+  assert.equal(f.call('key', 'Home', false), false);
+  assert.equal(f.scrollRequests.length, count);
+});
+runtimeTest('compound scroll content can opt out of Tab without becoming inert', async t => {
+  const f = await fixture(t, 'scroll-region', { tabStop: false });
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'none');
+  f.event('host:focus'); f.call('key', 'PageDown', false);
+  assert.deepEqual(f.scrollRequests, [{ kind: 'page', axis: 'vertical', direction: 'after' }]);
+  f.update({ tabStop: true });
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'auto');
+  f.update({ tabStop: false });
+  await f.session.unmount(); await f.session.mount();
+  assert.equal(f.session.caps.getPort('focus').getFocusableConfig().navParticipation, 'none');
+});
 runtimeTest('action projects expansion only for declared disclosure controls', async t => {
   const f = await fixture(t, 'action-control', { expandable: true, expanded: false, label: 'Section' });
   assert.deepEqual(f.semantics().states, { disabled: false, expanded: false });
@@ -211,166 +269,53 @@ runtimeTest('action projects expansion only for declared disclosure controls', a
   f.update({ expandable: false }); assert.deepEqual(f.semantics().states, { disabled: false });
 });
 
-
-runtimeTest('action Enter default response is source-owned and pointer/Space retain ordinary activation', async t => {
-  const f = await fixture(t, 'action-control', { submitOnEnter: true, label: 'Choice' });
-  assert.equal(f.event('key.down', { key: 'Enter' }).defaultPrevented, true);
-  assert.deepEqual(f.events, [{ name: 'submit', payload: { revision: 'document:1' } }]);
-  // Space remains available to the host's press protocol; suppressing key.down
-  // would prevent the native compiler from producing its semantic press.
-  assert.equal(f.event('key.down', { key: ' ' }).defaultPrevented, false);
-  f.event('press.start', { key: ' ' });
-  assert.equal(f.event('press.commit', { key: ' ' }).defaultPrevented, true);
-  assert.equal(f.events.at(-1).name, 'activate');
-  f.update({ disabled: true, revision: 'document:2' });
-  const n = f.events.length; f.event('key.down', { key: 'Enter' }); f.event('press.commit');
-  assert.equal(f.events.length, n);
+runtimeTest('menu radio selection is checked and modified tab keys preserve host shortcuts', async t => {
+  const radio = await fixture(t, 'action-control', { role: 'menuitemradio', selected: true, selectable: true });
+  assert.deepEqual(radio.semantics().states, { disabled: false, checked: true });
+  const tab = await fixture(t, 'action-control', { role: 'tab', selected: true, position: 0, count: 3 });
+  for (const modifier of ['ctrlKey', 'altKey', 'metaKey']) {
+    assert.equal(tab.event('key.down', { key: 'ArrowRight', [modifier]: true }).defaultPrevented, false);
+  }
+  assert.deepEqual(tab.events, []);
 });
 
-runtimeTest('track list context requests validate hit facts and rejection restores accepted selection', async t => {
-  const f = await fixture(t, 'collection-control', { mode: 'tracklist', cursor: 0 });
+runtimeTest('collection rejects fractional indices and reentrant submenu changes retire older expansion', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'menu', cursor: 0 });
+  f.call('setItems', [2, 1, 1]);
+  for (const index of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, 3]) {
+    assert.equal(f.call('choose', index, false, 'document:1'), false);
+    assert.equal(f.call('selectIndex', index, false, 'document:1'), false);
+  }
+  assert.deepEqual(f.events, []);
+  const unsubscribe = f.x.expanded.subscribe(event => {
+    if (event.type === 'next' && event.next === 0) f.update({ disabled: true, expanded: -1, revision: 'new-menu' });
+  });
+  f.call('key', 'ArrowRight', false, false);
+  unsubscribe();
+  assert.equal(f.x.expanded.get(), -1);
+  assert.deepEqual(f.events, []);
+});
+
+runtimeTest('search list routes text shortcuts through source without consuming input or stale field callbacks', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'searchlist', cursor: 0 });
   f.call('setItems', [1, 1, 1]);
   assert.equal(f.semantics().role, 'listbox');
-  assert.equal(f.call('contextAt', 2, 'old', 4, 5, false), false);
-  assert.equal(f.call('contextAt', 2, 'document:1', Infinity, 5, false), false);
-  assert.equal(f.call('contextAt', 2, 'document:1', 4, 5, false), true);
-  assert.deepEqual(f.events.at(-1), { name:'context', payload:{ index:2, x:4, y:5, keyboard:false, revision:'document:1' } });
-  assert.equal(f.call('reconcile'), true); assert.equal(f.x.cursor.get(), 0);
-  f.call('key', 'F10', true, false);
-  assert.deepEqual(f.events.at(-1), { name:'context', payload:{ index:0, x:0, y:0, keyboard:true, revision:'document:1' } });
-  const stop = f.x.cursor.subscribe(event => { if (event.type === 'next' && event.next === 1) f.update({ cursor:0, disabled:true, revision:'document:2' }); });
-  const count = f.events.length;
-  assert.equal(f.call('contextAt', 1, 'document:1', 4, 5, false), false); stop();
-  assert.equal(f.events.length, count); assert.equal(f.x.cursor.get(), 0);
-});
-
-runtimeTest('collection page and edge navigation request its declared scroll engine', async t => {
-  const f = await fixture(t, 'collection-control', { mode:'table', cursor:0 });
-  f.call('setItems', new Array(100).fill(1));
-  f.call('key','PageDown',false,false); assert.equal(f.x.cursor.get(),20);
-  f.call('key','Home',false,false); assert.equal(f.x.cursor.get(),0);
-  f.call('key','End',false,false); assert.equal(f.x.cursor.get(),99);
-  assert.deepEqual(f.scrollRequests,[
-    {kind:'page',axis:'vertical',direction:'after'},
-    {kind:'to',axis:'vertical',position:0},
-    {kind:'to-end',axis:'vertical'},
-  ]);
-});
-runtimeTest('nested scroll regions can delegate their focus scope to the surrounding overlay', async t => {
-  const f = await fixture(t, 'scroll-region', { scope:false });
-  assert.equal(f.x.scopeActive.get(),false); assert.equal(f.call('key','Tab',false),false);
-  f.call('key','PageDown',false); assert.equal(f.scrollRequests.length,1);
-  f.update({scope:true}); assert.equal(f.x.scopeActive.get(),true);
-  f.update({scope:false}); assert.equal(f.x.scopeActive.get(),false);
-});
-
-runtimeTest('action context ownership validates native facts and routes keyboard through the same policy', async t => {
-  const f = await fixture(t,'action-control',{contextMenu:true});
-  assert.equal(f.call('requestContext',12,34,false,'old'),false);
-  assert.equal(f.call('requestContext',Infinity,34,false,'document:1'),false);
-  assert.equal(f.call('requestContext',12,34,false,'document:1'),true);
-  assert.deepEqual(f.events.at(-1),{name:'context',payload:{x:12,y:34,keyboard:false,revision:'document:1'}});
-  assert.equal(f.event('key.down',{key:'F10',shiftKey:true}).defaultPrevented,true);
-  assert.deepEqual(f.events.at(-1),{name:'context',payload:{x:0,y:0,keyboard:true,revision:'document:1'}});
-  f.update({disabled:true,revision:'document:2'});const n=f.events.length;
-  assert.equal(f.call('requestContext',12,34,false,'document:2'),false);
-  f.event('key.down',{key:'ContextMenu'});assert.equal(f.events.length,n);
-});
-runtimeTest('scroll axis policy handles horizontal panes without inventing a second engine', async t => {
-  const f=await fixture(t,'scroll-region',{axes:'horizontal',scope:false});
-  f.call('key','ArrowRight',false);f.call('key','PageDown',false);f.call('key','Home',false);
-  assert.deepEqual(f.scrollRequests,[{kind:'by',axis:'horizontal',delta:40},{kind:'page',axis:'horizontal',direction:'after'},{kind:'to',axis:'horizontal',position:0}]);
-});
-
-runtimeTest('filtered collection owns result reconciliation, search routing and focus commands', async t => {
-  const f = await fixture(t, 'collection-control', { mode:'filterlist', cursor:-1 });
-  assert.equal(f.events.at(-1).payload.index, -1, 'empty results clear accepted selection through the source');
-  f.events.length = 0;
-  f.call('setItems', [1, 1, 1]);
-  assert.equal(f.semantics().role, 'listbox');
-  assert.equal(f.x.cursor.get(), 0);
-  assert.deepEqual(f.events.map(event => [event.name, event.payload.key]), [['select', 'reconcile'], ['command', 'reveal']]);
-  f.events.length = 0;
-  assert.equal(f.call('filterKey', 'ArrowDown', false, false, false, true, 'document:1', false), true);
+  for (const key of [' ', 'Home', 'End', 'ArrowLeft', 'Delete']) {
+    assert.equal(f.call('keyFrom', 'search', key, false, false, 'document:1'), false);
+  }
+  assert.deepEqual(f.events, []);
+  assert.equal(f.call('keyFrom', 'search', 'ArrowDown', false, false, 'document:1'), true);
+  assert.equal(f.events.at(-1).name, 'select');
   assert.equal(f.x.cursor.get(), 1);
-  assert.deepEqual(f.events.map(event => [event.name, event.payload.index, event.payload.key]), [['select', 1, ''], ['command', 1, 'reveal']]);
-  assert.equal(f.call('filterKey', 'Enter', false, false, false, true, 'document:1', false), true);
+  assert.equal(f.call('keyFrom', 'search', 'Enter', false, false, 'document:1'), true);
   assert.equal(f.events.at(-1).name, 'activate');
-  assert.equal(f.call('filterKey', 'f', false, true, false, false, 'document:1', false), true);
-  assert.equal(f.events.at(-1).payload.key, 'focus-filter');
-  assert.equal(f.call('filterKey', 'Escape', false, false, false, true, 'document:1', false), true);
+  assert.equal(f.call('keyFrom', 'root', 'f', false, true, 'document:1'), true);
+  assert.equal(f.events.at(-1).payload.key, 'Find');
+  const before = f.events.length;
+  assert.equal(f.call('keyFrom', 'form', 'ArrowDown', false, false, 'document:1'), false);
+  f.update({ revision: 'filtered', cursor: 0 });
+  assert.equal(f.call('keyFrom', 'search', 'Enter', false, false, 'document:1'), false);
+  assert.equal(f.events.length, before);
+  assert.equal(f.call('keyFrom', 'form', 'Escape', false, false, 'filtered'), true);
   assert.equal(f.events.at(-1).name, 'close');
-  f.update({ revision:'document:2', cursor:-1 });
-  assert.equal(f.events.filter(event => event.name === 'select').at(-1).payload.revision, 'document:2');
-  assert.equal(f.x.cursor.get(), 0);
-  f.events.length = 0; f.update({ disabled:true, cursor:-1 });
-  assert.equal(f.events.length, 0, 'disabled reconciliation cannot publish a selection');
-});
-
-runtimeTest('filtered routing leaves editing, modifiers, composition and replaced views authoritative', async t => {
-  const f = await fixture(t, 'collection-control', { mode:'filterlist' });
-  f.call('setItems', [1, 1]); f.events.length = 0;
-  for (const key of [' ', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageDown', 'Backspace', 'Delete', 'Tab', 'x']) {
-    assert.equal(f.call('filterKey', key, false, false, false, true, 'document:1', false), false);
-  }
-  for (const key of ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'f']) {
-    assert.equal(f.call('filterKey', key, false, key === 'f', true, true, 'document:1', false), false);
-  }
-  assert.equal(f.call('filterKey', 'ArrowDown', false, false, false, false, 'document:1', false), false);
-  assert.equal(f.call('filterKey', 'ArrowDown', false, false, false, true, 'document:1', true), false);
-  assert.equal(f.call('filterKey', 'ArrowDown', false, false, false, true, 'old', false), false);
-  assert.equal(f.events.length, 0);
-  await f.session.unmount();
-  assert.equal(f.call('filterKey', 'Enter', false, false, false, true, 'document:1', false), false);
-});
-
-runtimeTest('collection reveals measured rows by its nearest edge and rejects stale geometry', async t => {
-  const f = await fixture(t, 'collection-control', { mode:'filterlist' });
-  f.call('setItems', [1, 1]);
-  assert.equal(f.call('revealGeometry', 0, -20, 20, 0, 100, 'document:1'), true);
-  assert.equal(f.call('revealGeometry', 0, 90, 130, 0, 100, 'document:1'), true);
-  assert.equal(f.call('revealGeometry', 0, 10, 30, 0, 100, 'document:1'), true);
-  assert.equal(f.call('revealGeometry', 0, -10, 110, 0, 100, 'document:1'), true);
-  assert.deepEqual(f.scrollRequests, [{kind:'by',axis:'vertical',delta:-20}, {kind:'by',axis:'vertical',delta:30}]);
-  for (const args of [[1,110,140,0,100,'document:1'], [0,110,140,0,100,'old'], [0,NaN,140,0,100,'document:1'], [0,110,140,0,0,'document:1'], [0,140,110,0,100,'document:1']]) {
-    assert.equal(f.call('revealGeometry', ...args), false);
-  }
-  assert.equal(f.scrollRequests.length, 2);
-  await f.session.unmount();
-  assert.equal(f.call('revealGeometry', 0, 110, 140, 0, 100, 'document:1'), false);
-});
-
-runtimeTest('horizontal collections own page, edge and measured strip reveal on one axis', async t => {
-  const f = await fixture(t, 'collection-control', { mode:'tracklist', orientation:'horizontal' });
-  f.call('setItems', new Array(40).fill(1));
-  f.call('key','PageDown',false,false); assert.equal(f.x.cursor.get(),20);
-  f.call('key','Home',false,false); f.call('key','End',false,false);
-  assert.equal(f.call('revealGeometry',39,150,180,0,100,'document:1'),true);
-  assert.deepEqual(f.scrollRequests,[{kind:'page',axis:'horizontal',direction:'after'}, {kind:'to',axis:'horizontal',position:0},
-    {kind:'to-end',axis:'horizontal'}, {kind:'by',axis:'horizontal',delta:80}]);
-});
-
-runtimeTest('reentrant result acceptance retires a suspended page and reveal proposal', async t => {
-  const f = await fixture(t, 'collection-control', { mode:'filterlist' });
-  f.call('setItems', new Array(50).fill(1)); f.events.length = 0;
-  f.onEvent(name => { if (name === 'select') f.update({ cursor:0, revision:'document:2', disabled:true }); });
-  assert.equal(f.call('key','PageDown',false,false),true);
-  assert.equal(f.x.cursor.get(),0); assert.equal(f.scrollRequests.length,0);
-  assert.equal(f.events.filter(event => event.name === 'command').length,0);
-});
-
-runtimeTest('scroll nearest reveal validates measured geometry against the accepted item authority', async t => {
-  const f=await fixture(t,'scroll-region',{scope:false,revealIndex:3,revealRevision:'lane:3'});
-  assert.equal(f.call('revealGeometry',3,300,340,0,200,'old'),false);
-  assert.equal(f.call('revealGeometry',2,300,340,0,200,'lane:3'),false);
-  assert.equal(f.call('revealGeometry',3,NaN,340,0,200,'lane:3'),false);
-  assert.equal(f.call('revealGeometry',3,300,340,0,200,'lane:3'),true);
-  assert.deepEqual(f.scrollRequests,[{kind:'by',axis:'vertical',delta:140}]);
-  f.call('revealGeometry',3,20,60,0,200,'lane:3');
-  f.call('revealGeometry',3,-10,300,0,200,'lane:3');
-  assert.equal(f.scrollRequests.length,1,'visible and oversized spanning items do not oscillate');
-  f.update({axes:'horizontal',revealRevision:'lane:4'});
-  f.call('revealGeometry',3,-40,-10,0,200,'lane:4');
-  assert.deepEqual(f.scrollRequests.at(-1),{kind:'by',axis:'horizontal',delta:-40});
-  await f.session.unmount();assert.equal(f.call('revealGeometry',3,300,340,0,200,'lane:4'),false);
 });

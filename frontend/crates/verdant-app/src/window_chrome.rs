@@ -199,8 +199,8 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
         // Windows retains non-client mouse hit testing (including snap layouts).
         // GPUI keyboard and assistive routes, and every non-Windows click, pass
         // through the compiled action before this native window command.
-        button = button.on_click(cx.listener(move |ed, event, window, cx| {
-            if windows && matches!(event, gpui::ClickEvent::Mouse(_)) { return; }
+        button = button.on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, window, cx| {
+            if windows && event.is_mouse() { return; }
             match caption {
                 Caption::Minimize => window.minimize_window(),
                 Caption::Maximize => window.zoom_window(),

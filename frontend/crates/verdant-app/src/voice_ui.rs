@@ -117,7 +117,6 @@ impl Editor {
             .child(format!("原始 BIN：{}", draft.evidence.model.display()))
             .child(div().text_color(th.text_secondary).child("安装会核对文件内容并保存来源记录。原始文件匹配与您的使用权声明分别记录。"))
             .child(crate::proto_controls::action("voice-rights-attestation", label).role(Role::CheckBox)
-                .authority(format!("{}:{:?}:{:?}:{:?}",crate::proto_controls::editor_authority(self),draft.assets.voice_package,draft.evidence.token,draft.evidence.model))
                 .aria_selected(accepted).tab_index(0).p(px(8.)).rounded(px(5.)).bg(th.control)
                 .child(format!("{} {label}", if accepted { "☑" } else { "☐" }))
                 .on_click(cx.listener(move |ed, _, _, cx| toggle(ed, cx)))

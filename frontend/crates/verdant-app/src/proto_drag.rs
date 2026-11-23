@@ -77,26 +77,16 @@ pub(crate) fn source(key:impl Into<String>,label:impl Into<String>,revision:impl
 }
 struct Drawing { input:Input,draw:Draw }
 impl Render for Drawing {
-    fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement { crate::proto_parent::slot(&self.input.handle.owner,(self.draw)(self.input.clone())) }
-}
-struct Mount {root:Entity<DragSource>,drawing:Entity<Drawing>,input:Input,props:Value,_changes:Subscription,window:gpui::AnyWindowHandle,app:gpui::AsyncApp}
-impl Drop for Mount {
-    fn drop(&mut self){
-        self.input.live.set(false);
-        let token=self.input.lease.get();if token==0.{return;}
-        let input=self.input.clone();let window=self.window;
-        self.app.spawn(async move|cx|{let _=cx.update(|cx|{
-            if input.lease.get()!=token{return;}
-            // The native drag image clears its lease immediately on Drop,
-            // including a completed transfer followed by another native drag.
-            input.lease.set(0.);let _=window.update(cx,|_,window,cx|{cx.stop_active_drag(window);});
-        });}).detach();
+    fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+        crate::proto_parent::slot(&self.input.handle.owner,(self.draw)(self.input.clone()))
     }
 }
+struct Mount {root:Entity<DragSource>,drawing:Entity<Drawing>,input:Input,props:Value,_changes:Subscription}
+impl Drop for Mount {fn drop(&mut self){self.input.live.set(false);}}
 impl RenderOnce for Source {
     fn render(self,window:&mut Window,cx:&mut App)->impl IntoElement {
-        let props=json!({"label":self.label,"revision":self.revision,"disabled":self.disabled});
         let parent=crate::proto_parent::current();let initial_parent=parent.clone();
+        let props=json!({"label":self.label,"revision":self.revision,"disabled":self.disabled});
         let initial=props.clone();let draw=self.draw.clone();let choose=self.choose.clone();
         let key=SharedString::from(format!("proto-transfer-{}",self.key));
         let mount=window.use_keyed_state(key,cx,move |window,cx| {
@@ -111,11 +101,11 @@ impl RenderOnce for Source {
             let changes=cx.observe(&root,move |mount:&mut Mount,_,cx| {
                 let input=mount.input.clone();cx.defer(move |cx| {let _=handle.update(cx,|_,window,cx|input.drain(window,cx));});
             });
-            Mount{root,drawing,input,props:initial,_changes:changes,window:handle,app:cx.to_async()}
+            Mount{root,drawing,input,props:initial,_changes:changes}
         });
         mount.update(cx,|mount,cx| {
-            if crate::proto_parent::changed(&mount.input.handle.owner,&parent) {
-                mount.root.update(cx,|root,cx|root.set_parent(parent,cx)).expect("compiled transfer parent");
+            if crate::proto_parent::changed(&mount.root.read(cx).handle().owner,&parent) {
+                mount.root.update(cx,|root,cx|root.set_parent(parent,cx)).expect("compiled drag source parent");
             }
             if mount.props!=props {
                 let _=mount.root.update(cx,|root,cx|root.set_props(props.clone(),window,cx));

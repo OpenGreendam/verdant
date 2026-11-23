@@ -36,10 +36,6 @@ pub(crate) fn instrument_project() -> Project {
 pub(crate) fn frames<T: Render + 'static>(window: WindowHandle<T>, cx: &mut TestAppContext) {
     for _ in 0..3 {
         cx.update_window(window.into(), |_, window, cx| {
-            // TestPlatform has no automatic display-link loop. Deliver the
-            // same callbacks a real frame runs before drawing, including
-            // measured source reveal requests and retained focus updates.
-            window.simulate_next_frame(cx);
             window.refresh();
             window.draw(cx).clear(cx);
         }).unwrap();

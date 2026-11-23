@@ -71,11 +71,17 @@ fn source_chip(ed:&Editor,editor:&Entity<Editor>,target:&Target,source:usize,lab
 pub(super) fn docked_sources(ed: &Editor, editor:&Entity<Editor>, target: &Target) -> gpui::AnyElement {
     if !workflow::read_workspace(ed, target).matrix_open { return div().into_any_element(); }
     let th = ed.theme;
-    crate::proto_scroll::viewport("native-modulation-sources", "调制来源", "horizontal").role(Role::Group).aria_label("拖动调制来源到参数")
+    let owner = editor.clone(); let target = target.clone();
+    div().id("native-modulation-sources").role(Role::Group).aria_label("拖动调制来源到参数")
         .w_full().min_w_0().h(px(42.)).flex_none()
         .bg(th.headerbar).border_b_1().border_color(th.shade)
-        .child(div().h_full().flex().items_center().gap(px(6.)).px(px(16.)).children(
-            dsp::MOD_SOURCE_LABELS.iter().enumerate().skip(1).map(|(source,label)|source_chip(ed,editor,target,source,label,true))))
+        .child(crate::proto_scroll::native_content("modulation-source-scroll", "调制来源", move |scroll,_,cx| {
+            let ed = owner.read(cx);
+            div().id("modulation-source-document").size_full().overflow_x_scroll().track_scroll(scroll)
+                .child(div().h_full().flex().items_center().gap(px(6.)).px(px(16.)).children(
+                    dsp::MOD_SOURCE_LABELS.iter().enumerate().skip(1).map(|(source,label)|source_chip(ed,&owner,&target,source,label,true))))
+                .into_any_element()
+        }).axes("horizontal"))
         .into_any_element()
 }
 
@@ -111,7 +117,7 @@ fn target_picker(ed: &Editor, target: &Target, effect: &str, params: &[ParamDesc
     let label = choices.iter().find(|(i, _)| *i == selected).map_or("选择目标".into(), |(_, d)| d.name.clone());
     let choices: Vec<_> = choices.into_iter().map(|(i, d)| (i, d.name.clone())).collect();
     let target = target.clone(); let id = id.to_string();
-    dropdown_button(format!("mod-target-{}-{id}", target.slot).into(), label, ed.theme, suite::action_authority(ed, &target), move |_| {
+    dropdown_button(format!("mod-target-{}-{id}", target.slot).into(), label, ed.theme, move |_| {
         use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
         choices.iter().map(|(i, name)| I::action(name.clone(), M::SetDeviceParams { target: target.track.clone(), slot: target.slot,
             expected_key: Some(target.key), values: vec![(id.clone(), *i as f64)] }).checked(*i == selected)).collect()
@@ -122,7 +128,7 @@ fn source_picker(ed: &Editor, target: &Target, params: &[ParamDesc], id: &str, c
     let selected = param(params, id).map_or(0, |p| p.value.round() as usize);
     let label = dsp::MOD_SOURCE_LABELS.get(selected).unwrap_or(&"关闭").to_string();
     let target = target.clone(); let id = id.to_string();
-    dropdown_button(format!("mod-source-choice-{}-{id}", target.slot).into(), label, ed.theme, suite::action_authority(ed, &target), move |_| {
+    dropdown_button(format!("mod-source-choice-{}-{id}", target.slot).into(), label, ed.theme, move |_| {
         use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
         dsp::MOD_SOURCE_LABELS.iter().enumerate().map(|(i, label)| I::action(*label, M::SetDeviceParams {
             target: target.track.clone(), slot: target.slot, expected_key: Some(target.key), values: vec![(id.clone(), i as f64)] }).checked(i == selected)).collect()
@@ -159,7 +165,6 @@ fn advanced_sources(ed: &Editor, editor: &Entity<Editor>, target: &Target, param
     let state = workflow::read_workspace(ed, target); let toggle_target = target.clone();
     let mut section = div().flex().flex_col().gap(gpui::rems(10./16.))
         .child(crate::ui_controls::selectable_button(format!("mod-advanced-{slot}"), "高级来源与 XLFO 步进编辑", state.modulation_advanced_open, th)
-            .authority(suite::action_authority(ed,target))
             .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
                 let mut state = workflow::read_workspace(ed, &toggle_target);
                 state.modulation_advanced_open = !state.modulation_advanced_open;
@@ -195,7 +200,6 @@ fn advanced_sources(ed: &Editor, editor: &Entity<Editor>, target: &Target, param
     let tabs = div().flex().flex_wrap().gap(gpui::rems(4./16.)).children((0..length).map(|step| {
         let target = target.clone();
         crate::ui_controls::selectable_button(format!("seq-detail-{slot}-{step}"), (step+1).to_string(), step == selected, th)
-            .authority(suite::action_authority(ed,&target))
             .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
                 let mut state = workflow::read_workspace(ed, &target); state.sequencer_step = step;
                 workflow::write_workspace(ed, &target, &state); cx.notify();
@@ -220,7 +224,6 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
     let used = (1..=8).filter(|n| param(params, &format!("mod{n}_source")).is_some_and(|d| d.value > 0.)).count();
     let mut panel = div().flex().flex_col().gap(gpui::rems(12./16.)).pt(gpui::rems(12./16.)).border_t_1().border_color(th.shade)
         .child(crate::ui_controls::selectable_button(format!("mod-open-{slot}"), format!("调制与 MIDI · {used} / 8 连线"), state.matrix_open, th)
-            .authority(suite::action_authority(ed,&target))
             .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
                 let mut state = workflow::read_workspace(ed, &toggle_target); state.matrix_open = !state.matrix_open;
                 workflow::write_workspace(ed, &toggle_target, &state); cx.notify();
@@ -266,7 +269,6 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             .child(target_picker(ed, &target, effect, params, &target_id, cx))
             .child(knob_row(editor, || target.clone(), params, &[&cc_id, &channel_id], th, 30.))
             .child(crate::ui_controls::selectable_button(format!("learn-{slot}-{index}"), "学习", false, th).tab_index(0)
-                .authority(suite::action_authority(ed,&target))
                 .on_click(cx.listener(move |ed, _, _, cx| {
                     ed.begin_device_midi_learn(learn_target.track.clone(), learn_target.slot, learn_target.key, index - 1, cx);
                 }))));

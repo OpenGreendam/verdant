@@ -394,6 +394,8 @@ pub struct Editor {
     pub table_focus: crate::table::TableFocus,
     pub table_scroll: gpui::UniformListScrollHandle,
     pub point_scroll: gpui::UniformListScrollHandle,
+    pub(crate) table_native_scroll: crate::proto_scroll::NativeScroll,
+    pub(crate) point_native_scroll: crate::proto_scroll::NativeScroll,
     pub numeric_preview: Option<(crate::generated::controls::NumericId, crate::generated::controls::CommandArg, f64)>,
     /// Plugin host client and live insert state per track.
     pub plugins: Option<Arc<verdant_plugins::PluginClient>>,
@@ -524,6 +526,10 @@ impl Editor {
             });
         }
         let layout = crate::ui_controls::LayoutPrefs::from_prefs(&opts.prefs);
+        let table_scroll = gpui::UniformListScrollHandle::new();
+        let point_scroll = gpui::UniformListScrollHandle::new();
+        let table_native_scroll = crate::proto_scroll::NativeScroll::new(table_scroll.0.borrow().base_handle.clone());
+        let point_native_scroll = crate::proto_scroll::NativeScroll::new(point_scroll.0.borrow().base_handle.clone());
         let mut ed = Editor {
             persistence,
             project_path,
@@ -618,8 +624,10 @@ impl Editor {
             table_cursor: 0,
             table_anchor: None,
             table_focus: crate::table::TableFocus::default(),
-            table_scroll: gpui::UniformListScrollHandle::new(),
-            point_scroll: gpui::UniformListScrollHandle::new(),
+            table_scroll,
+            point_scroll,
+            table_native_scroll,
+            point_native_scroll,
             numeric_preview: None,
             plugins: None,
             insert_runtime: plugin_ui::InsertRuntime::default(),
@@ -1502,7 +1510,7 @@ impl Editor {
                 else { self.import_project_path(path, window, cx); }
             }
             MenuAction::ExportProject => crate::files::export_dialog(self, window, cx),
-            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.is_focused(window) => {
+            action @ (MenuAction::Cut | MenuAction::Copy | MenuAction::Paste | MenuAction::DeleteSelection | MenuAction::SelectAll | MenuAction::Duplicate) if self.focus_arrange.contains_focused(window, cx) => {
                 use integrations::audio_edit_ui::AudioUiAction as A;
                 let action=match action{MenuAction::Cut=>A::Cut,MenuAction::Copy=>A::Copy,MenuAction::Paste=>A::Paste,MenuAction::DeleteSelection=>A::Delete,MenuAction::SelectAll=>A::SelectAll,_=>A::Duplicate};
                 if let Err(error)=self.run_audio_ui(action,window,cx){self.notice(error);cx.notify();}
@@ -1724,6 +1732,7 @@ impl Editor {
             self.table_anchor = Some(note.id.clone());
         }
         self.table_cursor = index;
+        self.table_scroll.scroll_to_item(index, gpui::ScrollStrategy::Nearest);
         self.session.viewport.reveal(note);
         cx.notify();
     }
@@ -1739,6 +1748,7 @@ impl Editor {
         }
         let n = self.active_track().map(|t| t.notes.len()).unwrap_or(0);
         self.table_cursor = self.table_cursor.min(n.saturating_sub(1));
+        self.table_scroll.scroll_to_item(self.table_cursor, gpui::ScrollStrategy::Nearest);
     }
 
     /// Explicit vowel-proxy pronunciation for the selection (one transaction).
@@ -1781,6 +1791,8 @@ impl Editor {
         self.mixer_drag = None;
         self.table_cursor = 0;
         self.table_anchor = None;
+        self.table_scroll.scroll_to_item(0, gpui::ScrollStrategy::Nearest);
+        self.point_scroll.scroll_to_item(0, gpui::ScrollStrategy::Nearest);
         self.needs_fit = true;
     }
 

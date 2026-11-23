@@ -124,10 +124,6 @@ fn apply(
     };
 
     match property {
-        // Plain GPUI Text surfaces have no native selection controller, so
-        // `none` is already the physical behavior. Other selection policies
-        // still require a dedicated selectable text surface.
-        "user-select" | "-webkit-user-select" if value == "none" => {}
         "display" => match value {
             "flex" | "inline-flex" => style.display = Some(Display::Flex),
             "block" | "inline-block" => style.display = Some(Display::Block),
@@ -443,21 +439,4 @@ fn to_absolute(dimension: Dimension) -> Result<AbsoluteLength, Unmapped> {
         .then(|| AbsoluteLength::Pixels(px(dimension.px)))
         // A percentage has no absolute form; GPUI needs one here.
         .ok_or(Unmapped::UnsupportedValue)
-}
-
-#[cfg(test)]
-mod compiled_selection_style_tests {
-    use super::*;
-    #[test]
-    fn none_selection_matches_plain_text_without_admitting_selectable_text() {
-        for property in ["user-select", "-webkit-user-select"] {
-            for value in ["none", "text", "all", "auto"] {
-                let mut resolved = ResolvedStyle::default();
-                resolved.declarations.insert("position".into(), "relative".into());
-                resolved.declarations.insert(property.into(), value.into());
-                let mapped = map(&resolved, LengthContext::default());
-                assert_eq!(mapped.is_complete(), value == "none", "{property}: {value}");
-            }
-        }
-    }
 }

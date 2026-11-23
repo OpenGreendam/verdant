@@ -201,7 +201,7 @@ export default definePrototype<Props>({
     const sync = (handle: RunHandle<Props>) => {
       if (disposed) return;
       ++epoch; const ticket = ++authorityEpoch; syncing = true; run = handle;
-      const props = handle.props.get(); const nextRevision = props.revision ?? '';
+      const props = handle.props.get(); const nextRevision = props.revision ?? ''; const previousRevision = revision;
       const nextX = clamp(props.x ?? 0.5, props.minX ?? 0, props.maxX ?? 1);
       const nextY = clamp(props.y ?? 0.5, props.minY ?? 0, props.maxY ?? 1);
       const shouldCancel = phase.get() !== 'idle' && (nextRevision !== revision || nextX !== acceptedX || nextY !== acceptedY || props.disabled === true);
@@ -225,7 +225,7 @@ export default definePrototype<Props>({
         if (!authorityCurrent(ticket)) return;
       }
       if (!projection(ticket, true)) return;
-      if (shouldCancel) handle.expose.emit('interactionCancel', { revision });
+      if (shouldCancel) handle.expose.emit('interactionCancel', { revision: previousRevision });
       if (!authorityCurrent(ticket)) return;
       syncing = false; if (attached) handle.update();
     };

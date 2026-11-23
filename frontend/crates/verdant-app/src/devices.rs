@@ -17,6 +17,8 @@ use gpui::{
 };
 use verdant_domain::{Revision, TrackId};
 use verdant_ui_protocol::GesturePhase;
+#[cfg(test)]
+use verdant_ui_protocol::{ControlEffect, GestureEvent, PlannerError, drag_normalized};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use verdant_plugins::builtin_dsp::{self as dsp, BandKind, EqParams, Placement};
@@ -156,11 +158,11 @@ fn device_params(ed: &Editor, key: InsertKey) -> Option<Vec<ParamDesc>> {
     Some(params)
 }
 
-/// Project a source-normalized graph coordinate into the plug-in's declared
-/// units and step grid. All movement and fine-mode decisions precede this.
-fn bounded_graph_value(d:&ParamDesc,axis:Axis,normalized:f64)->f64{
-    let value=axis.value(normalized).clamp(d.min,d.max);
-    from_norm(d,to_norm(d,value))
+#[cfg(test)]
+fn bounded_graph_value(d: &ParamDesc, axis: Axis, start: f64, delta: f64, travel: f64, fine: bool) -> Result<f64, PlannerError> {
+    let value = axis.value(drag_normalized(start, delta, travel, fine)?).clamp(d.min, d.max);
+    // Discrete graph handles obey the same native steps as knobs.
+    Ok(from_norm(d, to_norm(d, value)))
 }
 
 fn param<'a>(params: &'a [ParamDesc], id: &str) -> Option<&'a ParamDesc> { params.iter().find(|p| p.id == id) }
@@ -221,7 +223,9 @@ impl Editor {
     /// Window notifications cannot cancel a capture acquired by another editor
     /// window. Project changes still use the unconditional cancellation path.
     pub(crate) fn cancel_device_drag_in(&mut self, window: gpui::AnyWindowHandle, cx: &mut Context<Self>) {
-        if self.device_drag.as_ref().and_then(|drag| drag.capture.as_ref()).is_some_and(|capture| capture.window() == window) {
+        if self.device_drag.as_ref().is_some_and(|drag|
+            drag.source.as_ref().is_some_and(|source| source.window() == window)
+                || drag.capture.as_ref().is_some_and(|capture| capture.window() == window)) {
             self.cancel_device_drag(cx);
         }
     }
@@ -280,13 +284,13 @@ pub(crate) fn open_parameter_value(editor: &Entity<Editor>, owner: DeviceTarget,
     value_entry::open(editor, Target { track: owner, slot, key }, desc, cx);
 }
 
-pub(crate) type SemanticCommand = Rc<dyn Fn(Option<&gpui::ClickEvent>, &mut Window, &mut gpui::App)>;
+pub(crate) type SemanticCommand = Rc<dyn Fn(Option<&crate::proto_controls::Activation>, &mut Window, &mut gpui::App)>;
 
 /// Semantic activation must not synthesize pointer input. GPUI's default
 /// accessible Click creates a MouseUp which can otherwise commit an unrelated
 /// held preview before a toolbar command hides or changes its input surface.
 pub(crate) fn semantic_command<T: 'static>(editor: gpui::WeakEntity<Editor>, actor: gpui::WeakEntity<T>,
-    command: impl Fn(&mut T, Option<&gpui::ClickEvent>, &mut Window, &mut Context<T>) + 'static) -> SemanticCommand {
+    command: impl Fn(&mut T, Option<&crate::proto_controls::Activation>, &mut Window, &mut Context<T>) + 'static) -> SemanticCommand {
     Rc::new(move |event, window, cx| {
         // Native cancellation calls the authored prototype and can report an
         // error through Editor. Release the read borrow before invoking it.
@@ -298,9 +302,9 @@ pub(crate) fn semantic_command<T: 'static>(editor: gpui::WeakEntity<Editor>, act
 }
 
 pub(crate) fn semantic_click(button: crate::proto_controls::Action, command: SemanticCommand) -> crate::proto_controls::Action {
-    let pointer = command.clone();
-    button.on_click(move |event, window, cx| pointer(Some(event), window, cx))
-        .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| command(None, window, cx))
+    // The accepted event retains its keyboard/assistive origin and semantic
+    // anchor; the compiled action never invents a pointer release for either.
+    button.on_click(move |event, window, cx| command(Some(event), window, cx))
 }
 
 // ---------------------------------------------------------------------------
@@ -494,7 +498,7 @@ fn choice(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
         let rows: Vec<_> = labels.iter().map(|s| (*s).to_string()).collect();
         let label = rows.get(current).cloned().unwrap_or_default();
         let id = id.to_string();
-        return dropdown_button(format!("choice-menu-{slot}-{id}").into(), label, th, crate::proto_controls::editor_authority(ed), move |_| {
+        return dropdown_button(format!("choice-menu-{slot}-{id}").into(), label, th, move |_| {
             use crate::editor::MenuAction as M; use crate::menu::MenuItem as I;
             let Some(target) = &target else { return Vec::new() };
             rows.iter().enumerate().map(|(i, name)| I::action(name.clone(), M::SetDeviceParams {
@@ -506,7 +510,7 @@ fn choice(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
         let on = i == current;
         let navigate: Vec<_> = (0..labels.len()).map(|index| parameter_command(target.clone(), vec![(id_owned.clone(), index as f64)], cx)).collect();
         let command = parameter_command(target, vec![(id_owned, i as f64)], cx);
-        semantic_click(crate::proto_controls::action(SharedString::from(format!("choice-{slot}-{id}-{i}")), label.to_string()).authority(format!("{}:{track:?}:{slot}:{id}", crate::proto_controls::editor_authority(ed))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
+        semantic_click(crate::proto_controls::action(SharedString::from(format!("choice-{slot}-{id}-{i}")), label.to_string()).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
             .h(gpui::rems(26.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
             .when(on, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
             .hover(move |s| s.bg(if on { th.checked } else { th.hover }))
@@ -522,7 +526,7 @@ fn toggle(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
     let on = param(params, id).is_some_and(|d| d.value >= 0.5);
     let (target, id_owned) = (target_for(ed, track, slot), id.to_string());
     let command = parameter_command(target, vec![(id_owned, if on { 0.0 } else { 1.0 })], cx);
-    semantic_click(crate::proto_controls::action(SharedString::from(format!("toggle-{slot}-{id}")), label.to_string()).authority(format!("{}:{track:?}:{slot}:{id}", crate::proto_controls::editor_authority(ed))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
+    semantic_click(crate::proto_controls::action(SharedString::from(format!("toggle-{slot}-{id}")), label.to_string()).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
         .flex().items_center().gap(gpui::rems(8.0/16.)).cursor_pointer().text_sm()
         .child(label.to_string()).child(crate::view::switch(on, th)), command)
         .into_any_element()
@@ -538,12 +542,12 @@ fn parameter_command(target: Option<Target>, values: Vec<(String, f64)>, cx: &Co
 }
 
 /// A dropdown-looking button that opens a menu (AdwComboRow's button).
-pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, authority: String, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
+pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let command = semantic_command(cx.weak_entity(), cx.weak_entity(), move |ed, event, window, cx| {
-        let position = event.map_or_else(|| window.mouse_position(), gpui::ClickEvent::position);
+        let position = event.map_or_else(|| window.mouse_position(), crate::proto_controls::Activation::position);
         ed.show_menu(position, items(ed), window, cx);
     });
-    semantic_click(crate::proto_controls::action(id, label.clone()).authority(authority).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
+    semantic_click(crate::proto_controls::action(id, label.clone()).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
         .rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
         .child(div().max_w(gpui::rems(120.0/16.)).truncate().child(label))
         .child(svg().path(icon("chevron-down")).size(gpui::rems(12.0/16.)).text_color(th.text_secondary)), command)
@@ -572,7 +576,7 @@ fn sidechain_picker(ed: &Editor, target: &DeviceTarget, slot: usize, cx: &mut Co
     div().flex().items_center().gap(gpui::rems(8.0/16.))
         .child(svg().path(icon("git-merge")).size(gpui::rems(14.0/16.)).text_color(th.text_secondary))
         .child(div().text_sm().text_color(th.text_secondary).child("侧链"))
-        .child(dropdown_button(SharedString::from(format!("sidechain-{slot}")), label, th, crate::proto_controls::editor_authority(ed), items, cx))
+        .child(dropdown_button(SharedString::from(format!("sidechain-{slot}")), label, th, items, cx))
         .into_any_element()
 }
 
@@ -631,7 +635,7 @@ fn eq_band_tab(ed: &Editor, target: Target, index: usize, band: dsp::Band, selec
     let command = suite::command(ed, target.clone(), suite::SuiteAction::SelectBand(index), cx);
     let navigate: Vec<_> = (0..dsp::EQ_BANDS).map(|index| suite::command(ed, target.clone(), suite::SuiteAction::SelectBand(index), cx)).collect();
     suite::command_button(crate::proto_controls::action(SharedString::from(format!("eq-band-{}-{index}", target.slot)), format!("频段 {}", index + 1))
-        .authority(suite::action_authority(ed, &target)).role(Role::Tab).aria_selected(selected).tab_index(0).aria_label(format!("频段 {}：{}", index + 1, band.kind.label()))
+        .role(Role::Tab).aria_selected(selected).tab_index(0).aria_label(format!("频段 {}：{}", index + 1, band.kind.label()))
         .h(gpui::rems(30.0/16.)).px(gpui::rems(8.0/16.)).flex().items_center().gap(gpui::rems(5.0/16.)).rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
         .border_1().border_color(if selected { with_alpha(band_color(index), 0.6) } else { th.shade }).bg(th.card)
         .when(selected, |d| d.bg(th.checked)).hover(move |s| s.bg(if selected { th.checked } else { th.hover })).active(move |s| s.bg(th.control_pressed))
@@ -719,13 +723,13 @@ fn eq_editor(ed: &Editor, editor: &Entity<Editor>, track: &DeviceTarget, slot: u
             write_if_current(ed, &add_target, vec![(dsp::eq_param_id(next, "on"), 1.)], cx);
         });
         bands = bands.child(semantic_click(presentation::button(format!("eq-add-band-{slot}"), "＋ 频段", false, th)
-            .authority(format!("{}:{next}", suite::action_authority(ed, &target()))).aria_label("启用下一个空闲均衡频段"), command));
+            .aria_label("启用下一个空闲均衡频段"), command));
     }
     bands = bands.child(div().flex_1()).child(semantic_click(
-        presentation::button(format!("eq-all-bands-{slot}"), if all_bands { "仅显示当前" } else { "全部 24 段" }, all_bands, th).authority(suite::action_authority(ed, &target())),
+        presentation::button(format!("eq-all-bands-{slot}"), if all_bands { "仅显示当前" } else { "全部 24 段" }, all_bands, th),
         presentation::section_command(target(), "eq-all-bands".into(), cx)));
     let shape_track = track.clone();
-    let shape = dropdown_button(SharedString::from(format!("eq-shape-{slot}")), band.kind.label().into(), th, format!("{}:{selected}", suite::action_authority(ed, &target())), move |ed| {
+    let shape = dropdown_button(SharedString::from(format!("eq-shape-{slot}")), band.kind.label().into(), th, move |ed| {
         let params = ed.live_device_insert(&shape_track, slot).and_then(|h| ed.plugin_params.get(&h.key()).cloned()).unwrap_or_default();
         eq_menu(shape_track.clone(), slot, key, selected, &EqParams::from_descs(&params))
     }, cx);
@@ -1253,7 +1257,8 @@ fn chain_command(ed: &Editor, track: TrackId, action: ChainAction, cx: &Context<
                     I::separator(),
                     I::action("移除效果器", M::RemoveInsert { track: track.clone(), slot, expected_key }),
                 ];
-                ed.show_menu(event.map(|event| event.position()).unwrap_or_else(|| window.mouse_position()), items, window, cx);
+                let position = event.map_or_else(|| window.mouse_position(), crate::proto_controls::Activation::position);
+                ed.show_menu(position, items, window, cx);
             }
             ChainAction::AddBuiltin(id) => ed.add_insert(&track, "builtin", id, cx),
             ChainAction::Browse(slot) => ed.open_plugin_browser(track.clone(), slot, cx),
@@ -1278,12 +1283,12 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
     let keyed = verdant_service::project_audio::sidechain_source(spec).is_some();
     let title = builtin.and_then(dsp::short_label).map_or(spec.name.clone(), str::to_string);
     let header = div().flex().items_center().gap(gpui::rems(10.0/16.)).h(gpui::rems(32.0/16.))
-        .child(suite::command_button(crate::proto_controls::action(SharedString::from(format!("device-power-{slot}")), "效果器旁通").authority(format!("{}:{track}:{slot}:{expected_key:?}",crate::proto_controls::editor_authority(ed))).role(Role::Switch)
+        .child(suite::command_button(crate::proto_controls::action(SharedString::from(format!("device-power-{slot}")), "效果器旁通").role(Role::Switch)
             .aria_label("启用效果器").aria_selected(on).tab_index(0).cursor_pointer().child(crate::view::switch(on, th)),
             chain_command(ed, track.clone(), ChainAction::Bypass { slot, expected_key }, cx)))
         .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::BOLD).text_color(if on { th.text } else { th.text_secondary }).child(title))
         .when(keyed, |d| d.child(div().px(gpui::rems(8.0/16.)).h(gpui::rems(22.0/16.)).flex().items_center().rounded(gpui::rems(11.0/16.)).bg(with_alpha(th.accent, 0.18)).text_xs().text_color(th.accent).child("侧链")))
-        .child(suite::command_button(crate::proto_controls::action(SharedString::from(format!("device-menu-{slot}")), "效果器菜单").authority(format!("{}:{track}:{slot}:{expected_key:?}",crate::proto_controls::editor_authority(ed))).role(Role::Button).aria_label("效果器菜单").tab_index(0).size(gpui::rems(28.0/16.)).rounded(gpui::rems(6.0/16.))
+        .child(suite::command_button(crate::proto_controls::action(SharedString::from(format!("device-menu-{slot}")), "效果器菜单").role(Role::Button).aria_label("效果器菜单").tab_index(0).size(gpui::rems(28.0/16.)).rounded(gpui::rems(6.0/16.))
             .flex().items_center().justify_center().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed)).cursor_pointer()
             .child(svg().path(icon("menu")).size(gpui::rems(14.0/16.)).text_color(th.text)),
             chain_command(ed, track.clone(), ChainAction::Menu { slot, expected_key }, cx)));
@@ -1303,7 +1308,7 @@ fn device_card(ed: &Editor, editor: &Entity<Editor>, track: &TrackId, slot: usiz
 
 fn add_card(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    let pill = |id: SharedString, label: &str| crate::proto_controls::action(id, label.to_string()).authority(format!("{}:{track}:{slot}",crate::proto_controls::editor_authority(ed))).role(Role::Button).aria_label(label.to_string()).tab_index(0).h(gpui::rems(32.0/16.)).px(gpui::rems(12.0/16.))
+    let pill = |id: SharedString, label: &str| crate::proto_controls::action(id, label.to_string()).role(Role::Button).aria_label(label.to_string()).tab_index(0).h(gpui::rems(32.0/16.)).px(gpui::rems(12.0/16.))
         .flex().items_center().rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked))
         .cursor_pointer().text_sm().child(label.to_string());
     let effects = dsp::EFFECT_IDS.iter().map(|&id| {
@@ -1320,12 +1325,30 @@ fn add_card(ed: &Editor, track: &TrackId, slot: usize, cx: &mut Context<Editor>)
 }
 
 /// The device view for the selected track.
-pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window, cx: &mut Context<Editor>) -> gpui::AnyElement {
+pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, _window: &mut Window, _cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let track = ed.session.track.clone();
     let Some(name) = ed.project().track(&track).map(|t| t.name.clone()) else {
         return div().size_full().bg(th.view).into_any_element();
     };
+    let count = ed.insert_specs(&track).len();
+    let empty = count == 0 && ed.project().track(&track).is_none_or(|track| track.instrument().is_none());
+    let owner = editor.clone();
+    div().id("device-view").role(Role::Group).aria_label(format!("{name} 的效果器链"))
+        .track_focus(&ed.focus_devices)
+        .size_full().flex().flex_col().bg(th.view)
+        .child(div().h(gpui::rems(40.0/16.)).flex_none().px(gpui::rems(16.0/16.)).flex().items_center().gap(gpui::rems(8.0/16.))
+            .child(svg().path(icon("sliders-horizontal")).size(gpui::rems(15.0/16.)).text_color(th.text_secondary))
+            .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))
+            .child(div().text_sm().text_color(th.text_secondary).child(if empty { "· 还没有效果器".to_string() } else { format!("· {count} 个效果器，信号从左到右") })))
+        .child(div().flex_1().min_h_0().child(crate::proto_scroll::content("device-chain", "效果器链", move |window, cx| {
+            owner.update(cx, |ed, cx| device_chain(ed, &owner, window, cx))
+        }).axes("both")))
+        .into_any_element()
+}
+
+fn device_chain(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window, cx: &mut Context<Editor>) -> gpui::AnyElement {
+    let track = ed.session.track.clone();
     let count = ed.insert_specs(&track).len();
     for slot in 0..count { ed.fetch_track_insert_params(&track, slot, cx); }
     let mut params = Vec::with_capacity(count);
@@ -1340,23 +1363,19 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window
     let instrument = crate::instrument::instrument_card(ed, editor, &track, window, cx);
     let ed = &*ed;
     let cards: Vec<gpui::AnyElement> = instrument.into_iter().chain(params.into_iter().enumerate().map(|(slot, p)| device_card(ed, editor, &track, slot, p, cx))).collect();
-    let empty = cards.is_empty();
-    div().id("device-view").role(Role::Group).aria_label(format!("{name} 的效果器链"))
-        .track_focus(&ed.focus_devices)
-        .size_full().flex().flex_col().bg(th.view)
-        .child(div().h(gpui::rems(40.0/16.)).flex_none().px(gpui::rems(16.0/16.)).flex().items_center().gap(gpui::rems(8.0/16.))
-            .child(svg().path(icon("sliders-horizontal")).size(gpui::rems(15.0/16.)).text_color(th.text_secondary))
-            .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))
-            .child(div().text_sm().text_color(th.text_secondary).child(if empty { "· 还没有效果器".to_string() } else { format!("· {count} 个效果器，信号从左到右") })))
-        .child(crate::proto_scroll::viewport("device-chain", "效果器链", "both").flex_1().min_h_0().flex().items_start().gap(gpui::rems(12.0/16.)).px(gpui::rems(12.0/16.)).pb(gpui::rems(12.0/16.))
-            .children(cards)
-            .child(add_card(ed, &track, count, cx)))
-        .into_any_element()
+    div().flex().items_start().gap(gpui::rems(12.0/16.)).px(gpui::rems(12.0/16.)).pb(gpui::rems(12.0/16.))
+        .children(cards).child(add_card(ed, &track, count, cx)).into_any_element()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn plan(phase: GesturePhase, event: GestureEvent, hit: bool, crossed: bool, reset: bool, double: bool) -> Result<verdant_ui_protocol::ControlPlan, PlannerError> {
+        verdant_ui_protocol::plan_control(phase, event, verdant_ui_protocol::ControlGuards {
+            hit_control: hit, threshold_crossed: crossed, reset_modifier: reset, double_click: double,
+        })
+    }
 
     fn d(min: f64, max: f64, unit: &str) -> ParamDesc {
         ParamDesc { id: "x".into(), name: "x".into(), value: min, min, max, unit: unit.into(), step_count: 0, default_value: None }
@@ -1382,6 +1401,27 @@ mod tests {
     }
 
     #[test]
+    fn compiled_control_protocol_selects_drags_commits_and_resets() {
+        use ControlEffect::*;
+        use GestureEvent::*;
+        use GesturePhase::*;
+        let down = plan(Idle, Down, true, false, false, false).unwrap();
+        assert_eq!(down.next_phase, Armed);
+        assert!(down.consumed);
+        assert_eq!(down.effects, [Select, Begin, Capture]);
+        assert!(plan(Armed, Move, true, false, false, false).unwrap().effects.is_empty());
+        assert_eq!(plan(Armed, Move, true, true, false, false).unwrap().next_phase, Dragging);
+        assert_eq!(plan(Dragging, Up, true, false, false, false).unwrap().effects, [Commit, Release]);
+        assert_eq!(plan(Armed, Up, true, false, false, false).unwrap().effects, [Discard, Release]);
+        assert_eq!(plan(Idle, Down, true, false, false, true).unwrap().effects, [Select, Reset]);
+        assert_eq!(plan(Idle, Down, true, false, true, false).unwrap().effects, [Select, Reset]);
+        assert!(!plan(Idle, Down, false, false, false, false).unwrap().consumed);
+        assert_eq!(drag_normalized(0.5, 90.0, 180.0, false).unwrap(), 1.0);
+        assert!((drag_normalized(0.5, 90.0, 180.0, true).unwrap() - 0.55).abs() < 1e-9);
+        assert_eq!(drag_normalized(0.2, -500.0, 180.0, false).unwrap(), 0.0);
+    }
+
+    #[test]
     fn graph_axes_map_both_ways_and_animation_eases_in_the_knob_scale() {
         let hz = Axis::log(20.0, 20_000.0);
         assert!((hz.value(hz.norm(1_000.0)) - 1_000.0).abs() < 1e-9);
@@ -1400,21 +1440,35 @@ mod tests {
     }
 
     #[test]
+    fn compiled_control_cancel_discards_armed_and_previewed_edits() {
+        for phase in [GesturePhase::Armed, GesturePhase::Dragging] {
+            let cancel = plan(phase, GestureEvent::Cancel, false, false, false, false).unwrap();
+            assert_eq!(cancel.next_phase, GesturePhase::Idle);
+            assert_eq!(cancel.effects, [ControlEffect::Discard, ControlEffect::Release]);
+            assert!(plan(cancel.next_phase, GestureEvent::Up, true, false, false, false).unwrap().effects.is_empty(),
+                "a late release must not commit a cancelled preview");
+            let next = plan(cancel.next_phase, GestureEvent::Down, true, false, false, false).unwrap();
+            assert_eq!(next.next_phase, GesturePhase::Armed);
+            assert!(next.effects.contains(&ControlEffect::Begin));
+        }
+    }
+
+    #[test]
     fn graph_drags_use_the_display_axis_then_clamp_to_the_parameter() {
         let ceiling = d(-12., 0., "dB");
         let level_axis = Axis::lin(-36., 0.);
-        assert!((bounded_graph_value(&ceiling,level_axis,level_axis.norm(-6.)+0.1) + 2.4).abs() < 1e-9);
-        assert_eq!(bounded_graph_value(&ceiling,level_axis,0.), -12.);
+        assert!((bounded_graph_value(&ceiling, level_axis, level_axis.norm(-6.), 10., 100., false).unwrap() + 2.4).abs() < 1e-9);
+        assert_eq!(bounded_graph_value(&ceiling, level_axis, level_axis.norm(-6.), -100., 100., false).unwrap(), -12.);
         let cutoff = d(20., 1000., "Hz");
-        assert!((bounded_graph_value(&cutoff,FREQ_AXIS,FREQ_AXIS.norm(100.)+0.1) - 199.5262315).abs() < 1e-6);
-        assert!((bounded_graph_value(&cutoff,FREQ_AXIS,1.) - 1000.).abs() < 1e-9);
+        assert!((bounded_graph_value(&cutoff, FREQ_AXIS, FREQ_AXIS.norm(100.), 10., 100., false).unwrap() - 199.5262315).abs() < 1e-6);
+        assert!((bounded_graph_value(&cutoff, FREQ_AXIS, FREQ_AXIS.norm(100.), 100., 100., false).unwrap() - 1000.).abs() < 1e-9);
         let delay = d(1., 2000., "ms");
         let timeline = Axis::lin(0., 2000.);
-        assert!((bounded_graph_value(&delay,timeline,0.35) - 700.).abs() < 1e-9);
+        assert!((bounded_graph_value(&delay, timeline, timeline.norm(500.), 10., 100., false).unwrap() - 700.).abs() < 1e-9);
         let attack = d(1., 2000., "ms");
         let envelope = Axis::log(1., 2000.).span(0.02, 0.25);
         let before = envelope.norm(100.);
-        let value = bounded_graph_value(&attack,envelope,before+0.03);
+        let value = bounded_graph_value(&attack, envelope, before, 3., 100., false).unwrap();
         assert!((envelope.norm(value) - before - 0.03).abs() < 1e-9, "a handle follows the pointer within its own envelope segment");
     }
 
@@ -1526,11 +1580,14 @@ mod native_tests {
     }
 
     fn hold_suite_knob(window: &mut Window, cx: &mut App) -> (verdant_normalized_knob::NormalizedKnobHandle, gpui::Point<Pixels>, serde_json::Value) {
-        let owner = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+        let mut owners = verdant_normalized_knob::native::gpui_native_owner::all_owners().into_iter().filter(|owner| {
             let owner = owner.borrow();
-            owner.mounted && owner.window_id == Some(window.window_handle().window_id()) && owner.declared_events.contains("valueCommit")
-                && owner.exposes.contains_key("value") && owner.exposes.contains_key("phase")
-        }).expect("the production compiled knob is mounted in this window");
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.declared_events.contains("exactValueRequested")
+                && owner.exposes.contains_key("phase") && owner.exposes.contains_key("value")
+        });
+        let owner = owners.next().expect("the production compiled knob is mounted in this window");
+        assert!(owners.next().is_none(), "the fixture has exactly one production knob, independently of the graph's compiled owners");
         let knob = verdant_normalized_knob::NormalizedKnobHandle { owner };
         let accepted = knob.state("value").unwrap();
         let start = knob.owner.borrow().native_hitbox.as_ref().unwrap().bounds.center();
@@ -1690,9 +1747,7 @@ mod native_tests {
         }).unwrap();
     }
 
-    struct EqTabHarness {
-        editor: Entity<Editor>, target: Target, desc: ParamDesc,
-    }
+    struct EqTabHarness { editor: Entity<Editor>, target: Target, desc: ParamDesc }
 
     impl Render for EqTabHarness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1710,20 +1765,23 @@ mod native_tests {
         let main = open(cx, false);
         let (editor, target, desc) = main.update(cx, |host, _, _| (host.editor.clone(), host.target.clone(), host.desc.clone())).unwrap();
         let window = cx.open_window(size(px(520.), px(220.)), |_, _| EqTabHarness { editor, target, desc });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
         crate::native_test_support::frames(window, cx);
         let (knob, start, accepted) = window.update(cx, |_, window, cx| hold_suite_knob(window, cx)).unwrap();
         crate::native_test_support::frames(window, cx);
-        window.update(cx, |_, window, cx| {
-            use verdant_action_control::native::gpui_native_owner::{all_owners, resolved};
-            let name = format!("频段 3：{}", EqParams::default().bands[2].kind.label());
-            let owner = all_owners().into_iter().find(|owner| {
+        let tab = cx.update_window(window.into(), |_, window, cx| {
+            let owner = verdant_action_control::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
                 let owner = owner.borrow();
                 owner.mounted && owner.window_id == Some(window.window_handle().window_id())
-                    && owner.modules.accessible_text.get("name").is_some_and(|value| resolved(value).text() == name)
-            }).expect("actual compiled EQ tab focus target");
-            verdant_action_control::ActionControlHandle { owner }.call("focusSelf", vec![], window, cx).unwrap();
+                    && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("tab")
+                    && crate::proto_controls::source_index(owner.props.get("position")) == Some(2)
+            }).expect("the exact EQ tab's compiled action is mounted");
+            let tab = verdant_action_control::ActionControlHandle { owner };
+            tab.call("focusSelf", vec![], window, cx).unwrap();
+            tab
         }).unwrap();
         crate::native_test_support::frames(window, cx);
+        assert_eq!(tab.state("focused").unwrap(), serde_json::json!(true), "keyboard input targets the source-owned focus handle");
         cx.simulate_keystrokes(window.into(), "space");
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
@@ -1874,6 +1932,39 @@ mod native_tests {
     }
 
     #[gpui::test]
+    fn graph_lost_or_replaced_capture_cannot_commit_or_release_its_successor(cx: &mut TestAppContext) {
+        for replacement in [false, true] {
+            for terminal_only in [false, true] {
+                let window = open(cx, false);
+                window.update(cx, |host, window, cx| {
+                    down(host, window, cx);
+                    let hitbox = window.captured_hitbox().unwrap();
+                    let successor = if replacement {
+                        Some(crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx))
+                    } else {
+                        window.release_pointer(); None
+                    };
+                    if !terminal_only {
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: start(host) + point(px(20.), px(-12.)),
+                            pressed_button: Some(MouseButton::Left), ..Default::default()
+                        }), cx);
+                        assert!(host.editor.read(cx).device_drag.is_none());
+                        if let Some(successor) = successor.as_ref() {
+                            assert!(successor.is_current(window, cx), "old cancellation preserves the newer capture");
+                        }
+                    }
+                    up(window, cx);
+                    assert!(host.editor.read(cx).device_drag.is_none());
+                    assert_eq!(host.editor.read(cx).revision().get(), 0);
+                    assert_eq!(gain(host, cx), host.desc.value);
+                    if let Some(successor) = successor { successor.release(window, cx); }
+                }).unwrap();
+            }
+        }
+    }
+
+    #[gpui::test]
     fn graph_rejects_a_stale_frame_before_pointer_down(cx: &mut TestAppContext) {
         let window = open(cx, false);
         window.update(cx, |host, window, cx| {
@@ -2005,36 +2096,33 @@ mod native_tests {
 
     #[gpui::test]
     fn graph_exit_blur_and_subtree_detach_cancel_without_waiting_for_up(cx: &mut TestAppContext) {
-        for reason in ["exit", "escape", "blur", "detach"] {
+        for reason in ["exit", "blur", "detach"] {
             let window = open(cx, false);
             window.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
             crate::native_test_support::frames(window, cx);
-            window.update(cx, |_,window,cx| {
-                let owner=verdant_graph_point::native::gpui_native_owner::all_owners().into_iter().find(|owner|{
-                    let source=owner.borrow();source.mounted&&source.window_id==Some(window.window_handle().window_id())
-                        &&source.exposes.contains_key("x")&&source.exposes.contains_key("y")&&source.exposes.contains_key("phase")
-                }).expect("compiled graph point");
-                let source=verdant_graph_point::GraphPointHandle{owner};
-                assert_eq!(source.state("focused").unwrap(),serde_json::json!(true),"graph owns focus before {reason}; native focus: {:?}",window.focused(cx));
+            let point = window.update(cx, |_, window, _| {
+                let owner = verdant_graph_point::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                    let owner = owner.borrow();
+                    owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                        && owner.exposes.contains_key("axis") && owner.exposes.contains_key("x")
+                        && owner.declared_events.contains("valueCommit")
+                }).expect("the physical graph handle has its compiled owner");
+                let point = verdant_graph_point::GraphPointHandle { owner };
+                assert_eq!(point.state("focused").unwrap(), serde_json::json!(true), "the physical press focuses its own graph control");
+                point
             }).unwrap();
             window.update(cx, |host, window, cx| match reason {
                 "exit" => { window.dispatch_event(gpui::PlatformInput::MouseExited(gpui::MouseExitEvent::default()), cx); }
-                "escape" => {},
                 "blur" => window.focus(&host.outside, cx),
                 "detach" => { host.show = false; cx.notify(); }
                 _ => unreachable!(),
             }).unwrap();
-            if reason == "escape" { cx.simulate_keystrokes(window.into(), "escape"); }
             crate::native_test_support::frames(window, cx);
             window.update(cx, |host, window, cx| {
-                if reason == "blur" {
-                    let owner=verdant_graph_point::native::gpui_native_owner::all_owners().into_iter().find(|owner|{
-                        let source=owner.borrow();source.mounted&&source.window_id==Some(window.window_handle().window_id())
-                            &&source.exposes.contains_key("x")&&source.exposes.contains_key("y")&&source.exposes.contains_key("phase")
-                    }).expect("compiled graph point");
-                    let source=verdant_graph_point::GraphPointHandle{owner};
-                    assert_eq!(source.state("focused").unwrap(),serde_json::json!(false),"physical graph blur; failures {:?}",source.take_failures());
-                    assert_eq!(source.state("phase").unwrap(),serde_json::json!("idle"),"source graph blur; failures {:?}",source.take_failures());
+                if reason == "detach" {
+                    assert!(!point.owner.borrow().mounted, "detached source cannot accept another input");
+                } else {
+                    assert_eq!(point.state("phase").unwrap(), serde_json::json!("idle"), "{reason} retires the authored graph phase");
                 }
                 assert!(host.editor.read(cx).device_drag.is_none(), "{reason} removed the preview");
                 assert!(window.captured_hitbox().is_none(), "{reason} released native capture");
@@ -2069,19 +2157,51 @@ mod native_tests {
             assert!(!host.editor.read(cx).has_proto_pointer_contact());
 
             down(host, window, cx);
-            let graph_contact=host.editor.read(cx).proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade).expect("compiled graph owns a native contact");
-            let generation=graph_contact.generation.get();
+            let graph_contact = host.editor.read(cx).proto_pointer_contact.as_ref()
+                .and_then(std::rc::Weak::upgrade).expect("the compiled graph owns its contact");
             touch(gpui::TouchPhase::Started, touch_start, window, cx);
-            let current=host.editor.read(cx).proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade).expect("graph contact survives rival touch");
-            assert!(Rc::ptr_eq(&current,&graph_contact));
-            assert_eq!(current.generation.get(),generation);
-            assert_eq!(current.input.get(),Some(verdant_graph_point::native::gpui_native_move::MoveGestureInput::Mouse));
+            let current_contact = host.editor.read(cx).proto_pointer_contact.as_ref()
+                .and_then(std::rc::Weak::upgrade).expect("the graph contact remains live");
+            assert!(Rc::ptr_eq(&graph_contact, &current_contact), "the knob cannot replace the graph contact");
+            assert!(current_contact.is_active());
             assert!(host.editor.read(cx).device_drag.is_some());
             touch(gpui::TouchPhase::Cancelled, touch_start, window, cx);
             up(window, cx);
             assert_eq!(gain(host, cx), host.desc.max);
             assert_eq!(host.editor.read(cx).revision().get(), 1);
         }).unwrap();
+    }
+
+    #[gpui::test]
+    fn production_graph_touch_has_no_mouse_capture_and_obeys_its_window_retirement(cx: &mut TestAppContext) {
+        for cancel in [false, true] {
+            let window = open(cx, false);
+            window.update(cx, |host, window, cx| {
+                let origin = start(host);
+                let touch = |phase, position, window: &mut Window, cx: &mut App| {
+                    window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+                        id: gpui::TouchId(91), phase, position, ..Default::default()
+                    }), cx);
+                };
+                touch(gpui::TouchPhase::Started, origin, window, cx);
+                assert!(host.editor.read(cx).device_drag.is_some(), "production graph accepts touch");
+                assert!(window.captured_hitbox().is_none(), "touch uses its own gesture arena");
+                up(window, cx);
+                assert!(host.editor.read(cx).device_drag.is_some(), "mouse release cannot terminate touch");
+                touch(gpui::TouchPhase::Moved, origin + point(px(0.), px(-12.)), window, cx);
+                if cancel {
+                    host.editor.update(cx, |ed, cx| ed.cancel_device_drag_in(window.window_handle(), cx));
+                    assert!(host.editor.read(cx).device_drag.is_none());
+                }
+                touch(gpui::TouchPhase::Ended, origin + point(px(0.), px(-20.)), window, cx);
+                assert!(host.editor.read(cx).device_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+                assert_eq!(host.editor.read(cx).revision().get(), if cancel { 0 } else { 1 });
+                if cancel { assert_eq!(gain(host, cx), host.desc.value); }
+                else { assert!(gain(host, cx) > host.desc.value); }
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+        }
     }
 
     #[gpui::test]

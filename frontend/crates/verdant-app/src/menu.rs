@@ -187,14 +187,19 @@ impl MenuItem {
     pub fn is_separator(&self) -> bool { self.label.is_empty() }
     fn row_height(&self) -> f32 { if self.is_separator() { 9.0 } else if self.header { 22.0 } else { 26.0 } }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct OpenMenu {
+    /// A dismissed menu cannot lend its callbacks to a later opening at the
+    /// same anchor, even when its content and document revision are identical.
+    instance: String,
     pub window: gpui::AnyWindowHandle,
     pub anchor: Point<Pixels>,
     pub items: Vec<MenuItem>,
     pub selected: usize,
     pub previous_focus: Option<FocusHandle>,
     expanded: Option<usize>,
+    scroll: gpui::ScrollHandle,
+    native_scroll: crate::proto_scroll::NativeScroll,
 }
 
 impl OpenMenu {
@@ -226,7 +231,7 @@ impl Editor {
 
     fn activate_menu_item(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(menu) = self.menu.as_mut().filter(|menu| menu.window == window.window_handle()) else { return; };
-        let Some((index, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
+        let Some((_, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
         match &item.command {
             Some(MenuCommand::Submenu(_)) => {},
             Some(MenuCommand::Editor(command)) => {
@@ -276,7 +281,9 @@ impl Editor {
         let previous_focus = self.menu.as_ref().filter(|m| m.window == window.window_handle())
             .and_then(|m| m.previous_focus.clone()).or_else(|| window.focused(cx));
         let selected = items.iter().position(|i| i.enabled && i.command.is_some()).unwrap_or(0);
-        self.menu = Some(OpenMenu { window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None });
+        let scroll = gpui::ScrollHandle::new();
+        let native_scroll = crate::proto_scroll::NativeScroll::new(scroll.clone());
+        self.menu = Some(OpenMenu { instance: verdant_domain::TrackId::generate().to_string(), window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None, scroll, native_scroll });
         window.focus(&self.focus_menu, cx);
         cx.notify();
     }
@@ -529,12 +536,13 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
 }
 
 fn collection_revision(ed: &Editor, menu: &OpenMenu) -> String {
-    format!("{}:{}:{:?}:{:?}:{:?}", ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.items)
+    // Expanded children change the row-to-command mapping. Old virtual row
+    // callbacks must therefore expire when the submenu topology changes.
+    format!("{}:{}:{}:{:?}:{:?}:{:?}:{:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.expanded, menu.items)
 }
 
-pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx: &mut Context<Editor>) -> impl IntoElement {
+pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, _window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
     let revision = collection_revision(ed, menu);
-    let viewport = window.use_keyed_state("context-menu-viewport", cx, |_,_| gpui::ScrollHandle::new());
     let items = menu.rows().map(|(_, _, item)| if !item.enabled || item.command.is_none() { 0 }
         else if matches!(&item.command, Some(MenuCommand::Submenu(_))) { 2 } else { 1 }).collect();
     let expanded = menu.rows().enumerate().find_map(|(row, (index, child, _))|
@@ -542,8 +550,12 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
     let props = serde_json::json!({"mode":"menu", "label":"上下文菜单", "cursor":menu.selected,
         "expanded": expanded, "revision":revision, "autoFocus":true, "disabled":false});
     let draw_editor = cx.entity(); let snapshot = menu.clone(); let basis = revision.clone();
-    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut gpui::App| {
-        draw_editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), engine.clone().expect("menu viewport binding"), window, cx).into_any_element())
+    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, _window: &mut Window, _cx: &mut gpui::App| {
+        let editor = draw_editor.clone(); let snapshot = snapshot.clone(); let basis = basis.clone(); let handle = handle.clone();
+        let target = snapshot.native_scroll.clone();
+        crate::proto_scroll::content("compiled-context-menu-scroll", "菜单选项", move |window, cx| {
+            editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), window, cx).into_any_element())
+        }).tab_stop(false).native_scroll(target).into_any_element()
     });
     let editor = cx.entity().downgrade();
     let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
@@ -554,12 +566,15 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
             match name {
                 "close" => ed.close_menu(window, cx),
                 "activate" if index >= 0 => ed.activate_menu_item(index as usize, window, cx),
-                "select" if index >= 0 => { if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; } cx.notify(); },
+                "select" if index >= 0 => { if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; menu.scroll.scroll_to_item(index as usize); } cx.notify(); },
                 "expand" => {
                     if let Some(menu) = ed.menu.as_mut() {
+                        let previous_parent = menu.rows().enumerate().find_map(|(row, (source, child, _))|
+                            (!child && menu.expanded == Some(source)).then_some(row));
                         let target = if index >= 0 { menu.rows().nth(index as usize).map(|(source, _, _)| source) } else { None };
                         menu.expanded = target;
                         if index >= 0 { menu.selected = index as usize; }
+                        else if let Some(parent) = previous_parent { menu.selected = parent; }
                     }
                     cx.notify();
                 },
@@ -568,11 +583,10 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
         });
     });
     crate::proto_collection::collection("compiled-context-menu", props, items, draw, sink)
-        .scroll_engine(crate::proto_scroll::Engine::Native(viewport))
 }
 
 fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_collection_control::CollectionControlHandle,
-    revision: String, engine: crate::proto_scroll::EngineBinding, window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
+    revision: String, window: &Window, _cx: &mut Context<Editor>) -> impl IntoElement {
 
     let th = ed.theme;
     let win = window.viewport_size();
@@ -585,8 +599,7 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_colle
     let key_handle = handle.clone();
     let list = div().id("context-menu")
         .key_context("ContextMenu").occlude()
-        .w_full().max_h(height).overflow_y_scroll().track_scroll(&engine.handle(cx))
-        .on_scroll_wheel(move |_,window,cx| engine.notify_input(window,cx))
+        .w_full().max_h(height).overflow_y_scroll().track_scroll(&menu.scroll)
         .p(px(6.0)).rounded(px(12.0)).bg(th.popover).border_1().border_color(th.shade).shadow_lg()
         .text_sm().text_color(th.text)
         .on_key_down(move |event, window, cx| crate::proto_collection::key(&key_handle, event, window, cx))
@@ -605,12 +618,13 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_colle
             let expanded = submenu && menu.expanded == Some(index);
             let choose = handle.clone(); let choose_revision = revision.clone();
             let hover = handle.clone(); let hover_revision = revision.clone();
-            crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone()).role(if item.checked.is_some() { gpui::Role::MenuItemCheckBox } else { gpui::Role::MenuItem })
-                .authority(format!("{revision}:{i}"))
+            crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone())
+                .role(if item.checked.is_some() { gpui::Role::MenuItemCheckBox } else { gpui::Role::MenuItem })
                 .disabled(!enabled)
+                .tab_index(-1)
                 .aria_label(item.label.clone())
                 .when_some(item.checked, |d, on| d.aria_selected(on))
-                .when(submenu, |action| action.aria_expanded(expanded))
+                .when(submenu, |d| d.aria_expanded(expanded))
                 .when(i == selected && enabled, |d| d.aria_active_descendant().bg(th.hover))
                 .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0))
                 .text_color(if enabled { th.text } else { th.text_tertiary })

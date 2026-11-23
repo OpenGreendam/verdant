@@ -2,7 +2,7 @@
 //! controls, draggable pane splitters, and timeline scroll/zoom bars.
 
 use gpui::{
-    AccessibleAction, App, ClickEvent, Context, CursorStyle, DispatchPhase, Div, Entity,
+    AccessibleAction, App, Context, CursorStyle, DispatchPhase, Div, Entity,
     FontWeight, Global, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, Pixels, Role, SharedString, Stateful, Window, canvas, div, fill, prelude::*, px,
     svg,
@@ -262,7 +262,6 @@ pub fn selectable_command_button(
 ) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
-    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
     controls::command_button(
         cmd,
         arg,
@@ -273,7 +272,6 @@ pub fn selectable_command_button(
         if active { th.checked.into() } else { th.control_pressed.into() },
         cx,
     )
-    .authority(authority)
     .role(Role::Button)
     .aria_label(label)
     .aria_selected(active)
@@ -301,7 +299,6 @@ pub fn flat_command_button(
     let label = label.into();
     let th = ed.theme;
     let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
-    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
     controls::command_button(
         cmd,
         arg,
@@ -312,7 +309,6 @@ pub fn flat_command_button(
         if active { th.checked.into() } else { th.hover.into() },
         cx,
     )
-    .authority(authority)
     .role(Role::Button)
     .aria_label(label)
     .aria_selected(active)
@@ -374,7 +370,6 @@ pub fn generated_select_button(
     let th = ed.theme;
     let current = ed.current_select_option(id, &arg);
     let spec = controls::select(id);
-    let authority = format!("{}:{id:?}:{arg:?}:{current}", crate::proto_controls::editor_authority(ed));
     controls::select_control(
         id,
         arg,
@@ -385,7 +380,6 @@ pub fn generated_select_button(
         th.control_pressed.into(),
         cx,
     )
-    .authority(authority)
     .role(Role::ComboBox)
     .aria_label(spec.label)
     .h(px(PANEL_BTN_H))
@@ -566,11 +560,12 @@ pub fn numeric_pill(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>
             let text = if compact { format!("{label} {formatted}") } else { formatted };
             let stepper = |direction: f64, symbol: &'static str| {
                 let actions = actions.clone();
-                div().id(symbol).w(px(if compact { 24.0 } else { 30.0 })).h_full().flex_none()
+                crate::proto_controls::action(symbol, format!("{label}{}", if direction < 0.0 { "减少" } else { "增加" }))
+                    .w(px(if compact { 24.0 } else { 30.0 })).h_full().flex_none()
                     .flex().items_center().justify_center().border_l_1().border_color(th.shade)
                     .text_color(th.text).hover(move |s| s.bg(th.control_pressed))
                     .child(svg().path(icon(symbol)).size(px(13.0)).text_color(th.text))
-                    .on_click(move |event: &ClickEvent, window, cx| {
+                    .on_click(move |event, window, cx| {
                         actions.invoke("adjust", vec![direction.into(), event.modifiers().shift.into()], window, cx);
                         cx.stop_propagation();
                     })
@@ -699,7 +694,13 @@ impl gpui::RenderOnce for Splitter {
         let control = scalar(self.editor, id, spec,
             move |sample, _, initial| {
                 let delta = if vertical { sample.total_delta.x } else { sample.total_delta.y } * sign;
-                Sample { value: initial + delta, fine: initial + delta * 0.1, jump: false }
+                // LayoutPrefs stores f32. Propose that same representation so
+                // its preview echo remains exact across a native repaint.
+                Sample {
+                    value: f64::from((initial + delta) as f32),
+                    fine: f64::from((initial + delta * 0.1) as f32),
+                    jump: false,
+                }
             },
             move |display, _, _, _| canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
                 move |bounds, hitbox, window, _| {
@@ -729,6 +730,114 @@ impl gpui::RenderOnce for Splitter {
             });
         div().id(id).flex_none().when(vertical, |d| d.w(px(5.0)).h_full())
             .when(!vertical, |d| d.h(px(5.0)).w_full()).bg(th.surface).child(control)
+    }
+}
+
+#[cfg(test)]
+mod splitter_precision_tests {
+    use super::*;
+    use gpui::{AppContext, Render, Subscription, TestAppContext, point, size};
+
+    struct Harness { editor: Entity<Editor>, kind: SplitterKind, _changed: Subscription }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let theme = self.editor.read(cx).theme;
+            div().size_full().child(div().w(px(200.0)).h(px(100.0))
+                .child(splitter_bar(self.editor.clone(), self.kind, theme)))
+        }
+    }
+    fn value(layout: LayoutPrefs, kind: SplitterKind) -> f32 {
+        match kind {
+            SplitterKind::InspectorWidth => layout.inspector_width,
+            SplitterKind::RightDockWidth => layout.right_dock_width,
+            SplitterKind::ArrangeHeight => layout.arrange_height,
+            SplitterKind::LaneHeight => layout.lane_height,
+        }
+    }
+
+    #[gpui::test]
+    fn native_splitters_keep_f32_previews_through_repaint_and_release(cx: &mut TestAppContext) {
+        for kind in [SplitterKind::InspectorWidth, SplitterKind::RightDockWidth,
+            SplitterKind::ArrangeHeight, SplitterKind::LaneHeight] {
+            for fine in [false, true] {
+                let window = cx.open_window(size(px(400.0), px(240.0)), |window, cx| {
+                    let editor = cx.new(|cx| Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx));
+                    let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+                    Harness { editor, kind, _changed: changed }
+                });
+                window.update(cx, |_, window, _| window.activate_window()).unwrap();
+                crate::native_test_support::frames(window, cx);
+                let (source, start, initial, saved_layout) = window.update(cx, |host, window, cx| {
+                    let owners = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter()
+                        .filter(|owner| {
+                            let owner = owner.borrow();
+                            owner.window_id == Some(window.window_handle().window_id()) && owner.mounted
+                                && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("separator")
+                        }).collect::<Vec<_>>();
+                    assert_eq!(owners.len(), 1, "the production splitter has one compiled scalar");
+                    let source = verdant_continuous_control::ContinuousControlHandle { owner: owners[0].clone() };
+                    let bounds = source.owner.borrow().native_hitbox.as_ref().expect("painted production splitter").bounds;
+                    assert!(bounds.size.width > px(0.0) && bounds.size.height > px(0.0));
+                    let start = bounds.center();
+                    let editor = host.editor.read(cx);
+                    (source, start, f64::from(value(editor.layout, kind)), editor.prefs.extra.get(LAYOUT_PREFS_KEY).cloned())
+                }).unwrap();
+                cx.update_window(window.into(), |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                        position: start, button: MouseButton::Left, ..Default::default()
+                    }), cx);
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+                let vertical = matches!(kind, SplitterKind::InspectorWidth | SplitterKind::RightDockWidth);
+                let sign = if matches!(kind, SplitterKind::RightDockWidth | SplitterKind::LaneHeight) { -1.0 } else { 1.0 };
+                let mut last = start;
+                let mut expected = initial as f32;
+                for delta in [13.37, 27.19] {
+                    last = if vertical { point(start.x + px(delta), start.y) } else { point(start.x, start.y + px(delta)) };
+                    let distance = if vertical { f64::from(last.x) - f64::from(start.x) } else { f64::from(last.y) - f64::from(start.y) };
+                    expected = (initial + distance * sign * if fine { 0.1 } else { 1.0 }) as f32;
+                    cx.update_window(window.into(), |_, window, cx| {
+                        window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                            position: last, pressed_button: Some(MouseButton::Left),
+                            modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                        }), cx);
+                    }).unwrap();
+                    // The observed Editor is rendered again with its f32 draft;
+                    // retaining only the initial props would hide this bug.
+                    crate::native_test_support::frames(window, cx);
+                    window.update(cx, |host, window, cx| {
+                        let editor = host.editor.read(cx);
+                        assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"), "{kind:?}, fine={fine}");
+                        assert_eq!(value(editor.layout, kind), expected);
+                        assert_eq!(source.state("value").unwrap().as_f64(), Some(f64::from(expected)));
+                        // Window-bounds observation can independently dirty
+                        // preferences; inspect the actual persisted layout.
+                        assert_eq!(editor.prefs.extra.get(LAYOUT_PREFS_KEY), saved_layout.as_ref(),
+                            "preview must not persist layout preferences");
+                        assert!(window.captured_hitbox().is_some(), "the same drag must retain native capture after repaint");
+                    }).unwrap();
+                }
+                cx.update_window(window.into(), |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                        position: last, button: MouseButton::Left,
+                        modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                    }), cx);
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+                window.update(cx, |host, window, cx| {
+                    let editor = host.editor.read(cx);
+                    assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
+                    assert_eq!(value(editor.layout, kind), expected);
+                    assert_eq!(source.state("value").unwrap().as_f64(), Some(f64::from(expected)),
+                        "release must retain the accepted layout for the next interaction");
+                    assert!(editor.prefs_dirty, "release commits the production layout callback");
+                    assert_eq!(LayoutPrefs::from_prefs(&editor.prefs), editor.layout);
+                    assert_ne!(editor.prefs.extra.get(LAYOUT_PREFS_KEY), saved_layout.as_ref());
+                    assert!(window.captured_hitbox().is_none());
+                    assert!(source.take_failures().is_empty());
+                }).unwrap();
+            }
+        }
     }
 }
 
@@ -782,9 +891,6 @@ impl gpui::RenderOnce for TimelineScrollbar {
 
 /// Horizontal timeline scrollbar + zoom buttons for Arrangement or Piano Roll.
 pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: Theme, cx: &mut Context<Editor>) -> impl IntoElement {
-    let space = if is_arrange { crate::clock::Space::Arrange } else { crate::clock::Space::Editor };
-    let e_zoom_out = editor.clone();
-    let e_zoom_in = editor.clone();
     let id_prefix = if is_arrange { "arrange-scroll" } else { "roll-scroll" };
     div()
         .id(id_prefix)
@@ -810,16 +916,8 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
                 .child("−")
-                .on_click(cx.listener(move |ed, _, _, cx| {
-                    if is_arrange {
-                        let c = ed.arrange.width * 0.5;
-                        ed.arrange.zoom_x_at(c, 0.8);
-                    } else {
-                        let c = ed.session.viewport.width * 0.5;
-                        ed.session.viewport.zoom_x_at(c, 0.8);
-                    }
-                    let _ = &e_zoom_out;
-                    ed.notify_viewport(space, cx);
+                .on_click(cx.listener(move |ed, _, window, cx| {
+                    crate::proto_editor_surface::zoom(ed, is_arrange, "zoom-out", window, cx);
                 })),
         )
         .child(
@@ -835,16 +933,8 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .text_color(th.text_secondary)
                 .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
                 .child("+")
-                .on_click(cx.listener(move |ed, _, _, cx| {
-                    if is_arrange {
-                        let c = ed.arrange.width * 0.5;
-                        ed.arrange.zoom_x_at(c, 1.25);
-                    } else {
-                        let c = ed.session.viewport.width * 0.5;
-                        ed.session.viewport.zoom_x_at(c, 1.25);
-                    }
-                    let _ = &e_zoom_in;
-                    ed.notify_viewport(space, cx);
+                .on_click(cx.listener(move |ed, _, window, cx| {
+                    crate::proto_editor_surface::zoom(ed, is_arrange, "zoom-in", window, cx);
                 })),
         )
 }
