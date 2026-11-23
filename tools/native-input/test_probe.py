@@ -29,7 +29,114 @@ class PresetActionSelected(Exception):
     """Stop the offline case at the real accessibility transport boundary."""
 
 
+class TextFocusObserved(Exception):
+    """Stop after the actual selector and focus predicate accept a native node."""
+
+
+class CollectionEntrySelected(Exception):
+    """Stop before clicking the observed library entry in the native window."""
+
+
 class ProbeHelpers(unittest.TestCase):
+    def test_collection_entry_uses_the_native_push_button_in_its_own_window(self):
+        main, other = [':1.3', '/frame/0'], [':1.3', '/frame/1']
+        selected = {'reference': [':1.3', '/library'], 'name': '预设库',
+                    'role': 'push button', 'roleNumber': 43, 'windowReference': main}
+        snapshot = {'nodes': [selected,
+            {**selected, 'reference': [':1.3', '/other/library'], 'windowReference': other},
+            {**selected, 'reference': [':1.3', '/generic'], 'role': 'button'},
+        ]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = main
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        probe.persisted = lambda: {'revision': 2}
+        probe.click = Mock(side_effect=CollectionEntrySelected)
+        with self.assertRaises(CollectionEntrySelected):
+            probe.collection_scroll_cancel()
+        probe.click.assert_called_once_with(selected)
+
+    def collection_probe(self):
+        current, other = [':1.3', '/frame/1'], [':1.3', '/frame/0']
+        viewport = {'reference': [':1.3', '/collection'], 'name': '匹配的预设',
+                    'role': 'list box', 'windowReference': current, 'windowExtents': [168, 148, 716, 340]}
+        first = {'reference': [':1.3', '/option/0'], 'name': 'Deep Sub', 'role': 'list item',
+                 'windowReference': current, 'states': ['selected'], 'windowExtents': [168, 148, 716, 24]}
+        hidden = {**first, 'reference': [':1.3', '/option/19'], 'name': 'Soft Pad',
+                  'states': [], 'windowExtents': [168, 604, 716, 24]}
+        snapshot = {'nodes': [viewport, first, hidden,
+            {**viewport, 'reference': [':1.3', '/other/collection'], 'windowReference': other},
+            {**viewport, 'reference': [':1.3', '/legacy'], 'name': '预设列表', 'role': 'document frame'},
+            {**viewport, 'reference': [':1.3', '/wrong-role'], 'role': 'document frame'},
+            {**first, 'reference': [':1.3', '/other/option'], 'windowReference': other},
+        ]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = current
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        return probe, snapshot, viewport
+
+    def test_collection_observation_uses_the_compiled_listbox_in_its_current_window(self):
+        # Both retained native failures already expose this exact ListBox;
+        # the obsolete document-frame selector never reached its real rows.
+        probe, _, viewport = self.collection_probe()
+        observed = probe.collection_observation()
+        self.assertEqual(observed['viewportReference'], viewport['reference'])
+        self.assertEqual(observed['viewport'], [168, 148, 716, 340])
+        self.assertEqual([row['reference'] for row in observed['options']],
+                         [[':1.3', '/option/0'], [':1.3', '/option/19']])
+        self.assertEqual([row['visible'] for row in observed['options']], [True, False])
+        self.assertEqual([row['selected'] for row in observed['options']], [True, False])
+
+    def test_collection_observation_rejects_missing_wrong_or_ambiguous_listbox(self):
+        for mutation in ('missing', 'role', 'name', 'window', 'duplicate'):
+            with self.subTest(mutation=mutation):
+                probe, snapshot, viewport = self.collection_probe()
+                if mutation == 'missing': snapshot['nodes'].remove(viewport)
+                elif mutation == 'role': viewport['role'] = 'document frame'
+                elif mutation == 'name': viewport['name'] = '预设列表'
+                elif mutation == 'window': viewport['windowReference'] = [':1.3', '/other-frame']
+                else: snapshot['nodes'].append({**viewport, 'reference': [':1.3', '/duplicate']})
+                message = 'Ambiguous accessible target' if mutation == 'duplicate' else 'Timed out waiting'
+                with self.assertRaisesRegex(RuntimeError, message):
+                    probe.collection_observation()
+
+    def test_text_journey_selects_the_native_push_button_after_tab(self):
+        frame = [':1.3', '/frame/0']
+        field = {'reference': [':1.3', '/input'], 'name': '输入文字…', 'role': 'entry',
+                 'states': ['focusable'], 'windowReference': frame}
+        cancel = {'reference': [':1.3', '/cancel'], 'name': '取消', 'role': 'push button',
+                  'roleNumber': 43, 'states': ['focusable', 'focused'], 'windowReference': frame}
+        decoy = {'reference': [':1.3', '/generic'], 'name': '取消', 'role': 'button',
+                 'states': ['focusable'], 'windowReference': frame}
+        snapshot = {'nodes': [field, cancel, decoy]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = frame
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        probe.persisted = lambda: {'revision': 0, 'panPermille': 0}
+        probe.rename_prompt = lambda: field
+        probe.type_unicode = Mock()
+        probe.text = Mock()
+        probe.key = Mock()
+        probe.log_input = Mock()
+        probe.observer = SimpleNamespace(
+            set_text_selection=Mock(return_value=True),
+            read=lambda reference: next(n for n in snapshot['nodes'] if tuple(n['reference']) == reference))
+
+        def record(label, **evidence):
+            if label == 'text-focus-forward':
+                self.assertEqual(evidence['control']['focused'], cancel)
+                raise TextFocusObserved()
+
+        probe.record = Mock(side_effect=record)
+        with self.assertRaises(TextFocusObserved):
+            probe.text_selection_focus()
+        self.assertEqual(probe.key.call_args.args, ('Tab',))
+
     def preset_probe(self, controls):
         main, native = [':1.3', '/frame/0'], [':1.3', '/frame/3']
         snapshot = {'nodes': [
@@ -239,8 +346,8 @@ def synthetic_control_observations():
                 nodes.append(focus)
         if 'viewport' in control:
             control['viewportReference'] = [':1.2', '/viewport']
-            nodes.append({'reference': control['viewportReference'], 'name': '预设列表',
-                          'role': 'document frame', 'windowExtents': copy.deepcopy(control['viewport'])})
+            nodes.append({'reference': control['viewportReference'], 'name': '匹配的预设',
+                          'role': 'list box', 'windowExtents': copy.deepcopy(control['viewport'])})
             nodes.extend({'reference': item['reference'], 'name': item['name'], 'role': 'list item',
                           'states': ['selected'] if item['selected'] else [], 'windowExtents': copy.deepcopy(item['bounds'])}
                          for item in control['options'])
@@ -299,18 +406,36 @@ class ControlEvidenceRefusals(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'actual tree'):
             validate_control_trace(self.observations, self.final)
 
+    def test_cancel_requires_the_platform_push_button_role_and_actual_focus(self):
+        # A real AT-SPI Button is role 43, named "push button". The original
+        # X11 trace had already focused it when the generic "button" query
+        # timed out. Keep role and physical focus checks independently strict.
+        self.detail('text-focus-forward')['control']['focused']['role'] = 'button'
+        next(node for node in self.detail('text-focus-forward')['tree']['nodes']
+             if node.get('reference') == self.detail('text-focus-forward')['control']['focused']['reference'])['role'] = 'button'
+        with self.assertRaisesRegex(RuntimeError, 'wrong physical focus target'):
+            validate_control_trace(self.observations, self.final)
+        self.setUp()
+        self.detail('text-focus-forward')['control']['focused']['states'] = []
+        with self.assertRaisesRegex(RuntimeError, 'focus summary differs from the actual tree'):
+            validate_control_trace(self.observations, self.final)
+
     def test_scroll_requires_changed_visible_rows_and_consistent_native_geometry(self):
         self.detail('collection-wheel')['control'] = copy.deepcopy(self.detail('collection-home')['control'])
-        with self.assertRaises(RuntimeError):
+        self.detail('collection-wheel')['tree'] = copy.deepcopy(self.detail('collection-home')['tree'])
+        with self.assertRaisesRegex(RuntimeError, 'visible rows'):
             validate_control_trace(self.observations, self.final)
         self.setUp()
         self.detail('collection-wheel')['control']['options'][0]['visible'] = True
-        with self.assertRaises(RuntimeError):
+        with self.assertRaisesRegex(RuntimeError, 'platform geometry'):
             validate_control_trace(self.observations, self.final)
 
     def test_end_requires_last_row_selected_and_visible(self):
         self.detail('collection-end')['control']['options'][-1]['selected'] = False
-        with self.assertRaises(RuntimeError):
+        last = self.detail('collection-end')['control']['options'][-1]['reference']
+        next(node for node in self.detail('collection-end')['tree']['nodes']
+             if node.get('reference') == last)['states'] = []
+        with self.assertRaisesRegex(RuntimeError, 'selection/reveal'):
             validate_control_trace(self.observations, self.final)
 
     def test_terminal_sample_cannot_commit_last_observed_preview(self):
@@ -364,6 +489,20 @@ class ControlEvidenceRefusals(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'actual tree'):
                     validate_control_trace(self.observations, self.final)
 
+    def test_collection_viewport_requires_exact_raw_role_label_and_current_window(self):
+        for mutation in ('role', 'name', 'window', 'duplicate-reference'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                detail = self.detail('collection-open')
+                viewport = next(node for node in detail['tree']['nodes']
+                                if node.get('reference') == detail['control']['viewportReference'])
+                if mutation == 'role': viewport['role'] = 'document frame'
+                elif mutation == 'name': viewport['name'] = '预设列表'
+                elif mutation == 'window': viewport['windowReference'] = [':1.2', '/another-window']
+                else: detail['tree']['nodes'].append(copy.deepcopy(viewport))
+                with self.assertRaises(RuntimeError):
+                    validate_control_trace(self.observations, self.final)
+
     def test_collection_summary_cannot_replace_raw_selection_bounds_or_focus(self):
         for mutation in ('selection', 'viewport', 'inventory', 'search-focus'):
             with self.subTest(mutation=mutation):
@@ -373,7 +512,7 @@ class ControlEvidenceRefusals(unittest.TestCase):
                 if mutation == 'selection':
                     next(node for node in nodes if node.get('states') == ['selected'])['states'] = []
                 elif mutation == 'viewport':
-                    next(node for node in nodes if node.get('name') == '预设列表')['windowExtents'] = [0, 0, 5, 5]
+                    next(node for node in nodes if node.get('reference') == detail['control']['viewportReference'])['windowExtents'] = [0, 0, 5, 5]
                 elif mutation == 'inventory':
                     nodes.remove(next(node for node in nodes if node.get('role') == 'list item'))
                 else:

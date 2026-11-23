@@ -2,7 +2,7 @@
 //! controls, draggable pane splitters, and timeline scroll/zoom bars.
 
 use gpui::{
-    AccessibleAction, App, Context, CursorStyle, DispatchPhase, Div, Entity,
+    AccessibleAction, App, ClickEvent, Context, CursorStyle, DispatchPhase, Div, Entity,
     FontWeight, Global, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, Pixels, Role, SharedString, Stateful, Window, canvas, div, fill, prelude::*, px,
     svg,
@@ -262,6 +262,7 @@ pub fn selectable_command_button(
 ) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
+    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
     controls::command_button(
         cmd,
         arg,
@@ -272,6 +273,7 @@ pub fn selectable_command_button(
         if active { th.checked.into() } else { th.control_pressed.into() },
         cx,
     )
+    .authority(authority)
     .role(Role::Button)
     .aria_label(label)
     .aria_selected(active)
@@ -299,6 +301,7 @@ pub fn flat_command_button(
     let label = label.into();
     let th = ed.theme;
     let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
+    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
     controls::command_button(
         cmd,
         arg,
@@ -309,6 +312,7 @@ pub fn flat_command_button(
         if active { th.checked.into() } else { th.hover.into() },
         cx,
     )
+    .authority(authority)
     .role(Role::Button)
     .aria_label(label)
     .aria_selected(active)
@@ -370,6 +374,7 @@ pub fn generated_select_button(
     let th = ed.theme;
     let current = ed.current_select_option(id, &arg);
     let spec = controls::select(id);
+    let authority = format!("{}:{id:?}:{arg:?}:{current}", crate::proto_controls::editor_authority(ed));
     controls::select_control(
         id,
         arg,
@@ -380,6 +385,7 @@ pub fn generated_select_button(
         th.control_pressed.into(),
         cx,
     )
+    .authority(authority)
     .role(Role::ComboBox)
     .aria_label(spec.label)
     .h(px(PANEL_BTN_H))
@@ -891,6 +897,9 @@ impl gpui::RenderOnce for TimelineScrollbar {
 
 /// Horizontal timeline scrollbar + zoom buttons for Arrangement or Piano Roll.
 pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: Theme, cx: &mut Context<Editor>) -> impl IntoElement {
+    let space = if is_arrange { crate::clock::Space::Arrange } else { crate::clock::Space::Editor };
+    let e_zoom_out = editor.clone();
+    let e_zoom_in = editor.clone();
     let id_prefix = if is_arrange { "arrange-scroll" } else { "roll-scroll" };
     div()
         .id(id_prefix)

@@ -7,16 +7,26 @@ use verdant_performance_key::{PerformanceKey,PerformanceKeyHandle,native::gpui_n
 type Callback=Rc<dyn Fn(bool,&mut App)>;
 type Draw=Rc<dyn Fn(bool)->AnyElement>;
 #[derive(Clone)]
-struct Entry { handle:PerformanceKeyHandle, delivery:Rc<RefCell<Delivery>> }
-struct Delivery { callback:Callback, revision:String, pressed:bool, live:bool }
+struct Entry { handle:PerformanceKeyHandle, delivery:Rc<RefCell<Delivery>>, registration:(WindowId,String,u8), owner:gpui::EntityId }
+struct Delivery { callback:Callback, revision:String, pressed:bool, momentary:bool, live:bool }
 fn deliver(entry:&Entry,pressed:bool,cx:&mut App) {
     let callback={let mut delivery=entry.delivery.borrow_mut();
         if delivery.pressed==pressed{return;}delivery.pressed=pressed;delivery.callback.clone()};
-    callback(pressed,cx);
+    if cx.try_global::<Playing>().is_none(){cx.set_global(Playing::default());}
+    if pressed {
+        cx.global_mut::<Playing>().0.insert(entry.registration.clone(),entry.owner);
+        callback(true,cx);
+    } else if cx.global::<Playing>().0.get(&entry.registration)==Some(&entry.owner) {
+        cx.global_mut::<Playing>().0.remove(&entry.registration);
+        callback(false,cx);
+    }
 }
 #[derive(Default)]
 struct Keys(HashMap<(WindowId,String,u8),Entry>);
 impl Global for Keys {}
+#[derive(Default)]
+struct Playing(HashMap<(WindowId,String,u8),gpui::EntityId>);
+impl Global for Playing {}
 
 fn drain(entry:&Entry,cx:&mut App) {
     let failures=entry.handle.take_failures();
@@ -26,7 +36,7 @@ fn drain(entry:&Entry,cx:&mut App) {
     if events.iter().any(|(name,payload)|name=="trigger"&&payload.get("revision").and_then(Value::as_str)==Some(revision.as_str())) {
         let callback=entry.delivery.borrow().callback.clone();callback(true,cx);callback(false,cx);
     }
-    if events.iter().any(|(name,_)|name=="pressedChange") {
+    if !entry.delivery.borrow().momentary&&events.iter().any(|(name,_)|name=="pressedChange") {
         let pressed=entry.handle.state("pressed").ok().and_then(|value|value.as_bool()).unwrap_or(false);
         // Collapsing a down/up batch prevents an already-released physical key
         // from starting a deferred audio note. Props settlement drains against
@@ -52,18 +62,21 @@ pub(crate) fn route_key(scope:&str,key:&str,down:bool,window:&mut Window,cx:&mut
     consumed
 }
 
-/// Retire every authored contact in this window's registered keyboard scope.
-///
-/// Window deactivation and hiding a keyboard are host lifecycle facts. Cancel
-/// each source synchronously so an older queued delivery observes its released
-/// state; deliver the resulting audio-domain changes after the host view lease.
-pub(crate) fn cancel_scope(scope:&str,window:&mut Window,cx:&mut App) {
+/// Window blur and keyboard hiding are physical host lifecycle notifications.
+/// Retire authored contacts synchronously; deliver output after the caller's
+/// NativePluginWindow borrow has ended.
+pub(crate) fn cancel_scope(scope:&str,window:&mut Window,cx:&mut App){
     let entries:Vec<_>=cx.try_global::<Keys>().map(|keys|keys.0.iter().filter(|((win,id,_),_)|
         *win==window.window_handle().window_id()&&id==scope).map(|(_,entry)|entry.clone()).collect()).unwrap_or_default();
     for entry in entries {
         let _=entry.handle.call("cancel",vec![],window,cx);
         cx.defer(move |cx|drain(&entry,cx));
     }
+}
+#[cfg(test)]
+pub(crate) fn pressed(scope:&str,note:u8,window:&Window,cx:&App)->bool{
+    cx.try_global::<Keys>().and_then(|keys|keys.0.get(&(window.window_handle().window_id(),scope.into(),note)))
+        .and_then(|entry|entry.handle.state("pressed").ok()).and_then(|v|v.as_bool()).unwrap_or(false)
 }
 
 #[derive(IntoElement)]
@@ -77,8 +90,7 @@ impl Key { pub(crate) fn momentary(mut self)->Self { self.momentary=true;self } 
 struct Drawing { handle:PerformanceKeyHandle,draw:Draw }
 impl Render for Drawing {
     fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
-        let pressed=self.handle.state("pressed").ok().and_then(|v|v.as_bool()).unwrap_or(false);
-        crate::proto_parent::slot(&self.handle.owner,(self.draw)(pressed))
+        let pressed=self.handle.state("pressed").ok().and_then(|v|v.as_bool()).unwrap_or(false);crate::proto_parent::slot(&self.handle.owner,(self.draw)(pressed))
     }
 }
 struct Mount { root:Entity<PerformanceKey>,drawing:Entity<Drawing>,entry:Entry,props:Value,_changes:Subscription,
@@ -86,22 +98,22 @@ struct Mount { root:Entity<PerformanceKey>,drawing:Entity<Drawing>,entry:Entry,p
 impl Drop for Mount {
     fn drop(&mut self) {
         let registration=self.registration.clone();let entry=self.entry.clone();
-        // Retire input synchronously, before a queued observer can turn an
-        // already detached key back on. Release belongs to this delivery even
-        // if a replacement key registered under the same note in the meantime.
+        // Retire before any queued callback can restart the detached key.
         entry.delivery.borrow_mut().live=false;
         self.app.spawn(async move |cx| { let _=cx.update(|cx| {
             let same=cx.try_global::<Keys>().and_then(|keys|keys.0.get(&registration))
                 .is_some_and(|current|Rc::ptr_eq(&current.handle.owner,&entry.handle.owner));
             if same { cx.global_mut::<Keys>().0.remove(&registration); }
+            // Retire this source's note even if a new root has registered.
+            // Playing ownership prevents a late note-off from muting it.
             deliver(&entry,false,cx);
         }); }).detach();
     }
 }
 impl RenderOnce for Key {
     fn render(self,window:&mut Window,cx:&mut App)->impl IntoElement {
-        let parent=crate::proto_parent::current();let initial_parent=parent.clone();
         let props=json!({"note":self.note,"label":self.label,"revision":self.revision,"disabled":self.disabled,"momentary":self.momentary});
+        let parent=crate::proto_parent::current();let initial_parent=parent.clone();
         let initial=props.clone();let draw=self.draw.clone();let callback=self.callback.clone();
         let registration=(window.window_handle().window_id(),self.scope.clone(),self.note);
         let initial_registration=registration.clone();
@@ -109,7 +121,7 @@ impl RenderOnce for Key {
         let mount=window.use_keyed_state(key,cx,move |window,cx| {
             let root=PerformanceKey::create(initial.clone(),initial_parent,window,cx)
                 .unwrap_or_else(|e|panic!("compiled performance key setup failed: {e:?}"));
-            let entry=Entry{handle:root.read(cx).handle(),delivery:Rc::new(RefCell::new(Delivery{callback,revision:initial["revision"].as_str().unwrap_or_default().into(),pressed:false,live:true}))};
+            let entry=Entry{handle:root.read(cx).handle(),registration:initial_registration.clone(),owner:root.entity_id(),delivery:Rc::new(RefCell::new(Delivery{callback,revision:initial["revision"].as_str().unwrap_or_default().into(),pressed:false,momentary:initial["momentary"].as_bool().unwrap_or(false),live:true}))};
             let drawing=cx.new(|_|Drawing{handle:entry.handle.clone(),draw});
             root.update(cx,|root,cx|root.set_slot(vec![NativeSnapshot::native_view(drawing.clone().into())],cx))
                 .unwrap_or_else(|e|panic!("compiled performance key drawing failed: {e:?}"));
@@ -119,8 +131,8 @@ impl RenderOnce for Key {
             Mount{root,drawing,entry,props:initial,_changes:changes,registration:initial_registration,app:cx.to_async()}
         });
         mount.update(cx,|mount,cx| {
-            if crate::proto_parent::changed(&mount.root.read(cx).handle().owner,&parent) {
-                mount.root.update(cx,|root,cx|root.set_parent(parent,cx)).expect("compiled performance key parent");
+            if crate::proto_parent::changed(&mount.entry.handle.owner,&parent) {
+                mount.root.update(cx,|root,cx|root.set_parent(parent,cx)).expect("compiled key parent");
             }
             if mount.props!=props {
                 let _=mount.root.update(cx,|root,cx|root.set_props(props.clone(),window,cx));
@@ -129,14 +141,12 @@ impl RenderOnce for Key {
             }
             let next_revision=mount.props["revision"].as_str().unwrap_or_default().to_string();
             if mount.entry.delivery.borrow().revision!=next_revision { deliver(&mount.entry,false,cx); }
-            {let mut delivery=mount.entry.delivery.borrow_mut();delivery.callback=self.callback;delivery.revision=next_revision;}
+            {let mut delivery=mount.entry.delivery.borrow_mut();delivery.callback=self.callback;delivery.revision=next_revision;delivery.momentary=mount.props["momentary"].as_bool().unwrap_or(false);}
             mount.drawing.update(cx,|drawing,cx|{drawing.draw=self.draw;cx.notify();});
             if cx.try_global::<Keys>().is_none(){cx.set_global(Keys::default());}
             let previous=cx.global_mut::<Keys>().0.insert(registration,mount.entry.clone());
             if let Some(previous)=previous.filter(|previous|!Rc::ptr_eq(&previous.handle.owner,&mount.entry.handle.owner)) {
                 previous.delivery.borrow_mut().live=false;
-                // This runs before input can start the replacement; a later
-                // Drop release is idempotent because delivery records the off.
                 cx.defer(move |cx|deliver(&previous,false,cx));
             }
             mount.root.clone()

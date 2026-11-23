@@ -134,10 +134,11 @@ _=>{},
 let hidden=resolved(&owner.modules.accessible_tree.member("hidden",true));if !hidden.nullish(){if hidden.bool(){node.set_hidden()}else{node.clear_hidden()}}
 }
 }
+
 #[cfg(all(test,feature="test-support"))]
 mod conditional_state_tests {
     use super::*;
-    use crate::gpui_native_owner::{Owner,OwnerRef,create_state,accessible_state,record};
+    use crate::gpui_native_owner::{Owner,OwnerRef,create_state,accessible_state,action_from_name,record};
     use std::rc::Rc;
     fn owner()->OwnerRef {Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary())}
     fn flag(owner:&OwnerRef,name:&str,value:bool)->Value {
@@ -148,6 +149,13 @@ mod conditional_state_tests {
         let semantics=Semantics{element:gpui::div(),owner:Rc::downgrade(owner),role:Some(gpui::Role::Button)};
         let mut node=gpui::accesskit::Node::new(gpui::Role::Button);semantics.write_a11y_info(&mut node);node
     }
+    #[test]
+    fn portable_activation_projects_the_native_click_action() {
+        assert_eq!(action_from_name("activate"),gpui::AccessibleAction::Click);
+        assert_eq!(action_from_name("press"),gpui::AccessibleAction::Click);
+        assert_eq!(action_from_name("click"),gpui::AccessibleAction::Click);
+    }
+
     #[test]
     fn native_condition_omits_and_reactivates_current_state() {
         let owner=owner();let value=flag(&owner,"value",false);let when=flag(&owner,"when",false);

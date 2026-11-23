@@ -27,6 +27,10 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
         vec!["Verdant", "NoteTable", "NoteTablePoint"],
         vec!["Verdant", "LyricEditor"],
         vec!["Verdant", "TextPrompt"],
+        vec!["Verdant", "PianoRoll", "LyricEditor"],
+        vec!["Verdant", "PianoRoll", "TextPrompt"],
+        vec!["Verdant", "Arrange", "TextPrompt"],
+        vec!["Verdant", "NoteTable", "LyricEditor"],
     ];
     let contexts: Vec<Vec<KeyContext>> = focus_paths.iter().map(|path| {
         path.iter().map(|context| KeyContext::parse(context).expect("fixture key context")).collect()
@@ -88,14 +92,14 @@ fn shortcut_table_is_conflict_free_dispatchable_and_exactly_rendered() {
                 // proto_text's native registry test exercises every variant
                 // below with the application's real bindings installed.
                 assert!(matches!(shortcut.scope, Scope::Text | Scope::Lyric));
-                let expected = match command {
-                    TextCommand::Submit => "enter", TextCommand::Advance => "tab", TextCommand::Retreat => "shift-tab",
-                    TextCommand::Cancel => "escape", TextCommand::Undo => "secondary-z", TextCommand::Space => "space",
-                    TextCommand::Backspace => "backspace", TextCommand::Delete => "delete", TextCommand::Left => "left",
-                    TextCommand::Right => "right", TextCommand::SelectLeft => "shift-left", TextCommand::SelectRight => "shift-right",
-                    TextCommand::Home => "home", TextCommand::End => "end", TextCommand::SelectAll => "secondary-a", TextCommand::Paste => "secondary-v",
+                let expected: &[&str] = match command {
+                    TextCommand::Submit => &["enter"], TextCommand::Advance => &["tab"], TextCommand::Retreat => &["shift-tab"],
+                    TextCommand::Cancel => &["escape"], TextCommand::Undo => &["secondary-z"], TextCommand::Redo => &["secondary-shift-z", "secondary-y"], TextCommand::Space => &["space"],
+                    TextCommand::Backspace => &["backspace"], TextCommand::Delete => &["delete"], TextCommand::Left => &["left"],
+                    TextCommand::Right => &["right"], TextCommand::SelectLeft => &["shift-left"], TextCommand::SelectRight => &["shift-right"],
+                    TextCommand::Home => &["home"], TextCommand::End => &["end"], TextCommand::SelectAll => &["secondary-a"], TextCommand::Paste => &["secondary-v"],
                 };
-                assert_eq!(shortcut.keys, expected, "compiled input command must describe its actual key");
+                assert!(expected.contains(&shortcut.keys), "compiled input command must describe its actual key: {:?} {}", command, shortcut.keys);
                 continue;
             }
         };

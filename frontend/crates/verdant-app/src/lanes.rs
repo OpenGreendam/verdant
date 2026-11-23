@@ -102,7 +102,9 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
         }
     }
     let durations = preview.as_deref().unwrap_or(&budget.durations_seconds);
-    let mut row_labels = Vec::with_capacity(budget.labels.len());
+    let rows_height = (budget.labels.len() as f32 * 22.0).min(180.0).max(22.0);
+    let mut rows = crate::proto_scroll::viewport("phoneme-duration-rows", "音素时长", "vertical").h(px(rows_height)).flex_none()
+        .flex().flex_col().gap(px(3.0));
     for (index, (label, duration)) in budget.labels.iter().zip(durations).enumerate() {
         let scheduled = schedule.as_ref().and_then(|s| s.durations.get(index)).copied()
             .or_else(|| (!anchored).then_some(budget.durations_seconds[index]));
@@ -110,13 +112,9 @@ pub fn phoneme_panel(ed: &Editor, editor: Entity<Editor>, cx: &App) -> impl Into
             Some(seconds) => format!("{} · 预算 {:.1} ms · 计划 {:.1} ms", label, duration * 1000.0, seconds * 1000.0),
             None => format!("{} · 预算 {:.1} ms · 计划待预检", label, duration * 1000.0),
         };
-        row_labels.push(text);
+        rows = rows.child(gpui::div().flex_none().text_xs().child(text));
     }
-    let rows_height = (row_labels.len() as f32 * 22.0).min(180.0).max(22.0);
-    panel = panel.child(gpui::div().h(px(rows_height)).child(crate::proto_scroll::native_content("phoneme-duration-region", "音素时长明细", move |scroll, _, _| {
-        gpui::div().id("phoneme-duration-rows").size_full().overflow_y_scroll().track_scroll(scroll)
-            .flex().flex_col().gap(px(3.0)).children(row_labels.iter().map(|text| gpui::div().flex_none().text_xs().child(text.clone()))).into_any_element()
-    })));
+    panel = panel.child(rows);
     if let Some(schedule) = schedule {
         panel = panel.child(gpui::div().text_xs().text_color(th.text_secondary).child(format!(
             "计划辅音先行 {:.1} ms · 让出尾部 {:.1} ms", schedule.prefix_seconds * 1000.0, schedule.tail_trim_seconds * 1000.0)));
@@ -338,10 +336,9 @@ fn region_controls(ed: &Editor, editor: Entity<Editor>, param: Param, slot: usiz
     let any_disabled = !selected.is_empty() && selected.iter().all(|n| ed.region_lane_disabled(n, param));
     let current_interp = selected.first().map(|n| n.curves.interpolation(param.short()));
     let (th, enabled) = (ed.theme, !any_disabled);
-    let button = move |key: &str, label: &str, active: bool| gpui::div()
-        .id(gpui::SharedString::from(format!("region-{}-{slot}-{key}", param.short())))
-        .role(gpui::Role::Button)
-        .aria_label(format!("{}：{label}", param.name()))
+    let button = move |key: &str, label: &str, active: bool| crate::proto_controls::action(
+        format!("region-{}-{slot}-{key}", param.short()), format!("{}：{label}", param.name()))
+        .authority(crate::proto_controls::editor_authority(ed))
         .aria_selected(active)
         .cursor_pointer()
         .h(px(20.0))

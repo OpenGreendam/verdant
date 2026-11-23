@@ -30,8 +30,7 @@ pub(crate) struct Spec {
     pub drag_mode: &'static str,
     pub double_action: &'static str,
     pub tap_action: &'static str,
-    /// Point collections retain horizontal/page traversal and Enter/Escape.
-    pub keyboard_mode: &'static str,
+    pub key_mode: &'static str,
     /// The host has a transient draft/viewport that echoes emitted previews.
     /// Such an echo is distinct from a new project revision or external value.
     pub preview_echo: bool,
@@ -42,7 +41,7 @@ impl Spec {
     pub fn slider(value: f64, min: f64, max: f64, label: impl Into<String>) -> Self {
         Self { value, min, max, step: (max-min)/100.0, fine_step: (max-min)/1000.0,
             default_value: value, label: label.into(), role: "slider", drag_mode: "absolute",
-            double_action: "reset", tap_action: "none", keyboard_mode: "full", preview_echo: false, disabled: false, mixer_preview: false }
+            double_action: "reset", tap_action: "none", key_mode: "scalar", preview_echo: false, disabled: false, mixer_preview: false }
     }
 }
 
@@ -132,6 +131,24 @@ fn cancel_source(handle: &ContinuousControlHandle, target: &Target, window: &mut
 #[derive(Clone)]
 pub(crate) struct Actions { handle: ContinuousControlHandle, target: Rc<RefCell<Target>> }
 impl Actions {
+    /// Native spelling/modifiers are physical facts. The authored source owns
+    /// whether this scalar or its surrounding collection handles the key.
+    pub fn key(&self, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) -> bool {
+        let name = match event.keystroke.key.as_str() {
+            "up" => "ArrowUp", "down" => "ArrowDown", "left" => "ArrowLeft", "right" => "ArrowRight",
+            "home" => "Home", "end" => "End", "pageup" => "PageUp", "pagedown" => "PageDown",
+            "enter" => "Enter", "space" => " ", "escape" => "Escape", "backspace" => "Backspace", other => other,
+        };
+        let mods = event.keystroke.modifiers; let target = self.target.borrow().clone();
+        match call(&self.handle, "key", vec![name.into(), mods.shift.into(), (mods.control || mods.platform).into(), mods.alt.into()], window, cx) {
+            Ok(handled) => {
+                drain(&self.handle, &target, window, cx);
+                if handled { window.prevent_default(); cx.stop_propagation(); }
+                handled
+            },
+            Err(error) => { self.handle.take_events(); report(&target, error, cx); false },
+        }
+    }
     pub fn invoke(&self, method: &str, args: Vec<Value>, window: &mut Window, cx: &mut App) {
         let target = self.target.borrow().clone();
         match call(&self.handle, method, args, window, cx) {
@@ -287,8 +304,7 @@ impl RenderOnce for Scalar {
         let props = json!({ "value": spec.value, "min": spec.min, "max": spec.max, "step": spec.step,
             "fineStep": spec.fine_step, "defaultValue": spec.default_value, "label": spec.label,
             "disabled": spec.disabled, "revision": token, "role": spec.role, "dragMode": spec.drag_mode,
-            "doubleAction": spec.double_action, "tapAction": spec.tap_action, "keyboardMode": spec.keyboard_mode,
-            "previewEcho": spec.preview_echo });
+            "doubleAction": spec.double_action, "tapAction": spec.tap_action, "previewEcho": spec.preview_echo, "keyMode": spec.key_mode });
         let parent = crate::proto_parent::current(); let initial_parent = parent.clone();
         let initial_props = props.clone();
         let initial_target = target.clone();

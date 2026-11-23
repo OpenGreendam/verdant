@@ -57,6 +57,8 @@ esac
 export VERDANT_WORKER_BINARY="$worker_target/debug/verdant-worker"
 export VERDANT_TEST_WORKER_BINARY="$worker_target/debug/verdant-test-worker"
 cargo test --offline --locked --workspace --features verdant-test-worker/protocol-fixture
+cargo test --offline --locked -p proto-ui-gpui-native --features test-support,gpui/test-support --lib -- --test-threads=1
+cargo test --offline --locked -p proto-ui-gpui-native --features test-support,gpui/test-support,gpui-modern-element-api,gpui-text-selection-notification --lib -- --test-threads=1
 # Packages need the optimized DSP host: debug oversampling can miss realtime deadlines.
 cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-launcher \
     -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release

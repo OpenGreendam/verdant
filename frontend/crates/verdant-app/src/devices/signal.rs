@@ -14,6 +14,7 @@ fn waveform_frames(total: u64, points: usize) -> usize {
 pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
     cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
+    let authority=suite::action_authority(ed,&Target{track:owner.clone(),slot,key});
     let cached = if slot == crate::instrument::INSTRUMENT_SLOT {
         match owner { DeviceTarget::Track(t) => ed.instrument_telemetry(t), DeviceTarget::Master => None }
     } else { ed.live_device_insert(owner, slot).filter(|handle| handle.key() == key).and_then(|handle| handle.cached_telemetry()) };
@@ -30,6 +31,7 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             if waveform { "波形" } else { "频谱" }, if waveform { wave_ms } else { window_ms }, snapshot.frames_total as f64 / snapshot.sample_rate.max(1.))));
     for (show_waveform, label) in [(false, "频谱"), (true, "波形")] {
         header = header.child(crate::ui_controls::selectable_button(format!("signal-mode-{slot}-{show_waveform}"), label, waveform == show_waveform, th)
+            .authority(authority.clone())
             .role(Role::Tab).tab_index(0)
             .on_click(cx.listener(move |ed, _, _, cx| {
                 ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now())).signal_waveform = show_waveform;
@@ -44,6 +46,7 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
     }
     let reset_target = owner.clone();
     header = header.child(crate::ui_controls::selectable_button(format!("meters-reset-{slot}"), "重置计量", false, th)
+        .authority(authority)
         .tab_index(0).on_click(cx.listener(move |ed, _, _, cx| {
             if !ed.device_target_matches(&reset_target, slot, key) { return; }
             if slot == crate::instrument::INSTRUMENT_SLOT {

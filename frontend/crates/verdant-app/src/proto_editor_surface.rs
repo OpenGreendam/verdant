@@ -12,6 +12,7 @@ use crate::editor::Editor;
 
 type Cancel = Rc<dyn Fn(&str, &mut Window, &mut App)>;
 type Draw = Rc<dyn Fn(Input) -> AnyElement>;
+type Command = Rc<dyn Fn(&str, &mut Window, &mut App)>;
 
 #[derive(Default)]
 struct Contacts { next: u64, active: HashMap<EntityId, Contact> }
@@ -43,7 +44,7 @@ pub(crate) fn source_native_snapshot(editor:EntityId,key:&str,window:&Window,cx:
 }
 
 #[derive(Clone)]
-struct Target { editor: WeakEntity<Editor>, revision: String, cancel: Cancel }
+struct Target { editor: WeakEntity<Editor>, editor_id:EntityId, revision: String, cancel: Cancel, command: Option<Command> }
 
 fn authority(editor: &Editor) -> String {
     format!("{}:{}:{}", editor.project().project_id, editor.document_generation, editor.revision())
@@ -59,7 +60,7 @@ pub(crate) struct Input {
 fn pointer(pointer: PointerId) -> String { format!("{pointer:?}") }
 
 impl Input {
-    fn editor_id(&self) -> Option<EntityId> { self.target.borrow().editor.upgrade().map(|e| e.entity_id()) }
+    fn editor_id(&self) -> Option<EntityId> { Some(self.target.borrow().editor_id) }
     fn owns(&self, window: &Window, cx: &App) -> bool {
         self.editor_id().is_some_and(|id| cx.try_global::<Contacts>()
             .and_then(|c| c.active.get(&id)).is_some_and(|entry| entry.owner == self.owner && entry.window == window.window_handle()))
@@ -132,24 +133,44 @@ impl Input {
     }
     fn drain(&self, window: &mut Window, cx: &mut App) {
         let failures = self.handle.take_failures();
-        // Decode the entire batch before invoking a domain callback. The
-        // authored lease distinguishes two contacts of the same pointer and
-        // revision; a deferred cancellation can never retire its replacement.
-        let events: Result<Vec<Cancellation>, String> = self.handle.take_events().into_iter().map(|(name, payload)| {
-            if name != "interactionCancel" { return Err(format!("unknown editing surface event: {name}")); }
-            let event: Cancellation = serde_json::from_value(payload).map_err(|e| e.to_string())?;
-            if !event.lease.is_finite() || event.lease <= 0.0 || event.lease.fract() != 0.0 || event.pointer.is_empty() {
-                return Err("invalid editing contact cancellation".into());
+        // Decode the entire batch before domain callbacks. Cancellation belongs
+        // to its captured lease; a later contact cannot inherit that retirement.
+        let events: Result<Vec<Output>, String> = self.handle.take_events().into_iter().map(|(name, payload)| {
+            match name.as_str() {
+                "interactionCancel" => {
+                    let event: Cancellation = serde_json::from_value(payload).map_err(|e| e.to_string())?;
+                    if !event.lease.is_finite() || event.lease <= 0.0 || event.lease.fract() != 0.0 || event.pointer.is_empty() {
+                        return Err("invalid editing contact cancellation".into());
+                    }
+                    Ok(Output::Cancel(event))
+                }
+                "command" => {
+                    let event: CommandOutput = serde_json::from_value(payload).map_err(|e| e.to_string())?;
+                    if !matches!(event.command.as_str(), "delete" | "ripple-delete" | "split" | "select-all" | "join" | "range-tool" | "select-tool" | "clear-range") {
+                        return Err("invalid editing command".into());
+                    }
+                    Ok(Output::Command(event))
+                }
+                _ => Err(format!("unknown editing surface event: {name}")),
             }
-            Ok(event)
         }).collect();
         let malformed = events.is_err();
         if let Ok(events) = events {
             for event in events {
-                let matches = self.contact(window, cx).is_some_and(|contact| contact.lease == event.lease
-                    && contact.pointer == event.pointer && contact.revision == event.revision);
-                if matches {
-                    if let Some(contact) = self.clear(window, cx) { (contact.cancel)(&contact.pointer, window, cx); }
+                match event {
+                    Output::Cancel(event) => {
+                        let matches = self.contact(window, cx).is_some_and(|contact| contact.lease == event.lease
+                            && contact.pointer == event.pointer && contact.revision == event.revision);
+                        if matches {
+                            if let Some(contact) = self.clear(window, cx) { (contact.cancel)(&contact.pointer, window, cx); }
+                        }
+                    }
+                    Output::Command(event) => {
+                        let target = self.target.borrow().clone();
+                        if event.revision == target.revision && self.valid(cx) {
+                            if let Some(callback) = target.command { callback(&event.command, window, cx); }
+                        }
+                    }
                 }
             }
         }
@@ -206,6 +227,10 @@ impl Input {
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Cancellation { pointer: String, revision: String, lease: f64 }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CommandOutput { command: String, revision: String }
+enum Output { Cancel(Cancellation), Command(CommandOutput) }
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -297,13 +322,18 @@ impl Input {
 }
 
 #[derive(IntoElement)]
-pub(crate) struct Surface { editor: Entity<Editor>, key: String, label: String, threshold: f64, draw: Draw, cancel: Cancel, audio_keys: bool }
+pub(crate) struct Surface { editor: Entity<Editor>, key: String, label: String, threshold: f64, draw: Draw, cancel: Cancel, command_mode: String, command: Option<Command> }
 pub(crate) fn surface(editor: Entity<Editor>, key: impl Into<String>, label: impl Into<String>, threshold: f64,
     draw: impl Fn(Input) -> AnyElement + 'static,
     cancel: impl Fn(&str, &mut Window, &mut App) + 'static) -> Surface {
-    Surface { editor, key: key.into(), label: label.into(), threshold, draw: Rc::new(draw), cancel: Rc::new(cancel), audio_keys: false }
+    Surface { editor, key: key.into(), label: label.into(), threshold, draw: Rc::new(draw), cancel: Rc::new(cancel), command_mode:String::new(), command:None }
 }
-impl Surface { pub(crate) fn audio_keys(mut self, enabled: bool) -> Self { self.audio_keys = enabled; self } }
+
+impl Surface {
+    pub(crate) fn commands(mut self, mode: &str, callback: impl Fn(&str, &mut Window, &mut App) + 'static) -> Self {
+        self.command_mode = mode.into(); self.command = Some(Rc::new(callback)); self
+    }
+}
 
 struct Drawing { input: Input, draw: Draw }
 impl Render for Drawing {
@@ -312,46 +342,40 @@ impl Render for Drawing {
     }
 }
 struct Mount { root: Entity<EditorSurface>, drawing: Entity<Drawing>, input: Input, props: Value, _changes: Subscription,
-    app: gpui::AsyncApp, window: gpui::AnyWindowHandle, audio_key: Option<(EntityId, String)> }
+    app: gpui::AsyncApp, window: gpui::AnyWindowHandle, surface_key: Option<(EntityId, String)> }
 impl Drop for Mount {
     fn drop(&mut self) {
-        let input=self.input.clone(); let handle=self.window; let audio_key = self.audio_key.clone();
+        let input=self.input.clone(); let window_handle=self.window; let surface_key=self.surface_key.clone();
         self.app.spawn(async move |cx| { let _=cx.update(|cx| {
-            if let Some(key) = audio_key && let Some(registry) = cx.try_global::<Surfaces>()
+            if let Some(key) = surface_key && let Some(registry) = cx.try_global::<Surfaces>()
                 && registry.inputs.get(&key).is_some_and(|(_, current)| current.owner == input.owner) {
                 cx.global_mut::<Surfaces>().inputs.remove(&key);
             }
-            let _=handle.update(cx,|_,window,cx| {
-                if input.owns(window,cx) {
-                    if let Some(contact) = input.clear(window,cx) { (contact.cancel)(&contact.pointer,window,cx); }
-                }
-            });
+            let Some(editor)=input.editor_id()else{return;};
+            let owned=cx.try_global::<Contacts>().and_then(|contacts|contacts.active.get(&editor))
+                .is_some_and(|contact|contact.owner==input.owner);
+            if !owned{return;}
+            let mut contact=cx.global_mut::<Contacts>().active.remove(&editor).expect("owned editor contact");
+            if let Some(capture)=contact.capture.take(){capture.release_deferred(cx);}
+            // Remove native ownership even after the original window or Editor
+            // died. Only the domain callback requires that live window.
+            let _=window_handle.update(cx,|_,window,cx|(contact.cancel)(&contact.pointer,window,cx));
         }); }).detach();
     }
 }
 
-/// Route a physical key while Editor is already borrowed. Source decides its
-/// meaning and retires the contact; the caller clears its domain previews.
-pub(crate) fn audio_key(editor: &Editor, editor_id: EntityId, event: &gpui::KeyDownEvent,
-    window: &mut Window, cx: &mut App) -> Option<(String, bool)> {
-    let registry = cx.try_global::<Surfaces>()?;
-    let focused = registry.inputs.iter().find(|((id, key), (host, input))| *id == editor_id
-        && matches!(key.as_str(), "arrangement" | "ruler-true")
-        && *host == window.window_handle() && input.handle.state("focused").ok() == Some(Value::Bool(true)));
-    let input = focused.or_else(|| editor.focus_arrange.is_focused(window).then(||
-        registry.inputs.iter().find(|((id, key), (host, _))| *id == editor_id && key == "arrangement"
-            && *host == window.window_handle())).flatten()).map(|(_, (_, input))| input.clone())?;
-    let revision = authority(editor);
-    if input.target.borrow().revision != revision { return None; }
-    let key = verdant_editor_surface::native::gpui_native_key::portable_key(&event.keystroke)?;
-    let mods = event.keystroke.modifiers;
-    let result = input.handle.call("audioKey", vec![key.into(), mods.shift.into(),
-        (mods.control || mods.platform).into(), mods.alt.into(), event.is_held.into(), revision.into()], window, cx);
-    let retired = input.handle.state("phase").ok().as_ref().and_then(Value::as_str) == Some("idle")
-        && input.clear(window, cx).is_some();
-    let command = result.ok().and_then(|value| value.as_str().map(str::to_owned)).unwrap_or_default();
-    if !matches!(command.as_str(), "" | "delete" | "ripple-delete" | "split" | "select-all" | "join" | "range-tool" | "select-tool" | "escape") { return None; }
-    (!command.is_empty() || retired).then_some((command, retired))
+/// Restore an application canvas focus after a compiled toolbar command.
+/// The mounted source still decides whether cancellation/focus is admitted.
+pub(crate) fn focus_commands(mode: &str, window: &mut Window, cx: &mut App) -> bool {
+    use verdant_editor_surface::native::gpui_native_owner::all_owners;
+    let owner = all_owners().into_iter().find(|owner| {
+        let source = owner.borrow();
+        source.mounted && source.window_id == Some(window.window_handle().window_id())
+            && source.declared_events.contains("command")
+            && source.props.get("commandMode").and_then(Value::as_str) == Some(mode)
+    });
+    owner.is_some_and(|owner| EditorSurfaceHandle { owner }.call("activate", vec![], window, cx)
+        .ok().and_then(|value| value.as_bool()).unwrap_or(false))
 }
 
 /// A toolbar activation or remappable application keyboard action requests
@@ -392,7 +416,11 @@ pub(crate) fn cancel_from_editor_deferred(editor: EntityId, cx: &mut App) {
         cx.defer(move |cx| {
             let current=cx.try_global::<Contacts>().and_then(|c|c.active.get(&editor)).is_some_and(|c|c.owner==owner && c.generation==generation);
             if !current { return; }
-            let _=handle.update(cx,|_,window,cx| { input.clear(window,cx); let _=input.handle.call("cancel",vec![],window,cx);input.handle.take_events();input.handle.take_failures(); });
+            if handle.update(cx,|_,window,cx| { input.clear(window,cx); let _=input.handle.call("cancel",vec![],window,cx);input.handle.take_events();input.handle.take_failures(); }).is_err() {
+                let current=cx.try_global::<Contacts>().and_then(|contacts|contacts.active.get(&editor))
+                    .is_some_and(|contact|contact.owner==owner&&contact.generation==generation);
+                if current {cx.global_mut::<Contacts>().active.remove(&editor);}
+            }
         });
     }
 }
@@ -402,13 +430,13 @@ impl RenderOnce for Surface {
         let parent = crate::proto_parent::current();
         let initial_parent = parent.clone();
         let revision = authority(self.editor.read(cx));
-        let target = Target { editor: self.editor.downgrade(), revision: revision.clone(), cancel: self.cancel };
+        let target = Target { editor: self.editor.downgrade(), editor_id:self.editor.entity_id(), revision: revision.clone(), cancel: self.cancel, command:self.command };
         let editor = self.editor.read(cx);
         let disabled = editor.menu.is_some() || editor.text_prompt.is_some() || editor.modal_dialog.is_some();
         let props = json!({ "revision": revision, "label": self.label, "threshold": self.threshold, "disabled": disabled,
-            "commands": if self.audio_keys { "audio" } else { "none" } });
-        let audio_key = Some((self.editor.entity_id(), self.key.clone()));
-        let initial_audio_key = audio_key.clone();
+            "commandMode": self.command_mode });
+        let surface_key = Some((self.editor.entity_id(), self.key.clone()));
+        let initial_surface_key = surface_key.clone();
         let initial_props = props.clone();
         let initial_target = target.clone();
         let draw = self.draw.clone();
@@ -425,7 +453,7 @@ impl RenderOnce for Surface {
                 let input = mount.input.clone();
                 cx.defer(move |cx| { let _ = window_handle.update(cx, |_, window, cx| input.drain(window, cx)); });
             });
-            Mount { root, drawing, input, props: initial_props, _changes: changes, app: cx.to_async(), window: window_handle, audio_key: initial_audio_key }
+            Mount { root, drawing, input, props: initial_props, _changes: changes, app: cx.to_async(), window: window_handle, surface_key: initial_surface_key }
         });
         mount.update(cx, |mount, cx| {
             if crate::proto_parent::changed(&mount.root.read(cx).handle().owner, &parent) {
@@ -440,10 +468,10 @@ impl RenderOnce for Surface {
                 mount.props = props;
             }
             *mount.input.target.borrow_mut() = target;
-            if let Some(key) = audio_key {
+            if let Some(key) = surface_key {
                 if cx.try_global::<Surfaces>().is_none() { cx.set_global(Surfaces::default()); }
                 cx.global_mut::<Surfaces>().inputs.insert(key.clone(), (window.window_handle(), mount.input.clone()));
-                mount.audio_key = Some(key);
+                mount.surface_key = Some(key);
             }
             mount.drawing.update(cx, |drawing, cx| { drawing.draw = self.draw; cx.notify(); });
             mount.root.clone()

@@ -7,6 +7,13 @@ pub type Callback = Rc<dyn Fn(Vec<Value>) -> Value>;
 // Native frame factories capture an authored-render snapshot; they do not store
 // semantic tags or re-run the authored render function during native repaint.
 pub type NativeRenderer = Rc<dyn Fn(Vec<Value>) -> NativeSnapshot>;
+// Checked rendering is an additional use of the original authored callable.
+// Keep its identity and scalar invocation separate from the native conversion;
+// a hook's captured render field remains the same JavaScript function.
+pub struct RendererAdapter { pub callable:Value, pub render:NativeRenderer, public_owner:Option<OwnerWeak> }
+pub fn capture_renderer(callable:Value,render:NativeRenderer)->Value {
+    Value::Renderer(Rc::new(RendererAdapter{callable,render,public_owner:None}))
+}
 // A native helper is an ordinary typed closure with its own runtime identity.
 // Its identity is independent of both its FunctionIR declaration and child snapshots.
 pub struct NativeCallable<F:?Sized> { pub identity:Rc<()>, pub call:Rc<F> }
@@ -17,7 +24,7 @@ impl<F:?Sized> NativeCallable<F> {
     pub fn truthy(&self)->bool { true }
     pub fn nullish(&self)->bool { false }
     pub fn equals_native<G:?Sized>(&self,other:&NativeCallable<G>)->bool { Rc::ptr_eq(&self.identity,&other.identity) }
-    pub fn equals_value(&self,other:&Value)->bool { matches!(other,Value::NativeFunction{identity,..} if Rc::ptr_eq(&self.identity,identity)) }
+    pub fn equals_value(&self,other:&Value)->bool { matches!(other.callable_value(),Value::NativeFunction{identity,..} if Rc::ptr_eq(&self.identity,identity)) }
 }
 pub type NativeFrame = Rc<dyn Fn(&OwnerRef,&FocusHandle,&str,&Drive,&[NativeSnapshot],&mut usize)->Vec<AnyElement>>;
 #[derive(Clone)]
@@ -68,7 +75,7 @@ pub fn assert_native_slot_children(children:&[NativeSnapshot]) {
 #[derive(Clone)]
 pub enum Value {
     Undefined, Opaque(Rc<()>), ContextKey(NativeContextKey), Number(f64), Json(Json), Record(Rc<NativeRecord>), Array(Rc<Vec<Value>>), CaughtStringUnit(u16),
-    Function(Callback), NativeFunction{identity:Rc<()>,render:NativeRenderer}, Renderer(NativeRenderer), Owner(OwnerWeak), Definition(OwnerWeak), RenderHandle(OwnerWeak), State(Rc<State>), BorrowedState(Rc<State>),
+    Function(Callback), NativeFunction{identity:Rc<()>,render:NativeRenderer}, Renderer(Rc<RendererAdapter>), Owner(OwnerWeak), DefinitionOwner(OwnerWeak), RenderOwner(OwnerWeak), State(Rc<State>), BorrowedState(Rc<State>),
     Style(Vec<(String, String)>), Resource(Rc<Cell<bool>>),
     Input(Rc<Input>),
     StaticCapability(&'static StaticDeclaration), Handle(OwnerWeak, &'static str),
@@ -147,23 +154,23 @@ impl Value {
     pub fn scalar_number(&self)->f64{match self{Self::Number(v)=>*v,Self::Json(Json::Number(v))=>v.as_f64().unwrap(),Self::Json(Json::Null)=>0.,Self::Json(Json::Bool(v))=>if *v{1.}else{0.},Self::Json(Json::String(v))=>ecma_string_number(v),Self::Undefined=>f64::NAN,_=>panic!("structured coercion is not admitted")}}
     pub fn nullish(&self) -> bool { matches!(self,Self::Undefined|Self::Json(Json::Null)) }
     pub fn call(&self,args:Vec<Self>)->Result<Self,Self>{catch_authored(||self.call_authored(args))}
+    pub fn callable_value(&self)->&Self { match self { Self::Renderer(adapter)=>adapter.callable.callable_value(), _=>self } }
+    pub fn is_callback(&self)->bool { matches!(self.callable_value(),Self::Function(_)) }
     // Compiler-emitted authored composition stays in one exception scope.
     // Native consumers use call(), which returns before any GPUI lease unwinds.
-    pub fn call_authored(&self, args: Vec<Self>) -> Self { match self { Self::Function(f)=>f(args), _=>value_type_error("Value is not callable") } }
+    pub fn call_authored(&self, args: Vec<Self>) -> Self { match self.callable_value() { Self::Function(f)=>f(args), _=>value_type_error("Value is not callable") } }
     pub fn get(&self) -> Self { match self { Self::State(state)|Self::BorrowedState(state)=>{ensure(&state.owner);state.value.borrow().clone()}, Self::Observed(owner, key)=>observed(owner,key), _=>value_type_error("expected State handle") } }
-    pub fn owner(&self) -> OwnerWeak { match self { Self::Owner(owner)|Self::Definition(owner)|Self::RenderHandle(owner)|Self::Handle(owner,_)|Self::HostTarget(owner)|Self::Part(owner,_)|Self::ObjectRef(owner)=>owner.clone(), _=>panic!("expected owner capability") } }
+    pub fn owner(&self) -> OwnerWeak { match self { Self::Owner(owner)|Self::DefinitionOwner(owner)|Self::RenderOwner(owner)|Self::Handle(owner,_)|Self::HostTarget(owner)|Self::Part(owner,_)|Self::ObjectRef(owner)=>owner.clone(), _=>panic!("expected owner capability") } }
     pub fn items(&self) -> Vec<Self> { match self {Self::Array(v)=>(**v).clone(),Self::Json(Json::Array(v))=>v.iter().cloned().map(Self::json).collect(),_=>value_type_error("expected array")} }
 }
 pub fn strict_equal(a:&Value,b:&Value)->bool {
+    let a=a.callable_value();let b=b.callable_value();
     match (a,b) {
-        // Callback handles are retained references to one owner. Comparing
-        // clones observes identity without granting a new callback scope.
-        (Value::Owner(a),Value::Owner(b))|(Value::Definition(a),Value::Definition(b))|(Value::RenderHandle(a),Value::RenderHandle(b))=>return Weak::ptr_eq(a,b),
         (Value::CaughtStringUnit(a),Value::CaughtStringUnit(b))=>return a==b,
         (Value::CaughtStringUnit(unit),Value::Json(Json::String(text)))|(Value::Json(Json::String(text)),Value::CaughtStringUnit(unit))=>return text.encode_utf16().eq(std::iter::once(*unit)),
         _=>{},
     }
-    match (a,b){(Value::Undefined,Value::Undefined)=>true,(Value::Opaque(a),Value::Opaque(b))=>Rc::ptr_eq(a,b),(Value::ContextKey(a),Value::ContextKey(b))=>a==b,(Value::Number(a),Value::Number(b))=>a==b,(Value::Json(a),Value::Json(b))=>match(a,b){(Json::Array(_)|Json::Object(_),_)=>false,(Json::Number(a),Json::Number(b))=>a.as_f64()==b.as_f64(),_=>a==b},(Value::Record(a),Value::Record(b))=>Rc::ptr_eq(a,b),(Value::Array(a),Value::Array(b))=>Rc::ptr_eq(a,b),(Value::State(a),Value::State(b))|(Value::BorrowedState(a),Value::BorrowedState(b))=>Rc::ptr_eq(a,b),(Value::Function(a),Value::Function(b))=>Rc::ptr_eq(a,b),(Value::NativeFunction{identity:a,..},Value::NativeFunction{identity:b,..})=>Rc::ptr_eq(a,b),(Value::StaticCapability(a),Value::StaticCapability(b))=>a.identity()==b.identity(),(Value::Handle(a,ak),Value::Handle(b,bk))=>ak==bk&&Weak::ptr_eq(a,b),(Value::Observed(a,ak),Value::Observed(b,bk))=>ak==bk&&Weak::ptr_eq(a,b),(Value::ObjectRef(a),Value::ObjectRef(b))|(Value::HostTarget(a),Value::HostTarget(b))=>Weak::ptr_eq(a,b),(Value::Part(a,ar),Value::Part(b,br))=>ar==br&&Weak::ptr_eq(a,b),_=>false}}
+    match (a,b){(Value::Undefined,Value::Undefined)=>true,(Value::Opaque(a),Value::Opaque(b))=>Rc::ptr_eq(a,b),(Value::ContextKey(a),Value::ContextKey(b))=>a==b,(Value::Owner(a),Value::Owner(b))|(Value::DefinitionOwner(a),Value::DefinitionOwner(b))|(Value::RenderOwner(a),Value::RenderOwner(b))=>Weak::ptr_eq(a,b),(Value::Number(a),Value::Number(b))=>a==b,(Value::Json(a),Value::Json(b))=>match(a,b){(Json::Array(_)|Json::Object(_),_)=>false,(Json::Number(a),Json::Number(b))=>a.as_f64()==b.as_f64(),_=>a==b},(Value::Record(a),Value::Record(b))=>Rc::ptr_eq(a,b),(Value::Array(a),Value::Array(b))=>Rc::ptr_eq(a,b),(Value::State(a),Value::State(b))|(Value::BorrowedState(a),Value::BorrowedState(b))=>Rc::ptr_eq(a,b),(Value::Function(a),Value::Function(b))=>Rc::ptr_eq(a,b),(Value::NativeFunction{identity:a,..},Value::NativeFunction{identity:b,..})=>Rc::ptr_eq(a,b),(Value::StaticCapability(a),Value::StaticCapability(b))=>a.identity()==b.identity(),(Value::Handle(a,ak),Value::Handle(b,bk))=>ak==bk&&Weak::ptr_eq(a,b),(Value::Observed(a,ak),Value::Observed(b,bk))=>ak==bk&&Weak::ptr_eq(a,b),(Value::ObjectRef(a),Value::ObjectRef(b))|(Value::HostTarget(a),Value::HostTarget(b))=>Weak::ptr_eq(a,b),(Value::Part(a,ar),Value::Part(b,br))=>ar==br&&Weak::ptr_eq(a,b),_=>false}}
 fn same_value(a:&Value,b:&Value)->bool{
     if matches!(a,Value::Number(_)|Value::Json(Json::Number(_)))&&matches!(b,Value::Number(_)|Value::Json(Json::Number(_))){
         let a=a.num();let b=b.num();a.to_bits()==b.to_bits()||(a.is_nan()&&b.is_nan())
@@ -246,9 +253,11 @@ pub fn arg(args:&[Value],index:usize)->Value{args.get(index).cloned().unwrap_or(
 pub fn ensure(owner:&OwnerWeak)->OwnerRef{let owner=owner.upgrade().unwrap_or_else(||throw_error("OWNER_RELEASED","owner released"));if owner.borrow().disposed{throw_error("OWNER_DISPOSED","terminally disposed owner")}owner}
 pub fn setup(owner:&OwnerWeak)->OwnerRef{let owner=ensure(owner);if owner.borrow().phase!="setup"{value_error("setup-only capability")}owner}
 pub fn runtime(owner:&OwnerWeak)->OwnerRef{let owner=ensure(owner);if matches!(owner.borrow().phase,"setup"|"render"|"before-dispose"){value_error("callback capability required")}owner}
+// Stable Run identity is shared by this owner's callbacks. Definition and
+// rendering handles remain distinct objects even when they share that owner.
 pub fn capability(owner:&OwnerWeak)->Value{Value::Owner(owner.clone())}
-pub fn definition_capability(owner:&OwnerWeak)->Value{Value::Definition(owner.clone())}
-pub fn renderer_capability(owner:&OwnerWeak)->Value{Value::RenderHandle(owner.clone())}
+pub fn definition_capability(owner:&OwnerWeak)->Value{Value::DefinitionOwner(owner.clone())}
+pub fn render_capability(owner:&OwnerWeak)->Value{Value::RenderOwner(owner.clone())}
 pub struct State { pub value:RefCell<Value>, pub kind:&'static str, pub spec:Value, pub owner:OwnerWeak }
 #[derive(Clone)]
 struct Watcher { active:Rc<Cell<bool>>, keys:Option<Vec<String>>, raw:bool, callback:Value }
@@ -334,7 +343,7 @@ impl Owner {
         let guard=PhaseGuard{owner:Rc::downgrade(owner),previous};
         // C-CORE-SYNTAX-0004-C: void setup projects one anonymous slot.
         let _lexical_owner=enter_lexical_owner(&Rc::downgrade(owner));
-        let result=match renderer{Value::Undefined=>NativeSnapshot::slot(),Value::Renderer(render)=>render(vec![renderer_capability(&Rc::downgrade(owner))]),_=>panic!("expected compiled native renderer")};
+        let result=match renderer{Value::Undefined=>NativeSnapshot::slot(),Value::Renderer(adapter)=>(adapter.render)(vec![render_capability(&Rc::downgrade(owner))]),_=>panic!("expected compiled native renderer")};
         result.assert_children();
         {let mut o=owner.borrow_mut();o.projection=Some(result);o.projection_revision+=1;}
         drop(guard);
@@ -521,7 +530,45 @@ pub fn expose_state(owner:&OwnerWeak,key:Value,state:Value)->Value{
 pub fn expose_value(owner:&OwnerWeak,key:Value,value:Value)->Value{let owner_ref=setup(owner);let key=expose_key(&owner_ref,key);owner_ref.borrow_mut().exposes.insert(key,value);Value::Undefined}
 pub fn expose_method(owner:&OwnerWeak,key:Value,callback:Value)->Value{let owner_ref=setup(owner);let key=expose_key(&owner_ref,key);capture_method(&owner_ref,key.clone(),callback.clone());owner_ref.borrow_mut().exposes.insert(key,callback);Value::Undefined}
 pub fn expose_event(owner:&OwnerWeak,key:Value)->Value{let owner_ref=setup(owner);let key=expose_key(&owner_ref,key);owner_ref.borrow_mut().declared_events.insert(key);Value::Undefined}
-pub fn emit(owner:&OwnerWeak,key:Value,payload:Value)->Value{let owner=runtime(owner);let key=key.text();assert!(owner.borrow().declared_events.contains(&key),"undeclared Expose event");let payload=if matches!(payload,Value::Undefined){Json::Null}else{payload.data()};{let mut owner=owner.borrow_mut();owner.emitted.push((key,payload));owner.pending_native_events=true;owner.dirty=true;}Value::Undefined}
+pub fn emit(owner:&OwnerWeak,key:Value,payload:Value)->Value{let owner=runtime(owner);let key=key.text();assert!(owner.borrow().declared_events.contains(&key),"undeclared Expose event");let payload=if matches!(payload,Value::Undefined){Json::Null}else{payload.data()};{let mut o=owner.borrow_mut();o.emitted.push((key,payload));o.pending_native_events=true;o.dirty=true;}Value::Undefined}
+// Event publication wakes the retained native consumer without requesting an
+// authored render. Event-only controls must not wait for unrelated State writes.
+#[cfg(all(test,feature="test-support"))]
+mod event_notification_tests {
+    use super::*;
+    #[test]
+    fn stable_callback_owner_identity_preserves_distinct_handle_kinds() {
+        let first=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+        let second=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+        let a=Rc::downgrade(&first);let b=Rc::downgrade(&second);
+        assert!(strict_equal(&capability(&a),&capability(&a)));
+        assert!(!strict_equal(&capability(&a),&capability(&b)));
+        assert!(strict_equal(&definition_capability(&a),&definition_capability(&a)));
+        assert!(strict_equal(&render_capability(&a),&render_capability(&a)));
+        assert!(!strict_equal(&capability(&a),&definition_capability(&a)));
+        assert!(!strict_equal(&capability(&a),&render_capability(&a)));
+        assert!(!strict_equal(&definition_capability(&a),&render_capability(&a)));
+        Owner::dispose(&first);Owner::dispose(&second);
+    }
+
+    #[test]
+    fn event_only_publication_notifies_without_reexecuting_the_authored_renderer() {
+        let owner=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+        let weak=Rc::downgrade(&owner);
+        expose_event(&weak,Value::string("chosen"));
+        let renders=Rc::new(Cell::new(0));let observed=renders.clone();
+        Owner::finish(&owner,capture_renderer(Value::Function(Rc::new(|_|Value::Json(Json::Null))),Rc::new(move |_|{observed.set(observed.get()+1);NativeSnapshot::empty()})));
+        Owner::project(&owner);let revision=owner.borrow().projection_revision;
+        {let mut o=owner.borrow_mut();o.phase="callback";o.mounted=true;o.dirty=false;}
+        emit(&weak,Value::string("chosen"),Value::number(7.));
+        assert!(owner.borrow().dirty,"event consumers need a native observer notification");
+        assert!(!owner.borrow().update_requested,"publication is not source render intent");
+        assert_eq!(owner.borrow().emitted,vec![("chosen".into(),serde_json::json!(7.))]);
+        Owner::project(&owner);
+        assert_eq!(renders.get(),1);assert_eq!(owner.borrow().projection_revision,revision);
+        Owner::dispose(&owner);
+    }
+}
 pub fn disposer(owner:OwnerRef,active:Rc<Cell<bool>>,setup_only:bool)->Value{let owner=Rc::downgrade(&owner);Value::Function(Rc::new(move |_|{if setup_only{setup(&owner);}else{ensure(&owner);}active.set(false);Value::Undefined}))}
 pub fn style_use(owner:&OwnerWeak,handles:Vec<Value>)->Value{let owner=setup(owner);let active=Rc::new(Cell::new(true));owner.borrow_mut().contributions.push(Contribution{active:active.clone(),predicate:None,styles:style_items(handles)});disposer(owner,active,true)}
 pub fn rule(owner:&OwnerWeak,predicate:Value,handles:Vec<Value>)->Value{let owner=setup(owner);let active=Rc::new(Cell::new(true));owner.borrow_mut().contributions.push(Contribution{active:active.clone(),predicate:Some(predicate),styles:style_items(handles)});Value::Resource(active)}
@@ -566,7 +613,7 @@ pub fn context_update(owner:&OwnerWeak,key:Value,next:Value,optional:bool)->Valu
         throw_error("CONTEXT_DISCONNECTED","required Context provider missing")
     };
     let previous=bound.borrow().providers[&key].clone();
-    let value=if matches!(next,Value::Function(_)){next.call_authored(vec![previous.clone()])}else{next};
+    let value=if next.is_callback(){next.call_authored(vec![previous.clone()])}else{next};
     ensure(&Rc::downgrade(&bound));
     let data=value.try_data().unwrap_or_else(||throw_error("CONTEXT_VALUE_INVALID","invalid Context data"));
     if !(owner.borrow().context_accepts)(&key.descriptor,&data) { throw_error("CONTEXT_VALUE_INVALID","invalid Context data"); }
@@ -756,14 +803,17 @@ element=element.child(canvas(move|_,window,_|{note_host_order(&measured);hover_v
     if committed.borrow().modules.hooks.contains("overlay"){window.on_mouse_event::<gpui::ScrollWheelEvent>(overlay_modal_wheel);}
     let owner=committed.clone();let drive=commit_drive.clone();let focus=commit_focus.clone();let epoch=owner.borrow().epoch;
     window.defer(cx,move|window,cx|{
-        native_host_callback(&owner,"commit",||{
+        // A mounted/updated callback may publish before it throws. Preserve
+        // the reported error and stopped callback list; only deliver events
+        // already published, without retrying commit or authored projection.
+        if native_host_callback(&owner,"commit",||{
             let current={let o=owner.borrow();!o.disposed&&o.present&&o.bounds.is_some()&&o.epoch==epoch&&o.window_id==Some(window.window_handle().window_id())&&o.projection_revision==revision};
             if !current{return}if native_focus_observation_needed(&owner){owner.borrow_mut().modules.focus.native=Some(focus);}
             #[cfg(feature="experimental-focus-tree")]refresh_native_entry(&owner,window);
             Owner::commit(&owner,revision);if owner.borrow().disposed||!owner.borrow().present{return}
             if native_hover_reconcile(&owner,window,cx){window.prevent_default()}
             poll_state_watchers();if !owner.borrow().disposed&&owner.borrow().present{drive(window,cx)}
-        });
+        }).is_none(){drive_pending_native_events(&owner,window,cx); }
     });
 }).absolute().size_full());
 if image_supported(owner){let fill_height=matches!(element.style().size.height,Some(gpui::Length::Definite(_)));element=element.child(image_element(owner,fill_height));}
@@ -1028,7 +1078,7 @@ pub fn global_key_down(event:&gpui::KeyDownEvent,window:&mut Window,cx:&mut App)
     if KEY_DISPATCHED.with(|dispatched|dispatched.replace(true)){return}
     let key=portable_key(&event.keystroke);let mut fields=event_fields("key.down");if let Some(key)=&key{fields.insert("key".into(),Json::String(key.clone()));}fields.insert("repeat".into(),Json::Bool(event.is_held));modifiers(&mut fields,event.keystroke.modifiers);
     let mut host_fields=None;
-    let target=KEY_TARGET.with(|target|target.borrow().as_ref().and_then(Weak::upgrade));let mut prevented=false;
+    let target=native_root_key_target(window);let mut prevented=false;
     for owner in owners_in(window,cx){
         if !matches!(key.as_deref(),Some("Enter"|" ")){owner.borrow_mut().suppress_click=false;}
         if has_listener(&owner,"host:keydown",true,false){prevented|=dispatch(&owner,"host:keydown",true,host_fields.get_or_insert_with(||press_fields("host:keydown",&fields)).clone());}
@@ -1078,7 +1128,7 @@ mod callback_handle_identity_tests {
         assert!(strict_equal(&handle,&capability(&Rc::downgrade(&first))));
         assert!(!strict_equal(&handle,&capability(&Rc::downgrade(&second))));
         assert!(!strict_equal(&handle,&Value::HostTarget(Rc::downgrade(&first))));
-        let definition=definition_capability(&Rc::downgrade(&first));let renderer=renderer_capability(&Rc::downgrade(&first));
+        let definition=definition_capability(&Rc::downgrade(&first));let renderer=render_capability(&Rc::downgrade(&first));
         assert!(strict_equal(&definition,&definition.clone()));assert!(strict_equal(&renderer,&renderer.clone()));
         assert!(!strict_equal(&definition,&handle));assert!(!strict_equal(&renderer,&handle));assert!(!strict_equal(&definition,&renderer));
         Owner::finish(&first,Value::Undefined);Owner::dispose(&first);
@@ -1259,8 +1309,8 @@ pub fn lexical_binding<T:Clone+'static>()->LexicalBinding<T> {
 fn clear_lexicals(owner:&OwnerRef){let slots=std::mem::take(&mut owner.borrow_mut().lexical_slots);for slot in slots{if let Some(slot)=slot.upgrade(){slot.clear();}}}
 
 #[derive(Default)]
-struct AuthoredHooks { entries:BTreeMap<String,Rc<RefCell<AuthoredEntry>>>, builtins:BTreeMap<String,(u64,Value)>, kinds:BTreeMap<String,bool>, frames:Vec<AuthoredFrame>, root_names:BTreeSet<String>, order:u64 }
-struct AuthoredFrame { id:u64, names:BTreeSet<String>, states:BTreeMap<String,Value>, methods:BTreeMap<String,Value>, children:Vec<Value> }
+struct AuthoredHooks { entries:BTreeMap<String,Rc<RefCell<AuthoredEntry>>>, builtins:BTreeMap<String,(u64,Value)>, kinds:BTreeMap<String,bool>, frames:Vec<AuthoredFrame>, root_names:BTreeSet<String>, state_names:BTreeMap<usize,String>, order:u64 }
+struct AuthoredFrame { id:u64, names:BTreeSet<String>, states:BTreeMap<String,Value>, methods:BTreeMap<String,Value>, children:Vec<Value>, effects:BTreeMap<String,Vec<Value>>, disposers:BTreeMap<String,Vec<Value>>, event_keys:BTreeMap<String,Value> }
 struct AuthoredEntry { order:u64, mode:&'static str, api:Value, result:Value, handle:Value, handle_set:bool }
 struct CaptureGuard { owner:OwnerWeak, open:bool }
 impl Drop for CaptureGuard { fn drop(&mut self){if self.open{if let Some(owner)=self.owner.upgrade(){owner.borrow_mut().authored.frames.pop();}}} }
@@ -1271,7 +1321,38 @@ fn claim_state_name(owner:&OwnerRef,name:&str)->String {
     if !names.insert(name.into()){value_error(&format!("[State] duplicate state name in setup frame: {name}"))}
     id.map(|id|format!("hook:{id}:{name}")).unwrap_or_else(||name.into())
 }
-fn capture_state(owner:&OwnerRef,name:String,state:Rc<State>){if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.states.insert(name,Value::BorrowedState(state));}}
+fn capture_state(owner:&OwnerRef,name:String,state:Rc<State>){
+    let mut owner=owner.borrow_mut();owner.authored.state_names.insert(Rc::as_ptr(&state)as usize,name.clone());
+    if let Some(frame)=owner.authored.frames.last_mut(){frame.states.insert(name,Value::BorrowedState(state));}
+}
+pub fn capture_introduced_state(owner:&OwnerWeak,state:Value){
+    let owner=setup(owner);let mut owner=owner.borrow_mut();
+    let projected=match &state{
+        Value::State(state)|Value::BorrowedState(state)=>owner.authored.state_names.get(&(Rc::as_ptr(state)as usize)).cloned().map(|name|(name,Value::BorrowedState(state.clone()))),
+        Value::Observed(_,"focus.focused")=>Some(("focused".into(),state.clone())),
+        Value::Observed(_,"focus.visible")=>Some(("focusVisible".into(),state.clone())),
+        Value::Observed(_,"focus.ready")=>Some(("focusable".into(),state.clone())),
+        _=>None,
+    };
+    if let (Some((name,state)),Some(frame))=(projected,owner.authored.frames.last_mut()){frame.states.insert(name,state);}
+}
+// These functions store receipts of already executed checked setup operations.
+// Bucket values remain opaque; no operation or behavior is interpreted here.
+pub fn capture_effect(owner:&OwnerWeak,bucket:&str,value:Value){
+    let owner=setup(owner);if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.effects.entry(bucket.into()).or_default().push(value);};
+}
+pub fn capture_disposer(owner:&OwnerWeak,group:&str,value:Value){
+    let owner=setup(owner);if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.disposers.entry(group.into()).or_default().push(value);};
+}
+pub fn capture_event_key(owner:&OwnerWeak,key:Value){
+    let owner=setup(owner);if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.event_keys.insert(key.text(),key);};
+}
+pub fn capture_rule(owner:&OwnerWeak,handle:Value)->Value{
+    let target=owner.clone();let captured=handle.clone();
+    let off=Value::Function(Rc::new(move |_|rule_dispose(&target,captured.clone())));
+    capture_effect(owner,"context",record(vec![("op",Value::string("rule")),("handle",handle.clone()),("off",off.clone())]));
+    capture_disposer(owner,"rule",off);handle
+}
 fn capture_method(owner:&OwnerRef,name:String,method:Value){if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.methods.insert(name,method);}}
 fn record_hook_child(owner:&OwnerRef,name:&str,mode:&str,order:u64,privileged:bool,result:Value,handle:Value){
     if let Some(frame)=owner.borrow_mut().authored.frames.last_mut(){frame.children.push(freeze(record(vec![
@@ -1304,15 +1385,34 @@ pub fn native_builtin_hook(owner:&OwnerWeak,name:&str,install:impl FnOnce()->Val
     };
     record_hook_child(&owner_ref,name,"once",order,true,result.clone(),result.clone());result
 }
-fn finish_capture(frame:AuthoredFrame,render:Value)->Value {
-    let mut fields=BTreeMap::new();
-    if !frame.states.is_empty(){let states=freeze(record_map(frame.states));fields.insert("stateHandles".into(),states.clone());fields.insert("getState".into(),Value::Function(Rc::new(move|args|states.member(&arg(&args,0).text(),false))));}
-    if !frame.methods.is_empty(){let methods=frame.methods;fields.insert("getMethod".into(),Value::Function(Rc::new(move|args|methods.get(&arg(&args,0).text()).cloned().unwrap_or_default())));}
+fn finish_capture(owner:&OwnerWeak,frame:AuthoredFrame,render:Value)->Value {
+    let mut fields=BTreeMap::new();let mut artifacts=BTreeMap::new();
+    for (bucket,mut effects) in frame.effects { let value=if effects.len()==1{effects.pop().unwrap()}else{Value::Array(Rc::new(effects))};fields.insert(bucket,value); }
+    if !frame.states.is_empty(){
+        let states=freeze(record_map(frame.states));fields.insert("stateHandles".into(),states.clone());artifacts.insert("stateHandles".into(),states.clone());
+        fields.insert("getState".into(),Value::Function(Rc::new(move|args|states.member(&arg(&args,0).text(),false))));
+    }
+    if !frame.methods.is_empty(){
+        let methods=freeze(record_map(frame.methods));fields.insert("methods".into(),methods.clone());artifacts.insert("methods".into(),methods.clone());
+        fields.insert("getMethod".into(),Value::Function(Rc::new(move|args|methods.member(&arg(&args,0).text(),false))));
+    }
     if !frame.children.is_empty(){
-        let children=Rc::new(frame.children);let raw=children.clone();
+        let children=Rc::new(frame.children);let raw=children.clone();let array=Value::Array(children.clone());
+        fields.insert("asHooks".into(),array.clone());artifacts.insert("asHooks".into(),array);
         fields.insert("getAsHook".into(),Value::Function(Rc::new(move|args|{let name=arg(&args,0);raw.iter().find(|child|strict_equal(&child.member("name",false),&name)).cloned().unwrap_or_default()})));
         fields.insert("getAsHookHandle".into(),Value::Function(Rc::new(move|args|{let name=arg(&args,0);children.iter().find(|child|strict_equal(&child.member("name",false),&name)).map(|child|child.member("handle",false)).unwrap_or_default()})));
     }
+    if !frame.event_keys.is_empty(){artifacts.insert("eventKeys".into(),freeze(record_map(frame.event_keys)));}
+    if !artifacts.is_empty(){fields.insert("artifacts".into(),freeze(record_map(artifacts)));}
+    let mut groups=BTreeMap::new();let mut all=Vec::new();let mut disposers=frame.disposers;
+    for group in ["props","context","rule","event","feedback"] {
+        let Some(source)=disposers.remove(group) else{continue};if source.is_empty(){continue}
+        let wrapped:Vec<Value>=source.into_iter().map(|off|{
+            let owner=owner.clone();Value::Function(Rc::new(move |_|{setup(&owner);off.call_authored(vec![]);Value::Undefined}))
+        }).collect();
+        all.extend(wrapped.iter().cloned());groups.insert(group.into(),Value::Array(Rc::new(wrapped)));
+    }
+    if !all.is_empty(){groups.insert("all".into(),Value::Array(Rc::new(all)));fields.insert("disposers".into(),freeze(record_map(groups)));}
     if matches!(render,Value::Function(_)|Value::NativeFunction{..}|Value::Renderer(_)){fields.insert("render".into(),render);}
     freeze(record_map(fields))
 }
@@ -1334,11 +1434,11 @@ pub fn authored_hook(owner:&OwnerWeak,name:&str,mode:&'static str,input:Value,in
     let api=freeze(record(vec![("name",Value::string(name)),("order",Value::number(order as f64)),("store",record(vec![]))]));
     let entry=Rc::new(RefCell::new(AuthoredEntry{order,mode,api:api.clone(),result:Value::Undefined,handle:Value::Undefined,handle_set:false}));
     {let mut owner=owner_ref.borrow_mut();if mode!="multiple"{owner.authored.entries.insert(name.into(),entry.clone());}
-     owner.authored.frames.push(AuthoredFrame{id:order,names:BTreeSet::new(),states:BTreeMap::new(),methods:BTreeMap::new(),children:Vec::new()});}
+     owner.authored.frames.push(AuthoredFrame{id:order,names:BTreeSet::new(),states:BTreeMap::new(),methods:BTreeMap::new(),children:Vec::new(),effects:BTreeMap::new(),disposers:BTreeMap::new(),event_keys:BTreeMap::new()});}
     let mut guard=CaptureGuard{owner:owner.clone(),open:true};
     let render=install.call_authored(vec![definition_capability(owner),input.clone(),api.clone()]);
     let frame=owner_ref.borrow_mut().authored.frames.pop().expect("capture frame");guard.open=false;
-    let result=finish_capture(frame,render);
+    let result=finish_capture(owner,frame,render);
     // Capture succeeded even if projection subsequently throws. Preserve that
     // raw result for the already-owned registration, as the Core wrapper does.
     entry.borrow_mut().result=result.clone();
@@ -1363,13 +1463,23 @@ struct PublicValues {
     projected_functions:BTreeMap<usize,WeakPublicCallback>,
 }
 fn needs_public_projection(value:&Value,seen:&mut BTreeSet<usize>)->bool{match value{
-    Value::Function(_)=>true,
+    Value::Function(_)|Value::Renderer(_)=>true,
     Value::Record(record)=>seen.insert(Rc::as_ptr(record)as usize)&&record.fields.borrow().values().any(|value|needs_public_projection(value,seen)),
     Value::Array(items)=>seen.insert(Rc::as_ptr(items)as usize)&&items.iter().any(|value|needs_public_projection(value,seen)),
     _=>false,
 }}
 fn outward_value(owner:&OwnerWeak,value:Value)->Value {
     fn project(owner:&OwnerWeak,value:Value,receiver:u64,projecting:&mut BTreeSet<usize>)->Value {match value{
+        Value::Renderer(adapter)=>{
+            // Re-exposing a public renderer through its owner is an identity
+            // operation. Other owners retain both sets of lifetime guards.
+            ensure(owner);
+            if adapter.public_owner.as_ref().is_some_and(|known|Weak::ptr_eq(known,owner)){return Value::Renderer(adapter)}
+            let callable=project(owner,adapter.callable.clone(),receiver,projecting);
+            let weak=owner.clone();let render=adapter.render.clone();
+            let render:NativeRenderer=Rc::new(move|args|{let owner=ensure(&weak);invoke_scoped(&owner,"render",||render(args))});
+            Value::Renderer(Rc::new(RendererAdapter{callable,render,public_owner:Some(owner.clone())}))
+        },
         Value::Function(callback)=>{
             let id=Rc::as_ptr(&callback)as *const ()as usize;let owner_ref=ensure(owner);
             // Echoing an already public value through the same owner is an
@@ -1436,6 +1546,187 @@ fn finish_public_exposes(owner:&OwnerRef){
     let wrapped=raw.into_iter().map(|(key,value)|(key,outward_value(&weak,value))).collect();owner.borrow_mut().exposes=wrapped;
 }
 
+#[cfg(all(test,feature="test-support"))]
+mod authored_renderer_identity_tests {
+    use super::*;
+    fn owner()->OwnerRef {
+        Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary())
+    }
+    fn text_renderer(callback:Value)->Value {
+        let original=callback.clone();
+        capture_renderer(callback,Rc::new(move|arguments|NativeSnapshot::text_value(original.call_authored(arguments))))
+    }
+    fn capture(owner:&OwnerRef,callback:Value)->Value {
+        let install=Value::Function(Rc::new(move|_|text_renderer(callback.clone())));
+        authored_hook(&Rc::downgrade(owner),"identity-content","once",Value::Undefined,install,Value::Undefined,Value::Undefined)
+    }
+
+    #[test]
+    fn captured_scalar_renderer_keeps_identity_and_direct_invocation() {
+        let owner=owner();let calls=Rc::new(Cell::new(0));let observed=calls.clone();
+        let original=Value::Function(Rc::new(move|_|{observed.set(observed.get()+1);Value::string("captured text")}));
+        let captured=capture(&owner,original.clone());let render=captured.member("render",false);
+        assert!(strict_equal(&render,&original));assert!(strict_equal(&original,&render));
+        assert!(strict_equal(&render,&captured.member("render",false)));
+        assert!(!strict_equal(&render,&Value::Function(Rc::new(|_|Value::string("captured text")))));
+        assert_eq!(render.call(vec![]).unwrap().text(),"captured text");
+        assert_eq!(typeof_value(&render).text(),"function");assert!(render.is_callback());
+        assert!(render.truthy());assert!(!render.nullish());assert!(render.try_data().is_none());
+        assert_eq!(calls.get(),1,"capture does not eagerly execute the callable");
+        Owner::finish(&owner,render);Owner::project(&owner);
+        assert_eq!((owner.borrow().projection.as_ref().unwrap().text)(&[]),"captured text");
+        assert_eq!(calls.get(),2);Owner::project(&owner);assert_eq!(calls.get(),2);
+        Owner::dispose(&owner);
+    }
+
+    #[test]
+    fn public_renderer_aliases_keep_guards_and_scalar_call_behavior() {
+        let owner=owner();let weak=Rc::downgrade(&owner);let observed=weak.clone();
+        let original=Value::Function(Rc::new(move|_|Value::string(observed.upgrade().unwrap().borrow().phase)));
+        let captured=capture(&owner,original.clone());let render=captured.member("render",false);
+        expose_value(&weak,Value::string("api"),record(vec![("render",render.clone()),("original",original)]));
+        Owner::finish(&owner,render);
+        let api=owner.borrow().exposes["api"].clone();let public=api.member("render",false);
+        assert!(strict_equal(&public,&api.member("original",false)),"same receiver aliases share one public callback");
+        assert_eq!(public.call(vec![]).unwrap().text(),"expose-method");
+        assert_eq!(owner.borrow().phase,"idle");
+        let echoed=outward_value(&weak,api.clone());assert!(strict_equal(&api,&echoed));
+        assert!(strict_equal(&public,&echoed.member("render",false)));
+        let Value::Renderer(adapter)=&public else{panic!("public renderer loses checked rendering")};
+        for _ in 0..4 {
+            let Value::Renderer(echoed)=outward_value(&weak,public.clone()) else{panic!("public renderer changed kind")};
+            assert!(Rc::ptr_eq(adapter,&echoed),"public echo must not accumulate guard closures");
+        }
+        assert_eq!(((adapter.render)(vec![]).text)(&[]),"render");
+        assert_eq!(owner.borrow().phase,"idle");
+        Owner::dispose(&owner);
+        let error=public.call(vec![]).unwrap_err();assert_eq!(error.member("code",false).text(),"OWNER_DISPOSED");
+        let error=catch_authored(||(adapter.render)(vec![])).err().expect("retired public render must reject");
+        assert_eq!(error.member("code",false).text(),"OWNER_DISPOSED");
+    }
+
+    #[test]
+    fn captured_native_renderer_retains_its_original_callable_identity() {
+        let native:NativeCallable<dyn Fn()->NativeSnapshot>=NativeCallable{identity:Rc::new(()),call:Rc::new(NativeSnapshot::empty)};
+        let render:NativeRenderer=Rc::new(|_|NativeSnapshot::empty());
+        let original=Value::NativeFunction{identity:native.identity.clone(),render:render.clone()};
+        let captured=capture_renderer(original.clone(),render);
+        assert!(strict_equal(&original,&captured));assert!(strict_equal(&captured,&captured));
+        assert!(native.equals_value(&captured));assert_eq!(typeof_value(&captured).text(),"function");
+        let other=Value::NativeFunction{identity:Rc::new(()),render:Rc::new(|_|NativeSnapshot::empty())};
+        assert!(!strict_equal(&captured,&other));
+    }
+}
+#[cfg(all(test,feature="test-support"))]
+mod authored_capture_facade_tests {
+    use super::*;
+    fn owner()->OwnerRef {
+        Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary())
+    }
+    fn hook(owner:&OwnerWeak,name:&str,install:Value,project:Value)->Value {
+        authored_hook(owner,name,"once",Value::Undefined,install,project,Value::Undefined)
+    }
+    #[test]
+    fn capture_facade_preserves_shared_artifacts_raw_children_and_projected_handles() {
+        let owner=owner();let weak=Rc::downgrade(&owner);let target=weak.clone();
+        let read=Value::Function(Rc::new(|_|Value::string("seed")));let method=read.clone();
+        let render=Value::Function(Rc::new(|_|Value::string("text")));let render_child=render.clone();
+        let child=Value::Function(Rc::new(move |_|{
+            let state=create_state(&target,"string",Value::string("text"),Value::string("seed"),record(vec![]));
+            capture_effect(&target,"state",state.clone());
+            expose_method(&target,Value::string("read"),method.clone());
+            capture_effect(&target,"context",record(vec![("op",Value::string("expose.method")),("key",Value::string("read")),("fn",method.clone())]));
+            expose_event(&target,Value::string("changed"));capture_event_key(&target,Value::string("changed"));
+            capture_effect(&target,"event",record(vec![("op",Value::string("expose.event")),("key",Value::string("changed"))]));
+            render_child.clone()
+        }));
+        let projected=Value::Function(Rc::new(|args|{let raw=arg(&args,0);let mut fields=own_entries(raw);fields.insert("projected".into(),Value::boolean(true));freeze(record_map(fields))}));
+        let target=weak.clone();let raw_slot=Rc::new(RefCell::new(Value::Undefined));let raw_observed=raw_slot.clone();
+        let outer=Value::Function(Rc::new(move |_|{
+            let first=hook(&target,"child",child.clone(),projected.clone());
+            let again=hook(&target,"child",child.clone(),projected.clone());assert!(strict_equal(&first,&again));
+            *raw_observed.borrow_mut()=first;Value::Undefined
+        }));
+        let capture=hook(&weak,"outer",outer,Value::Undefined);let child=raw_slot.borrow().clone();
+        let descriptor=capture.member("getAsHook",false).call_authored(vec![Value::string("child")]);
+        let raw=descriptor.member("result",false);let handle=descriptor.member("handle",false);
+        assert!(strict_equal(&handle,&child));assert!(!strict_equal(&raw,&handle));
+        assert!(strict_equal(&descriptor,&capture.member("getAsHook",false).call_authored(vec![Value::string("child")])));
+        assert!(strict_equal(&handle,&capture.member("getAsHookHandle",false).call_authored(vec![Value::string("child")])));
+        assert!(capture.member("stateHandles",false).nullish(),"nested state is not flattened");
+        assert_eq!(capture.member("asHooks",false).items().len(),2);
+        assert!(strict_equal(&capture.member("asHooks",false),&capture.member("artifacts",false).member("asHooks",false)));
+        let states=raw.member("stateHandles",false);let methods=raw.member("methods",false);let artifacts=raw.member("artifacts",false);
+        assert!(strict_equal(&states,&artifacts.member("stateHandles",false)));
+        assert!(strict_equal(&methods,&artifacts.member("methods",false)));
+        assert!(strict_equal(&methods.member("read",false),&read));
+        assert!(strict_equal(&read,&raw.member("getMethod",false).call_authored(vec![Value::string("read")])));
+        assert!(strict_equal(&states.member("text",false),&raw.member("getState",false).call_authored(vec![Value::string("text")])));
+        assert!(matches!(states.member("text",false),Value::BorrowedState(_)));
+        assert!(strict_equal(&child.member("getState",false),&raw.member("getState",false)));
+        assert!(strict_equal(&child.member("getMethod",false),&raw.member("getMethod",false)),"projectHandle forwards the original captured getter");
+        assert!(strict_equal(&child.member("render",false),&render));
+        assert_eq!(artifacts.member("eventKeys",false).member("changed",false).text(),"changed");
+        assert_eq!(raw.member("getMethod",false).call_authored(vec![Value::string("read")]).call_authored(vec![]).text(),"seed");
+        assert!(raw.try_data().is_none(),"capabilities must never become portable JSON");
+        expose_value(&weak,Value::string("facade"),capture);Owner::finish(&owner,Value::Undefined);
+        let public=owner.borrow().exposes["facade"].clone();let public_child=public.member("getAsHook",false).call(vec![Value::string("child")]).unwrap();
+        assert!(strict_equal(&public_child,&public.member("asHooks",false).items()[0]),"getter lookup returns the same public child record");
+        let projected_public=public_child.member("handle",false);let raw_public=public_child.member("result",false);
+        // Public callbacks preserve their original receiver. The raw result and
+        // custom handle are separate receivers, while capture above retains
+        // the original getter identity before this outward guard boundary.
+        let projected_getter=projected_public.member("getMethod",false);
+        let raw_getter=raw_public.member("getMethod",false);
+        let again=public.member("getAsHook",false).call(vec![Value::string("child")]).unwrap();
+        assert!(strict_equal(&projected_public,&again.member("handle",false)));
+        assert!(strict_equal(&raw_public,&again.member("result",false)));
+        assert!(strict_equal(&projected_getter,&again.member("handle",false).member("getMethod",false)),"same projected receiver keeps its public getter");
+        assert!(strict_equal(&raw_getter,&again.member("result",false).member("getMethod",false)),"same raw receiver keeps its public getter");
+        let projected_read=projected_getter.call(vec![Value::string("read")]).unwrap();
+        let raw_read=raw_getter.call(vec![Value::string("read")]).unwrap();
+        assert!(strict_equal(&projected_read,&raw_read),"both getters return the same live public method");
+        assert_eq!(projected_read.call(vec![]).unwrap().text(),"seed");
+        assert_eq!(raw_read.call(vec![]).unwrap().text(),"seed");
+        Owner::dispose(&owner);
+        assert!(public.member("getAsHook",false).call(vec![Value::string("child")]).is_err());
+        for getter in [projected_getter,raw_getter] {
+            let error=getter.call(vec![Value::string("read")]).unwrap_err();
+            assert_eq!(error.member("code",false).text(),"OWNER_DISPOSED");
+        }
+        for method in [projected_read,raw_read] {
+            let error=method.call(vec![]).unwrap_err();
+            assert_eq!(error.member("code",false).text(),"OWNER_DISPOSED");
+        }
+    }
+    #[test]
+    fn capture_disposers_release_real_registrations_only_during_setup() {
+        let owner=owner();let weak=Rc::downgrade(&owner);let target=weak.clone();
+        let install=Value::Function(Rc::new(move |_|{
+            let off=watch_props(&target,None,false,Value::Function(Rc::new(|_|Value::Undefined)));
+            capture_effect(&target,"props",record(vec![("op",Value::string("watchAll")),("off",off.clone())]));
+            capture_disposer(&target,"props",off);Value::Undefined
+        }));
+        let capture=hook(&weak,"watcher",install,Value::Undefined);
+        let disposers=capture.member("disposers",false);let off=disposers.member("all",false).items()[0].clone();
+        assert!(strict_equal(&off,&disposers.member("props",false).items()[0]));
+        assert!(owner.borrow().watchers[0].active.get());off.call_authored(vec![]);assert!(!owner.borrow().watchers[0].active.get());
+        Owner::finish(&owner,Value::Undefined);
+        assert!(off.call(vec![]).is_err(),"captured disposer is setup-only");
+        Owner::dispose(&owner);assert!(off.call(vec![]).is_err());
+    }
+    #[test]
+    fn empty_capture_omits_absent_public_fields() {
+        let owner=owner();let weak=Rc::downgrade(&owner);
+        let capture=hook(&weak,"empty",Value::Function(Rc::new(|_|Value::Undefined)),Value::Undefined);
+        for key in ["props","state","context","event","feedback","stateHandles","methods","asHooks","artifacts","disposers","render","getState","getMethod","getAsHook","getAsHookHandle"] {
+            assert!(!has_own(&capture,&Value::string(key)).bool(),"unexpected empty field: {key}");
+        }
+        Owner::dispose(&owner);
+    }
+}
+
+
 #[derive(Default)]
 struct NativeHostAtoms {
     scheduler_enabled:bool,metadata_enabled:bool,
@@ -1463,7 +1754,7 @@ fn cancel_delay(delay:&NativeDelay){delay.active.set(false);delay.callback.borro
 pub fn schedule_delay(owner:&OwnerWeak,duration:Value,callback:Value)->Value {
     let owner_ref=runtime(owner);let duration=duration.num();
     if !duration.is_finite()||duration<0.{value_type_error("Delay duration must be finite and nonnegative")}
-    if !matches!(callback,Value::Function(_)){value_type_error("Delay callback must be callable")}
+    if !callback.is_callback(){value_type_error("Delay callback must be callable")}
     let (app,window)={let owner=owner_ref.borrow();(owner.atoms.app.clone().expect("native scheduler is not bound"),owner.atoms.window.expect("native scheduler window is not bound"))};
     let delay=Rc::new(NativeDelay{active:Cell::new(true),callback:RefCell::new(Some(callback)),task:RefCell::new(None)});
     let executor=app.background_executor().clone();let start=executor.now();let weak=owner.clone();let pending=delay.clone();
@@ -1530,7 +1821,7 @@ pub fn presence_owner(owner:&OwnerWeak)->Value {
     let state=Rc::new(RefCell::new(NativePresence{reference:reference.clone(),writer:writer.clone(),frame:Value::Undefined,binding:Value::Undefined,pending:Value::Undefined,callback:Value::Undefined}));
     owner_ref.borrow_mut().atoms.presence.push(state.clone());let weak=owner.clone();
     freeze(record(vec![("ref",reference),("writer",writer),("onCompletionRequest",Value::Function(Rc::new(move|args|{
-        setup(&weak);let callback=arg(&args,0);if !matches!(callback,Value::Function(_))||!state.borrow().callback.nullish(){value_type_error("Exactly one presence completion receiver is required")}
+        setup(&weak);let callback=arg(&args,0);if !callback.is_callback()||!state.borrow().callback.nullish(){value_type_error("Exactly one presence completion receiver is required")}
         state.borrow_mut().callback=callback;Value::Undefined
     })))]))
 }
@@ -2187,7 +2478,7 @@ pub fn collection_configure(owner:&OwnerWeak,patch:Value,item:bool)->Value{
 fn collection_item_meta(owner:&OwnerWeak)->Value{let owner_ref=ensure(owner);let callback=field(&owner_ref.borrow().modules.topology.item,"getMeta");if callback.nullish(){record(vec![])}else{invoke(&owner_ref,"expose-method",&callback,vec![capability(owner)])}}
 fn collection_position(owner:&OwnerRef)->(i64,usize){let config=owner.borrow().modules.topology.item.clone();let family=field(&config,"family");if family.nullish(){return(-1,0)}let family=declaration(&family,"anatomy-family");let role=text_or(field(&config,"role"),"item");let parts=anatomy_members(owner,family.identity(),Some(&role),false);(parts.iter().position(|p|Rc::ptr_eq(p,owner)).map_or(-1,|i|i as i64),parts.len())}
 pub fn collection_item_snapshot(owner:&OwnerWeak)->Value{let owner_ref=ensure(owner);let(index,total)=collection_position(&owner_ref);let meta=collection_item_meta(owner);let Value::Record(meta)=meta else{panic!("Collection item metadata must be portable record")};let mut fields=meta.fields.borrow().clone();fields.insert("index".into(),Value::number(index as f64));fields.insert("total".into(),Value::number(total as f64));fields.insert("first".into(),Value::boolean(index==0));fields.insert("last".into(),Value::boolean(index>=0&&index as usize+1==total));record_map(fields)}
-pub fn collection_items(owner:&OwnerWeak)->Value{let owner=ensure(owner);let config=owner.borrow().modules.topology.collection.clone();let family=field(&config,"family");if family.nullish(){return Value::Array(Rc::new(vec![]))}let family=declaration(&family,"anatomy-family");let role=text_or(field(&config,"itemRole"),"item");let meta_key=text_or(field(&config,"itemMetaExposeKey"),"__collectionItem");let parts=anatomy_members(&owner,family.identity(),Some(&role),false);let total=parts.len();Value::Array(Rc::new(parts.into_iter().enumerate().map(|(index,part)|{let meta=part.borrow().exposes.get(&meta_key).cloned();let meta=match meta{Some(Value::Function(f))=>invoke(&part,"expose-method",&Value::Function(f),vec![]),Some(value)=>value,None=>record(vec![])};let Value::Record(meta)=meta else{panic!("Collection item metadata must be portable record")};let mut fields=meta.fields.borrow().clone();fields.insert("index".into(),Value::number(index as f64));fields.insert("total".into(),Value::number(total as f64));fields.insert("first".into(),Value::boolean(index==0));fields.insert("last".into(),Value::boolean(index+1==total));record_map(fields)}).collect()))}
+pub fn collection_items(owner:&OwnerWeak)->Value{let owner=ensure(owner);let config=owner.borrow().modules.topology.collection.clone();let family=field(&config,"family");if family.nullish(){return Value::Array(Rc::new(vec![]))}let family=declaration(&family,"anatomy-family");let role=text_or(field(&config,"itemRole"),"item");let meta_key=text_or(field(&config,"itemMetaExposeKey"),"__collectionItem");let parts=anatomy_members(&owner,family.identity(),Some(&role),false);let total=parts.len();Value::Array(Rc::new(parts.into_iter().enumerate().map(|(index,part)|{let meta=part.borrow().exposes.get(&meta_key).cloned();let meta=match meta{Some(value) if value.is_callback()=>invoke(&part,"expose-method",&value,vec![]),Some(value)=>value,None=>record(vec![])};let Value::Record(meta)=meta else{panic!("Collection item metadata must be portable record")};let mut fields=meta.fields.borrow().clone();fields.insert("index".into(),Value::number(index as f64));fields.insert("total".into(),Value::number(total as f64));fields.insert("first".into(),Value::boolean(index==0));fields.insert("last".into(),Value::boolean(index+1==total));record_map(fields)}).collect()))}
 pub fn collection_count(owner:&OwnerWeak)->Value{Value::number(collection_items(owner).items().len()as f64)}
 pub fn topology_refresh(){
     if TOPOLOGY_UPDATING.with(|flag|flag.replace(true)){return}struct Reset;impl Drop for Reset{fn drop(&mut self){TOPOLOGY_UPDATING.with(|flag|flag.set(false));}}let _reset=Reset;
@@ -2296,11 +2587,11 @@ impl NativeScrollLease{
 }
 impl Drop for NativeScrollLease{fn drop(&mut self){if let Some(owner)=self.owner.upgrade(){let current=owner.borrow().modules.scroll.external.as_ref().is_some_and(|binding|binding.generation==self.generation);if current{scroll_release_external(&owner);}}}}
 #[derive(Default)]
-pub struct ScrollModule{pub config:BTreeMap<String,Value>,pub handle:Option<gpui::ScrollHandle>,pub last_input:Option<std::time::Instant>,pub following:bool,pub pending_end:Option<(bool,u64)>,pub request_status:String,pub previous_max:gpui::Point<Pixels>,external:Option<NativeScrollBinding>,external_expected:bool,binding_generation:u64}
+pub struct ScrollModule{pub external_engine:u64,pub next_engine:u64,pub config:BTreeMap<String,Value>,pub handle:Option<gpui::ScrollHandle>,pub last_input:Option<std::time::Instant>,pub following:bool,pub pending_end:Option<(bool,u64)>,pub request_status:String,pub previous_max:gpui::Point<Pixels>,external:Option<NativeScrollBinding>,external_expected:bool,binding_generation:u64}
 impl ScrollModule{
     fn current_handle(&self)->Option<&gpui::ScrollHandle>{if self.external_expected{self.external.as_ref().map(|binding|&binding.target.0.handle)}else{self.handle.as_ref()}}
     fn handle(&self)->&gpui::ScrollHandle{self.current_handle().expect("ScrollHandle requires a current scroll target")}
-    fn builtin_projection(&self)->bool{!self.external_expected}
+    fn builtin_projection(&self)->bool{!self.external_expected&&self.external_engine==0}
 }
 fn scroll_release_external(owner:&OwnerRef){
     let binding={let mut o=owner.borrow_mut();let s=&mut o.modules.scroll;if s.pending_end.take().is_some(){s.request_status="rejected".into();}s.last_input=None;s.previous_max=gpui::Point::default();let binding=s.external.take();o.dirty=true;binding};
@@ -2310,7 +2601,7 @@ fn scroll_release_external(owner:&OwnerRef){
 /// The caller retains the target identity and lease for the physical view life.
 pub fn attach_scroll_surface(owner:&OwnerWeak,target:NativeScrollTarget,window:&Window)->Result<NativeScrollLease,&'static str>{
     let owner=owner.upgrade().ok_or("owner-disposed")?;
-    {let o=owner.borrow();if o.disposed{return Err("owner-disposed")}if !o.modules.hooks.contains("scroll"){return Err("not-declared")}}
+    {let o=owner.borrow();if o.disposed||o.disposing{return Err("owner-disposed")}if o.modules.scroll.external_engine!=0{return Err("legacy-engine-attached")}if !o.modules.hooks.contains("scroll"){return Err("not-declared")}}
     let busy=target.0.claim.borrow().as_ref().is_some_and(|(claimed,generation)|claimed.upgrade().is_some_and(|claimed|{let o=claimed.borrow();!o.disposed&&o.modules.scroll.external.as_ref().is_some_and(|binding|binding.generation==*generation)}));
     if busy{return Err("target-already-attached")}
     scroll_release_external(&owner);
@@ -2321,7 +2612,7 @@ pub fn attach_scroll_surface(owner:&OwnerWeak,target:NativeScrollTarget,window:&
 /// Explicitly restore the compiler root as the physical scroll surface.
 pub fn use_builtin_scroll_surface(owner:&OwnerWeak)->Result<(),&'static str>{
     let owner=owner.upgrade().ok_or("owner-disposed")?;
-    {let o=owner.borrow();if o.disposed{return Err("owner-disposed")}if !o.modules.hooks.contains("scroll"){return Err("not-declared")}}
+    {let o=owner.borrow();if o.disposed||o.disposing{return Err("owner-disposed")}if o.modules.scroll.external_engine!=0{return Err("legacy-engine-attached")}if !o.modules.hooks.contains("scroll"){return Err("not-declared")}}
     scroll_release_external(&owner);owner.borrow_mut().modules.scroll.external_expected=false;Ok(())
 }
 pub fn scroll_detach(owner:&OwnerRef){if owner.borrow().modules.scroll.external.is_some(){scroll_release_external(owner);}}
@@ -2329,6 +2620,52 @@ fn scroll_ready(owner:&OwnerRef)->bool{
     if !ready(owner){return false}let o=owner.borrow();let s=&o.modules.scroll;
     if s.external_expected{s.external.as_ref().is_some_and(|binding|Some(binding.window)==o.window_id&&binding.target.0.handle.bounds().size.width>gpui::px(0.)&&binding.target.0.handle.bounds().size.height>gpui::px(0.))}else{s.handle.is_some()}
 }
+
+/// Compatibility binding for callers with an existing ScrollHandle and owner.
+/// It preserves its original explicit lease/fallback contract. It cannot coexist
+/// with NativeScrollTarget; use one host binding API for a physical owner.
+/// The host engine remains attached to its actual viewport (including virtual
+/// lists). This lease gives the declared Proto ScrollSurface that exact engine;
+/// the compiler root must not also track it as a second viewport.
+pub struct ScrollEngineLease{owner:OwnerWeak,id:u64,fallback:gpui::ScrollHandle}
+pub fn attach_scroll_engine(target:OwnerWeak,handle:gpui::ScrollHandle)->Result<ScrollEngineLease,String>{
+    let owner=target.upgrade().ok_or("scroll target is no longer available")?;
+    let mut o=owner.try_borrow_mut().map_err(|_|"scroll target is currently borrowed")?;
+    if o.disposed||o.disposing{return Err("scroll target is disposed".into())}
+    if !o.modules.hooks.contains("scroll"){return Err("scroll target did not declare ScrollSurface".into())}
+    let s=&mut o.modules.scroll;
+    if s.external_engine!=0||s.external_expected{return Err("scroll target already has an external engine or target".into())}
+    let fallback=s.handle.as_ref().ok_or("scroll target has no initialized engine")?.clone();
+    let id=s.next_engine.checked_add(1).ok_or("scroll engine generation exhausted")?;
+    s.next_engine=id;s.external_engine=id;
+    if s.pending_end.take().is_some(){s.request_status="rejected".into();}
+    s.previous_max=handle.max_offset();s.last_input=None;
+    let axis=text_or(field(&s.config,"endFollow").member("axis",true),"vertical");
+    let (offset,max)=(handle.offset(),handle.max_offset());
+    s.following=if axis=="horizontal"{f32::from(offset.x+max.x)<=1.}else{f32::from(offset.y+max.y)<=1.};
+    s.handle=Some(handle);o.dirty=true;o.update_requested=true;
+    Ok(ScrollEngineLease{owner:target,id,fallback})
+}
+impl ScrollEngineLease{
+    pub fn is_attached(&self)->bool{self.owner.upgrade().is_some_and(|owner|{let o=owner.borrow();!o.disposed&&!o.disposing&&o.modules.scroll.external_engine==self.id})}
+    /// Report physical input after it reaches this engine, never copy offsets
+    /// into a second ScrollHandle or invent a portable scroll event.
+    pub fn notify_input(&self,window:&mut Window,cx:&mut App)->bool{
+        let Some(owner)=self.owner.upgrade()else{return false};
+        if !ready(&owner)||owner.borrow().modules.scroll.external_engine!=self.id||owner.borrow().window_id!=Some(window.window_handle().window_id()){return false}
+        scroll_input(&owner);let drive=owner.borrow().native_drive.clone();if let Some(drive)=drive{drive(window,cx)}window.refresh();true
+    }
+    pub fn dispose(&self){
+        let Some(owner)=self.owner.upgrade()else{return};let mut o=owner.borrow_mut();
+        if o.modules.scroll.external_engine!=self.id{return}
+        let s=&mut o.modules.scroll;s.external_engine=0;s.handle=Some(self.fallback.clone());
+        if s.pending_end.take().is_some(){s.request_status="rejected".into();}
+        s.previous_max=self.fallback.max_offset();s.last_input=None;s.following=false;
+        o.dirty=true;o.update_requested=true;
+    }
+}
+impl Drop for ScrollEngineLease{fn drop(&mut self){self.dispose()}}
+
 pub fn scroll_setup(owner:&OwnerWeak)->Value{let result=module_handle(owner,"scroll");setup(owner).borrow_mut().modules.scroll.handle.get_or_insert_with(gpui::ScrollHandle::default);result}
 pub fn scroll_configure(owner:&OwnerWeak,patch:Value)->Value{let owner=setup(owner);let required=patch.member("requireProjection",false);assert!(required.nullish()||required.text()=="system","GPUI system ScrollHandle has no composed-chrome projection");let end=patch.member("endFollow",false);let mut o=owner.borrow_mut();if !end.nullish(){o.modules.scroll.following=text_or(end.member("mode",false),"off")=="while-at-end";}merge_config(&mut o.modules.scroll.config,patch);Value::Undefined}
 pub fn scroll_sync(owner:&OwnerWeak,patch:Value)->Value{
@@ -2440,6 +2777,71 @@ pub fn scroll_frame(owner:&OwnerRef,window:&mut Window){
     if s.last_input.is_some_and(|time|time.elapsed()<std::time::Duration::from_millis(120)){window.request_animation_frame();}else{s.last_input=None;}
 }
 pub fn scroll_input(owner:&OwnerRef){let mut o=owner.borrow_mut();o.modules.scroll.last_input=Some(std::time::Instant::now());o.modules.scroll.following=false;o.dirty=true;}
+
+#[cfg(all(test,feature="test-support"))]
+mod scroll_engine_tests {
+    use super::*;
+    fn owner()->OwnerRef{Owner::new(serde_json::json!({}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary())}
+    struct Empty;
+    impl gpui::Render for Empty {fn render(&mut self,_:&mut Window,_:&mut gpui::Context<Self>)->impl IntoElement{gpui::div()}}
+    #[gpui::test]
+    fn bound_engine_notifies_input_from_the_native_event_loop(cx:&mut gpui::TestAppContext){
+        use gpui::AppContext;
+        let window=cx.update(|cx|cx.open_window(Default::default(),|_,cx|cx.new(|_|Empty)).unwrap());
+        window.update(cx,|_,window,cx|{
+            let owner=owner();scroll_setup(&Rc::downgrade(&owner));
+            let lease=attach_scroll_engine(Rc::downgrade(&owner),gpui::ScrollHandle::new()).unwrap();
+            // Inject the already-committed mount facts: this fixture targets
+            // event-loop scheduling, while consumer tests mount the real view.
+            {let mut o=owner.borrow_mut();o.phase="callback";o.mounted=true;o.bounds=Some(gpui::Bounds::new(gpui::point(gpui::px(0.),gpui::px(0.)),gpui::size(gpui::px(100.),gpui::px(100.))));o.window_id=Some(window.window_handle().window_id());}
+            assert!(ready(&owner));
+            assert!(lease.notify_input(window,cx));assert!(owner.borrow().dirty);
+            lease.dispose();assert!(!lease.notify_input(window,cx));Owner::dispose(&owner);
+        }).unwrap();
+    }
+    #[test]
+    fn explicit_engine_lease_binds_one_handle_and_retires_queued_requests(){
+        let owner=owner();scroll_setup(&Rc::downgrade(&owner));
+        let fallback=owner.borrow().modules.scroll.handle().clone();fallback.set_offset(gpui::point(gpui::px(0.),gpui::px(-7.)));
+        let engine=gpui::ScrollHandle::new();let first=attach_scroll_engine(Rc::downgrade(&owner),engine.clone()).unwrap();
+        assert!(first.is_attached());assert!(attach_scroll_engine(Rc::downgrade(&owner),gpui::ScrollHandle::new()).is_err());
+        engine.set_offset(gpui::point(gpui::px(0.),gpui::px(-32.)));
+        assert_eq!(owner.borrow().modules.scroll.handle().offset(),engine.offset(),"exact engine, not mirrored offsets");
+        owner.borrow_mut().modules.scroll.pending_end=Some((false,0));first.dispose();
+        assert!(!first.is_attached());assert_eq!(owner.borrow().modules.scroll.handle().offset(),fallback.offset());
+        assert_eq!(owner.borrow().modules.scroll.request_status,"rejected");assert!(owner.borrow().modules.scroll.pending_end.is_none());
+        let second=attach_scroll_engine(Rc::downgrade(&owner),engine).unwrap();drop(first);
+        assert!(second.is_attached(),"retired lease cannot detach the new binding");drop(second);assert_eq!(owner.borrow().modules.scroll.external_engine,0);
+        Owner::dispose(&owner);assert!(attach_scroll_engine(Rc::downgrade(&owner),gpui::ScrollHandle::new()).is_err());
+    }
+    #[gpui::test]
+    fn legacy_engine_and_retained_target_keep_distinct_explicit_lease_policies(cx:&mut gpui::TestAppContext){
+        use gpui::AppContext;
+        let window=cx.update(|cx|cx.open_window(Default::default(),|_,cx|cx.new(|_|Empty)).unwrap());
+        window.update(cx,|_,window,_|{
+            let owner=owner();let weak=Rc::downgrade(&owner);scroll_setup(&weak);
+            let first=attach_scroll_engine(weak.clone(),gpui::ScrollHandle::new()).unwrap();
+            let target=NativeScrollTarget::new(gpui::ScrollHandle::new());
+            assert!(attach_scroll_surface(&weak,target.clone(),window).is_err());
+            assert!(use_builtin_scroll_surface(&weak).is_err());
+            assert!(first.is_attached());first.dispose();
+            let external=attach_scroll_surface(&weak,target,window).unwrap();
+            assert!(external.is_current());
+            assert!(attach_scroll_engine(weak.clone(),gpui::ScrollHandle::new()).is_err());
+            drop(external);
+            assert!(attach_scroll_engine(weak.clone(),gpui::ScrollHandle::new()).is_err(),"a retired target does not silently become a different viewport");
+            use_builtin_scroll_surface(&weak).unwrap();
+            let second=attach_scroll_engine(weak,gpui::ScrollHandle::new()).unwrap();drop(first);
+            assert!(second.is_attached(),"old compatibility lease cannot retire a successor");
+            drop(second);assert!(owner.borrow().modules.scroll.builtin_projection());Owner::dispose(&owner);
+        }).unwrap();
+    }
+
+    #[test]
+    fn missing_source_declaration_cannot_gain_scroll_semantics_from_binding(){
+        let owner=owner();assert!(attach_scroll_engine(Rc::downgrade(&owner),gpui::ScrollHandle::new()).is_err());Owner::dispose(&owner);
+    }
+}
 
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
@@ -2559,9 +2961,10 @@ fn text_notify_selection_changed(focus:&FocusHandle,window:&mut Window){
     window.notify_text_selection_changed(focus);
     #[cfg(not(feature="gpui-text-selection-notification"))]
     if focus.is_focused(window){
-        // The default GPUI profile exposes its focused input handler through
-        // the next-frame IME coordinate query. Re-query the accepted selection
-        // without invalidating another editor or retaining this editing lease.
+        // Published GPUI 62e5991 exposes the same pull-input path used by its
+        // Editor::selections_did_change: next frame queries the current native
+        // input handler's selected bounds and updates the platform IME position.
+        // Redraw also publishes the changed selection/caret and editing lease.
         window.invalidate_character_coordinates();
         window.refresh();
     }
@@ -2973,6 +3376,7 @@ pub fn text_pointer_move(owner:&OwnerRef,event:&gpui::MouseMoveEvent,window:&mut
         else if let(Some(anchor),Some(geometry))=(text.drag_anchor,text.geometry.as_ref()){let target=geometry.index(event.position);text.selection=anchor.min(target)..anchor.max(target);text.reversed=target<anchor;text.reveal_caret=true;o.dirty=true;true}else{false}};
     if changed{text_drive(owner,window,cx);}
 }
+
 #[cfg(all(test, feature="test-support"))]
 mod text_owner_tests {
     use super::*;
@@ -3432,7 +3836,7 @@ pub fn positioning_connect(owner:&OwnerWeak,connection:Value)->Value {
     let owner=ensure(owner);assert!(!matches!(owner.borrow().phase,"render"|"before-dispose"),"positioning binding phase required");
     let anchor=connection.member("anchor",false).owner();let floating=connection.member("floating",false).owner();
     ensure(&anchor);ensure(&floating);let config=PositionConfig::read(&connection.member("config",false));let callback=connection.member("onResolved",false);
-    assert!(matches!(callback,Value::Undefined|Value::Function(_)),"anchored resolution requires a callable");
+    assert!(matches!(callback,Value::Undefined)||callback.is_callback(),"anchored resolution requires a callable");
     let weak=Rc::downgrade(&owner);let mut owner=owner.borrow_mut();let position=&mut owner.modules.positioning;
     let registered=position.connection.is_some();
     let same=position.connection.as_ref().is_some_and(|old|Weak::ptr_eq(&old.anchor,&anchor)&&Weak::ptr_eq(&old.floating,&floating));
@@ -3519,7 +3923,7 @@ impl gpui::Element for PositionedRoot {
             if !floating.upgrade().is_some_and(|owner|ready(&owner))||!anchor.upgrade().is_some_and(|owner|ready(&owner)){return}
             if !controller.borrow().modules.positioning.connection.as_ref().is_some_and(|connection|connection.generation==generation){return}
             let snapshot=record(vec![("side",Value::string(side)),("align",Value::string(align)),("strategy",Value::string(config.strategy))]);controller.borrow_mut().modules.positioning.snapshot=snapshot.clone();
-            if matches!(callback,Value::Function(_)){native_host_callback(&controller,"positioning",||invoke(&controller,"positioning",&callback,vec![snapshot]));}
+            if callback.is_callback(){native_host_callback(&controller,"positioning",||invoke(&controller,"positioning",&callback,vec![snapshot]));}
             let drive=controller.borrow().native_drive.clone();if let Some(drive)=drive{drive(window,cx);}
         });}
     }
@@ -3615,7 +4019,7 @@ pub fn overlay_register(owner:&OwnerWeak,target:Value,kind:&str)->Value{
 pub fn overlay_keep_mounted(owner:&OwnerWeak)->Value{let owner=setup(owner);let mut owner=owner.borrow_mut();assert!(matches!(owner.modules.overlay.presence,Value::Undefined),"cannot retain a Presence-bound overlay");owner.modules.overlay.retained=true;Value::Undefined}
 pub fn overlay_bind_presence(owner:&OwnerWeak,binding:Value)->Value{
     let owner_ref=setup(owner);{let owner=owner_ref.borrow();assert!(!owner.modules.overlay.retained,"cannot bind Presence after keepMounted");if !matches!(owner.modules.overlay.presence,Value::Undefined){assert!(strict_equal(&owner.modules.overlay.presence,&binding),"Overlay Presence already bound");return Value::Undefined}}
-    assert!(matches!(binding.member("enter",false),Value::Function(_))&&matches!(binding.member("leave",false),Value::Function(_)),"Presence requires callable enter/leave");let present=binding.member("present",false);let active=present.get().bool();
+    assert!(binding.member("enter",false).is_callback()&&binding.member("leave",false).is_callback(),"Presence requires callable enter/leave");let present=binding.member("present",false);let active=present.get().bool();
     owner_ref.borrow_mut().modules.overlay.presence=binding;overlay_view_active(&owner_ref,active);
     let weak=owner.clone();watch_state(owner,present,Value::Function(Rc::new(move|arguments|{let event=arg(&arguments,1);if event.member("type",false).text()=="next"{let owner=ensure(&weak);overlay_view_active(&owner,event.member("next",false).bool());overlay_reconcile(&owner);}Value::Undefined})));let active=owner_ref.borrow().modules.state_watchers.last().expect("Presence watcher").active.clone();owner_ref.borrow_mut().modules.overlay.presence_active=Some(active);
     // Registered at bind time, after the bound transition's created callback.
@@ -3674,6 +4078,629 @@ pub fn native_pointer_press(event:&gpui::MouseDownEvent,phase:gpui::DispatchPhas
     if phase.capture(){POINTER_PRESS_DISPATCHED.with(|sample|sample.set(false));return}
     if !phase.bubble()||POINTER_PRESS_DISPATCHED.with(|sample|sample.replace(true)){return}
     native_boundary_press(event.position,window,cx);
+}
+
+/// Source state and platform effects have already settled when this is called.
+/// GPUI suppresses Notify effects while drawing (including focus callbacks),
+/// so wake retained consumers after the current host lease has returned. A
+/// terminal owner can still have a live generated entity whose consumers need
+/// its final events; only the entity's actual lifetime gates this notification.
+pub fn notify_native_change<T:'static>(cx:&mut gpui::Context<T>) {
+    let view=cx.entity().downgrade();
+    cx.defer(move |cx| {
+        if let Some(view)=view.upgrade(){cx.notify(view.entity_id());}
+    });
+}
+
+/// An undelivered event queue is not a standing request for more notifications.
+/// Consume only the fact that a new event was emitted, including a terminal
+/// event whose owner is already disposed. Drawing may clear ordinary dirty;
+/// it must not clear this independent pending delivery fact.
+pub fn notify_native_events<T:'static>(owner:&OwnerRef,cx:&mut gpui::Context<T>)->bool {
+    if !std::mem::take(&mut owner.borrow_mut().pending_native_events){return false}
+    notify_native_change(cx);
+    true
+}
+
+/// A public operation can publish before it throws. Its caller must retain
+/// that exact error while the existing coalesced native drive delivers the
+/// already-published events. Do not drive failed calls that published nothing.
+pub fn drive_pending_native_events(owner:&OwnerRef,window:&mut Window,cx:&mut App) {
+    let drive={let owner=owner.borrow();if !owner.pending_native_events{return}owner.native_drive.clone()};
+    if let Some(drive)=drive{native_host_callback(owner,"event-notification",||drive(window,cx));}
+}
+
+#[cfg(all(test,feature="test-support"))]
+mod native_notification_tests {
+    use super::notify_native_change;
+    use gpui::prelude::*;
+    use gpui::{AppContext,Context,Entity,FocusHandle,InteractiveElement,IntoElement,ParentElement,
+        Render,Styled,Subscription,TestAppContext,Window,WindowHandle,div,px,size};
+    use std::{cell::RefCell,rc::Rc};
+
+    struct FocusTarget {
+        focus:FocusHandle,
+        active:bool,
+        retired:bool,
+        _blur:Subscription,
+    }
+    impl FocusTarget {
+        fn new(window:&mut Window,cx:&mut Context<Self>)->Self {
+            let focus=cx.focus_handle();
+            let blur=cx.on_blur(&focus,window,|target,_,cx| {
+                // This callback runs in Window::draw's Focus phase. A direct
+                // cx.notify() here does not enqueue a native observer effect.
+                target.active=false;
+                target.retired=true;
+                notify_native_change(cx);
+                assert!(!target.active,"source retirement stays synchronous");
+            });
+            Self{focus,active:true,retired:false,_blur:blur}
+        }
+    }
+    impl Render for FocusTarget {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            div().id("native-notification-target").track_focus(&self.focus).size(px(24.))
+        }
+    }
+    struct Host {
+        target:Entity<FocusTarget>,
+        outside:FocusHandle,
+        observed:Rc<RefCell<Vec<(bool,bool)>>>,
+        _changes:Subscription,
+    }
+    impl Render for Host {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            div().size_full().flex().child(self.target.clone())
+                .child(div().id("native-notification-outside").track_focus(&self.outside).size(px(24.)))
+        }
+    }
+    fn frames(window:WindowHandle<Host>,cx:&mut TestAppContext) {
+        for _ in 0..3 {
+            cx.update_window(window.into(),|_,window,cx|{
+                window.refresh();window.draw(cx).clear(cx);
+            }).unwrap();
+            cx.run_until_parked();
+        }
+    }
+
+    #[gpui::test]
+    fn physical_blur_notifies_retained_consumers_after_source_retirement(cx:&mut TestAppContext) {
+        let window=cx.open_window(size(px(96.),px(48.)),|window,cx|{
+            let target=cx.new(|cx|FocusTarget::new(window,cx));
+            let observed=Rc::new(RefCell::new(Vec::new()));
+            let output=observed.clone();
+            let changes=cx.observe(&target,move|_:&mut Host,target,cx|{
+                let target=target.read(cx);
+                output.borrow_mut().push((target.active,target.retired));
+            });
+            Host{target,outside:cx.focus_handle(),observed,_changes:changes}
+        });
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,window,cx|{
+            let focus=host.target.read(cx).focus.clone();
+            window.focus(&focus,cx);
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,window,cx|{
+            assert!(host.target.read(cx).focus.is_focused(window));
+            assert!(host.observed.borrow().is_empty());
+            window.focus(&host.outside,cx);
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert!(!host.target.read(cx).active);
+            assert!(host.target.read(cx).retired);
+            assert_eq!(&*host.observed.borrow(),&[(false,true)],
+                "native consumers must receive retirement even when it occurred during draw");
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn deferred_notification_does_not_keep_a_dropped_entity_alive(cx:&mut TestAppContext) {
+        let weak=cx.update(|cx|{
+            let target=cx.new(|_|());
+            let weak=target.downgrade();
+            target.update(cx,|_,cx|notify_native_change(cx));
+            drop(target);
+            weak
+        });
+        cx.run_until_parked();
+        assert!(weak.upgrade().is_none(),"notification does not retain or resurrect its target");
+    }
+}
+
+#[cfg(all(test,feature="test-support"))]
+mod native_event_notification_tests {
+    use super::*;
+    use gpui::{AppContext,Context,Entity,IntoElement,Render,Subscription,TestAppContext,WindowHandle,px,size};
+
+    struct EmittingTarget { owner:OwnerRef, value:f64, authored_renders:Rc<Cell<usize>> }
+    impl EmittingTarget {
+        fn new(cx:&Context<Self>)->Self {
+            let owner=Owner::new(serde_json::json!({"value":0}),Default::default(),|_,_|true,|_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+            let weak=Rc::downgrade(&owner);
+            props_define(&weak,record(vec![("value",record(vec![("type",Value::string("number")),("default",Value::number(0.))]))]));
+            expose_event(&weak,Value::string("proposed"));
+            watch_props(&weak,Some(Value::string("value")),false,Value::Function(Rc::new(|args|{
+                let value=arg(&args,1).member("value",false);
+                emit(&arg(&args,0).owner(),Value::string("proposed"),value.clone());
+                if value.num()==13.{throw_value(Value::boolean(false))}
+                Value::Undefined
+            })));
+            let method_owner=weak.clone();
+            expose_method(&weak,Value::string("publishThenThrow"),Value::Function(Rc::new(move|_|{
+                emit(&method_owner,Value::string("proposed"),Value::number(21.));throw_value(Value::number(0.))
+            })));
+            let authored_renders=Rc::new(Cell::new(0));let observed=authored_renders.clone();
+            Owner::finish(&owner,capture_renderer(Value::Function(Rc::new(|_|Value::Json(Json::Null))),Rc::new(move |_|{
+                observed.set(observed.get()+1);NativeSnapshot::empty()
+            })));
+            let target=cx.entity().downgrade();
+            owner.borrow_mut().native_drive=Some(Rc::new(move|window,cx|{
+                let target=target.clone();window.defer(cx,move|_,cx|{let _=target.update(cx,|target,cx|target.drive(cx));});
+            }));
+            Self{owner,value:0.,authored_renders}
+        }
+        fn replace(&mut self,value:f64,window:&mut Window,cx:&mut Context<Self>)->Result<(),Value> {
+            if self.value==value{return Ok(())}
+            self.value=value;
+            // This is the real SDK Props watcher and Expose publication path,
+            // invoked from the containing GPUI view's render below.
+            let outcome=catch_authored(||replace_props(&self.owner,serde_json::json!({"value":value})));
+            if outcome.is_err(){drive_pending_native_events(&self.owner,window,cx);}
+            outcome?;self.drive(cx);Ok(())
+        }
+        fn call_throwing(&self,window:&mut Window,cx:&mut App)->Result<Value,Value> {
+            let outcome=catch_authored(||{
+                let callback=self.owner.borrow().exposes["publishThenThrow"].clone();
+                let result=invoke(&self.owner,"expose-method",&callback,vec![]);
+                let drive=self.owner.borrow().native_drive.clone();if let Some(drive)=drive{drive(window,cx);}
+                result
+            });
+            if outcome.is_err(){drive_pending_native_events(&self.owner,window,cx);}
+            outcome
+        }
+        fn drive(&mut self,cx:&mut Context<Self>) {
+            let dirty=std::mem::take(&mut self.owner.borrow_mut().dirty);
+            if !notify_native_events(&self.owner,cx)&&dirty{cx.notify();}
+        }
+    }
+    impl Render for EmittingTarget {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            Owner::project(&self.owner);
+            // Native drawing consumes repaint dirtiness independently of the
+            // one pending event notification, as the generated component does.
+            self.owner.borrow_mut().dirty=false;
+            div().size_full()
+        }
+    }
+    struct EventHost {
+        target:Entity<EmittingTarget>,desired:f64,notifications:usize,
+        events:Vec<(String,Json)>,drain:bool,error:Option<Value>,_changes:Subscription,
+    }
+    impl Render for EventHost {
+        fn render(&mut self,window:&mut Window,cx:&mut Context<Self>)->impl IntoElement {
+            if let Err(error)=self.target.update(cx,|target,cx|target.replace(self.desired,window,cx)){self.error=Some(error);}
+            div().size_full().child(self.target.clone())
+        }
+    }
+    fn frames(window:WindowHandle<EventHost>,cx:&mut TestAppContext) {
+        for _ in 0..3 {
+            cx.update_window(window.into(),|_,window,cx|{window.refresh();window.draw(cx).clear(cx);}).unwrap();
+            cx.run_until_parked();
+        }
+    }
+    fn open(cx:&mut TestAppContext,drain:bool)->WindowHandle<EventHost> {
+        let window=cx.open_window(size(px(96.),px(48.)),move|_,cx|{
+            let target=cx.new(|cx|EmittingTarget::new(cx));
+            let changes=cx.observe(&target,|host:&mut EventHost,target,cx|{
+                host.notifications+=1;
+                if host.drain{host.events.extend(std::mem::take(&mut target.read(cx).owner.borrow_mut().emitted));}
+            });
+            EventHost{target,desired:0.,notifications:0,events:Vec::new(),drain,error:None,_changes:changes}
+        });
+        frames(window,cx);window
+    }
+
+    #[gpui::test]
+    fn render_time_props_emit_reaches_a_retained_consumer_without_authored_repaint(cx:&mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,_,cx|{assert_eq!(host.notifications,0);host.desired=7.;cx.notify();}).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert_eq!(host.notifications,1);
+            assert_eq!(host.events,vec![("proposed".into(),serde_json::json!(7.))]);
+            let target=host.target.read(cx);assert_eq!(target.authored_renders.get(),1);
+            assert!(!target.owner.borrow().update_requested);assert!(!target.owner.borrow().pending_native_events);
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,_,cx|{assert_eq!(host.notifications,1);assert_eq!(host.target.read(cx).authored_renders.get(),1);}).unwrap();
+    }
+
+    #[gpui::test]
+    fn undrained_event_backlog_does_not_repeat_notifications_or_repaint(cx:&mut TestAppContext) {
+        let window=open(cx,false);
+        window.update(cx,|host,_,cx|{host.desired=1.;cx.notify();}).unwrap();frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert_eq!(host.notifications,1);let target=host.target.read(cx);
+            assert_eq!(target.owner.borrow().emitted.len(),1);assert!(!target.owner.borrow().pending_native_events);
+            assert_eq!(target.authored_renders.get(),1);
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,_,cx|{assert_eq!(host.notifications,1);host.desired=2.;cx.notify();}).unwrap();frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert_eq!(host.notifications,2);let target=host.target.read(cx);
+            assert_eq!(target.owner.borrow().emitted.len(),2);assert_eq!(target.authored_renders.get(),1);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn terminal_owner_events_still_notify_a_live_retained_entity(cx:&mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,_,cx|{
+            host.target.update(cx,|target,cx|{
+                invoke_scoped(&target.owner,"callback",||emit(&Rc::downgrade(&target.owner),Value::string("proposed"),Value::number(9.)));
+                Owner::dispose(&target.owner);
+                assert!(target.owner.borrow().pending_native_events);
+                target.drive(cx);
+            });
+        }).unwrap();frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert_eq!(host.notifications,1);assert_eq!(host.events,vec![("proposed".into(),serde_json::json!(9.))]);
+            let target=host.target.read(cx);assert!(target.owner.borrow().disposed);assert!(!target.owner.borrow().pending_native_events);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn render_time_watcher_emit_then_throw_keeps_false_and_delivers_once(cx:&mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,_,cx|{host.desired=13.;cx.notify();}).unwrap();frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert!(matches!(host.error,Some(Value::Json(Json::Bool(false)))),"the original falsy authored error survives notification scheduling");
+            assert_eq!(host.notifications,1);assert_eq!(host.events,vec![("proposed".into(),serde_json::json!(13.))]);
+            assert_eq!(host.target.read(cx).authored_renders.get(),1);
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,_,_|{assert_eq!(host.notifications,1);assert_eq!(host.events.len(),1);}).unwrap();
+    }
+
+    #[gpui::test]
+    fn public_method_emit_then_throw_keeps_zero_and_delivers_once(cx:&mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,window,cx|{
+            let error=host.target.update(cx,|target,cx|target.call_throwing(window,cx)).unwrap_err();
+            assert!(strict_equal(&error,&Value::number(0.)),"the exact authored error is returned before the retained observer runs");
+            assert_eq!(host.notifications,0);
+        }).unwrap();frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            assert_eq!(host.notifications,1);assert_eq!(host.events,vec![("proposed".into(),serde_json::json!(21.))]);
+            assert_eq!(host.target.read(cx).authored_renders.get(),1);
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,_,_|{assert_eq!(host.notifications,1);assert_eq!(host.events.len(),1);}).unwrap();
+    }
+}
+
+// GPUI caches its hover state and can deliver the first change before the
+// deferred authored mount commits. Retain the latest physical observation;
+// replaying geometry or waiting for another mouse move loses that transition.
+#[derive(Clone,Copy,PartialEq,Eq)]
+struct NativeHoverView { epoch:u64, window:gpui::WindowId, hitbox:gpui::HitboxId }
+#[derive(Default)]
+struct NativeHoverState {
+    mounted_epoch:Option<u64>,
+    needs_sync:bool,
+    cached_hover:Option<bool>,
+    resample_input:bool,
+    pending:Option<(NativeHoverView,bool,u64)>,
+    observation:u64,
+    delivered:bool,
+}
+fn native_hover_view(owner:&OwnerRef,window:&Window)->Option<NativeHoverView> {
+    let o=owner.borrow();
+    if o.disposed||o.disposing||!o.present||o.bounds.is_none()
+        ||o.window_id!=Some(window.window_handle().window_id()){return None}
+    Some(NativeHoverView {
+        epoch:if o.mounted{o.epoch}else{o.epoch.wrapping_add(1)},
+        window:o.window_id?,hitbox:o.native_hitbox.as_ref()?.id,
+    })
+}
+fn native_hover_current(owner:&OwnerRef,view:NativeHoverView,window:&Window)->bool {
+    native_hover_view(owner,window)==Some(view)
+}
+fn native_hover_mounted(owner:&OwnerRef,epoch:u64) {
+    let mut o=owner.borrow_mut();
+    // Mark completion after the authored lifecycle turn, including its error
+    // boundary. A failure cannot disable a still-live view's later input;
+    // synchronous detach, disposal or replacement still retires this epoch.
+    if !o.disposed&&!o.disposing&&o.present&&o.mounted&&o.epoch==epoch {
+        if o.native_hover.mounted_epoch!=Some(epoch){o.native_hover.needs_sync=true;}
+        o.native_hover.mounted_epoch=Some(epoch);
+    }
+}
+fn native_hover_flush(owner:&OwnerRef,window:&mut Window)->bool {
+    let pending={
+        let mut o=owner.borrow_mut();
+        if !o.mounted||o.native_hover.mounted_epoch!=Some(o.epoch){return false}
+        o.native_hover.pending.take()
+    };
+    let Some((view,hover,observation))=pending else{return false};
+    if !native_hover_current(owner,view,window){return false}
+    {
+        let mut o=owner.borrow_mut();
+        if o.native_hover.delivered==hover{return false}
+        // Claim before callbacks, so synchronous host reentry cannot deliver
+        // this same enter twice. A newer observation remains independently owned.
+        o.native_hover.delivered=hover;
+    }
+    let kind=if hover{"pointer.enter"}else{"pointer.leave"};
+    let mut prevented=dispatch_root_route(owner,kind,event_fields(kind));
+    if !native_hover_current(owner,view,window)||owner.borrow().native_hover.observation!=observation{return prevented}
+    if !hover{control_label_pointer_cancel(owner);prevented|=pointer_intent(owner,"press.cancel",event_fields("press.cancel"));}
+    if !native_hover_current(owner,view,window)||owner.borrow().native_hover.observation!=observation{return prevented}
+    let kind=if hover{"host:mouseenter"}else{"host:mouseleave"};
+    prevented|=dispatch(owner,kind,false,event_fields(kind));
+    prevented
+}
+fn native_hover_fact(owner:&OwnerRef,view:NativeHoverView,hover:bool,window:&mut Window)->bool {
+    // Each callback belongs to the view measured during its own prepaint.
+    // Cached callbacks from another frame, window or mount cannot overwrite
+    // the current observation, even when the same logical Owner is retained.
+    if !native_hover_current(owner,view,window){return false}
+    {
+        let mut o=owner.borrow_mut();let state=&mut o.native_hover;
+        if state.pending.is_none()&&state.delivered==hover{return false}
+        state.observation=state.observation.wrapping_add(1);
+        state.pending=Some((view,hover,state.observation));
+    }
+    native_hover_flush(owner,window)
+}
+fn native_hover_reconcile(owner:&OwnerRef,window:&mut Window,cx:&mut App)->bool {
+    let Some(view)=native_hover_view(owner,window)else{return false};
+    let synchronize={
+        let mut o=owner.borrow_mut();
+        if !o.mounted||o.native_hover.mounted_epoch!=Some(o.epoch){return false}
+        std::mem::take(&mut o.native_hover.needs_sync)
+    };
+    if !synchronize{return native_hover_flush(owner,window)}
+    // A previous frame's deferred GPUI callback can update its shared hover
+    // cache before the current frame's callback runs. Never adopt that old
+    // boolean. Read the current host hit-test fact once at this boundary; GPUI
+    // owns clipping, occlusion, input modality and capture in is_hovered.
+    let hover=!cx.has_active_drag()&&owner.borrow().native_hitbox.as_ref()
+        .is_some_and(|hitbox|hitbox.id==view.hitbox&&hitbox.is_hovered(window));
+    // If an old paint changed GPUI's cache to a different fact, its next real
+    // inside move may not call on_hover. Keep only that mismatch until a
+    // physical move or a current callback brings both observations together.
+    {
+        let mut o=owner.borrow_mut();let state=&mut o.native_hover;
+        state.resample_input=state.cached_hover.is_some_and(|cached|cached!=hover);
+    }
+    native_hover_fact(owner,view,hover,window)
+}
+fn native_hover_input(owner:&OwnerRef,view:NativeHoverView,hover:bool,window:&mut Window,cx:&mut App)->bool {
+    let Some(current)=native_hover_view(owner,window)else{return false};
+    if current==view{
+        {let mut o=owner.borrow_mut();o.native_hover.cached_hover=Some(hover);o.native_hover.resample_input=false;}
+        return native_hover_fact(owner,view,hover,window)
+    }
+    // A changed paint frame within this same live view requests one fresh
+    // physical observation. An old mount or another window has no authority
+    // even to request that reconciliation.
+    if current.epoch!=view.epoch||current.window!=view.window{return false}
+    {let mut o=owner.borrow_mut();o.native_hover.cached_hover=Some(hover);o.native_hover.needs_sync=true;}
+    native_hover_reconcile(owner,window,cx)
+}
+fn native_hover_motion(owner:&OwnerRef,view:Option<NativeHoverView>,window:&mut Window,cx:&mut App)->bool {
+    let(Some(view),Some(current))=(view,native_hover_view(owner,window))else{return false};
+    if current.epoch!=view.epoch||current.window!=view.window{return false}
+    {
+        let mut o=owner.borrow_mut();
+        if !o.native_hover.resample_input{return false}
+        o.native_hover.needs_sync=true;
+    }
+    native_hover_reconcile(owner,window,cx)
+}
+
+#[cfg(all(test,feature="test-support"))]
+mod native_hover_tests {
+    use super::*;
+    use gpui::{AppContext,Context,Entity,Render,TestAppContext,WindowHandle,point,px,size};
+
+    struct Content;
+    impl Render for Content {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            div().w(px(80.)).h(px(40.))
+        }
+    }
+    struct Host { owner:OwnerRef, focus:FocusHandle, shown:bool, _content:Entity<Content> }
+    impl Render for Host {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            let mut root=div().size_full();
+            if self.shown&&!self.owner.borrow().disposed {
+                Owner::project(&self.owner);
+                let snapshot=self.owner.borrow().projection.clone().unwrap();
+                root=root.child(paint_native_root(&snapshot,&self.owner,&self.focus,
+                    "native-hover-target".into(),Rc::new(|_,_|{})));
+            }
+            root
+        }
+    }
+    fn owner(trace:Rc<RefCell<Vec<String>>>,retire_on_mount:bool,fail_on_mount:bool)->OwnerRef {
+        let owner=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,
+            |_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+        let weak=Rc::downgrade(&owner);
+        for kind in ["mounted","unmounted"] {
+            let output=trace.clone();
+            register_life(&weak,kind,Value::Function(Rc::new(move |_| {
+                output.borrow_mut().push(kind.into());Value::Undefined
+            })));
+        }
+        for kind in ["pointer.enter","pointer.leave","host:mouseenter","host:mouseleave"] {
+            let output=trace.clone();
+            listen(&weak,Value::string(kind),false,Value::Function(Rc::new(move |_| {
+                output.borrow_mut().push(kind.into());Value::Undefined
+            })),Value::Undefined);
+        }
+        if retire_on_mount {
+            let target=weak.clone();
+            register_life(&weak,"mounted",Value::Function(Rc::new(move |_| {
+                if let Some(owner)=target.upgrade(){Owner::dispose(&owner)}Value::Undefined
+            })));
+        }
+        if fail_on_mount {
+            register_life(&weak,"mounted",Value::Function(Rc::new(|_|throw_value(Value::boolean(false)))));
+        }
+        Owner::finish(&owner,Value::Undefined);owner
+    }
+    fn open(cx:&mut TestAppContext,trace:Rc<RefCell<Vec<String>>>,retire:bool)->WindowHandle<Host> {
+        cx.open_window(size(px(160.),px(80.)),move |_,cx| {
+            let owner=owner(trace,retire,false);let content=cx.new(|_|Content);
+            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(content.clone().into())];
+            Host{owner,focus:cx.focus_handle(),shown:false,_content:content}
+        })
+    }
+    fn frames(window:WindowHandle<Host>,cx:&mut TestAppContext) {
+        for _ in 0..3 {
+            cx.update_window(window.into(),|_,window,cx| {
+                window.refresh();window.draw(cx).clear(cx);
+            }).unwrap();
+            cx.run_until_parked();
+        }
+    }
+    fn cold_mount(window:WindowHandle<Host>,cx:&mut TestAppContext) {
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,window,cx| {
+            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
+            host.shown=true;cx.notify();
+        }).unwrap();
+        frames(window,cx);
+    }
+
+    #[gpui::test]
+    fn cold_hover_is_delivered_after_mount_once_and_tracks_real_transitions(cx:&mut TestAppContext) {
+        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
+        cold_mount(window,cx);
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
+            "the initial native hover must survive the pre-mount callback boundary");
+        frames(window,cx);
+        window.update(cx,|_,window,cx|window.simulate_mouse_move(point(px(12.),px(12.)),cx)).unwrap();
+        assert_eq!(trace.borrow().len(),3,"cached frames and inside-to-inside motion cannot duplicate enter");
+        window.update(cx,|_,window,cx| {
+            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
+            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
+        }).unwrap();
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter",
+            "pointer.leave","host:mouseleave","pointer.enter","host:mouseenter"]);
+        window.update(cx,|host,_,_|Owner::dispose(&host.owner)).unwrap();
+    }
+
+    #[gpui::test]
+    fn detach_retires_hover_facts_and_remount_rejects_old_view_callbacks(cx:&mut TestAppContext) {
+        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
+        cold_mount(window,cx);
+        let stale=window.update(cx,|host,window,cx| {
+            let view=native_hover_view(&host.owner,window).unwrap();
+            host.shown=false;cx.notify();view
+        }).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,window,cx| {
+            assert!(!host.owner.borrow().mounted);
+            assert!(host.owner.borrow().native_hover.pending.is_none());
+            assert!(!host.owner.borrow().native_hover.delivered);
+            let before=trace.borrow().len();native_hover_input(&host.owner,stale,true,window,cx);
+            assert_eq!(trace.borrow().len(),before);
+            host.shown=true;cx.notify();
+        }).unwrap();
+        frames(window,cx);
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter",
+            "unmounted","mounted","pointer.enter","host:mouseenter"]);
+        window.update(cx,|host,window,cx| {
+            let current=native_hover_view(&host.owner,window).unwrap();
+            assert_ne!(stale.epoch,current.epoch);
+            let before=trace.borrow().len();native_hover_input(&host.owner,stale,false,window,cx);
+            assert_eq!(trace.borrow().len(),before,"retired leave cannot affect the remount");
+            assert!(host.owner.borrow().native_hover.delivered);
+            Owner::dispose(&host.owner);let before=trace.borrow().len();
+            native_hover_input(&host.owner,current,true,window,cx);
+            assert_eq!(trace.borrow().len(),before,"terminal owner rejects late physical input");
+            assert!(host.owner.borrow().native_hover.pending.is_none());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn mounted_callback_retirement_discards_pending_native_hover(cx:&mut TestAppContext) {
+        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),true);
+        cold_mount(window,cx);
+        assert_eq!(&*trace.borrow(),&["mounted","unmounted"],
+            "a physical fact cannot outlive synchronous authored mount retirement");
+        window.update(cx,|host,_,_| {
+            assert!(host.owner.borrow().disposed);
+            assert!(host.owner.borrow().native_hover.pending.is_none());
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn mounted_callback_failure_keeps_current_hover_and_exact_error(cx:&mut TestAppContext) {
+        let trace=Rc::new(RefCell::new(Vec::new()));let output=trace.clone();
+        let window=cx.open_window(size(px(160.),px(80.)),move |_,cx| {
+            let owner=owner(output,false,true);let content=cx.new(|_|Content);
+            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(content.clone().into())];
+            Host{owner,focus:cx.focus_handle(),shown:false,_content:content}
+        });
+        cold_mount(window,cx);
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
+            "an authored mount failure does not retire an otherwise current native view");
+        window.update(cx,|host,window,cx| {
+            let failures=take_native_failures(&host.owner);
+            assert_eq!(failures.len(),1);
+            assert!(matches!(failures[0].error,Value::Json(Json::Bool(false))));
+            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
+            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
+            assert_eq!(trace.borrow().len(),7,"the current view keeps real leave and enter delivery");
+            Owner::dispose(&host.owner);
+        }).unwrap();
+    }
+    #[gpui::test]
+    fn two_frames_before_deferred_commit_preserve_the_current_cold_hover(cx:&mut TestAppContext) {
+        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();
+        frames(window,cx);
+        cx.update_window(window.into(),|_,window,cx| {
+            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
+            let host=window.root::<Host>().unwrap().unwrap();
+            host.update(cx,|host,cx|{host.shown=true;cx.notify();});
+            window.refresh();window.draw(cx).clear(cx);
+            window.refresh();window.draw(cx).clear(cx);
+            assert!(trace.borrow().is_empty(),"draws precede the deferred mount and hover delivery");
+        }).unwrap();
+        cx.run_until_parked();
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
+            "a stale frame callback cannot consume the current view's only initial hover change");
+        window.update(cx,|host,_,_|Owner::dispose(&host.owner)).unwrap();
+
+        // The old frame's true cache is not authority for the current view:
+        // move outside before the second draw, then genuinely enter again.
+        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();frames(window,cx);
+        cx.update_window(window.into(),|_,window,cx| {
+            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
+            let host=window.root::<Host>().unwrap().unwrap();
+            host.update(cx,|host,cx|{host.shown=true;cx.notify();});
+            window.refresh();window.draw(cx).clear(cx);
+            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
+            window.refresh();window.draw(cx).clear(cx);
+        }).unwrap();cx.run_until_parked();
+        assert_eq!(&*trace.borrow(),&["mounted"],"stale inside must not override the current outside hit-test");
+        window.update(cx,|_,window,cx|window.simulate_mouse_move(point(px(10.),px(10.)),cx)).unwrap();
+        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
+            "a stale GPUI cache must not swallow the next real enter after reconciliation");
+        frames(window,cx);
+        assert_eq!(trace.borrow().len(),3,"physical reconciliation is finite and does not duplicate enter");
+        window.update(cx,|host,_,_|Owner::dispose(&host.owner)).unwrap();
+    }
 }
 
 /// Opaque, same-SDK identity. It has no serialization or raw/structural constructor.
@@ -3948,350 +4975,191 @@ mod native_content_selection_tests {
     }
 }
 
-/// Source state and platform effects have already settled when this is called.
-/// GPUI suppresses Notify effects while drawing (including focus callbacks),
-/// so wake retained consumers after the current host lease has returned. A
-/// terminal owner can still have a live generated entity whose consumers need
-/// its final events; only the entity's actual lifetime gates this notification.
-pub fn notify_native_change<T:'static>(cx:&mut gpui::Context<T>) {
-    let view=cx.entity().downgrade();
-    cx.defer(move |cx| {
-        if let Some(view)=view.upgrade(){cx.notify(view.entity_id());}
-    });
-}
-
-/// An undelivered event queue is not a standing request for more notifications.
-/// Consume only the fact that a new event was emitted, including a terminal
-/// event whose owner is already disposed. Drawing may clear ordinary dirty;
-/// it must not clear this independent pending delivery fact.
-pub fn notify_native_events<T:'static>(owner:&OwnerRef,cx:&mut gpui::Context<T>)->bool {
-    if !std::mem::take(&mut owner.borrow_mut().pending_native_events){return false}
-    notify_native_change(cx);
-    true
-}
-
-/// A public operation can publish before it throws. Its caller must retain
-/// that exact error while the existing coalesced native drive delivers the
-/// already-published events. Do not drive failed calls that published nothing.
-pub fn drive_pending_native_events(owner:&OwnerRef,window:&mut Window,cx:&mut App) {
-    let drive={let owner=owner.borrow();if !owner.pending_native_events{return}owner.native_drive.clone()};
-    if let Some(drive)=drive{native_host_callback(owner,"event-notification",||drive(window,cx));}
-}
-
-
-// GPUI caches its hover state and can deliver the first change before the
-// deferred authored mount commits. Retain the latest physical observation;
-// replaying geometry or waiting for another mouse move loses that transition.
-#[derive(Clone,Copy,PartialEq,Eq)]
-struct NativeHoverView { epoch:u64, window:gpui::WindowId, hitbox:gpui::HitboxId }
-#[derive(Default)]
-struct NativeHoverState {
-    mounted_epoch:Option<u64>,
-    needs_sync:bool,
-    cached_hover:Option<bool>,
-    resample_input:bool,
-    pending:Option<(NativeHoverView,bool,u64)>,
-    observation:u64,
-    delivered:bool,
-}
-fn native_hover_view(owner:&OwnerRef,window:&Window)->Option<NativeHoverView> {
-    let o=owner.borrow();
-    if o.disposed||o.disposing||!o.present||o.bounds.is_none()
-        ||o.window_id!=Some(window.window_handle().window_id()){return None}
-    Some(NativeHoverView {
-        epoch:if o.mounted{o.epoch}else{o.epoch.wrapping_add(1)},
-        window:o.window_id?,hitbox:o.native_hitbox.as_ref()?.id,
-    })
-}
-fn native_hover_current(owner:&OwnerRef,view:NativeHoverView,window:&Window)->bool {
-    native_hover_view(owner,window)==Some(view)
-}
-fn native_hover_mounted(owner:&OwnerRef,epoch:u64) {
-    let mut o=owner.borrow_mut();
-    // Mark completion after the authored lifecycle turn, including its error
-    // boundary. A failure cannot disable a still-live view's later input;
-    // synchronous detach, disposal or replacement still retires this epoch.
-    if !o.disposed&&!o.disposing&&o.present&&o.mounted&&o.epoch==epoch {
-        if o.native_hover.mounted_epoch!=Some(epoch){o.native_hover.needs_sync=true;}
-        o.native_hover.mounted_epoch=Some(epoch);
-    }
-}
-fn native_hover_flush(owner:&OwnerRef,window:&mut Window)->bool {
-    let pending={
-        let mut o=owner.borrow_mut();
-        if !o.mounted||o.native_hover.mounted_epoch!=Some(o.epoch){return false}
-        o.native_hover.pending.take()
-    };
-    let Some((view,hover,observation))=pending else{return false};
-    if !native_hover_current(owner,view,window){return false}
-    {
-        let mut o=owner.borrow_mut();
-        if o.native_hover.delivered==hover{return false}
-        // Claim before callbacks, so synchronous host reentry cannot deliver
-        // this same enter twice. A newer observation remains independently owned.
-        o.native_hover.delivered=hover;
-    }
-    let kind=if hover{"pointer.enter"}else{"pointer.leave"};
-    let mut prevented=dispatch_root_route(owner,kind,event_fields(kind));
-    if !native_hover_current(owner,view,window)||owner.borrow().native_hover.observation!=observation{return prevented}
-    if !hover{control_label_pointer_cancel(owner);prevented|=pointer_intent(owner,"press.cancel",event_fields("press.cancel"));}
-    if !native_hover_current(owner,view,window)||owner.borrow().native_hover.observation!=observation{return prevented}
-    let kind=if hover{"host:mouseenter"}else{"host:mouseleave"};
-    prevented|=dispatch(owner,kind,false,event_fields(kind));
-    prevented
-}
-fn native_hover_fact(owner:&OwnerRef,view:NativeHoverView,hover:bool,window:&mut Window)->bool {
-    // Each callback belongs to the view measured during its own prepaint.
-    // Cached callbacks from another frame, window or mount cannot overwrite
-    // the current observation, even when the same logical Owner is retained.
-    if !native_hover_current(owner,view,window){return false}
-    {
-        let mut o=owner.borrow_mut();let state=&mut o.native_hover;
-        if state.pending.is_none()&&state.delivered==hover{return false}
-        state.observation=state.observation.wrapping_add(1);
-        state.pending=Some((view,hover,state.observation));
-    }
-    native_hover_flush(owner,window)
-}
-fn native_hover_reconcile(owner:&OwnerRef,window:&mut Window,cx:&mut App)->bool {
-    let Some(view)=native_hover_view(owner,window)else{return false};
-    let synchronize={
-        let mut o=owner.borrow_mut();
-        if !o.mounted||o.native_hover.mounted_epoch!=Some(o.epoch){return false}
-        std::mem::take(&mut o.native_hover.needs_sync)
-    };
-    if !synchronize{return native_hover_flush(owner,window)}
-    // A previous frame's deferred GPUI callback can update its shared hover
-    // cache before the current frame's callback runs. Never adopt that old
-    // boolean. Read the current host hit-test fact once at this boundary; GPUI
-    // owns clipping, occlusion, input modality and capture in is_hovered.
-    let hover=!cx.has_active_drag()&&owner.borrow().native_hitbox.as_ref()
-        .is_some_and(|hitbox|hitbox.id==view.hitbox&&hitbox.is_hovered(window));
-    // If an old paint changed GPUI's cache to a different fact, its next real
-    // inside move may not call on_hover. Keep only that mismatch until a
-    // physical move or a current callback brings both observations together.
-    {
-        let mut o=owner.borrow_mut();let state=&mut o.native_hover;
-        state.resample_input=state.cached_hover.is_some_and(|cached|cached!=hover);
-    }
-    native_hover_fact(owner,view,hover,window)
-}
-fn native_hover_input(owner:&OwnerRef,view:NativeHoverView,hover:bool,window:&mut Window,cx:&mut App)->bool {
-    let Some(current)=native_hover_view(owner,window)else{return false};
-    if current==view{
-        {let mut o=owner.borrow_mut();o.native_hover.cached_hover=Some(hover);o.native_hover.resample_input=false;}
-        return native_hover_fact(owner,view,hover,window)
-    }
-    // A changed paint frame within this same live view requests one fresh
-    // physical observation. An old mount or another window has no authority
-    // even to request that reconciliation.
-    if current.epoch!=view.epoch||current.window!=view.window{return false}
-    {let mut o=owner.borrow_mut();o.native_hover.cached_hover=Some(hover);o.native_hover.needs_sync=true;}
-    native_hover_reconcile(owner,window,cx)
-}
-fn native_hover_motion(owner:&OwnerRef,view:Option<NativeHoverView>,window:&mut Window,cx:&mut App)->bool {
-    let(Some(view),Some(current))=(view,native_hover_view(owner,window))else{return false};
-    if current.epoch!=view.epoch||current.window!=view.window{return false}
-    {
-        let mut o=owner.borrow_mut();
-        if !o.native_hover.resample_input{return false}
-        o.native_hover.needs_sync=true;
-    }
-    native_hover_reconcile(owner,window,cx)
+// C-EVENT-TYPE-0002 separates portable intent from a host event alias. A
+// native descendant can consume a sample while its physical event still
+// bubbles. Do not promote that sample into the ancestor's root key/press
+// route. Read this fact before portable callbacks: their own default-action
+// request (for example Space scroll prevention) still permits the source's
+// normal activation intent. Raw host/global observations remain independent.
+// Key-up is deliberately not gated: terminal callbacks must release ordinary
+// source-owned key sessions as well as the SDK's Enter/Space press lease.
+fn native_root_key_target(window:&Window)->Option<OwnerRef> {
+    if window.default_prevented(){return None}
+    KEY_TARGET.with(|target|target.borrow().as_ref().and_then(Weak::upgrade))
 }
 
 #[cfg(all(test,feature="test-support"))]
-mod native_hover_tests {
+mod native_key_boundary_tests {
     use super::*;
-    use gpui::{AppContext,Context,Entity,Render,TestAppContext,WindowHandle,point,px,size};
+    use gpui::{AppContext,Context,Entity,IntoElement,KeyDownEvent,KeyUpEvent,
+        Keystroke,PlatformInput,Render,Subscription,TestAppContext,WindowHandle,px,size};
 
-    struct Content;
-    impl Render for Content {
+    struct NativeChild {
+        focus:FocusHandle, consume_down:Rc<Cell<bool>>, consume_up:Rc<Cell<bool>>,
+        trace:Rc<RefCell<Vec<String>>>,
+    }
+    impl Render for NativeChild {
         fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
-            div().w(px(80.)).h(px(40.))
+            let down=self.consume_down.clone();let up=self.consume_up.clone();
+            let down_trace=self.trace.clone();let up_trace=self.trace.clone();
+            div().id("key-boundary-native-child").w(px(96.)).h(px(40.))
+                .track_focus(&self.focus)
+                .on_key_down(move|event,window,_|{
+                    down_trace.borrow_mut().push(format!("native.down:{}",event.keystroke.key));
+                    if down.get(){window.prevent_default();}
+                })
+                .on_key_up(move|event,window,_|{
+                    up_trace.borrow_mut().push(format!("native.up:{}",event.keystroke.key));
+                    if up.get(){window.prevent_default();}
+                })
         }
     }
-    struct Host { owner:OwnerRef, focus:FocusHandle, shown:bool, _content:Entity<Content> }
+    struct Host {
+        owner:OwnerRef, focus:FocusHandle, child_focus:FocusHandle, outside:FocusHandle,
+        consume_down:Rc<Cell<bool>>, consume_up:Rc<Cell<bool>>,
+        trace:Rc<RefCell<Vec<String>>>, pressed:Rc<Cell<bool>>,
+        _child:Entity<NativeChild>, _blur:Subscription,
+    }
     impl Render for Host {
         fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
-            let mut root=div().size_full();
-            if self.shown&&!self.owner.borrow().disposed {
-                Owner::project(&self.owner);
-                let snapshot=self.owner.borrow().projection.clone().unwrap();
-                root=root.child(paint_native_root(&snapshot,&self.owner,&self.focus,
-                    "native-hover-target".into(),Rc::new(|_,_|{})));
+            Owner::project(&self.owner);
+            let snapshot=self.owner.borrow().projection.clone().unwrap();
+            div().size_full().flex()
+                .child(paint_native_root(&snapshot,&self.owner,&self.focus,
+                    "key-boundary-root".into(),Rc::new(|_,_|{})))
+                .child(div().id("key-boundary-outside").track_focus(&self.outside).size(px(40.)))
+        }
+    }
+    fn open(cx:&mut TestAppContext,consume:bool)->WindowHandle<Host> {
+        let window=cx.open_window(size(px(240.),px(100.)),move|window,cx|{
+            let owner=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,
+                |_|true,|_,_|true,crate::gpui_native_style::vocabulary());
+            let weak=Rc::downgrade(&owner);
+            as_focusable(&weak);
+            let trace=Rc::new(RefCell::new(Vec::new()));let pressed=Rc::new(Cell::new(false));
+            for kind in ["key.down","key.up","press.start","press.commit","press.end","press.cancel"] {
+                let observed=trace.clone();let active=pressed.clone();
+                listen(&weak,Value::string(kind),false,Value::Function(Rc::new(move|args|{
+                    let input=arg(&args,1);let key=input.member("key",false);
+                    observed.borrow_mut().push(format!("{}:{}",kind,if key.nullish(){String::new()}else{key.text()}));
+                    if kind=="press.start"||(kind=="key.down"&&key.text()=="a"){active.set(true);}
+                    if matches!(kind,"press.end"|"press.cancel")||(kind=="key.up"&&key.text()=="a"){active.set(false);}
+                    if kind=="key.down"&&key.text()==" "{prevent(input);}
+                    Value::Undefined
+                })),Value::Undefined);
             }
-            root
-        }
-    }
-    fn owner(trace:Rc<RefCell<Vec<String>>>,retire_on_mount:bool,fail_on_mount:bool)->OwnerRef {
-        let owner=Owner::new(serde_json::json!({}),Default::default(),|_,_|true,
-            |_|true,|_,_|true,crate::gpui_native_style::vocabulary());
-        let weak=Rc::downgrade(&owner);
-        for kind in ["mounted","unmounted"] {
-            let output=trace.clone();
-            register_life(&weak,kind,Value::Function(Rc::new(move |_| {
-                output.borrow_mut().push(kind.into());Value::Undefined
-            })));
-        }
-        for kind in ["pointer.enter","pointer.leave","host:mouseenter","host:mouseleave"] {
-            let output=trace.clone();
-            listen(&weak,Value::string(kind),false,Value::Function(Rc::new(move |_| {
-                output.borrow_mut().push(kind.into());Value::Undefined
+            let observed=trace.clone();
+            listen(&weak,Value::string("host:keydown"),false,Value::Function(Rc::new(move|args|{
+                observed.borrow_mut().push(format!("host.down:{}",arg(&args,1).member("key",false).text()));
+                Value::Undefined
             })),Value::Undefined);
-        }
-        if retire_on_mount {
-            let target=weak.clone();
-            register_life(&weak,"mounted",Value::Function(Rc::new(move |_| {
-                if let Some(owner)=target.upgrade(){Owner::dispose(&owner)}Value::Undefined
-            })));
-        }
-        if fail_on_mount {
-            register_life(&weak,"mounted",Value::Function(Rc::new(|_|throw_value(Value::boolean(false)))));
-        }
-        Owner::finish(&owner,Value::Undefined);owner
-    }
-    fn open(cx:&mut TestAppContext,trace:Rc<RefCell<Vec<String>>>,retire:bool)->WindowHandle<Host> {
-        cx.open_window(size(px(160.),px(80.)),move |_,cx| {
-            let owner=owner(trace,retire,false);let content=cx.new(|_|Content);
-            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(content.clone().into())];
-            Host{owner,focus:cx.focus_handle(),shown:false,_content:content}
-        })
+            Owner::finish(&owner,Value::Undefined);
+            register_sequential_focus_owner(&owner,cx);
+            let focus=cx.focus_handle();let child_focus=cx.focus_handle();
+            let consume_down=Rc::new(Cell::new(consume));let consume_up=Rc::new(Cell::new(consume));
+            let child=cx.new(|_|NativeChild{focus:child_focus.clone(),consume_down:consume_down.clone(),consume_up:consume_up.clone(),trace:trace.clone()});
+            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(child.clone().into())];
+            let blur=cx.on_blur(&focus,window,|host:&mut Host,_,_|{native_press_blur(&host.owner);});
+            Host{owner,focus,child_focus,outside:cx.focus_handle(),consume_down,consume_up,trace,pressed,_child:child,_blur:blur}
+        });
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();
+        frames(window,cx);
+        window.update(cx,|host,window,cx|window.focus(&host.child_focus,cx)).unwrap();
+        frames(window,cx);window
     }
     fn frames(window:WindowHandle<Host>,cx:&mut TestAppContext) {
         for _ in 0..3 {
-            cx.update_window(window.into(),|_,window,cx| {
-                window.refresh();window.draw(cx).clear(cx);
-            }).unwrap();
+            cx.update_window(window.into(),|_,window,cx|{window.refresh();window.draw(cx).clear(cx);}).unwrap();
             cx.run_until_parked();
         }
     }
-    fn cold_mount(window:WindowHandle<Host>,cx:&mut TestAppContext) {
-        window.update(cx,|_,window,_|window.activate_window()).unwrap();
-        frames(window,cx);
-        window.update(cx,|host,window,cx| {
-            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
-            host.shown=true;cx.notify();
-        }).unwrap();
-        frames(window,cx);
-    }
-
-    #[gpui::test]
-    fn cold_hover_is_delivered_after_mount_once_and_tracks_real_transitions(cx:&mut TestAppContext) {
-        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
-        cold_mount(window,cx);
-        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
-            "the initial native hover must survive the pre-mount callback boundary");
-        frames(window,cx);
-        window.update(cx,|_,window,cx|window.simulate_mouse_move(point(px(12.),px(12.)),cx)).unwrap();
-        assert_eq!(trace.borrow().len(),3,"cached frames and inside-to-inside motion cannot duplicate enter");
-        window.update(cx,|_,window,cx| {
-            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
-            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
-        }).unwrap();
-        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter",
-            "pointer.leave","host:mouseleave","pointer.enter","host:mouseenter"]);
-        window.update(cx,|host,_,_|Owner::dispose(&host.owner)).unwrap();
-    }
-
-    #[gpui::test]
-    fn detach_retires_hover_facts_and_remount_rejects_old_view_callbacks(cx:&mut TestAppContext) {
-        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
-        cold_mount(window,cx);
-        let stale=window.update(cx,|host,window,cx| {
-            let view=native_hover_view(&host.owner,window).unwrap();
-            host.shown=false;cx.notify();view
-        }).unwrap();
-        frames(window,cx);
-        window.update(cx,|host,window,cx| {
-            assert!(!host.owner.borrow().mounted);
-            assert!(!host.owner.borrow().native_hover.delivered);
-            let before=trace.borrow().len();native_hover_input(&host.owner,stale,true,window,cx);
-            assert_eq!(trace.borrow().len(),before);
-            host.shown=true;cx.notify();
-        }).unwrap();
-        frames(window,cx);
-        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter",
-            "unmounted","mounted","pointer.enter","host:mouseenter"]);
-        window.update(cx,|host,window,cx| {
-            let current=native_hover_view(&host.owner,window).unwrap();
-            assert_ne!(stale.epoch,current.epoch);
-            let before=trace.borrow().len();native_hover_input(&host.owner,stale,false,window,cx);
-            assert_eq!(trace.borrow().len(),before,"retired leave cannot affect the remount");
-            assert!(host.owner.borrow().native_hover.delivered);
-            Owner::dispose(&host.owner);let before=trace.borrow().len();
-            native_hover_input(&host.owner,current,true,window,cx);
-            assert_eq!(trace.borrow().len(),before,"terminal owner rejects late physical input");
-        }).unwrap();
-    }
-
-    #[gpui::test]
-    fn mounted_callback_retirement_discards_pending_native_hover(cx:&mut TestAppContext) {
-        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),true);
-        cold_mount(window,cx);
-        assert_eq!(&*trace.borrow(),&["mounted","unmounted"],
-            "a physical fact cannot outlive synchronous authored mount retirement");
-        window.update(cx,|host,_,_| {
-            assert!(host.owner.borrow().disposed);
-        }).unwrap();
-    }
-    #[gpui::test]
-    fn mounted_callback_failure_keeps_current_hover_and_exact_error(cx:&mut TestAppContext) {
-        let trace=Rc::new(RefCell::new(Vec::new()));let output=trace.clone();
-        let window=cx.open_window(size(px(160.),px(80.)),move |_,cx| {
-            let owner=owner(output,false,true);let content=cx.new(|_|Content);
-            owner.borrow_mut().slot=vec![NativeSnapshot::native_view(content.clone().into())];
-            Host{owner,focus:cx.focus_handle(),shown:false,_content:content}
-        });
-        cold_mount(window,cx);
-        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
-            "an authored mount failure does not retire an otherwise current native view");
-        window.update(cx,|host,window,cx| {
-            let failures=take_native_failures(&host.owner);
-            assert_eq!(failures.len(),1);
-            assert!(matches!(failures[0].error,Value::Json(Json::Bool(false))));
-            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
-            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
-            assert_eq!(trace.borrow().len(),7,"the current view keeps real leave and enter delivery");
-            Owner::dispose(&host.owner);
-        }).unwrap();
-    }
-    #[gpui::test]
-    fn two_frames_before_deferred_commit_preserve_the_current_cold_hover(cx:&mut TestAppContext) {
-        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
-        window.update(cx,|_,window,_|window.activate_window()).unwrap();
-        frames(window,cx);
-        cx.update_window(window.into(),|_,window,cx| {
-            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
-            let host=window.root::<Host>().unwrap().unwrap();
-            host.update(cx,|host,cx|{host.shown=true;cx.notify();});
-            window.refresh();window.draw(cx).clear(cx);
-            window.refresh();window.draw(cx).clear(cx);
-            assert!(trace.borrow().is_empty(),"draws precede the deferred mount and hover delivery");
+    fn key(window:WindowHandle<Host>,name:&'static str,down:bool,cx:&mut TestAppContext) {
+        cx.update_window(window.into(),|_,window,cx|{
+            let mut keystroke=Keystroke::parse(name).unwrap();
+            // This physical sample explicitly carries the printable text fact.
+            if name=="a"{keystroke.key_char=Some("a".into());}
+            window.dispatch_event(if down {
+                PlatformInput::KeyDown(KeyDownEvent{keystroke,is_held:false,prefer_character_input:false})
+            } else {PlatformInput::KeyUp(KeyUpEvent{keystroke})},cx);
         }).unwrap();
         cx.run_until_parked();
-        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
-            "a stale frame callback cannot consume the current view's only initial hover change");
-        window.update(cx,|host,_,_|Owner::dispose(&host.owner)).unwrap();
+    }
+    fn semantic_trace(host:&Host)->Vec<String> {
+        host.trace.borrow().iter().filter(|item|item.starts_with("key.")||item.starts_with("press.")).cloned().collect()
+    }
 
-        // The old frame's true cache is not authority for the current view:
-        // move outside before the second draw, then genuinely enter again.
-        let trace=Rc::new(RefCell::new(Vec::new()));let window=open(cx,trace.clone(),false);
-        window.update(cx,|_,window,_|window.activate_window()).unwrap();frames(window,cx);
-        cx.update_window(window.into(),|_,window,cx| {
-            window.simulate_mouse_move(point(px(10.),px(10.)),cx);
-            let host=window.root::<Host>().unwrap().unwrap();
-            host.update(cx,|host,cx|{host.shown=true;cx.notify();});
-            window.refresh();window.draw(cx).clear(cx);
-            window.simulate_mouse_move(point(px(120.),px(60.)),cx);
-            window.refresh();window.draw(cx).clear(cx);
-        }).unwrap();cx.run_until_parked();
-        assert_eq!(&*trace.borrow(),&["mounted"],"stale inside must not override the current outside hit-test");
-        window.update(cx,|_,window,cx|window.simulate_mouse_move(point(px(10.),px(10.)),cx)).unwrap();
-        assert_eq!(&*trace.borrow(),&["mounted","pointer.enter","host:mouseenter"],
-            "a stale GPUI cache must not swallow the next real enter after reconciliation");
-        frames(window,cx);
-        assert_eq!(trace.borrow().len(),3,"physical reconciliation is finite and does not duplicate enter");
-        window.update(cx,|host,_,_|Owner::dispose(&host.owner)).unwrap();
+    #[gpui::test]
+    fn native_child_cancellation_does_not_become_ancestor_keyboard_intent(cx:&mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,window,_|assert!(host.child_focus.is_focused(window))).unwrap();
+        for name in ["enter","escape","space"]{key(window,name,true,cx);key(window,name,false,cx);}
+        window.update(cx,|host,_,_|{
+            assert_eq!(semantic_trace(host),["key.up:Enter","key.up:Escape","key.up: "],
+                "canceled key-down cannot create root intent; terminal key-up stays observable");
+            for name in ["enter","escape","space"] {
+                assert!(host.trace.borrow().contains(&format!("native.down:{name}")));
+                assert!(host.trace.borrow().contains(&format!("native.up:{name}")));
+            }
+            for name in ["Enter","Escape"," "]{assert!(host.trace.borrow().contains(&format!("host.down:{name}")),"physical bubbling still reaches the raw host listener");}
+            assert!(host.owner.borrow().press.key.is_none());assert!(!host.pressed.get());
+        }).unwrap();
+        window.update(cx,|host,_,_|{host.trace.borrow_mut().clear();host.consume_down.set(false);host.consume_up.set(false);}).unwrap();
+        key(window,"enter",true,cx);key(window,"enter",false,cx);
+        window.update(cx,|host,_,_|{
+            assert_eq!(semantic_trace(host),["key.down:Enter","press.start:Enter","press.commit:Enter","key.up:Enter","press.end:Enter"]);
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn source_space_prevention_keeps_one_activation_and_canceled_up_retires_the_lease(cx:&mut TestAppContext) {
+        let window=open(cx,false);
+        key(window,"space",true,cx);
+        window.update(cx,|host,window,_|{
+            assert!(host.child_focus.is_focused(window));
+            assert!(host.pressed.get());assert_eq!(host.owner.borrow().press.key.as_deref(),Some(" "));
+            assert_eq!(semantic_trace(host),["key.down: ","press.start: ","press.commit: "]);
+            host.consume_up.set(true);
+        }).unwrap();
+        key(window,"space",false,cx);
+        window.update(cx,|host,_,_|{
+            assert!(host.trace.borrow().contains(&"native.up:space".into()));
+            assert_eq!(semantic_trace(host),["key.down: ","press.start: ","press.commit: ","key.up: ","press.end: "]);
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none(),"canceled key-up cannot retain an earlier live press");
+            host.trace.borrow_mut().clear();
+        }).unwrap();
+        // A non-activation key has no SDK press lease. Its source callback
+        // still owns a session that must receive the real terminal key-up.
+        key(window,"a",true,cx);
+        window.update(cx,|host,_,_|{
+            assert!(host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+        }).unwrap();
+        key(window,"a",false,cx);
+        window.update(cx,|host,_,_|{
+            assert_eq!(semantic_trace(host),["key.down:a","key.up:a"]);
+            assert!(!host.pressed.get(),"native cancellation cannot suppress source-owned terminal input");
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_focus_loss_cancels_a_held_root_press_before_late_key_up(cx:&mut TestAppContext) {
+        let window=open(cx,false);
+        window.update(cx,|host,window,cx|window.focus(&host.focus,cx)).unwrap();frames(window,cx);
+        key(window,"enter",true,cx);
+        window.update(cx,|host,window,cx|{
+            assert!(host.focus.is_focused(window));assert!(host.pressed.get());
+            assert_eq!(host.owner.borrow().press.key.as_deref(),Some("Enter"));
+            window.focus(&host.outside,cx);
+        }).unwrap();frames(window,cx);
+        window.update(cx,|host,_,_|{
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+            assert_eq!(semantic_trace(host).iter().filter(|item|item.starts_with("press.cancel:")).count(),1);
+            assert_eq!(semantic_trace(host).iter().filter(|item|item.starts_with("press.commit:")).count(),1);
+        }).unwrap();
+        key(window,"enter",false,cx);
+        window.update(cx,|host,_,_|{
+            assert!(!host.pressed.get());assert!(host.owner.borrow().press.key.is_none());
+            assert_eq!(semantic_trace(host).iter().filter(|item|item.starts_with("press.commit:")).count(),1);
+        }).unwrap();
     }
 }

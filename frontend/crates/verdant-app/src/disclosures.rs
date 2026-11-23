@@ -163,11 +163,11 @@ impl Disclosures {
 }
 
 impl Render for Disclosures {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let locale = i18n::current(cx); let semantics = Surface::Disclosures.semantics(locale);
         let props = serde_json::json!({"label":semantics.label, "description":semantics.description, "role":"document", "autoFocus":true});
         let entity = cx.entity();
-        let draw = std::rc::Rc::new(move |_handle: &verdant_scroll_region::ScrollRegionHandle, focus: &FocusHandle, window: &mut Window, cx: &mut App| {
+        let draw = std::rc::Rc::new(move |_handle: &verdant_scroll_region::ScrollRegionHandle, focus: &FocusHandle, _engine: Option<crate::proto_scroll::EngineBinding>, window: &mut Window, cx: &mut App| {
             entity.update(cx, |view, cx| { view.focus = focus.clone(); view.native_content(window, cx) })
         });
         crate::proto_scroll::region("compiled-disclosures-scroll", props, draw)

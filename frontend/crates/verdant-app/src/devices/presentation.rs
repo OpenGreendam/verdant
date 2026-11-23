@@ -45,6 +45,7 @@ pub(super) fn tabs(ed: &Editor, target: &Target, cx: &mut Context<Editor>) -> gp
             let command = page_command(target.clone(), index, cx);
             let navigate: Vec<_> = (0..3).map(|page| page_command(target.clone(), page, cx)).collect();
             semantic_click(button(format!("device-page-{}-{index}", target.slot), label, selected == index, th)
+                .authority(suite::action_authority(ed, target))
                 .role(Role::Tab).aria_selected(selected == index).aria_label(format!("{label}工作区"))
                 .when(selected == index, |d| d.bg(th.card).text_color(th.text).border_color(th.shade)), command)
                 .navigation(index as usize, 3, move |index, window, cx| {
@@ -58,6 +59,7 @@ pub(super) fn section_header(ed: &Editor, target: &Target, label: &str, count: u
     let expanded = state.expanded_sections.contains(label); let th = ed.theme;
     let command = section_command(target.clone(), label.to_string(), cx);
     semantic_click(crate::proto_controls::action(format!("device-section-{}-{label}", target.slot), label.to_string()).role(Role::Button).tab_index(0)
+        .authority(suite::action_authority(ed, target))
         .aria_label(format!("{label} · {count} 个参数")).aria_expanded(expanded)
         .flex().items_center().gap(gpui::rems(10./16.)).w_full().min_h(gpui::rems(42./16.))
         .px(gpui::rems(12./16.)).rounded(gpui::rems(8./16.)).bg(th.card)

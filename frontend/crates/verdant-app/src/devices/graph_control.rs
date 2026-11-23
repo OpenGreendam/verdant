@@ -33,8 +33,8 @@ impl PointTarget {
         let params=&self.basis.as_ref()?.params;let mut values=Vec::new();
         for (coordinate,axis) in [(x,&self.point.x),(y,&self.point.y)] {
             if let Some((id,axis))=axis {
-                let desc=param(params,id)?;let plain=axis.value(coordinate).clamp(desc.min,desc.max);
-                values.push((id.clone(),from_norm(desc,to_norm(desc,plain))));
+                let desc=param(params,id)?;
+                values.push((id.clone(),bounded_graph_value(desc,*axis,coordinate)));
             }
         }
         values.extend(self.point.also.iter().cloned());
@@ -235,7 +235,7 @@ impl Render for Drawing {
     fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement{
         let focused=state(&self.handle,"focusVisible").and_then(|v|v.as_bool()).unwrap_or(false);
         let double=self.double.clone();let handle=self.handle.clone();let target=self.target.clone();let th=self.theme;
-        canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move|bounds,hitbox,window,_|{
+        let drawing=canvas(|bounds,window,_|window.insert_hitbox(bounds,HitboxBehavior::Normal),move|bounds,hitbox,window,_|{
             if focused{window.paint_quad(quad(bounds,px(13.),gpui::transparent_black(),px(2.),th.accent,gpui::BorderStyle::Solid));}
             window.on_mouse_event(move|event:&MouseDownEvent,phase,window,cx|{
                 if !hitbox.is_hovered(window){return;}
@@ -244,7 +244,8 @@ impl Render for Drawing {
                     let _=handle.call("openContext",vec![],window,cx);drain(&handle,&target.borrow(),window,cx);cx.stop_propagation();
                 }
             });
-        }).size_full()
+        }).size_full();
+        crate::proto_parent::slot(&self.handle.owner,drawing.into_any_element())
     }
 }
 struct Mount {root:Entity<GraphPoint>,drawing:Entity<Drawing>,target:Rc<RefCell<PointTarget>>,contact:Rc<crate::proto_knob::Contact>,lease:Rc<MoveGestureLease>,props:Value,_changes:Subscription}
@@ -398,13 +399,21 @@ fn paint_surface(editor:Entity<Editor>,target:Target,params:Vec<ParamDesc>,th:Th
             window.on_mouse_event(move|event:&MouseDownEvent,phase,window,cx|{
                 if !phase.bubble()||event.button!=MouseButton::Left||!hitbox.is_hovered(window)||near(event.position).is_some(){return;}
                 let Some(double)=double.as_ref()else{return;};
-                let available={let ed=editor.read(cx);surface.is_live()&&basis.is_some()
-                    &&DeviceScope::for_window(window).allows(&target.track,ed)&&may_begin_device_input(ed)&&target.basis(ed)==basis};
+                let Some(basis)=basis.as_ref()else{return;};
+                // The blank graph and its captured domain action share the
+                // frame's accepted parameters, including refreshes that do
+                // not advance the project revision. Never adopt a new basis
+                // while retaining this frame's double-click closure.
+                let available={let ed=editor.read(cx);surface.is_live()&&DeviceScope::for_window(window).allows(&target.track,ed)
+                    &&may_begin_device_input(ed)&&target.basis(ed).as_ref()==Some(basis)};
                 if !available||!input.double_activate(event.click_count,window,cx){return;}
                 let (x,y)=(f64::from(event.position.x-plot.o.x),f64::from(event.position.y-plot.o.y));
                 let normalized=(((x-GRAPH_PAD)/plot.inner_w()).clamp(0.,1.),((plot.h-GRAPH_PAD-y)/plot.inner_h()).clamp(0.,1.));
                 editor.update(cx,|ed,cx|{
-                    if !surface.is_live()||target.basis(ed)!=basis{return;}
+                    // Source focus/observers may synchronously replace the
+                    // target or retire the surface before domain evaluation.
+                    if !surface.is_live()||!DeviceScope::for_window(window).allows(&target.track,ed)
+                        ||!may_begin_device_input(ed)||target.basis(ed).as_ref()!=Some(basis){return;}
                     if let Some((writes,selected))=double(normalized){if let Some(index)=selected{select_band(ed,target.key,index);}write_if_current(ed,&target,writes,cx);}
                     else{ed.notice("所有频段都已在使用；右键频段可关闭它");cx.notify();}
                 });cx.stop_propagation();

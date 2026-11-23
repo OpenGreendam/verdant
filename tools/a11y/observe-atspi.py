@@ -123,7 +123,7 @@ class Observer:
             dbus.Int32(selection), dbus.Int32(start), dbus.Int32(end), timeout=3))
 
     def read_text(self, reference):
-        """Capture two equal platform observations; retain every raw read.
+        """Capture two equal platform observations; retain each completed sample.
 
         Text, caret and selection use separate D-Bus calls. Real typing can
         advance between them. Only a changing tuple is retried; a stable

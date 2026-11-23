@@ -26,7 +26,7 @@ PROGRAM_PATHS = {'verdant-gui': 'libexec/verdant/verdant-gui', 'verdant-worker':
 PROGRAM_ROLES = {'verdant-gui': 'gpui', 'verdant-worker': 'worker'}
 SOURCE_FILES = ('frontend/Cargo.lock', 'frontend/proto-ui/compiler.pin.json',
                 'tools/native-input/probe.py', 'tools/native-input/controls.py', 'tools/native-input/run-linux-isolated.py',
-                'tools/native-input/ci.py', 'tools/native-input/x11_screenshot.py',
+                'tools/native-input/ci.py', 'tools/native-input/x11_screenshot.py', 'tools/native-input/x11_keymap.py',
                 'tools/a11y/run-isolated.py', 'tools/a11y/observe-atspi.py')
 
 

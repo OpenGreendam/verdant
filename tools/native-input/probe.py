@@ -159,8 +159,6 @@ def arguments():
                         help="Private Weston's debug client for measured windowed surface geometry")
     parser.add_argument("--worker-binary", type=Path)
     parser.add_argument("--xdotool", default="xdotool")
-    parser.add_argument("--clipboard-writer", type=Path, help="Foreground writer for this private display")
-    parser.add_argument("--clipboard-reader", type=Path, help="Native clipboard reader for readiness observation")
     parser.add_argument("--gain-name", default="音量", help="Builtin synth gain's authored accessible name")
     parser.add_argument("--surface-offset", nargs=2, type=float, metavar=("X", "Y"),
                         help="Known Wayland surface origin inside the outer client; otherwise sizes must match")
@@ -203,7 +201,6 @@ class Probe(ControlCases):
         self.input_env = dict(os.environ, DISPLAY=args.input_display)
         self.started = time.monotonic()
         self.held = False
-        self.clipboard_processes = []
         self.last_press = 0.0
         self.process = None
         self.stdout = self.stderr = None
@@ -816,7 +813,6 @@ class Probe(ControlCases):
                 self.release()
             except Exception as error:
                 self.report.setdefault("cleanupErrors", []).append(str(error))
-        self.cleanup_clipboards()
         if self.process:
             # This group was created by this probe; no name-based pkill or
             # compositor/bus/session termination is performed here.

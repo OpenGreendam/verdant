@@ -81,7 +81,8 @@ impl Field {
             .unwrap_or_else(|error| panic!("compiled text field setup failed: {error:?}"));
         let focus = root.read(cx).focus_handle(cx);
         let handle = root.read(cx).handle();
-        let accepted = handle.state("value").ok().and_then(|value| value.as_str().map(str::to_string)).unwrap_or_else(|| value.into());
+        let accepted = handle.state("value").ok().and_then(|value| value.as_str().map(str::to_string))
+            .expect("compiled text field exposes its accepted value");
         let changes = cx.observe_in(&root, window, |field, _, window, cx| {
             field.flush_reset(window, cx);
             field.drain(window, cx);
@@ -115,6 +116,10 @@ impl Field {
         result
     }
     fn epoch(&self) -> Option<u64> { natural(&self.handle.state("viewEpoch").ok()?) }
+    fn current_draft(&self, generation: u64, epoch: Option<u64>) -> bool {
+        let live = { let owner = self.handle.owner.borrow(); owner.present && owner.mounted && !owner.disposed };
+        live && epoch.is_some() && !self.pending_reset && self.draft_generation == generation && self.epoch() == epoch
+    }
     fn publish(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(callback) = self.callback.clone() { callback(event.clone(), window, cx); }
         cx.emit(event);
@@ -152,8 +157,7 @@ impl Field {
         let generation = self.draft_generation;
         let epoch = self.epoch();
         for (name, detail) in events {
-            let live = { let owner = self.handle.owner.borrow(); owner.present && owner.mounted && !owner.disposed };
-            if !live || self.pending_reset || self.draft_generation != generation || self.epoch() != epoch { return; }
+            if !self.current_draft(generation, epoch) { return; }
             let event = match decode(&name, detail) {
                 Ok(event) => event,
                 Err(error) => { self.publish(Event::Failure(error), window, cx); continue; }
@@ -190,9 +194,15 @@ impl Field {
                     if self.handle.call("resetValue", vec![json!(detail.value)], window, cx).ok() == Some(json!(true)) {
                         let Ok(Value::String(value)) = self.handle.state("value") else { continue; };
                         self.draft_generation = self.draft_generation.wrapping_add(1);
+                        let replacement = self.draft_generation;
                         self.value = value.clone();
-                        self.publish(Event::Replaced { value }, window, cx);
-                        let _ = self.handle.call("selectRange", vec![json!(detail.start), json!(detail.end)], window, cx);
+                        self.publish(Event::Replaced { value: value.clone() }, window, cx);
+                        // A domain callback may retire this editor or replace
+                        // its draft. Never apply the old request's selection then.
+                        if self.current_draft(replacement, epoch) && self.value == value
+                            && self.handle.state("value").ok() == Some(json!(value)) {
+                            let _ = self.handle.call("selectRange", vec![json!(detail.start), json!(detail.end)], window, cx);
+                        }
                     }
                 }
                 _ => {},
@@ -342,11 +352,18 @@ mod tests {
     use super::*;
     use gpui::{TestAppContext, WindowHandle, size};
 
-    struct Harness { field: Entity<Field>, events: Vec<Event> }
+    struct Harness { field: Entity<Field>, events: Vec<Event>, workspace_commands:usize }
     impl Render for Harness {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             div().size_full().key_context("Verdant")
-                .child(div().size_full().key_context("LyricEditor").child(self.field.clone()))
+                .on_action(cx.listener(|host, _: &crate::actions::EditLyric, _, _| host.workspace_commands += 1))
+                .on_action(cx.listener(|host, _: &crate::actions::DeleteSelection, _, _| host.workspace_commands += 1))
+                .on_action(cx.listener(|host, _: &crate::actions::SelectAll, _, _| host.workspace_commands += 1))
+                .on_action(cx.listener(|host, _: &crate::actions::GoToStart, _, _| host.workspace_commands += 1))
+                .on_action(cx.listener(|host, _: &crate::actions::Escape, _, _| host.workspace_commands += 1))
+                .on_action(cx.listener(|host, _: &crate::actions::Undo, _, _| host.workspace_commands += 1))
+                .on_action(cx.listener(|host, _: &crate::actions::Redo, _, _| host.workspace_commands += 1))
+                .child(div().key_context("PianoRoll").child(div().key_context("LyricEditor").child(self.field.clone())))
         }
     }
     fn frames(window: WindowHandle<Harness>, cx: &mut TestAppContext) {
@@ -357,9 +374,9 @@ mod tests {
         let window = cx.open_window(size(px(360.), px(100.)), move |window, cx| {
             let field = Field::with_options("Text", &value, Theme::for_appearance(window.appearance()),
                 Options { auto_focus: true, select_all: true, submit_on_enter: true, cancel_on_escape: true,
-                    advance_on_tab: true, numeric: numeric.then_some(Numeric { min: 1., max: 32767., step: 1., default: 480. }), ..Default::default() }, window, cx);
+                    advance_on_tab:true, numeric: numeric.then_some(Numeric { min: 1., max: 32767., step: 1., default: 480. }), ..Default::default() }, window, cx);
             cx.subscribe_in(&field, window, |view: &mut Harness, _, event, _, _| view.events.push(event.clone())).detach();
-            Harness { field, events: Vec::new() }
+            Harness { field, events: Vec::new(), workspace_commands:0 }
         });
         window.update(cx, |_, window, _| window.activate_window()).unwrap();
         frames(window, cx);
@@ -393,6 +410,37 @@ mod tests {
     }
 
     #[gpui::test]
+    fn programmatic_replacement_delivers_source_selection_before_the_next_native_input(cx: &mut TestAppContext) {
+        let window = open(cx, "old draft", false);
+        window.update(cx, |host, _, cx| {
+            host.events.clear();
+            host.field.update(cx, |field, cx| field.set("a😀候", cx));
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let field = host.field.read(cx);
+            assert_eq!(field.value(), "a😀候");
+            assert!(!field.pending_reset);
+            assert!(field.pending_selection.is_none());
+            assert!(field.handle.take_events().is_empty(), "a render-time selectionRequest must reach the retained field observer without another input");
+            assert!(host.events.is_empty(), "explicit reset and selection do not synthesize a user edit");
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            assert!(host.field.read(cx).handle.take_events().is_empty(), "idle rendering does not re-emit selection requests");
+            assert!(host.events.is_empty());
+        }).unwrap();
+        // No Ctrl+A or explicit range command: the source-authored selection
+        // from Field::set must already have reached the live native editor.
+        cx.simulate_input(window.into(), "z"); frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            assert_eq!(host.field.read(cx).value(), "z", "the next native edit replaces the complete UTF-16 value");
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Changed { value, composing:false } if value == "z")).count(), 1);
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))));
+        }).unwrap();
+    }
+
+    #[gpui::test]
     fn compiled_numeric_text_steps_and_clears_without_document_commands(cx: &mut TestAppContext) {
         let window = open(cx, "", true);
         cx.simulate_keystrokes(window.into(), "up");
@@ -407,22 +455,100 @@ mod tests {
     }
 
     #[gpui::test]
+    fn native_editor_owns_the_registered_text_shortcuts(cx: &mut TestAppContext) {
+        cx.update(|cx| { let bindings = crate::shortcuts::bindings(cx); cx.bind_keys(bindings); });
+        let window = open(cx, "abc", false);
+        cx.simulate_input(window.into(), "x y"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "x y")).unwrap();
+        cx.simulate_keystrokes(window.into(), "left backspace home shift-right delete end"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "y")).unwrap();
+        cx.update(|cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string("候😀".into())));
+        cx.simulate_keystrokes(window.into(), "ctrl-a ctrl-v"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "候😀")).unwrap();
+        cx.simulate_keystrokes(window.into(), "ctrl-z"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "y", "Ctrl-Z remains native text undo")).unwrap();
+        cx.simulate_keystrokes(window.into(), "ctrl-shift-z"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "候😀")).unwrap();
+        cx.simulate_keystrokes(window.into(), "ctrl-z ctrl-y left shift-left right"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "候😀")).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter tab shift-tab escape"); frames(window, cx);
+        window.update(cx, |host, _, _| {
+            assert_eq!(host.workspace_commands, 0, "nested workspace commands cannot shadow the compiled editor");
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Submit { value } if value == "候😀")).count(), 1);
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Advance { forward:true, .. })).count(), 1);
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Advance { forward:false, .. })).count(), 1);
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Cancel)).count(), 1);
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))));
+        }).unwrap();
+    }
+
+    #[test]
+    fn source_navigation_requests_accept_only_the_finite_search_policy() {
+        for (key, shift, command) in [("ArrowLeft",false,false),("ArrowDown",false,true),("f",true,true),("Tab",false,false)] {
+            assert!(decode("navigationRequest",json!({"key":key,"value":"query","shift":shift,"command":command,"viewEpoch":1})).is_err());
+        }
+        assert!(matches!(decode("navigationRequest",json!({"key":"f","value":"query","shift":false,"command":true,"viewEpoch":1})).unwrap(),Output::Navigation(_)));
+    }
+
+    #[gpui::test]
     fn native_replacement_mirror_uses_the_source_single_line_value(cx: &mut TestAppContext) {
-        let window = open(cx, "old", false);
+        let window = open(cx, "old\r\ndraft", false);
         window.update(cx, |host, _, cx| {
+            assert_eq!(host.field.read(cx).value(), "olddraft");
             host.field.update(cx, |field, cx| field.set("new\r\nline\n😀", cx));
         }).unwrap();
         frames(window, cx);
         window.update(cx, |host, _, cx| {
             let field = host.field.read(cx);
-            let accepted = field.handle.state("value").unwrap();
-            assert_eq!(field.value(), accepted.as_str().unwrap());
-            assert!(!field.value().contains(['\r', '\n']));
+            assert_eq!(field.value(), "newline😀");
+            assert_eq!(field.handle.state("value").unwrap(), json!("newline😀"));
             assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))));
         }).unwrap();
-        cx.simulate_input(window.into(), "replaced");
-        frames(window, cx);
+        cx.simulate_input(window.into(), "replaced"); frames(window, cx);
         window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "replaced")).unwrap();
+    }
+
+    #[gpui::test]
+    fn numeric_replacement_retires_terminal_events_from_the_previous_draft(cx: &mut TestAppContext) {
+        let window = open(cx, "1", true);
+        window.update(cx, |host, window, cx| {
+            host.events.clear();
+            host.field.update(cx, |field, cx| {
+                assert_eq!(field.handle.call("stepText", vec![1.into()], window, cx).unwrap(), json!(true));
+                assert_eq!(field.handle.call("requestSubmit", vec![], window, cx).unwrap(), json!(true));
+                field.drain(window, cx);
+            });
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            assert_eq!(host.field.read(cx).value(), "2");
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Replaced { value } if value == "2")).count(), 1);
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Submit { .. } | Event::Failure(_))));
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn text_delivery_stops_when_a_callback_retires_the_native_view(cx: &mut TestAppContext) {
+        use verdant_text_field::native::gpui_native_owner::detach_native_view;
+        let window = open(cx, "draft", false);
+        window.update(cx, |host, window, cx| {
+            host.events.clear();
+            host.field.update(cx, |field, cx| {
+                let owner = field.handle.owner.clone();
+                field.callback = Some(Rc::new(move |event, _, _| {
+                    if matches!(event, Event::Submit { .. }) { detach_native_view(&owner); }
+                }));
+                assert_eq!(field.handle.call("requestSubmit", vec![], window, cx).unwrap(), json!(true));
+                assert_eq!(field.handle.call("requestAdvance", vec![true.into()], window, cx).unwrap(), json!(true));
+                field.drain(window, cx);
+                assert!(!field.handle.owner.borrow().mounted);
+            });
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, _| {
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Submit { value } if value == "draft")).count(), 1);
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Advance { .. } | Event::Failure(_))));
+        }).unwrap();
     }
 
     #[gpui::test]
@@ -439,13 +565,17 @@ mod tests {
                 host.events.clear();
             }).unwrap();
             frames(window, cx);
-            if command == C::Undo {
+            if matches!(command, C::Undo | C::Redo) {
                 cx.simulate_input(window.into(), "x"); frames(window, cx);
                 window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "abxcd")).unwrap();
+                if command == C::Redo {
+                    cx.simulate_keystrokes(window.into(), "secondary-z"); frames(window, cx);
+                    window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "abcd")).unwrap();
+                }
             }
             cx.simulate_keystrokes(window.into(), keys);
             frames(window, cx);
-            if matches!(command, C::Undo | C::Left | C::Right | C::SelectLeft | C::SelectRight | C::Home | C::End | C::SelectAll) {
+            if matches!(command, C::Undo | C::Redo | C::Left | C::Right | C::SelectLeft | C::SelectRight | C::Home | C::End | C::SelectAll) {
                 // Observe the actual caret/selection through subsequent OS
                 // text input, without inspecting private editor state.
                 cx.simulate_input(window.into(), "!"); frames(window, cx);
@@ -454,12 +584,14 @@ mod tests {
                 let field = host.field.read(cx);
                 let value = field.value();
                 assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))), "{command:?}: source input failure");
+                assert_eq!(host.workspace_commands, 0, "{command:?}: a document action cannot shadow the compiled editor");
                 match command {
                     C::Submit => assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Submit { value } if value == "abcd")).count(), 1),
                     C::Advance | C::Retreat => assert_eq!(host.events.iter().filter(|event| matches!(event,
                         Event::Advance { value, forward } if value == "abcd" && *forward == (command == C::Advance))).count(), 1),
                     C::Cancel => assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Cancel)).count(), 1),
                     C::Undo => assert_eq!(value, "ab!cd"),
+                    C::Redo => assert_eq!(value, "abx!cd"),
                     C::Space => assert_eq!(value, "ab cd"),
                     C::Backspace => assert_eq!(value, "acd"),
                     C::Delete => assert_eq!(value, "abd"),
@@ -485,7 +617,7 @@ mod tests {
     impl Render for SearchHarness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             let entity = cx.entity();
-            let draw: crate::proto_collection::Draw = Rc::new(move |handle, _, _, cx| entity.update(cx, |host, _| {
+            let draw: crate::proto_collection::Draw = Rc::new(move |handle, _, _, _, cx| entity.update(cx, |host, _| {
                 host.collection = Some(handle.clone());
                 div().size_full().child("Search results").into_any_element()
             }));
@@ -499,7 +631,7 @@ mod tests {
             }));
             div().size_full().flex().flex_col().child(self.field.clone())
                 .child(div().flex_1().min_h_0().child(crate::proto_collection::collection("search-results",
-                    json!({"mode":"searchlist","label":"Search results","cursor":self.selected,"revision":"search:1"}),
+                    json!({"mode":"filterlist","label":"Search results","cursor":self.selected,"revision":"search:1"}),
                     vec![1;5], draw, sink)))
         }
     }
@@ -514,10 +646,10 @@ mod tests {
             cx.subscribe_in(&field, window, |host: &mut SearchHarness, _, event, window, cx| {
                 match event {
                     Event::Navigation { key, value, shift, command } => {
-                        if host.field.read(cx).value() != value || host.field.read(cx).is_composing() { return; }
+                        if host.field.read(cx).value() != value || host.field.read(cx).is_composing() || !host.field.read(cx).focus.is_focused(window) { return; }
                         if let Some(collection) = &host.collection {
-                            crate::proto_collection::call(collection,"keyFrom",
-                                vec!["search".into(),key.clone().into(),(*shift).into(),(*command).into(),"search:1".into()],window,cx);
+                            crate::proto_collection::call(collection,"filterKey",
+                                vec![key.clone().into(),(*shift).into(),(*command).into(),false.into(),true.into(),"search:1".into(),false.into()],window,cx);
                         }
                     },
                     Event::Failure(error) => host.failures.push(error.clone()),

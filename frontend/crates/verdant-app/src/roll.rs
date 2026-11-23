@@ -1226,7 +1226,12 @@ pub(crate) enum ScrollSurface { Roll, Timeline, Keyboard }
 pub(crate) fn install_roll_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,surface:ScrollSurface,input:&crate::proto_editor_surface::Input,window:&mut Window) {
     let (e, h) = (editor.clone(), hitbox.clone());let input=input.clone();
     window.on_mouse_event(move |ev: &ScrollEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble || !h.should_handle_scroll(window) { return; }
+        if phase != DispatchPhase::Bubble {return;}
+        // The visible keys are compiled native siblings above the paint canvas.
+        // Their parent keyboard still owns wheel navigation over the clipped
+        // keyboard bounds, including the key hitboxes themselves.
+        let under_keyboard=matches!(surface,ScrollSurface::Keyboard)&&bounds.contains(&ev.position)&&h.content_mask.bounds.contains(&ev.position);
+        if !under_keyboard&&!h.should_handle_scroll(window){return;}
         let local = ev.position - bounds.origin;
         let Some(intent)=input.wheel(ev.delta,ev.modifiers,false,window,cx) else {return;};
         e.update(cx, |ed, cx| {
@@ -1244,14 +1249,19 @@ pub(crate) fn install_roll_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixels>,h
 
 /// Bar ruler for a horizontal view. `arrange` selects which viewport.
 pub fn ruler(editor: Entity<Editor>, arrange: bool) -> impl IntoElement {
-    let draw=editor.clone();let cancel=editor.clone();
-    crate::proto_editor_surface::surface(editor,format!("ruler-{arrange}"),"时间标尺与循环范围",0.0,
+    let draw=editor.clone();let cancel=editor.clone();let commands=editor.clone();
+    let surface = crate::proto_editor_surface::surface(editor,format!("ruler-{arrange}"),"时间标尺与循环范围",0.0,
         move |input|native_ruler(draw.clone(),arrange,input).into_any_element(),
         move |_,window,cx| {
             crate::ruler_navigation::cancel(cancel.entity_id(),window,cx);
             let owned=cx.try_global::<RollExtraDragState>().and_then(|s|s.loop_drag).is_some_and(|drag|drag.editor==cancel.entity_id()&&drag.arrange==arrange);
             if owned { cx.global_mut::<RollExtraDragState>().loop_drag=None;cancel.update(cx,|_,cx|cx.notify()); }
-        }).audio_keys(arrange)
+        });
+    if arrange {
+        surface.commands("audio", move |command, window, cx| commands.update(cx, |ed, cx| {
+            crate::editor::integrations::audio_edit_ui::source_command(ed, command, window, cx);
+        }))
+    } else { surface }
 }
 
 fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_surface::Input)->impl IntoElement {

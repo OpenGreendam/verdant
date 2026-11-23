@@ -135,6 +135,38 @@ fn export_dialog_cannot_discard_its_only_real_vsqx_voice_table() {
 }
 
 #[gpui::test]
+fn native_export_options_numeric_source_and_default_response_reach_exporter(cx: &mut gpui::TestAppContext) {
+    let (send, receive) = async_channel::bounded(1);
+    let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+        ScoreExportDialog::new(Format::Midi, ExportOptions::default(), vec!["Track".into()], send, window, cx)
+    });
+    window.update(cx, |_, window, _| window.activate_window()).unwrap(); crate::native_test_support::frames(window, cx);
+    cx.simulate_input(window.into(), "1920"); crate::native_test_support::frames(window, cx);
+    window.update(cx, |dialog, _, cx| assert_eq!(dialog.ppq.read(cx).value(), "1920")).unwrap();
+    cx.simulate_keystrokes(window.into(), "enter"); cx.run_until_parked();
+    assert_eq!(receive.try_recv().expect("source default response").midi_ppq, Some(1920));
+}
+
+#[gpui::test]
+fn native_export_radio_enter_uses_default_response_without_changing_selection(cx: &mut gpui::TestAppContext) {
+    use verdant_action_control::native::gpui_native_owner::{all_owners, resolved};
+    let (send, receive) = async_channel::bounded(1);
+    let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+        ScoreExportDialog::new(Format::Ust, ExportOptions::default(), vec!["Track".into()], send, window, cx)
+    });
+    window.update(cx, |_, window, _| window.activate_window()).unwrap(); crate::native_test_support::frames(window, cx);
+    window.update(cx, |_, window, cx| {
+        let owner = all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow(); owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name").is_some_and(|value| resolved(value).text() == "CP932（日文 Windows）")
+        }).expect("real source radio");
+        verdant_action_control::ActionControlHandle { owner }.call("focusSelf", vec![], window, cx).unwrap();
+    }).unwrap();
+    cx.simulate_keystrokes(window.into(), "enter"); cx.run_until_parked();
+    assert!(matches!(receive.try_recv().expect("source Enter default response").ust_encoding, UstEncoding::Utf8));
+}
+
+#[gpui::test]
 fn native_export_dialog_uses_compiled_text_selection_radio_and_submit(cx: &mut gpui::TestAppContext) {
     use verdant_action_control::native::gpui_native_owner::{all_owners, dispatch_accessibility_action, drive_owners, resolved};
     let (send, receive) = async_channel::bounded(1);

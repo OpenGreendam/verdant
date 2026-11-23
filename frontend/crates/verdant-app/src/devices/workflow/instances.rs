@@ -48,14 +48,14 @@ pub(crate) fn open(editor: Entity<Editor>, cx: &mut App) {
     }) { editor.update(cx, |ed, cx| { ed.notice(format!("无法打开插件实例：{error}")); cx.notify(); }); }
 }
 struct Instances { editor: WeakEntity<Editor>, generation: u64, search: Entity<TextField>, th: Theme }
-impl Instances {
-    fn render_instances(&mut self, window:&mut Window, cx:&mut Context<Self>)->gpui::AnyElement {
-        let Some(editor)=self.editor.upgrade()else{window.remove_window();return div().into_any_element()};
-        let ed=editor.read(cx);
-        if ed.document_generation!=self.generation{window.remove_window();return div().into_any_element()}
-        let th=self.th;
+impl Render for Instances {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let Some(editor) = self.editor.upgrade() else { window.remove_window(); return div().into_any_element() };
+        let ed = editor.read(cx);
+        if ed.document_generation != self.generation { window.remove_window(); return div().into_any_element() }
+        let th = self.th;
         let query = self.search.read(cx).value().to_lowercase();
-        let mut rows = div().w_full().flex().flex_col().gap(px(8.));
+        let mut rows = crate::proto_scroll::viewport("instance-list", "工程插件实例", "vertical").role(Role::List).flex_1().min_h_0().flex().flex_col().gap(px(8.));
         let mut count = 0;
         for item in instances(ed).into_iter().filter(|i| {
             let haystack = format!("{} {} {} {}", i.name, i.bus, i.id, i.status).to_lowercase();
@@ -70,6 +70,7 @@ impl Instances {
                     .child(div().text_xs().text_color(th.text_secondary).child(format!("{} · {}", if item.slot == crate::instrument::INSTRUMENT_SLOT { "音符乐器".into() } else { format!("插入 {}", item.slot + 1) }, item.status))))
                 .child(crate::ui_controls::selectable_button(format!("open-instance-{count}"), if item.key.is_some() { "打开界面" } else { "暂不可用" }, false, th)
                     .disabled(item.key.is_none())
+                    .authority(format!("{}:{:?}:{}:{:?}",crate::proto_controls::editor_authority(ed),item.owner,item.slot,item.key))
                     .aria_description(if item.key.is_some() { "打开当前实例的编辑器" } else { "当前实例没有可用编辑器" }).tab_index(if item.key.is_some() { 0 } else { -1 })
                     .when(item.key.is_none(), |button| button.opacity(0.5).cursor_default())
                     .on_click(move |_, _, cx| {
@@ -85,24 +86,6 @@ impl Instances {
                         });
                     })));
         }
-        rows.into_any_element()
-    }
-}
-impl Render for Instances {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let Some(editor) = self.editor.upgrade() else { window.remove_window(); return div().into_any_element() };
-        let ed = editor.read(cx);
-        if ed.document_generation != self.generation { window.remove_window(); return div().into_any_element() }
-        let th = self.th;
-        let query = self.search.read(cx).value().to_lowercase();
-        let count = instances(ed).into_iter().filter(|i| {
-            let haystack = format!("{} {} {} {}", i.name, i.bus, i.id, i.status).to_lowercase();
-            query.split_whitespace().all(|word| haystack.contains(word))
-        }).count();
-        let owner = cx.entity();
-        let rows = div().flex_1().min_h_0().child(crate::proto_scroll::region("instance-list", serde_json::json!({"label":"工程插件实例", "role":"list"}), Rc::new(move |_,_,window,cx| {
-            owner.update(cx,|view,cx|view.render_instances(window,cx))
-        })));
         div().size_full().bg(th.surface).text_color(th.text).p(px(18.)).flex().flex_col().gap(px(12.))
             .font(crate::theme::plugin_ui_font(ed.ui_font.clone()))
             .child(div().flex().items_center().gap(px(8.)).child(div().flex_1().text_lg().font_weight(FontWeight::BOLD).child("工程插件实例"))

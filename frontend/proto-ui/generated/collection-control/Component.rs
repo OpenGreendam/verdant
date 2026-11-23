@@ -17,23 +17,28 @@
           _ => false,
       }
   }
-  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("mode").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("cursor").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("expanded").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("revision").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("autoFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("columns").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) }
+  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("mode").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("description").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("cursor").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("orientation").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("expanded").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("revision").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("autoFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("columns").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) }
   fn prop_valid(key: &str, value: &Json) -> bool { match key { "mode" => value.is_string(),
         "label" => value.is_string(),
+        "description" => value.is_string(),
         "cursor" => value.as_f64().is_some_and(f64::is_finite),
+        "orientation" => value.is_string(),
         "expanded" => value.as_f64().is_some_and(f64::is_finite),
         "revision" => value.is_string(),
         "disabled" => value.is_boolean(),
         "autoFocus" => value.is_boolean(),
         "columns" => value.as_f64().is_some_and(f64::is_finite), _ => false } }
   fn check_method(name: &str, arguments: &[Value]) { match name {
-          "setItems" => if !(arguments.len() <= 1 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_array().is_some_and(|items| items.iter().all(|item| item.as_f64().is_some_and(f64::is_finite)))))) { value_type_error("invalid exposed method arguments") },
+          "filterKey" => if !(arguments.len() <= 7 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(4).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(5).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(6).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
+        "revealGeometry" => if !(arguments.len() <= 6 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(4).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(5).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
+        "setItems" => if !(arguments.len() <= 1 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_array().is_some_and(|items| items.iter().all(|item| item.as_f64().is_some_and(f64::is_finite)))))) { value_type_error("invalid exposed method arguments") },
         "choose" => if !(arguments.len() <= 3 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "selectIndex" => if !(arguments.len() <= 3 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "keyAt" => if !(arguments.len() <= 5 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(4).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "selectAndFocus" => if !(arguments.len() <= 3 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "key" => if !(arguments.len() <= 3 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
-        "keyFrom" => if !(arguments.len() <= 5 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(4).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
+        "contextAt" => if !(arguments.len() <= 5 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(4).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
+        "reconcile" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
         "dismiss" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
         "focusSelf" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
           _ => value_error("unknown exposed method"),
@@ -45,18 +50,22 @@ pub struct GeneratedData0 {
     pub field_0: Option<String>,
     #[serde(rename = "label", default, skip_serializing_if = "Option::is_none")]
     pub field_1: Option<String>,
+    #[serde(rename = "description", default, skip_serializing_if = "Option::is_none")]
+    pub field_2: Option<String>,
     #[serde(rename = "cursor", default, skip_serializing_if = "Option::is_none")]
-    pub field_2: Option<f64>,
-    #[serde(rename = "expanded", default, skip_serializing_if = "Option::is_none")]
     pub field_3: Option<f64>,
-    #[serde(rename = "revision", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "orientation", default, skip_serializing_if = "Option::is_none")]
     pub field_4: Option<String>,
+    #[serde(rename = "expanded", default, skip_serializing_if = "Option::is_none")]
+    pub field_5: Option<f64>,
+    #[serde(rename = "revision", default, skip_serializing_if = "Option::is_none")]
+    pub field_6: Option<String>,
     #[serde(rename = "disabled", default, skip_serializing_if = "Option::is_none")]
-    pub field_5: Option<bool>,
+    pub field_7: Option<bool>,
     #[serde(rename = "autoFocus", default, skip_serializing_if = "Option::is_none")]
-    pub field_6: Option<bool>,
+    pub field_8: Option<bool>,
     #[serde(rename = "columns", default, skip_serializing_if = "Option::is_none")]
-    pub field_7: Option<f64>,
+    pub field_9: Option<f64>,
 }
   
   pub type GeneratedProps = GeneratedData0;
@@ -64,12 +73,47 @@ pub struct GeneratedData0 {
   #[derive(Clone)]
   pub struct CollectionControlHandle { pub owner: OwnerRef }
   impl CollectionControlHandle {
-      pub fn state_0(&self) -> Result<String, Value> { self.state("mode").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn state_1(&self) -> Result<f64, Value> { self.state("cursor").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn state_2(&self) -> Result<f64, Value> { self.state("expanded").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn state_3(&self) -> Result<bool, Value> { self.state("focused").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn state_4(&self) -> Result<bool, Value> { self.state("focusVisible").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn method_10(&self, argument_0: Vec<f64>, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+      pub fn state_0(&self) -> Result<f64, Value> { self.state("scrollPosition").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_1(&self) -> Result<bool, Value> { self.state("scrollAtEnd").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_2(&self) -> Result<f64, Value> { self.state("horizontalPosition").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_3(&self) -> Result<String, Value> { self.state("mode").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_4(&self) -> Result<f64, Value> { self.state("cursor").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_5(&self) -> Result<f64, Value> { self.state("expanded").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_6(&self) -> Result<bool, Value> { self.state("focused").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_7(&self) -> Result<bool, Value> { self.state("focusVisible").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn method_14(&self, argument_0: String, argument_1: bool, argument_2: bool, argument_3: bool, argument_4: bool, argument_5: String, argument_6: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+        let outcome = catch_authored(|| {
+        refresh_native_atoms(&self.owner, window, cx);
+          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
+        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument")), Value::json(serde_json::to_value(argument_4).expect("portable argument")), Value::json(serde_json::to_value(argument_5).expect("portable argument")), Value::json(serde_json::to_value(argument_6).expect("portable argument"))];
+        let callback = self.owner.borrow().exposes.get("filterKey").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("filterKey", &arguments);
+        let result = invoke(&self.owner, "expose-method", &callback, arguments);
+        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
+        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
+        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
+        serde_json::from_value(result).expect("checked exposed method result")
+        });
+        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+        outcome
+    }
+    pub fn method_15(&self, argument_0: f64, argument_1: f64, argument_2: f64, argument_3: f64, argument_4: f64, argument_5: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+        let outcome = catch_authored(|| {
+        refresh_native_atoms(&self.owner, window, cx);
+          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
+        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument")), Value::json(serde_json::to_value(argument_4).expect("portable argument")), Value::json(serde_json::to_value(argument_5).expect("portable argument"))];
+        let callback = self.owner.borrow().exposes.get("revealGeometry").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("revealGeometry", &arguments);
+        let result = invoke(&self.owner, "expose-method", &callback, arguments);
+        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
+        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
+        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
+        serde_json::from_value(result).expect("checked exposed method result")
+        });
+        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+        outcome
+    }
+    pub fn method_16(&self, argument_0: Vec<f64>, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -85,7 +129,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_11(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_17(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -101,7 +145,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_12(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_18(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -117,7 +161,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_13(&self, argument_0: f64, argument_1: String, argument_2: bool, argument_3: bool, argument_4: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_19(&self, argument_0: f64, argument_1: String, argument_2: bool, argument_3: bool, argument_4: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -133,7 +177,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_14(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_20(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -149,7 +193,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_15(&self, argument_0: String, argument_1: bool, argument_2: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_21(&self, argument_0: String, argument_1: bool, argument_2: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -165,13 +209,13 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_16(&self, argument_0: String, argument_1: String, argument_2: bool, argument_3: bool, argument_4: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_22(&self, argument_0: f64, argument_1: String, argument_2: f64, argument_3: f64, argument_4: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
         let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument")), Value::json(serde_json::to_value(argument_4).expect("portable argument"))];
-        let callback = self.owner.borrow().exposes.get("keyFrom").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
-        check_method("keyFrom", &arguments);
+        let callback = self.owner.borrow().exposes.get("contextAt").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("contextAt", &arguments);
         let result = invoke(&self.owner, "expose-method", &callback, arguments);
         let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
         let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
@@ -181,7 +225,23 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_17(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
+    pub fn method_23(&self, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+        let outcome = catch_authored(|| {
+        refresh_native_atoms(&self.owner, window, cx);
+          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
+        let arguments = vec![];
+        let callback = self.owner.borrow().exposes.get("reconcile").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("reconcile", &arguments);
+        let result = invoke(&self.owner, "expose-method", &callback, arguments);
+        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
+        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
+        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
+        serde_json::from_value(result).expect("checked exposed method result")
+        });
+        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+        outcome
+    }
+    pub fn method_24(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -197,7 +257,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_18(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
+    pub fn method_25(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -303,10 +363,12 @@ pub struct GeneratedData0 {
             let v_64697361626c6564: LexicalBinding<Value> = lexical_binding();
             let v_726f6c65: LexicalBinding<Value> = lexical_binding();
             let v_6c6162656c: LexicalBinding<Value> = lexical_binding();
+            let v_6465736372697074696f6e: LexicalBinding<Value> = lexical_binding();
             let v_7461626c65: LexicalBinding<Value> = lexical_binding();
             let v_726f7773: LexicalBinding<Value> = lexical_binding();
             let v_636f6c756d6e73: LexicalBinding<Value> = lexical_binding();
             let v_666f637573: LexicalBinding<Value> = lexical_binding();
+            let v_7363726f6c6c: LexicalBinding<Value> = lexical_binding();
             let v_63757272656e74: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_6174746163686564: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_646973706f736564: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
@@ -321,417 +383,506 @@ pub struct GeneratedData0 {
             let v_7365656b: LexicalBinding<Value> = lexical_binding();
             let v_76616c69644974656d73: LexicalBinding<Value> = lexical_binding();
             let v_656d6974: LexicalBinding<Value> = lexical_binding();
+            let v_7265717565737452657665616c: LexicalBinding<Value> = lexical_binding();
             let v_6368616e6765457870616e73696f6e: LexicalBinding<Value> = lexical_binding();
             let v_73656c656374: LexicalBinding<Value> = lexical_binding();
             let v_63686f6f7365: LexicalBinding<Value> = lexical_binding();
-            let v_6b65795f5f33653136666361613234643562356135: LexicalBinding<Value> = lexical_binding();
+            let v_636f6e746578744174: LexicalBinding<Value> = lexical_binding();
+            let v_6b65795f5f63636538616136363530633839623964: LexicalBinding<Value> = lexical_binding();
             let v_73796e63: LexicalBinding<Value> = lexical_binding();
             // Source "frontend/proto-ui/src/collection-control.proto.ts":14:5
-            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("mode", record(vec![("type", Value::string("string")), ("default", Value::string("listbox"))])), ("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("cursor", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("expanded", record(vec![("type", Value::string("number")), ("default", Value::number(-(Value::number(1.0)).scalar_number()))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("columns", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))]))])) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":20:11
-            v_637572736f72.initialize({ let v_7075695f6e61746976655f31 = v_646566.clone(); create_state(&owner, "discrete", Value::string("cursor"), Value::number(0.0), Value::Undefined) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":21:11
-            v_657870616e646564.initialize({ let v_7075695f6e61746976655f32 = v_646566.clone(); create_state(&owner, "discrete", Value::string("expanded"), Value::number(-(Value::number(1.0)).scalar_number()), Value::Undefined) });
+            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("mode", record(vec![("type", Value::string("string")), ("default", Value::string("listbox"))])), ("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("description", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("cursor", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("orientation", record(vec![("type", Value::string("string")), ("default", Value::string("vertical"))])), ("expanded", record(vec![("type", Value::string("number")), ("default", Value::number(-(Value::number(1.0)).scalar_number()))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("columns", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))]))])) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":22:11
-            v_64697361626c6564.initialize({ let v_7075695f6e61746976655f33 = v_646566.clone(); create_state(&owner, "bool", Value::string("disabled"), Value::boolean(false), Value::Undefined) });
+            v_637572736f72.initialize({ let v_7075695f6e61746976655f31 = v_646566.clone(); create_state(&owner, "discrete", Value::string("cursor"), Value::number(0.0), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":23:11
-            v_726f6c65.initialize({ let v_7075695f6e61746976655f34 = v_646566.clone(); create_state(&owner, "string", Value::string("role"), Value::string("listbox"), Value::Undefined) });
+            v_657870616e646564.initialize({ let v_7075695f6e61746976655f32 = v_646566.clone(); create_state(&owner, "discrete", Value::string("expanded"), Value::number(-(Value::number(1.0)).scalar_number()), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":24:11
-            v_6c6162656c.initialize({ let v_7075695f6e61746976655f35 = v_646566.clone(); create_state(&owner, "string", Value::string("label"), Value::string(""), Value::Undefined) });
+            v_64697361626c6564.initialize({ let v_7075695f6e61746976655f33 = v_646566.clone(); create_state(&owner, "bool", Value::string("disabled"), Value::boolean(false), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":25:11
-            v_7461626c65.initialize({ let v_7075695f6e61746976655f36 = v_646566.clone(); create_state(&owner, "bool", Value::string("table"), Value::boolean(false), Value::Undefined) });
+            v_726f6c65.initialize({ let v_7075695f6e61746976655f34 = v_646566.clone(); create_state(&owner, "string", Value::string("role"), Value::string("listbox"), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":26:11
-            v_726f7773.initialize({ let v_7075695f6e61746976655f37 = v_646566.clone(); create_state(&owner, "discrete", Value::string("rows"), Value::number(0.0), Value::Undefined) });
+            v_6c6162656c.initialize({ let v_7075695f6e61746976655f35 = v_646566.clone(); create_state(&owner, "string", Value::string("label"), Value::string(""), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":27:11
-            v_636f6c756d6e73.initialize({ let v_7075695f6e61746976655f38 = v_646566.clone(); create_state(&owner, "discrete", Value::string("columns"), Value::number(0.0), Value::Undefined) });
+            v_6465736372697074696f6e.initialize({ let v_7075695f6e61746976655f36 = v_646566.clone(); create_state(&owner, "string", Value::string("description"), Value::string(""), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":28:11
-            v_666f637573.initialize(native_builtin_hook(&owner, "asFocusable", || as_focusable(&owner)));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":28:34
-            { let v_7075695f6e61746976655f39 = v_666f637573.read(); focus_setup_config(&(v_7075695f6e61746976655f39.clone()).owner(), "focus", record(vec![("disabled", Value::boolean(false))])) };
+            v_7461626c65.initialize({ let v_7075695f6e61746976655f37 = v_646566.clone(); create_state(&owner, "bool", Value::string("table"), Value::boolean(false), Value::Undefined) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":29:11
+            v_726f7773.initialize({ let v_7075695f6e61746976655f38 = v_646566.clone(); create_state(&owner, "discrete", Value::string("rows"), Value::number(0.0), Value::Undefined) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":30:11
+            v_636f6c756d6e73.initialize({ let v_7075695f6e61746976655f39 = v_646566.clone(); create_state(&owner, "discrete", Value::string("columns"), Value::number(0.0), Value::Undefined) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":31:11
+            v_666f637573.initialize(native_builtin_hook(&owner, "asFocusable", || as_focusable(&owner)));
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":31:34
+            { let v_7075695f6e61746976655f3130 = v_666f637573.read(); focus_setup_config(&(v_7075695f6e61746976655f3130.clone()).owner(), "focus", record(vec![("disabled", Value::boolean(false))])) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":32:11
+            v_7363726f6c6c.initialize(native_builtin_hook(&owner, "asScrollSurface", || scroll_setup(&owner)));
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":32:39
+            { let v_7075695f6e61746976655f3131 = v_7363726f6c6c.read(); scroll_configure(&(v_7075695f6e61746976655f3131.clone()).owner(), record(vec![("axes", Value::string("both")), ("projection", Value::string("system"))])) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:11
             let v_61313179 = native_builtin_hook(&owner, "asAccessible", || as_accessible(&owner));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":29:34
-            { let v_7075695f6e61746976655f3130 = v_61313179.clone(); accessible_role(&(v_7075695f6e61746976655f3130.clone()).owner(), v_726f6c65.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":29:51
-            { let v_7075695f6e61746976655f3131 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3131.clone()).owner(), "name", v_6c6162656c.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":29:69
-            { let v_7075695f6e61746976655f3132 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3132.clone()).owner(), Value::string("disabled"), v_64697361626c6564.read(), Value::Undefined) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":30:5
-            { let v_7075695f6e61746976655f3133 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3133.clone()).owner(), Value::string("rowCount"), v_726f7773.read(), record(vec![("when", v_7461626c65.read())])) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":30:52
-            { let v_7075695f6e61746976655f3134 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3134.clone()).owner(), Value::string("columnCount"), v_636f6c756d6e73.read(), record(vec![("when", v_7461626c65.read())])) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":31:5
-            { let v_7075695f6e61746976655f3135 = v_646566.clone(); expose_state(&owner, Value::string("mode"), v_726f6c65.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":32:5
-            { let v_7075695f6e61746976655f3136 = v_646566.clone(); expose_state(&owner, Value::string("cursor"), v_637572736f72.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":32:41
-            { let v_7075695f6e61746976655f3137 = v_646566.clone(); expose_state(&owner, Value::string("expanded"), v_657870616e646564.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:5
-            { let v_7075695f6e61746976655f3138 = v_646566.clone(); expose_state(&owner, Value::string("focused"), (v_666f637573.read()).member("focused", false)) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:49
-            { let v_7075695f6e61746976655f3139 = v_646566.clone(); expose_state(&owner, Value::string("focusVisible"), (v_666f637573.read()).member("focusVisible", false)) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:34
+            { let v_7075695f6e61746976655f3132 = v_61313179.clone(); accessible_role(&(v_7075695f6e61746976655f3132.clone()).owner(), v_726f6c65.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:51
+            { let v_7075695f6e61746976655f3133 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3133.clone()).owner(), "name", v_6c6162656c.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:69
+            { let v_7075695f6e61746976655f3134 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3134.clone()).owner(), "description", v_6465736372697074696f6e.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":33:100
+            { let v_7075695f6e61746976655f3135 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3135.clone()).owner(), Value::string("disabled"), v_64697361626c6564.read(), Value::Undefined) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":34:5
-            { let v_7075695f6e61746976655f3230 = v_646566.clone(); expose_event(&owner, Value::string("select")) };
+            { let v_7075695f6e61746976655f3136 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3136.clone()).owner(), Value::string("rowCount"), v_726f7773.read(), record(vec![("when", v_7461626c65.read())])) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":34:52
+            { let v_7075695f6e61746976655f3137 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3137.clone()).owner(), Value::string("columnCount"), v_636f6c756d6e73.read(), record(vec![("when", v_7461626c65.read())])) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":35:5
-            { let v_7075695f6e61746976655f3231 = v_646566.clone(); expose_event(&owner, Value::string("activate")) };
+            { let v_7075695f6e61746976655f3138 = v_646566.clone(); expose_state(&owner, Value::string("scrollPosition"), ((v_7363726f6c6c.read()).member("vertical", false)).member("position", false)) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":35:67
+            { let v_7075695f6e61746976655f3139 = v_646566.clone(); expose_state(&owner, Value::string("scrollAtEnd"), ((v_7363726f6c6c.read()).member("vertical", false)).member("atEnd", false)) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":36:5
-            { let v_7075695f6e61746976655f3232 = v_646566.clone(); expose_event(&owner, Value::string("expand")) };
+            { let v_7075695f6e61746976655f3230 = v_646566.clone(); expose_state(&owner, Value::string("horizontalPosition"), ((v_7363726f6c6c.read()).member("horizontal", false)).member("position", false)) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":37:5
-            { let v_7075695f6e61746976655f3233 = v_646566.clone(); expose_event(&owner, Value::string("close")) };
+            { let v_7075695f6e61746976655f3231 = v_646566.clone(); expose_state(&owner, Value::string("mode"), v_726f6c65.read()) };
             // Source "frontend/proto-ui/src/collection-control.proto.ts":38:5
-            { let v_7075695f6e61746976655f3234 = v_646566.clone(); expose_event(&owner, Value::string("command")) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":39:9
+            { let v_7075695f6e61746976655f3232 = v_646566.clone(); expose_state(&owner, Value::string("cursor"), v_637572736f72.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":38:41
+            { let v_7075695f6e61746976655f3233 = v_646566.clone(); expose_state(&owner, Value::string("expanded"), v_657870616e646564.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":39:5
+            { let v_7075695f6e61746976655f3234 = v_646566.clone(); expose_state(&owner, Value::string("focused"), (v_666f637573.read()).member("focused", false)) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":39:49
+            { let v_7075695f6e61746976655f3235 = v_646566.clone(); expose_state(&owner, Value::string("focusVisible"), (v_666f637573.read()).member("focusVisible", false)) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":40:5
+            { let v_7075695f6e61746976655f3236 = v_646566.clone(); expose_event(&owner, Value::string("select")) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":41:5
+            { let v_7075695f6e61746976655f3237 = v_646566.clone(); expose_event(&owner, Value::string("activate")) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":42:5
+            { let v_7075695f6e61746976655f3238 = v_646566.clone(); expose_event(&owner, Value::string("expand")) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":43:5
+            { let v_7075695f6e61746976655f3239 = v_646566.clone(); expose_event(&owner, Value::string("close")) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":44:5
+            { let v_7075695f6e61746976655f3330 = v_646566.clone(); expose_event(&owner, Value::string("command")) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":45:5
+            { let v_7075695f6e61746976655f3331 = v_646566.clone(); expose_event(&owner, Value::string("context")) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":46:9
             v_63757272656e74.initialize(Rc::new(std::cell::RefCell::new(Value::Json(Json::Null))));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":40:9
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":47:9
             v_6174746163686564.initialize(Rc::new(std::cell::RefCell::new(Value::boolean(false))));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":41:9
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":48:9
             v_646973706f736564.initialize(Rc::new(std::cell::RefCell::new(Value::boolean(false))));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":42:9
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":49:9
             v_65706f6368.initialize(Rc::new(std::cell::RefCell::new(Value::number(0.0))));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":43:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":50:11
             v_7265616479.initialize({  let v_64697361626c6564 = v_64697361626c6564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":43:34
-                return { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let value = (v_63757272656e74.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))); if left.truthy() { { let value = (v_6174746163686564.read()).borrow().clone(); value } } else { left } }; if left.truthy() { Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()) } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3235 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3235.clone()).get() }).truthy()) } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":50:34
+                return { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let value = (v_63757272656e74.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))); if left.truthy() { { let value = (v_6174746163686564.read()).borrow().clone(); value } } else { left } }; if left.truthy() { Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()) } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3332 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3332.clone()).get() }).truthy()) } else { left } };
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":44:9
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":51:9
             v_6974656d73.initialize(Rc::new(std::cell::RefCell::new(Value::Array(Rc::new(vec![])))));
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":45:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":52:11
             v_6b696e64.initialize({  let v_6974656d73 = v_6974656d73.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f33383330343633613538613831386464: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":45:45
-                return if ({ let left = { let left = { let left = number_is_finite(&(v_696e6465785f5f33383330343633613538613831386464.clone())); if left.truthy() { Value::boolean(strict_equal(&(Value::number((v_696e6465785f5f33383330343633613538613831386464.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }; if left.truthy() { { let relational_left = v_696e6465785f5f33383330343633613538613831386464.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }; if left.truthy() { { let relational_left = v_696e6465785f5f33383330343633613538613831386464.clone(); let relational_right = ({ let value = (v_6974656d73.read()).borrow().clone(); value }).member("length", false); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }).truthy() { { let left = { let object = { let value = (v_6974656d73.read()).borrow().clone(); value }; object.caught_member(&property_key(&(v_696e6465785f5f33383330343633613538613831386464.clone())), false) }; if left.nullish() { Value::number(0.0) } else { left } } } else { Value::number(0.0) };
+                let v_696e6465785f5f36363464363464383135616264373833: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":52:45
+                return if ({ let left = { let left = { let left = number_is_finite(&(v_696e6465785f5f36363464363464383135616264373833.clone())); if left.truthy() { Value::boolean(strict_equal(&(Value::number((v_696e6465785f5f36363464363464383135616264373833.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }; if left.truthy() { { let relational_left = v_696e6465785f5f36363464363464383135616264373833.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }; if left.truthy() { { let relational_left = v_696e6465785f5f36363464363464383135616264373833.clone(); let relational_right = ({ let value = (v_6974656d73.read()).borrow().clone(); value }).member("length", false); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }).truthy() { { let left = { let object = { let value = (v_6974656d73.read()).borrow().clone(); value }; object.caught_member(&property_key(&(v_696e6465785f5f36363464363464383135616264373833.clone())), false) }; if left.nullish() { Value::number(0.0) } else { left } } } else { Value::number(0.0) };
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":46:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":53:11
             v_636f756e74.initialize({  let v_6974656d73 = v_6974656d73.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":46:33
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":53:33
                 return ({ let value = (v_6974656d73.read()).borrow().clone(); value }).member("length", false);
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":47:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":54:11
             v_6d696e.initialize({   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_615f5f35333736356334313532333061663562: Value = arg(&arguments, 0);
-                let v_625f5f39363838376461653131663362616436: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":47:51
-                return if ({ let relational_left = v_615f5f35333736356334313532333061663562.clone(); let relational_right = v_625f5f39363838376461653131663362616436.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() { v_615f5f35333736356334313532333061663562.clone() } else { v_625f5f39363838376461653131663362616436.clone() };
+                let v_615f5f66613437356230386530336138663863: Value = arg(&arguments, 0);
+                let v_625f5f63366162623939393938333937383534: Value = arg(&arguments, 1);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":54:51
+                return if ({ let relational_left = v_615f5f66613437356230386530336138663863.clone(); let relational_right = v_625f5f63366162623939393938333937383534.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() { v_615f5f66613437356230386530336138663863.clone() } else { v_625f5f63366162623939393938333937383534.clone() };
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":48:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":55:11
             v_6d6178.initialize({   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_615f5f65646262376536636366353837663030: Value = arg(&arguments, 0);
-                let v_625f5f63633234613765333966393631643963: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":48:51
-                return if ({ let relational_left = v_615f5f65646262376536636366353837663030.clone(); let relational_right = v_625f5f63633234613765333966393631643963.clone(); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_615f5f65646262376536636366353837663030.clone() } else { v_625f5f63633234613765333966393631643963.clone() };
+                let v_615f5f34616131306637366338373831393632: Value = arg(&arguments, 0);
+                let v_625f5f61393064373237633066333932316664: Value = arg(&arguments, 1);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":55:51
+                return if ({ let relational_left = v_615f5f34616131306637366338373831393632.clone(); let relational_right = v_625f5f61393064373237633066333932316664.clone(); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_615f5f34616131306637366338373831393632.clone() } else { v_625f5f61393064373237633066333932316664.clone() };
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":49:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":56:11
             v_66696e64.initialize({  let v_6b696e64 = v_6b696e64.clone(); let v_66696e64 = v_66696e64.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_73746172745f5f62306433326562386337326661303031: Value = arg(&arguments, 0);
-                let v_656e645f5f62353862613033616530363838633732: Value = arg(&arguments, 1);
+                let v_73746172745f5f32326334346537333664336138613034: Value = arg(&arguments, 0);
+                let v_656e645f5f62383832313466396664336637333765: Value = arg(&arguments, 1);
                 let v_666f7277617264: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":50:7
-                if ({ let relational_left = v_656e645f5f62353862613033616530363838633732.clone(); let relational_right = v_73746172745f5f62306433326562386337326661303031.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":50:25
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":57:7
+                if ({ let relational_left = v_656e645f5f62383832313466396664336637333765.clone(); let relational_right = v_73746172745f5f32326334346537333664336138613034.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":57:25
                     return Value::number(-(Value::number(1.0)).scalar_number());
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":51:7
-                if (Value::boolean(strict_equal(&(Value::number((v_656e645f5f62353862613033616530363838633732.clone()).scalar_number() - (v_73746172745f5f62306433326562386337326661303031.clone()).scalar_number())), &(Value::number(1.0))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":51:30
-                    return if ({ let relational_left = v_6b696e64.read().call_authored(vec![v_73746172745f5f62306433326562386337326661303031.clone()]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_73746172745f5f62306433326562386337326661303031.clone() } else { Value::number(-(Value::number(1.0)).scalar_number()) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":58:7
+                if (Value::boolean(strict_equal(&(Value::number((v_656e645f5f62383832313466396664336637333765.clone()).scalar_number() - (v_73746172745f5f32326334346537333664336138613034.clone()).scalar_number())), &(Value::number(1.0))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":58:30
+                    return if ({ let relational_left = v_6b696e64.read().call_authored(vec![v_73746172745f5f32326334346537333664336138613034.clone()]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_73746172745f5f32326334346537333664336138613034.clone() } else { Value::number(-(Value::number(1.0)).scalar_number()) };
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":52:13
-                let v_73756d5f5f33373136643437336363316630643961 = add(v_73746172745f5f62306433326562386337326661303031.clone(), v_656e645f5f62353862613033616530363838633732.clone());
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":53:13
-                let v_6d6964646c655f5f31663863353466303065616564636361 = Value::number((Value::number((v_73756d5f5f33373136643437336363316630643961.clone()).scalar_number() - (Value::number((v_73756d5f5f33373136643437336363316630643961.clone()).scalar_number() % (Value::number(2.0)).scalar_number())).scalar_number())).scalar_number() / (Value::number(2.0)).scalar_number());
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":54:13
-                let v_63616e6469646174655f5f65623534323566613061343935386436 = if (v_666f7277617264.clone()).truthy() { v_66696e64.read().call_authored(vec![v_73746172745f5f62306433326562386337326661303031.clone(), v_6d6964646c655f5f31663863353466303065616564636361.clone(), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![v_6d6964646c655f5f31663863353466303065616564636361.clone(), v_656e645f5f62353862613033616530363838633732.clone(), Value::boolean(false)]) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":55:7
-                if ({ let relational_left = v_63616e6469646174655f5f65623534323566613061343935386436.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":55:27
-                    return v_63616e6469646174655f5f65623534323566613061343935386436.clone();
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":59:13
+                let v_73756d5f5f33303961306230316337396238383531 = add(v_73746172745f5f32326334346537333664336138613034.clone(), v_656e645f5f62383832313466396664336637333765.clone());
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":60:13
+                let v_6d6964646c655f5f37386164383235636239616665353633 = Value::number((Value::number((v_73756d5f5f33303961306230316337396238383531.clone()).scalar_number() - (Value::number((v_73756d5f5f33303961306230316337396238383531.clone()).scalar_number() % (Value::number(2.0)).scalar_number())).scalar_number())).scalar_number() / (Value::number(2.0)).scalar_number());
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":61:13
+                let v_63616e6469646174655f5f63303864656465393134663333643331 = if (v_666f7277617264.clone()).truthy() { v_66696e64.read().call_authored(vec![v_73746172745f5f32326334346537333664336138613034.clone(), v_6d6964646c655f5f37386164383235636239616665353633.clone(), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![v_6d6964646c655f5f37386164383235636239616665353633.clone(), v_656e645f5f62383832313466396664336637333765.clone(), Value::boolean(false)]) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":62:7
+                if ({ let relational_left = v_63616e6469646174655f5f63303864656465393134663333643331.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":62:27
+                    return v_63616e6469646174655f5f63303864656465393134663333643331.clone();
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":56:7
-                return if (v_666f7277617264.clone()).truthy() { v_66696e64.read().call_authored(vec![v_6d6964646c655f5f31663863353466303065616564636361.clone(), v_656e645f5f62353862613033616530363838633732.clone(), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![v_73746172745f5f62306433326562386337326661303031.clone(), v_6d6964646c655f5f31663863353466303065616564636361.clone(), Value::boolean(false)]) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":63:7
+                return if (v_666f7277617264.clone()).truthy() { v_66696e64.read().call_authored(vec![v_6d6964646c655f5f37386164383235636239616665353633.clone(), v_656e645f5f62383832313466396664336637333765.clone(), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![v_73746172745f5f32326334346537333664336138613034.clone(), v_6d6964646c655f5f37386164383235636239616665353633.clone(), Value::boolean(false)]) };
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":58:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":65:11
             v_7365656b.initialize({  let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_66696e64 = v_66696e64.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_7265717565737465645f5f63376561623461316434636264313733: Value = arg(&arguments, 0);
+                let v_7265717565737465645f5f62643933396431636635323762306436: Value = arg(&arguments, 0);
                 let v_646972656374696f6e: Value = arg(&arguments, 1);
                 let v_5f72656d61696e696e67: Value = arg(&arguments, 2);
                 let v_77726170: Value = arg(&arguments, 3);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":59:13
-                let v_696e6465785f5f37666539343561303966363566613938 = v_6d696e.read().call_authored(vec![v_636f756e74.read().call_authored(vec![]), v_6d6178.read().call_authored(vec![Value::number(-(Value::number(1.0)).scalar_number()), v_7265717565737465645f5f63376561623461316434636264313733.clone()])]);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":60:13
-                let v_63616e6469646174655f5f39653863383131636238333037643035 = if ({ let relational_left = v_646972656374696f6e.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_66696e64.read().call_authored(vec![v_6d6178.read().call_authored(vec![Value::number(0.0), v_696e6465785f5f37666539343561303966363566613938.clone()]), v_636f756e74.read().call_authored(vec![]), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![Value::number(0.0), v_6d696e.read().call_authored(vec![v_636f756e74.read().call_authored(vec![]), add(v_696e6465785f5f37666539343561303966363566613938.clone(), Value::number(1.0))]), Value::boolean(false)]) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":61:7
-                if ({ let left = { let relational_left = v_63616e6469646174655f5f39653863383131636238333037643035.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }; if !left.truthy() { Value::boolean(!(v_77726170.clone()).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":61:36
-                    return v_63616e6469646174655f5f39653863383131636238333037643035.clone();
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":62:7
-                return if ({ let relational_left = v_646972656374696f6e.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_66696e64.read().call_authored(vec![Value::number(0.0), v_6d6178.read().call_authored(vec![Value::number(0.0), v_696e6465785f5f37666539343561303966363566613938.clone()]), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![v_6d696e.read().call_authored(vec![v_636f756e74.read().call_authored(vec![]), add(v_696e6465785f5f37666539343561303966363566613938.clone(), Value::number(1.0))]), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]) };
-            })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":64:11
-            v_76616c69644974656d73.initialize({  let v_76616c69644974656d73 = v_76616c69644974656d73.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_76616c756573: Value = arg(&arguments, 0);
-                let v_73746172745f5f62663139373830333066376239633933: Value = arg(&arguments, 1);
-                let v_656e645f5f34633332353136383534353137613231: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":65:7
-                if ({ let relational_left = v_656e645f5f34633332353136383534353137613231.clone(); let relational_right = v_73746172745f5f62663139373830333066376239633933.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":65:25
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":66:7
-                if (Value::boolean(strict_equal(&(Value::number((v_656e645f5f34633332353136383534353137613231.clone()).scalar_number() - (v_73746172745f5f62663139373830333066376239633933.clone()).scalar_number())), &(Value::number(1.0))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":66:30
-                    return { let left = { let left = Value::boolean(strict_equal(&({ let object = v_76616c756573.clone(); object.caught_member(&property_key(&(v_73746172745f5f62663139373830333066376239633933.clone())), false) }), &(Value::number(0.0)))); if !left.truthy() { Value::boolean(strict_equal(&({ let object = v_76616c756573.clone(); object.caught_member(&property_key(&(v_73746172745f5f62663139373830333066376239633933.clone())), false) }), &(Value::number(1.0)))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&({ let object = v_76616c756573.clone(); object.caught_member(&property_key(&(v_73746172745f5f62663139373830333066376239633933.clone())), false) }), &(Value::number(2.0)))) } else { left } };
-                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":66:13
+                let v_696e6465785f5f33396633613562393662616462336531 = v_6d696e.read().call_authored(vec![v_636f756e74.read().call_authored(vec![]), v_6d6178.read().call_authored(vec![Value::number(-(Value::number(1.0)).scalar_number()), v_7265717565737465645f5f62643933396431636635323762306436.clone()])]);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":67:13
-                let v_73756d5f5f38656230633036656565666561323233 = add(v_73746172745f5f62663139373830333066376239633933.clone(), v_656e645f5f34633332353136383534353137613231.clone());
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":68:13
-                let v_6d6964646c655f5f37653761336366663232346464316563 = Value::number((Value::number((v_73756d5f5f38656230633036656565666561323233.clone()).scalar_number() - (Value::number((v_73756d5f5f38656230633036656565666561323233.clone()).scalar_number() % (Value::number(2.0)).scalar_number())).scalar_number())).scalar_number() / (Value::number(2.0)).scalar_number());
+                let v_63616e6469646174655f5f61653531383666613035326231303664 = if ({ let relational_left = v_646972656374696f6e.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_66696e64.read().call_authored(vec![v_6d6178.read().call_authored(vec![Value::number(0.0), v_696e6465785f5f33396633613562393662616462336531.clone()]), v_636f756e74.read().call_authored(vec![]), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![Value::number(0.0), v_6d696e.read().call_authored(vec![v_636f756e74.read().call_authored(vec![]), add(v_696e6465785f5f33396633613562393662616462336531.clone(), Value::number(1.0))]), Value::boolean(false)]) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":68:7
+                if ({ let left = { let relational_left = v_63616e6469646174655f5f61653531383666613035326231303664.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }; if !left.truthy() { Value::boolean(!(v_77726170.clone()).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":68:36
+                    return v_63616e6469646174655f5f61653531383666613035326231303664.clone();
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":69:7
-                return { let left = v_76616c69644974656d73.read().call_authored(vec![v_76616c756573.clone(), v_73746172745f5f62663139373830333066376239633933.clone(), v_6d6964646c655f5f37653761336366663232346464316563.clone()]); if left.truthy() { v_76616c69644974656d73.read().call_authored(vec![v_76616c756573.clone(), v_6d6964646c655f5f37653761336366663232346464316563.clone(), v_656e645f5f34633332353136383534353137613231.clone()]) } else { left } };
+                return if ({ let relational_left = v_646972656374696f6e.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_66696e64.read().call_authored(vec![Value::number(0.0), v_6d6178.read().call_authored(vec![Value::number(0.0), v_696e6465785f5f33396633613562393662616462336531.clone()]), Value::boolean(true)]) } else { v_66696e64.read().call_authored(vec![v_6d696e.read().call_authored(vec![v_636f756e74.read().call_authored(vec![]), add(v_696e6465785f5f33396633613562393662616462336531.clone(), Value::number(1.0))]), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]) };
             })) });
             // Source "frontend/proto-ui/src/collection-control.proto.ts":71:11
-            v_656d6974.initialize({  let v_63757272656e74 = v_63757272656e74.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e616d655f5f62363830376563343236323666336162: Value = arg(&arguments, 0);
-                let v_696e6465785f5f63393831313364353732373933313338: Value = arg(&arguments, 1);
-                let v_657874656e645f5f65656466613864626430393536646663: Value = arg(&arguments, 2);
-                let v_6b65795f5f33656165303463353266666136373330: Value = arg(&arguments, 3);
+            v_76616c69644974656d73.initialize({  let v_76616c69644974656d73 = v_76616c69644974656d73.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_76616c756573: Value = arg(&arguments, 0);
+                let v_73746172745f5f62396333303062343363623338616636: Value = arg(&arguments, 1);
+                let v_656e645f5f37653636623161383836346433353835: Value = arg(&arguments, 2);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":72:7
+                if ({ let relational_left = v_656e645f5f37653636623161383836346433353835.clone(); let relational_right = v_73746172745f5f62396333303062343363623338616636.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":72:25
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":73:7
+                if (Value::boolean(strict_equal(&(Value::number((v_656e645f5f37653636623161383836346433353835.clone()).scalar_number() - (v_73746172745f5f62396333303062343363623338616636.clone()).scalar_number())), &(Value::number(1.0))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":73:30
+                    return { let left = { let left = Value::boolean(strict_equal(&({ let object = v_76616c756573.clone(); object.caught_member(&property_key(&(v_73746172745f5f62396333303062343363623338616636.clone())), false) }), &(Value::number(0.0)))); if !left.truthy() { Value::boolean(strict_equal(&({ let object = v_76616c756573.clone(); object.caught_member(&property_key(&(v_73746172745f5f62396333303062343363623338616636.clone())), false) }), &(Value::number(1.0)))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&({ let object = v_76616c756573.clone(); object.caught_member(&property_key(&(v_73746172745f5f62396333303062343363623338616636.clone())), false) }), &(Value::number(2.0)))) } else { left } };
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":74:13
+                let v_73756d5f5f37653963393564326132353162383639 = add(v_73746172745f5f62396333303062343363623338616636.clone(), v_656e645f5f37653636623161383836346433353835.clone());
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":75:13
+                let v_6d6964646c655f5f33303439393264393338623235383761 = Value::number((Value::number((v_73756d5f5f37653963393564326132353162383639.clone()).scalar_number() - (Value::number((v_73756d5f5f37653963393564326132353162383639.clone()).scalar_number() % (Value::number(2.0)).scalar_number())).scalar_number())).scalar_number() / (Value::number(2.0)).scalar_number());
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":76:7
+                return { let left = v_76616c69644974656d73.read().call_authored(vec![v_76616c756573.clone(), v_73746172745f5f62396333303062343363623338616636.clone(), v_6d6964646c655f5f33303439393264393338623235383761.clone()]); if left.truthy() { v_76616c69644974656d73.read().call_authored(vec![v_76616c756573.clone(), v_6d6964646c655f5f33303439393264393338623235383761.clone(), v_656e645f5f37653636623161383836346433353835.clone()]) } else { left } };
+            })) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":78:11
+            v_656d6974.initialize({  let v_63757272656e74 = v_63757272656e74.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e616d655f5f38393536316239363236373961313664: Value = arg(&arguments, 0);
+                let v_696e6465785f5f65316365343832353735633961623635: Value = arg(&arguments, 1);
+                let v_657874656e645f5f36353566626264643163366330363164: Value = arg(&arguments, 2);
+                let v_6b65795f5f37383635303832363661313933636137: Value = arg(&arguments, 3);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":79:7
                 if ({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":72:20
-                    { let v_7075695f6e61746976655f3236 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3236.clone()).owner(), v_6e616d655f5f62363830376563343236323666336162.clone(), record(vec![("index", v_696e6465785f5f63393831313364353732373933313338.clone()), ("extend", v_657874656e645f5f65656466613864626430393536646663.clone()), ("key", v_6b65795f5f33656165303463353266666136373330.clone()), ("revision", { let left = ({ let v_7075695f6e61746976655f3237 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3237.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } })])) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":79:20
+                    { let v_7075695f6e61746976655f3333 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3333.clone()).owner(), v_6e616d655f5f38393536316239363236373961313664.clone(), record(vec![("index", v_696e6465785f5f65316365343832353735633961623635.clone()), ("extend", v_657874656e645f5f36353566626264643163366330363164.clone()), ("key", v_6b65795f5f37383635303832363661313933636137.clone()), ("revision", { let left = ({ let v_7075695f6e61746976655f3334 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3334.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } })])) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":74:11
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":81:11
+            v_7265717565737452657665616c.initialize({  let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f33393531626561343663653166626431: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":82:13
+                let v_6f776e65725f5f61353730616338633666353139383837 = { let value = (v_63757272656e74.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":83:7
+                if ({ let left = Value::boolean(!(v_6f776e65725f5f61353730616338633666353139383837.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":83:31
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":84:13
+                let v_6d6f64655f5f32386364333135663730633139386234 = ({ let v_7075695f6e61746976655f3335 = v_6f776e65725f5f61353730616338633666353139383837.clone(); read_props(&(v_7075695f6e61746976655f3335.clone()).owner(), false) }).member("mode", false);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":85:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f32386364333135663730633139386234.clone()), &(Value::string("filterlist")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f32386364333135663730633139386234.clone()), &(Value::string("tracklist")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":85:58
+                    v_656d6974.read().call_authored(vec![Value::string("command"), v_696e6465785f5f33393531626561343663653166626431.clone(), Value::boolean(false), Value::string("reveal")]);
+                }
+                Value::Undefined
+            })) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":87:11
             v_6368616e6765457870616e73696f6e.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f30356566353935643338396461386432: Value = arg(&arguments, 0);
-                let v_6e616d655f5f38313961633134336362313039376235: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":75:7
+                let v_6e6578745f5f31643832333866323937646431306436: Value = arg(&arguments, 0);
+                let v_6e616d655f5f34323666653430356465353638646632: Value = arg(&arguments, 1);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":88:7
                 if (Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":75:21
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":88:21
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":76:13
-                let v_7469636b65745f5f35366637313833646330326533326563 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":77:7
-                if ({ let left = { let relational_left = v_6e6578745f5f30356566353935643338396461386432.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if left.truthy() { { let relational_left = { let v_7075695f6e61746976655f3238 = v_657870616e646564.read(); (v_7075695f6e61746976655f3238.clone()).get() }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":78:9
-                    { let v_7075695f6e61746976655f3239 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3239.clone(), { let v_7075695f6e61746976655f3330 = v_657870616e646564.read(); (v_7075695f6e61746976655f3330.clone()).get() }, Value::string("reason: closing submenu restores parent")) };
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":79:9
-                    if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f35366637313833646330326533326563.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":79:43
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":89:13
+                let v_7469636b65745f5f35396236643266323430666663633037 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":90:7
+                if ({ let left = { let relational_left = v_6e6578745f5f31643832333866323937646431306436.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if left.truthy() { { let relational_left = { let v_7075695f6e61746976655f3336 = v_657870616e646564.read(); (v_7075695f6e61746976655f3336.clone()).get() }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":91:9
+                    { let v_7075695f6e61746976655f3337 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3337.clone(), { let v_7075695f6e61746976655f3338 = v_657870616e646564.read(); (v_7075695f6e61746976655f3338.clone()).get() }, Value::string("reason: closing submenu restores parent")) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":92:9
+                    if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f35396236643266323430666663633037.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":92:43
                         return Value::boolean(false);
                     }
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":81:7
-                { let v_7075695f6e61746976655f3331 = v_657870616e646564.read(); state_set(v_7075695f6e61746976655f3331.clone(), v_6e6578745f5f30356566353935643338396461386432.clone(), Value::string("reason: submenu expansion")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":82:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f35366637313833646330326533326563.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":82:41
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":83:7
-                v_656d6974.read().call_authored(vec![Value::string("expand"), v_6e6578745f5f30356566353935643338396461386432.clone(), Value::boolean(false), v_6e616d655f5f38313961633134336362313039376235.clone()]);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":84:7
-                if ({ let left = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(strict_equal(&(v_7469636b65745f5f35366637313833646330326533326563.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":84:40
-                    { let v_7075695f6e61746976655f3332 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3332.clone()).owner()) };
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":85:7
-                return Value::boolean(true);
-            })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":87:11
-            v_73656c656374.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f66636662326563386334386331643335: Value = arg(&arguments, 0);
-                let v_657874656e645f5f64313431663165323866663262373866: Value = arg(&arguments, 1);
-                let v_6578706c69636974: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":88:7
-                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f66636662326563386334386331643335.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":88:42
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":91:7
-                if ({ let left = { let left = Value::boolean(!(v_6578706c69636974.clone()).truthy()); if left.truthy() { Value::boolean(strict_equal(&(v_696e6465785f5f66636662326563386334386331643335.clone()), &({ let v_7075695f6e61746976655f3333 = v_637572736f72.read(); (v_7075695f6e61746976655f3333.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!(v_657874656e645f5f64313431663165323866663262373866.clone()).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":91:59
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":92:13
-                let v_7469636b65745f5f31633732336131366165353631356664 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":93:7
-                { let v_7075695f6e61746976655f3334 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3334.clone(), v_696e6465785f5f66636662326563386334386331643335.clone(), Value::string("reason: collection selection")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":94:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f31633732336131366165353631356664.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":94:41
+                { let v_7075695f6e61746976655f3339 = v_657870616e646564.read(); state_set(v_7075695f6e61746976655f3339.clone(), v_6e6578745f5f31643832333866323937646431306436.clone(), Value::string("reason: submenu expansion")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":95:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f35396236643266323430666663633037.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":95:41
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":95:7
-                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f66636662326563386334386331643335.clone(), v_657874656e645f5f64313431663165323866663262373866.clone(), Value::string("")]);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":96:7
-                if ({ let left = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(strict_equal(&(v_7469636b65745f5f31633732336131366165353631356664.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":96:40
-                    { let v_7075695f6e61746976655f3335 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3335.clone()).owner()) };
-                }
+                v_656d6974.read().call_authored(vec![Value::string("expand"), v_6e6578745f5f31643832333866323937646431306436.clone(), Value::boolean(false), v_6e616d655f5f34323666653430356465353638646632.clone()]);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":97:7
+                if ({ let left = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(strict_equal(&(v_7469636b65745f5f35396236643266323430666663633037.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":97:40
+                    { let v_7075695f6e61746976655f3430 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3430.clone()).owner()) };
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":98:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":99:11
-            v_63686f6f7365.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f31303933366663333430356362356538: Value = arg(&arguments, 0);
-                let v_657874656e645f5f36653734353665663531393662383762: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":100:7
-                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f31303933366663333430356362356538.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":100:42
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":101:13
-                let v_7469636b65745f5f31313034623130643764656138376162 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":102:7
-                { let v_7075695f6e61746976655f3336 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3336.clone(), v_696e6465785f5f31303933366663333430356362356538.clone(), Value::string("reason: collection activation cursor")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":103:7
-                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f31313034623130643764656138376162.clone()))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":103:41
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":100:11
+            v_73656c656374.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_7265717565737452657665616c = v_7265717565737452657665616c.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f30396366383834383461353234623464: Value = arg(&arguments, 0);
+                let v_657874656e645f5f65343537633465636263636362333362: Value = arg(&arguments, 1);
+                let v_6578706c69636974: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":101:7
+                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f30396366383834383461353234623464.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":101:42
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":104:7
-                if (Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f31303933366663333430356362356538.clone()])), &(Value::number(2.0))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":105:15
-                    let v_6e6578745f5f39386434313764643562303565303935 = if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3337 = v_657870616e646564.read(); (v_7075695f6e61746976655f3337.clone()).get() }), &(v_696e6465785f5f31303933366663333430356362356538.clone())))).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { v_696e6465785f5f31303933366663333430356362356538.clone() };
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":106:9
-                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![v_6e6578745f5f39386434313764643562303565303935.clone(), Value::string("")]);
-                } else {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":107:14
-                    v_656d6974.read().call_authored(vec![Value::string("activate"), v_696e6465785f5f31303933366663333430356362356538.clone(), v_657874656e645f5f36653734353665663531393662383762.clone(), Value::string("")]);
+                if ({ let left = { let left = Value::boolean(!(v_6578706c69636974.clone()).truthy()); if left.truthy() { Value::boolean(strict_equal(&(v_696e6465785f5f30396366383834383461353234623464.clone()), &({ let v_7075695f6e61746976655f3431 = v_637572736f72.read(); (v_7075695f6e61746976655f3431.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!(v_657874656e645f5f65343537633465636263636362333362.clone()).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":104:59
+                    return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":108:7
-                return Value::boolean(true);
-            })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":110:11
-            v_6b65795f5f33653136666361613234643562356135.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); let v_73656c656374 = v_73656c656374.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e616d655f5f66316363656631636166656366613938: Value = arg(&arguments, 0);
-                let v_73686966745f5f30306631393732336363613366373633: Value = arg(&arguments, 1);
-                let v_636f6d6d616e645f5f63393436336161386137383466613761: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":111:7
-                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":111:33
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":105:13
+                let v_7469636b65745f5f37626238383031343734313532396437 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":106:7
+                { let v_7075695f6e61746976655f3432 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3432.clone(), v_696e6465785f5f30396366383834383461353234623464.clone(), Value::string("reason: collection selection")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":107:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f37626238383031343734313532396437.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":107:41
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":112:13
-                let v_6d6f64655f5f65306330663134393432653465666439 = { let left = ({ let v_7075695f6e61746976655f3338 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3338.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":108:7
+                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f30396366383834383461353234623464.clone(), v_657874656e645f5f65343537633465636263636362333362.clone(), Value::string("")]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":109:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f37626238383031343734313532396437.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":109:41
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":110:7
+                v_7265717565737452657665616c.read().call_authored(vec![v_696e6465785f5f30396366383834383461353234623464.clone()]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":111:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f37626238383031343734313532396437.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":111:41
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":112:7
+                if ({ let left = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(strict_equal(&(v_7469636b65745f5f37626238383031343734313532396437.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":112:40
+                    { let v_7075695f6e61746976655f3433 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3433.clone()).owner()) };
+                }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":113:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("searchlist")))); if left.truthy() { v_636f6d6d616e645f5f63393436336161386137383466613761.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":114:9
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3339 = v_637572736f72.read(); (v_7075695f6e61746976655f3339.clone()).get() }, Value::boolean(false), Value::string("Find")]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":114:55
-                    return Value::boolean(true);
-                }
+                return Value::boolean(true);
+            })) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":115:11
+            v_63686f6f7365.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f30646536643164336436666136653830: Value = arg(&arguments, 0);
+                let v_657874656e645f5f34633161383735333230353534306130: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":116:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Enter")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":116:75
-                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3430 = v_637572736f72.read(); (v_7075695f6e61746976655f3430.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":116:117
-                    return Value::boolean(true);
+                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f30646536643164336436666136653830.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":116:42
+                    return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":117:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Tab")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":118:15
-                    let v_5f5f7075694d6f64756c6530 = add({ let v_7075695f6e61746976655f3431 = v_637572736f72.read(); (v_7075695f6e61746976655f3431.clone()).get() }, if (v_73686966745f5f30306631393732336363613366373633.clone()).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { Value::number(1.0) });
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":119:9
-                    if ({ let left = { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if !left.truthy() { { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = v_636f756e74.read().call_authored(vec![]); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":119:42
-                        v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3432 = v_637572736f72.read(); (v_7075695f6e61746976655f3432.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
-                    } else {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":120:14
-                        v_73656c656374.read().call_authored(vec![v_5f5f7075694d6f64756c6530.clone(), Value::boolean(false), Value::boolean(true)]);
-                    }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":121:9
-                    return Value::boolean(true);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":117:13
+                let v_7469636b65745f5f35393863386432653139666563623032 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":118:7
+                { let v_7075695f6e61746976655f3434 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3434.clone(), v_696e6465785f5f30646536643164336436666136653830.clone(), Value::string("reason: collection activation cursor")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":119:7
+                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f35393863386432653139666563623032.clone()))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":119:41
+                    return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":123:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("+")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("-")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":123:128
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3433 = v_637572736f72.read(); (v_7075695f6e61746976655f3433.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":123:172
-                    return Value::boolean(true);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":120:7
+                if (Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f30646536643164336436666136653830.clone()])), &(Value::number(2.0))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":121:15
+                    let v_6e6578745f5f65393831633161393530313364346565 = if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3435 = v_657870616e646564.read(); (v_7075695f6e61746976655f3435.clone()).get() }), &(v_696e6465785f5f30646536643164336436666136653830.clone())))).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { v_696e6465785f5f30646536643164336436666136653830.clone() };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":122:9
+                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![v_6e6578745f5f65393831633161393530313364346565.clone(), Value::string("")]);
+                } else {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":123:14
+                    v_656d6974.read().call_authored(vec![Value::string("activate"), v_696e6465785f5f30646536643164336436666136653830.clone(), v_657874656e645f5f34633161383735333230353534306130.clone(), Value::string("")]);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":124:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Escape")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Tab")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":124:71
-                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3434 = v_637572736f72.read(); (v_7075695f6e61746976655f3434.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":124:113
-                    return Value::boolean(true);
+                return Value::boolean(true);
+            })) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":126:11
+            v_636f6e746578744174.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f63383336636366396537373937356266: Value = arg(&arguments, 0);
+                let v_62617369735f5f35373233316461656662626465313432: Value = arg(&arguments, 1);
+                let v_78: Value = arg(&arguments, 2);
+                let v_79: Value = arg(&arguments, 3);
+                let v_6b6579626f617264: Value = arg(&arguments, 4);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":127:13
+                let v_6f776e65725f5f34333637383931663863643364353464 = { let value = (v_63757272656e74.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":128:7
+                if ({ let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!(v_6f776e65725f5f34333637383931663863643364353464.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f35373233316461656662626465313432.clone()), &({ let left = ({ let v_7075695f6e61746976655f3436 = v_6f776e65725f5f34333637383931663863643364353464.clone(); read_props(&(v_7075695f6e61746976655f3436.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f63383336636366396537373937356266.clone()])), &(Value::number(0.0)))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_696e6465785f5f63383336636366396537373937356266.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(Value::number((v_696e6465785f5f63383336636366396537373937356266.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_78.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_79.clone()))).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":129:102
+                    return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":125:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Enter")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("F2")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("table")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":125:84
-                    return v_63686f6f7365.read().call_authored(vec![{ let v_7075695f6e61746976655f3435 = v_637572736f72.read(); (v_7075695f6e61746976655f3435.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone()]);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":126:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Delete")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Backspace")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Tab")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":127:9
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3436 = v_637572736f72.read(); (v_7075695f6e61746976655f3436.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":127:53
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":129:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("table")))); if left.truthy() { v_636f6d6d616e645f5f63393436336161386137383466613761.clone() } else { left } }; if left.truthy() { { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowLeft")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowDown")))) } else { left } } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":130:9
-                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3437 = v_637572736f72.read(); (v_7075695f6e61746976655f3437.clone()).get() }, v_73686966745f5f30306631393732336363613366373633.clone(), v_6e616d655f5f66316363656631636166656366613938.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":130:53
-                    return Value::boolean(true);
-                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":130:13
+                let v_7469636b65745f5f66316139366230633865353735653634 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":131:7
+                { let v_7075695f6e61746976655f3437 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3437.clone(), v_696e6465785f5f63383336636366396537373937356266.clone(), Value::string("reason: collection context cursor")) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":132:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":133:9
-                    if ({ let relational_left = { let v_7075695f6e61746976655f3438 = v_657870616e646564.read(); (v_7075695f6e61746976655f3438.clone()).get() }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":133:33
-                        return Value::boolean(false);
-                    }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":134:9
-                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![Value::number(-(Value::number(1.0)).scalar_number()), v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f66316139366230633865353735653634.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":132:41
+                    return Value::boolean(false);
                 }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":133:7
+                { let v_7075695f6e61746976655f3438 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3438.clone()).owner(), Value::Undefined, false) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":134:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f66316139366230633865353735653634.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":134:41
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":135:7
+                { let v_7075695f6e61746976655f3439 = v_6f776e65725f5f34333637383931663863643364353464.clone(); emit(&(v_7075695f6e61746976655f3439.clone()).owner(), Value::string("context"), record(vec![("index", v_696e6465785f5f63383336636366396537373937356266.clone()), ("x", v_78.clone()), ("y", v_79.clone()), ("keyboard", v_6b6579626f617264.clone()), ("revision", v_62617369735f5f35373233316461656662626465313432.clone())])) };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":136:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":137:9
-                    if (Value::boolean(!strict_equal(&(v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f3439 = v_637572736f72.read(); (v_7075695f6e61746976655f3439.clone()).get() }])), &(Value::number(2.0))))).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":137:39
+                return Value::boolean(true);
+            })) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":138:11
+            v_6b65795f5f63636538616136363530633839623964.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_7363726f6c6c = v_7363726f6c6c.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); let v_656d6974 = v_656d6974.clone(); let v_6368616e6765457870616e73696f6e = v_6368616e6765457870616e73696f6e.clone(); let v_73656c656374 = v_73656c656374.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); let v_636f6e746578744174 = v_636f6e746578744174.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e616d655f5f39663033646662643236656166323335: Value = arg(&arguments, 0);
+                let v_73686966745f5f35346239656133393965376336626438: Value = arg(&arguments, 1);
+                let v_636f6d6d616e645f5f34323363326161366465626334663932: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":139:7
+                if ({ let left = Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":139:33
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":140:13
+                let v_6d6f64655f5f38336631336234323834663464633562 = { let left = ({ let v_7075695f6e61746976655f3530 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3530.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":141:7
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("filterlist")))); if left.truthy() { v_636f6d6d616e645f5f34323363326161366465626334663932.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":141:81
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3531 = v_637572736f72.read(); (v_7075695f6e61746976655f3531.clone()).get() }, Value::boolean(false), Value::string("focus-filter")]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":141:135
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":142:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("tracklist")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ContextMenu")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("F10")))); if left.truthy() { v_73686966745f5f35346239656133393965376336626438.clone() } else { left } } } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":142:90
+                    return v_636f6e746578744174.read().call_authored(vec![{ let v_7075695f6e61746976655f3532 = v_637572736f72.read(); (v_7075695f6e61746976655f3532.clone()).get() }, { let left = ({ let v_7075695f6e61746976655f3533 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3533.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }, Value::number(0.0), Value::number(0.0), Value::boolean(true)]);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":143:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("points")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Enter")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":143:75
+                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3534 = v_637572736f72.read(); (v_7075695f6e61746976655f3534.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone(), v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":143:117
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":144:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("points")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Tab")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":145:15
+                    let v_5f5f7075694d6f64756c6530 = add({ let v_7075695f6e61746976655f3535 = v_637572736f72.read(); (v_7075695f6e61746976655f3535.clone()).get() }, if (v_73686966745f5f35346239656133393965376336626438.clone()).truthy() { Value::number(-(Value::number(1.0)).scalar_number()) } else { Value::number(1.0) });
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":146:9
+                    if ({ let left = { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if !left.truthy() { { let relational_left = v_5f5f7075694d6f64756c6530.clone(); let relational_right = v_636f756e74.read().call_authored(vec![]); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":146:42
+                        v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3536 = v_637572736f72.read(); (v_7075695f6e61746976655f3536.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone(), v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                    } else {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":147:14
+                        v_73656c656374.read().call_authored(vec![v_5f5f7075694d6f64756c6530.clone(), Value::boolean(false), Value::boolean(true)]);
+                    }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":148:9
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":150:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("+")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("-")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":150:128
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3537 = v_637572736f72.read(); (v_7075695f6e61746976655f3537.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone(), v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":150:172
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":151:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Escape")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Tab")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("menu")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":151:71
+                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3538 = v_637572736f72.read(); (v_7075695f6e61746976655f3538.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone(), v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":151:113
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":152:7
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Enter")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("F2")))); if left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("table")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":152:84
+                    return v_63686f6f7365.read().call_authored(vec![{ let v_7075695f6e61746976655f3539 = v_637572736f72.read(); (v_7075695f6e61746976655f3539.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone()]);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":153:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Delete")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Backspace")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Tab")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":154:9
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3630 = v_637572736f72.read(); (v_7075695f6e61746976655f3630.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone(), v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":154:53
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":156:7
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("table")))); if left.truthy() { v_636f6d6d616e645f5f34323363326161366465626334663932.clone() } else { left } }; if left.truthy() { { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowLeft")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowDown")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":157:9
+                    v_656d6974.read().call_authored(vec![Value::string("command"), { let v_7075695f6e61746976655f3631 = v_637572736f72.read(); (v_7075695f6e61746976655f3631.clone()).get() }, v_73686966745f5f35346239656133393965376336626438.clone(), v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":157:53
+                    return Value::boolean(true);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":159:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":160:9
+                    if ({ let relational_left = { let v_7075695f6e61746976655f3632 = v_657870616e646564.read(); (v_7075695f6e61746976655f3632.clone()).get() }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":160:33
                         return Value::boolean(false);
                     }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":138:9
-                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![{ let v_7075695f6e61746976655f3530 = v_637572736f72.read(); (v_7075695f6e61746976655f3530.clone()).get() }, v_6e616d655f5f66316363656631636166656366613938.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":161:9
+                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![Value::number(-(Value::number(1.0)).scalar_number()), v_6e616d655f5f39663033646662643236656166323335.clone()]);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":140:11
-                let v_6e6578745f5f63333064316432366164346565353263 = Rc::new(std::cell::RefCell::new(Value::number(-(Value::number(1.0)).scalar_number())));
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":141:7
-                if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("Home"))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":141:28
-                    { let value = v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":163:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("menu")))); if left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":164:9
+                    if (Value::boolean(!strict_equal(&(v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f3633 = v_637572736f72.read(); (v_7075695f6e61746976655f3633.clone()).get() }])), &(Value::number(2.0))))).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":164:39
+                        return Value::boolean(false);
+                    }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":165:9
+                    return v_6368616e6765457870616e73696f6e.read().call_authored(vec![{ let v_7075695f6e61746976655f3634 = v_637572736f72.read(); (v_7075695f6e61746976655f3634.clone()).get() }, v_6e616d655f5f39663033646662643236656166323335.clone()]);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":167:11
+                let v_6e6578745f5f39303365663633396366633434303531 = Rc::new(std::cell::RefCell::new(Value::number(-(Value::number(1.0)).scalar_number())));
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":168:7
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Home"))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":168:28
+                    { let value = v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f39303365663633396366633434303531.clone()).borrow_mut() = value; }
                 } else {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":142:12
-                    if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("End"))))).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":142:32
-                        { let value = v_7365656b.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":169:12
+                    if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("End"))))).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":169:32
+                        { let value = v_7365656b.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f39303365663633396366633434303531.clone()).borrow_mut() = value; }
                     } else {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":143:12
-                        if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
-                            // Source "frontend/proto-ui/src/collection-control.proto.ts":143:60
-                            { let value = v_7365656b.read().call_authored(vec![Value::number(({ let v_7075695f6e61746976655f3531 = v_637572736f72.read(); (v_7075695f6e61746976655f3531.clone()).get() }).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":170:12
+                        if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowUp")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowLeft")))) } else { left } }).truthy() {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":170:60
+                            { let value = v_7365656b.read().call_authored(vec![Value::number(({ let v_7075695f6e61746976655f3635 = v_637572736f72.read(); (v_7075695f6e61746976655f3635.clone()).get() }).scalar_number() - (Value::number(1.0)).scalar_number()), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f39303365663633396366633434303531.clone()).borrow_mut() = value; }
                         } else {
-                            // Source "frontend/proto-ui/src/collection-control.proto.ts":144:12
-                            if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowDown")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
-                                // Source "frontend/proto-ui/src/collection-control.proto.ts":144:63
-                                { let value = v_7365656b.read().call_authored(vec![add({ let v_7075695f6e61746976655f3532 = v_637572736f72.read(); (v_7075695f6e61746976655f3532.clone()).get() }, Value::number(1.0)), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":171:12
+                            if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowDown")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("ArrowRight")))) } else { left } }).truthy() {
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":171:63
+                                { let value = v_7365656b.read().call_authored(vec![add({ let v_7075695f6e61746976655f3636 = v_637572736f72.read(); (v_7075695f6e61746976655f3636.clone()).get() }, Value::number(1.0)), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("menu")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("tablist")))) } else { left } }]); *(v_6e6578745f5f39303365663633396366633434303531.clone()).borrow_mut() = value; }
                             } else {
-                                // Source "frontend/proto-ui/src/collection-control.proto.ts":145:12
-                                if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("PageUp"))))).truthy() {
-                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":145:35
-                                    { let value = v_7365656b.read().call_authored(vec![v_6d6178.read().call_authored(vec![Value::number(0.0), Value::number(({ let v_7075695f6e61746976655f3533 = v_637572736f72.read(); (v_7075695f6e61746976655f3533.clone()).get() }).scalar_number() - (if (Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) }).scalar_number())]), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":172:12
+                                if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("PageUp"))))).truthy() {
+                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":172:35
+                                    { let value = v_7365656b.read().call_authored(vec![v_6d6178.read().call_authored(vec![Value::number(0.0), Value::number(({ let v_7075695f6e61746976655f3637 = v_637572736f72.read(); (v_7075695f6e61746976655f3637.clone()).get() }).scalar_number() - (if (Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) }).scalar_number())]), Value::number(-(Value::number(1.0)).scalar_number()), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f39303365663633396366633434303531.clone()).borrow_mut() = value; }
                                 } else {
-                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":146:12
-                                    if (Value::boolean(strict_equal(&(v_6e616d655f5f66316363656631636166656366613938.clone()), &(Value::string("PageDown"))))).truthy() {
-                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":146:37
-                                        { let value = v_7365656b.read().call_authored(vec![v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), add({ let v_7075695f6e61746976655f3534 = v_637572736f72.read(); (v_7075695f6e61746976655f3534.clone()).get() }, if (Value::boolean(strict_equal(&(v_6d6f64655f5f65306330663134393432653465666439.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) })]), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f63333064316432366164346565353263.clone()).borrow_mut() = value; }
+                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":173:12
+                                    if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("PageDown"))))).truthy() {
+                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":173:37
+                                        { let value = v_7365656b.read().call_authored(vec![v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), add({ let v_7075695f6e61746976655f3638 = v_637572736f72.read(); (v_7075695f6e61746976655f3638.clone()).get() }, if (Value::boolean(strict_equal(&(v_6d6f64655f5f38336631336234323834663464633562.clone()), &(Value::string("points"))))).truthy() { Value::number(4.0) } else { Value::number(20.0) })]), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)]); *(v_6e6578745f5f39303365663633396366633434303531.clone()).borrow_mut() = value; }
                                     } else {
-                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":147:12
+                                        // Source "frontend/proto-ui/src/collection-control.proto.ts":174:12
                                         return Value::boolean(false);
                                     }
                                 }
@@ -739,324 +890,480 @@ pub struct GeneratedData0 {
                         }
                     }
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":148:7
-                if ({ let relational_left = { let value = (v_6e6578745f5f63333064316432366164346565353263.clone()).borrow().clone(); value }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":148:22
-                    v_73656c656374.read().call_authored(vec![{ let value = (v_6e6578745f5f63333064316432366164346565353263.clone()).borrow().clone(); value }, v_73686966745f5f30306631393732336363613366373633.clone(), Value::boolean(true)]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":175:7
+                if ({ let left = { let relational_left = { let value = (v_6e6578745f5f39303365663633396366633434303531.clone()).borrow().clone(); value }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }; if left.truthy() { Value::boolean(!(v_73656c656374.read().call_authored(vec![{ let value = (v_6e6578745f5f39303365663633396366633434303531.clone()).borrow().clone(); value }, v_73686966745f5f35346239656133393965376336626438.clone(), Value::boolean(true)])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":175:52
+                    return Value::boolean(true);
                 } else {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":149:12
-                    if ({ let left = Value::boolean(!(v_73686966745f5f30306631393732336363613366373633.clone()).truthy()); if left.truthy() { { let relational_left = v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f3535 = v_637572736f72.read(); (v_7075695f6e61746976655f3535.clone()).get() }]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":149:50
-                        v_73656c656374.read().call_authored(vec![{ let v_7075695f6e61746976655f3536 = v_637572736f72.read(); (v_7075695f6e61746976655f3536.clone()).get() }, Value::boolean(false), Value::boolean(true)]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":176:12
+                    if ({ let left = { let left = { let left = { let relational_left = { let value = (v_6e6578745f5f39303365663633396366633434303531.clone()).borrow().clone(); value }; let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }; if left.truthy() { Value::boolean(!(v_73686966745f5f35346239656133393965376336626438.clone()).truthy()) } else { left } }; if left.truthy() { { let relational_left = v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f3639 = v_637572736f72.read(); (v_7075695f6e61746976655f3639.clone()).get() }]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }; if left.truthy() { Value::boolean(!(v_73656c656374.read().call_authored(vec![{ let v_7075695f6e61746976655f3730 = v_637572736f72.read(); (v_7075695f6e61746976655f3730.clone()).get() }, Value::boolean(false), Value::boolean(true)])).truthy()) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":176:100
+                        return Value::boolean(true);
                     }
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":150:7
-                return Value::boolean(true);
-            })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":152:5
-            { let v_7075695f6e61746976655f3537 = v_646566.clone(); expose_method(&owner, Value::string("setItems"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6974656d73 = v_6974656d73.clone(); let v_76616c69644974656d73 = v_76616c69644974656d73.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f63336462363239303163653033336462: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":153:7
-                if ({ let left = { let left = { let value = (v_646973706f736564.read()).borrow().clone(); value }; if !left.truthy() { { let relational_left = (v_6e6578745f5f63336462363239303163653033336462.clone()).member("length", false); let relational_right = Value::number(1000000.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }; if !left.truthy() { Value::boolean(!(v_76616c69644974656d73.read().call_authored(vec![v_6e6578745f5f63336462363239303163653033336462.clone(), Value::number(0.0), (v_6e6578745f5f63336462363239303163653033336462.clone()).member("length", false)])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":153:83
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":154:7
-                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":154:16
-                { let value = v_6e6578745f5f63336462363239303163653033336462.clone(); *(v_6974656d73.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":155:7
-                if ({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":155:20
-                    v_73796e63.read().call_authored(vec![{ let value = (v_63757272656e74.read()).borrow().clone(); value }]);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":156:7
-                return Value::boolean(true);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":158:5
-            { let v_7075695f6e61746976655f3538 = v_646566.clone(); expose_method(&owner, Value::string("choose"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f66353737353231626163366539343165: Value = arg(&arguments, 0);
-                let v_657874656e645f5f65396264633562613335356664396136: Value = arg(&arguments, 1);
-                let v_62617369735f5f38363834363564666435393761333634: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":159:7
-                if (Value::boolean(!strict_equal(&(v_62617369735f5f38363834363564666435393761333634.clone()), &({ let left = ({ let v_7075695f6e61746976655f3539 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3539.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3539.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":159:60
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":160:7
-                return v_63686f6f7365.read().call_authored(vec![v_696e6465785f5f66353737353231626163366539343165.clone(), v_657874656e645f5f65396264633562613335356664396136.clone()]);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":162:5
-            { let v_7075695f6e61746976655f3630 = v_646566.clone(); expose_method(&owner, Value::string("selectIndex"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f63353036383464353233643634356363: Value = arg(&arguments, 0);
-                let v_657874656e645f5f39663461633861653036333862643166: Value = arg(&arguments, 1);
-                let v_62617369735f5f62633662396166316630393466636466: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":163:7
-                if (Value::boolean(!strict_equal(&(v_62617369735f5f62633662396166316630393466636466.clone()), &({ let left = ({ let v_7075695f6e61746976655f3631 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3631.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3631.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":163:60
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":164:7
-                return v_73656c656374.read().call_authored(vec![v_696e6465785f5f63353036383464353233643634356363.clone(), v_657874656e645f5f39663461633861653036333862643166.clone(), Value::boolean(false)]);
-            })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":168:5
-            { let v_7075695f6e61746976655f3632 = v_646566.clone(); expose_method(&owner, Value::string("keyAt"), {  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6b65795f5f33653136666361613234643562356135 = v_6b65795f5f33653136666361613234643562356135.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f64306165326638646339316538393238: Value = arg(&arguments, 0);
-                let v_6e616d655f5f37633037336565656331383435386633: Value = arg(&arguments, 1);
-                let v_73686966745f5f36656666326561356338393366363434: Value = arg(&arguments, 2);
-                let v_636f6d6d616e645f5f66616363653966383038376163323264: Value = arg(&arguments, 3);
-                let v_62617369735f5f30313765626163333033336265303963: Value = arg(&arguments, 4);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":169:7
-                if ({ let left = { let left = { let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f30313765626163333033336265303963.clone()), &({ let left = ({ let v_7075695f6e61746976655f3633 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3633.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f64306165326638646339316538393238.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":169:104
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":170:13
-                let v_6d6f64655f5f66353666336236626638373938313438 = { let left = ({ let v_7075695f6e61746976655f3634 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3634.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":171:13
-                let v_68616e646c6564 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Enter")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Home")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("End")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowLeft")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("PageUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("PageDown")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Tab")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("table")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("menu")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("F2")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Delete")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("Backspace")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("+")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("-")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f66353666336236626638373938313438.clone()), &(Value::string("searchlist")))); if left.truthy() { v_636f6d6d616e645f5f66616363653966383038376163323264.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37633037336565656331383435386633.clone()), &(Value::string("F")))) } else { left } } } else { left } } } else { left } };
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":177:7
-                if (Value::boolean(!(v_68616e646c6564.clone()).truthy())).truthy() {
+                if (Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/collection-control.proto.ts":177:21
-                    return Value::boolean(false);
+                    return Value::boolean(true);
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":178:13
-                let v_7469636b65745f5f66386464366565353362663562323165 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                let v_686f72697a6f6e74616c = Value::boolean(strict_equal(&(({ let v_7075695f6e61746976655f3731 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3731.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3731.clone()).owner(), false) } }).member("orientation", true)), &(Value::string("horizontal"))));
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":179:7
-                { let v_7075695f6e61746976655f3635 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3635.clone(), v_696e6465785f5f64306165326638646339316538393238.clone(), Value::string("reason: addressed collection key")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":180:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f66386464366565353362663562323165.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":180:41
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":181:7
-                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f64306165326638646339316538393238.clone(), Value::boolean(false), Value::string("")]);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":182:7
-                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f66386464366565353362663562323165.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f30313765626163333033336265303963.clone()), &({ let left = ({ let v_7075695f6e61746976655f3636 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3636.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3636.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":182:92
-                    return Value::boolean(false);
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("PageUp"))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":179:32
+                    if (v_686f72697a6f6e74616c.clone()).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":179:48
+                        { let v_7075695f6e61746976655f3732 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3732.clone()).owner(), record(vec![("kind", Value::string("page")), ("axis", Value::string("horizontal")), ("direction", Value::string("before"))])) };
+                    } else {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":179:128
+                        { let v_7075695f6e61746976655f3733 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3733.clone()).owner(), record(vec![("kind", Value::string("page")), ("axis", Value::string("vertical")), ("direction", Value::string("before"))])) };
+                    }
+                } else {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":180:12
+                    if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("PageDown"))))).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":180:39
+                        if (v_686f72697a6f6e74616c.clone()).truthy() {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":180:55
+                            { let v_7075695f6e61746976655f3734 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3734.clone()).owner(), record(vec![("kind", Value::string("page")), ("axis", Value::string("horizontal")), ("direction", Value::string("after"))])) };
+                        } else {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":180:134
+                            { let v_7075695f6e61746976655f3735 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3735.clone()).owner(), record(vec![("kind", Value::string("page")), ("axis", Value::string("vertical")), ("direction", Value::string("after"))])) };
+                        }
+                    } else {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":181:12
+                        if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("Home"))))).truthy() {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":181:35
+                            if (v_686f72697a6f6e74616c.clone()).truthy() {
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":181:51
+                                { let v_7075695f6e61746976655f3736 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3736.clone()).owner(), record(vec![("kind", Value::string("to")), ("axis", Value::string("horizontal")), ("position", Value::number(0.0))])) };
+                            } else {
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":181:121
+                                { let v_7075695f6e61746976655f3737 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3737.clone()).owner(), record(vec![("kind", Value::string("to")), ("axis", Value::string("vertical")), ("position", Value::number(0.0))])) };
+                            }
+                        } else {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":182:12
+                            if (Value::boolean(strict_equal(&(v_6e616d655f5f39663033646662643236656166323335.clone()), &(Value::string("End"))))).truthy() {
+                                // Source "frontend/proto-ui/src/collection-control.proto.ts":182:34
+                                if (v_686f72697a6f6e74616c.clone()).truthy() {
+                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":182:50
+                                    { let v_7075695f6e61746976655f3738 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3738.clone()).owner(), record(vec![("kind", Value::string("to-end")), ("axis", Value::string("horizontal"))])) };
+                                } else {
+                                    // Source "frontend/proto-ui/src/collection-control.proto.ts":182:111
+                                    { let v_7075695f6e61746976655f3739 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3739.clone()).owner(), record(vec![("kind", Value::string("to-end")), ("axis", Value::string("vertical"))])) };
+                                }
+                            }
+                        }
+                    }
                 }
                 // Source "frontend/proto-ui/src/collection-control.proto.ts":183:7
-                return v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![v_6e616d655f5f37633037336565656331383435386633.clone(), v_73686966745f5f36656666326561356338393366363434.clone(), v_636f6d6d616e645f5f66616363653966383038376163323264.clone()]);
+                return Value::boolean(true);
+            })) });
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":188:5
+            { let v_7075695f6e61746976655f3830 = v_646566.clone(); expose_method(&owner, Value::string("filterKey"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b65795f5f63636538616136363530633839623964 = v_6b65795f5f63636538616136363530633839623964.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e616d655f5f37613536633837626431663532366332: Value = arg(&arguments, 0);
+                let v_73686966745f5f38353264393838616565376537356239: Value = arg(&arguments, 1);
+                let v_636f6d6d616e645f5f32366138313638353133626133353639: Value = arg(&arguments, 2);
+                let v_636f6d706f73696e67: Value = arg(&arguments, 3);
+                let v_66726f6d46696c746572: Value = arg(&arguments, 4);
+                let v_62617369735f5f38653339326536643161626362663536: Value = arg(&arguments, 5);
+                let v_616c74: Value = arg(&arguments, 6);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":189:13
+                let v_6f776e65725f5f61633262346635326137313438303332 = { let value = (v_63757272656e74.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":190:7
+                if ({ let left = { let left = { let left = { let left = { let left = Value::boolean(!(v_6f776e65725f5f61633262346635326137313438303332.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { v_636f6d706f73696e67.clone() } else { left } }; if !left.truthy() { v_616c74.clone() } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(({ let v_7075695f6e61746976655f3831 = v_6f776e65725f5f61633262346635326137313438303332.clone(); read_props(&(v_7075695f6e61746976655f3831.clone()).owner(), false) }).member("mode", false)), &(Value::string("filterlist")))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f38653339326536643161626362663536.clone()), &({ let left = ({ let v_7075695f6e61746976655f3832 = v_6f776e65725f5f61633262346635326137313438303332.clone(); read_props(&(v_7075695f6e61746976655f3832.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":190:142
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":191:7
+                if ({ let left = v_636f6d6d616e645f5f32366138313638353133626133353639.clone(); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37613536633837626431663532366332.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37613536633837626431663532366332.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":191:54
+                    return v_6b65795f5f63636538616136363530633839623964.read().call_authored(vec![v_6e616d655f5f37613536633837626431663532366332.clone(), v_73686966745f5f38353264393838616565376537356239.clone(), Value::boolean(true)]);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":192:7
+                if ({ let left = Value::boolean(!(v_66726f6d46696c746572.clone()).truthy()); if !left.truthy() { v_636f6d6d616e645f5f32366138313638353133626133353639.clone() } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":192:35
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":193:7
+                if ({ let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6e616d655f5f37613536633837626431663532366332.clone()), &(Value::string("ArrowUp")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f37613536633837626431663532366332.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f37613536633837626431663532366332.clone()), &(Value::string("Enter")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f37613536633837626431663532366332.clone()), &(Value::string("Escape")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":193:96
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":194:7
+                return v_6b65795f5f63636538616136363530633839623964.read().call_authored(vec![v_6e616d655f5f37613536633837626431663532366332.clone(), v_73686966745f5f38353264393838616565376537356239.clone(), Value::boolean(false)]);
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":185:5
-            { let v_7075695f6e61746976655f3637 = v_646566.clone(); expose_method(&owner, Value::string("selectAndFocus"), {  let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e6465785f5f66353962396636653339316335646135: Value = arg(&arguments, 0);
-                let v_657874656e645f5f66353030356433613765343738326139: Value = arg(&arguments, 1);
-                let v_62617369735f5f35373963656437353235666236363134: Value = arg(&arguments, 2);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":186:7
-                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f35373963656437353235666236363134.clone()), &({ let left = ({ let v_7075695f6e61746976655f3638 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3638.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":186:71
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":199:5
+            { let v_7075695f6e61746976655f3833 = v_646566.clone(); expose_method(&owner, Value::string("revealGeometry"), {  let v_637572736f72 = v_637572736f72.clone(); let v_7363726f6c6c = v_7363726f6c6c.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f61613236653065393430303964373333: Value = arg(&arguments, 0);
+                let v_73746172745f5f62326431336666663833346661633834: Value = arg(&arguments, 1);
+                let v_656e645f5f36663731373364653138373330666231: Value = arg(&arguments, 2);
+                let v_76696577706f72745374617274: Value = arg(&arguments, 3);
+                let v_76696577706f7274456e64: Value = arg(&arguments, 4);
+                let v_62617369735f5f37396562613432663433336531656363: Value = arg(&arguments, 5);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":200:13
+                let v_6f776e65725f5f65616234323132303862343434376265 = { let value = (v_63757272656e74.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":201:7
+                if ({ let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!(v_6f776e65725f5f65616234323132303862343434376265.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f37396562613432663433336531656363.clone()), &({ let left = ({ let v_7075695f6e61746976655f3834 = v_6f776e65725f5f65616234323132303862343434376265.clone(); read_props(&(v_7075695f6e61746976655f3834.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_696e6465785f5f61613236653065393430303964373333.clone()), &({ let v_7075695f6e61746976655f3835 = v_637572736f72.read(); (v_7075695f6e61746976655f3835.clone()).get() }))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f61613236653065393430303964373333.clone()])), &(Value::number(0.0)))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_73746172745f5f62326431336666663833346661633834.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_656e645f5f36663731373364653138373330666231.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_76696577706f72745374617274.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_76696577706f7274456e64.clone()))).truthy()) } else { left } }; if !left.truthy() { { let relational_left = v_656e645f5f36663731373364653138373330666231.clone(); let relational_right = v_73746172745f5f62326431336666663833346661633834.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) } } else { left } }; if !left.truthy() { { let relational_left = v_76696577706f7274456e64.clone(); let relational_right = v_76696577706f72745374617274.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":203:58
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":187:7
-                if ({ let left = Value::boolean(!(v_73656c656374.read().call_authored(vec![v_696e6465785f5f66353962396636653339316335646135.clone(), v_657874656e645f5f66353030356433613765343738326139.clone(), Value::boolean(true)])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f35373963656437353235666236363134.clone()), &({ let left = ({ let v_7075695f6e61746976655f3639 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3639.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3639.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":187:92
-                    return Value::boolean(false);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":204:7
+                if ({ let left = { let left = { let relational_left = v_73746172745f5f62326431336666663833346661633834.clone(); let relational_right = v_76696577706f72745374617274.clone(); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) }; if left.truthy() { { let relational_left = v_656e645f5f36663731373364653138373330666231.clone(); let relational_right = v_76696577706f7274456e64.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) } } else { left } }; if !left.truthy() { { let left = { let relational_left = v_73746172745f5f62326431336666663833346661633834.clone(); let relational_right = v_76696577706f72745374617274.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) }; if left.truthy() { { let relational_left = v_656e645f5f36663731373364653138373330666231.clone(); let relational_right = v_76696577706f7274456e64.clone(); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":204:109
+                    return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":188:7
-                { let v_7075695f6e61746976655f3730 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3730.clone()).owner(), Value::Undefined, false) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":189:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":205:13
+                let v_6c656164696e67 = Value::number((v_73746172745f5f62326431336666663833346661633834.clone()).scalar_number() - (v_76696577706f72745374617274.clone()).scalar_number());
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":205:52
+                let v_747261696c696e67 = Value::number((v_656e645f5f36663731373364653138373330666231.clone()).scalar_number() - (v_76696577706f7274456e64.clone()).scalar_number());
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":206:13
+                let v_6c656164696e6744697374616e6365 = if ({ let relational_left = v_6c656164696e67.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() { Value::number(-(v_6c656164696e67.clone()).scalar_number()) } else { v_6c656164696e67.clone() };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":206:71
+                let v_747261696c696e6744697374616e6365 = if ({ let relational_left = v_747261696c696e67.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() { Value::number(-(v_747261696c696e67.clone()).scalar_number()) } else { v_747261696c696e67.clone() };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":207:13
+                let v_64656c7461 = if ({ let relational_left = v_6c656164696e6744697374616e6365.clone(); let relational_right = v_747261696c696e6744697374616e6365.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() { v_6c656164696e67.clone() } else { v_747261696c696e67.clone() };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":208:7
+                if (Value::boolean(strict_equal(&(({ let v_7075695f6e61746976655f3836 = v_6f776e65725f5f65616234323132303862343434376265.clone(); read_props(&(v_7075695f6e61746976655f3836.clone()).owner(), false) }).member("orientation", false)), &(Value::string("horizontal"))))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":208:59
+                    { let v_7075695f6e61746976655f3837 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3837.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("horizontal")), ("delta", v_64656c7461.clone())])) };
+                } else {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":209:12
+                    { let v_7075695f6e61746976655f3838 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3838.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("vertical")), ("delta", v_64656c7461.clone())])) };
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":210:7
                 return Value::boolean(true);
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":191:5
-            { let v_7075695f6e61746976655f3731 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b65795f5f33653136666361613234643562356135.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":195:5
-            { let v_7075695f6e61746976655f3732 = v_646566.clone(); expose_method(&owner, Value::string("keyFrom"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6b65795f5f33653136666361613234643562356135 = v_6b65795f5f33653136666361613234643562356135.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6f726967696e: Value = arg(&arguments, 0);
-                let v_6e616d655f5f32326433386338663766393631363137: Value = arg(&arguments, 1);
-                let v_73686966745f5f31656661333433333861393737353465: Value = arg(&arguments, 2);
-                let v_636f6d6d616e645f5f38363831366138306238346364386536: Value = arg(&arguments, 3);
-                let v_62617369735f5f65633266346237343965623538623863: Value = arg(&arguments, 4);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":196:7
-                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f65633266346237343965623538623863.clone()), &({ let left = ({ let v_7075695f6e61746976655f3733 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3733.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":196:71
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":212:5
+            { let v_7075695f6e61746976655f3839 = v_646566.clone(); expose_method(&owner, Value::string("setItems"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6974656d73 = v_6974656d73.clone(); let v_76616c69644974656d73 = v_76616c69644974656d73.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e6578745f5f64396266323461323332323535373463: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":213:7
+                if ({ let left = { let left = { let value = (v_646973706f736564.read()).borrow().clone(); value }; if !left.truthy() { { let relational_left = (v_6e6578745f5f64396266323461323332323535373463.clone()).member("length", false); let relational_right = Value::number(1000000.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) } } else { left } }; if !left.truthy() { Value::boolean(!(v_76616c69644974656d73.read().call_authored(vec![v_6e6578745f5f64396266323461323332323535373463.clone(), Value::number(0.0), (v_6e6578745f5f64396266323461323332323535373463.clone()).member("length", false)])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":213:83
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":197:7
-                if (Value::boolean(strict_equal(&(v_6f726967696e.clone()), &(Value::string("form"))))).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":197:30
-                    return if (Value::boolean(strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("Escape"))))).truthy() { v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![v_6e616d655f5f32326433386338663766393631363137.clone(), v_73686966745f5f31656661333433333861393737353465.clone(), v_636f6d6d616e645f5f38363831366138306238346364386536.clone()]) } else { Value::boolean(false) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":214:7
+                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":214:16
+                { let value = v_6e6578745f5f64396266323461323332323535373463.clone(); *(v_6974656d73.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":215:7
+                if ({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":215:20
+                    v_73796e63.read().call_authored(vec![{ let value = (v_63757272656e74.read()).borrow().clone(); value }]);
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":198:7
-                if ({ let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6f726967696e.clone()), &(Value::string("search")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("Enter")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("Escape")))) } else { left } }; if left.truthy() { Value::boolean(!({ let left = v_636f6d6d616e645f5f38363831366138306238346364386536.clone(); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32326433386338663766393631363137.clone()), &(Value::string("F")))) } else { left } } } else { left } }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":199:58
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":200:7
-                return v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![v_6e616d655f5f32326433386338663766393631363137.clone(), v_73686966745f5f31656661333433333861393737353465.clone(), v_636f6d6d616e645f5f38363831366138306238346364386536.clone()]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":216:7
+                return Value::boolean(true);
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":202:5
-            { let v_7075695f6e61746976655f3734 = v_646566.clone(); expose_method(&owner, Value::string("dismiss"), {  let v_637572736f72 = v_637572736f72.clone(); let v_7265616479 = v_7265616479.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":202:42
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":218:5
+            { let v_7075695f6e61746976655f3930 = v_646566.clone(); expose_method(&owner, Value::string("choose"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f38656563363332363635383836383033: Value = arg(&arguments, 0);
+                let v_657874656e645f5f34613362383437633732356230383136: Value = arg(&arguments, 1);
+                let v_62617369735f5f34373939326232646538653363663566: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":219:7
+                if (Value::boolean(!strict_equal(&(v_62617369735f5f34373939326232646538653363663566.clone()), &({ let left = ({ let v_7075695f6e61746976655f3931 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3931.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3931.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":219:60
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":220:7
+                return v_63686f6f7365.read().call_authored(vec![v_696e6465785f5f38656563363332363635383836383033.clone(), v_657874656e645f5f34613362383437633732356230383136.clone()]);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":222:5
+            { let v_7075695f6e61746976655f3932 = v_646566.clone(); expose_method(&owner, Value::string("selectIndex"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f30663930393332303932616130326437: Value = arg(&arguments, 0);
+                let v_657874656e645f5f62646665313032383436333735333831: Value = arg(&arguments, 1);
+                let v_62617369735f5f33623766616636313731323030623061: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":223:7
+                if (Value::boolean(!strict_equal(&(v_62617369735f5f33623766616636313731323030623061.clone()), &({ let left = ({ let v_7075695f6e61746976655f3933 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3933.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3933.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } })))).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":223:60
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":224:7
+                return v_73656c656374.read().call_authored(vec![v_696e6465785f5f30663930393332303932616130326437.clone(), v_657874656e645f5f62646665313032383436333735333831.clone(), Value::boolean(false)]);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":228:5
+            { let v_7075695f6e61746976655f3934 = v_646566.clone(); expose_method(&owner, Value::string("keyAt"), {  let v_637572736f72 = v_637572736f72.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_656d6974 = v_656d6974.clone(); let v_6b65795f5f63636538616136363530633839623964 = v_6b65795f5f63636538616136363530633839623964.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f35316630646638376537343663303363: Value = arg(&arguments, 0);
+                let v_6e616d655f5f32346234353030616138373332366563: Value = arg(&arguments, 1);
+                let v_73686966745f5f62303936626531363166323339636132: Value = arg(&arguments, 2);
+                let v_636f6d6d616e645f5f31636337376335343432396662636564: Value = arg(&arguments, 3);
+                let v_62617369735f5f34646338376562343738383931353262: Value = arg(&arguments, 4);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":229:7
+                if ({ let left = { let left = { let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f34646338376562343738383931353262.clone()), &({ let left = ({ let v_7075695f6e61746976655f3935 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3935.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![v_696e6465785f5f35316630646638376537343663303363.clone()])), &(Value::number(0.0)))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":229:104
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":230:13
+                let v_6d6f64655f5f63613732626137346136613864333732 = { let left = ({ let v_7075695f6e61746976655f3936 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3936.clone()).owner(), false) }).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":231:13
+                let v_68616e646c6564 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("Escape")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("Enter")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string(" ")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("Home")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("End")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("ArrowLeft")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("ArrowRight")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("ArrowDown")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("PageUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("PageDown")))) } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("Tab")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("table")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("menu")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("table")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("F2")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("Delete")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("Backspace")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("points")))); if left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("+")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("=")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("-")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("filterlist")))); if left.truthy() { v_636f6d6d616e645f5f31636337376335343432396662636564.clone() } else { left } }; if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("f")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("F")))) } else { left } } } else { left } } } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6d6f64655f5f63613732626137346136613864333732.clone()), &(Value::string("tracklist")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("ContextMenu")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f32346234353030616138373332366563.clone()), &(Value::string("F10")))); if left.truthy() { v_73686966745f5f62303936626531363166323339636132.clone() } else { left } } } else { left } } } else { left } } } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":238:7
+                if (Value::boolean(!(v_68616e646c6564.clone()).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":238:21
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":239:13
+                let v_7469636b65745f5f62623365636533376534346261656537 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":240:7
+                { let v_7075695f6e61746976655f3937 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3937.clone(), v_696e6465785f5f35316630646638376537343663303363.clone(), Value::string("reason: addressed collection key")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":241:7
+                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f62623365636533376534346261656537.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":241:41
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":242:7
+                v_656d6974.read().call_authored(vec![Value::string("select"), v_696e6465785f5f35316630646638376537343663303363.clone(), Value::boolean(false), Value::string("")]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":243:7
+                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f62623365636533376534346261656537.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f34646338376562343738383931353262.clone()), &({ let left = ({ let v_7075695f6e61746976655f3938 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3938.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3938.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":243:92
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":244:7
+                return v_6b65795f5f63636538616136363530633839623964.read().call_authored(vec![v_6e616d655f5f32346234353030616138373332366563.clone(), v_73686966745f5f62303936626531363166323339636132.clone(), v_636f6d6d616e645f5f31636337376335343432396662636564.clone()]);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":246:5
+            { let v_7075695f6e61746976655f3939 = v_646566.clone(); expose_method(&owner, Value::string("selectAndFocus"), {  let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_73656c656374 = v_73656c656374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_696e6465785f5f39306136653737656637623231623938: Value = arg(&arguments, 0);
+                let v_657874656e645f5f31613534383230376165646161343561: Value = arg(&arguments, 1);
+                let v_62617369735f5f65336261643632616138346237366562: Value = arg(&arguments, 2);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":247:7
+                if ({ let left = Value::boolean(!({ let value = (v_63757272656e74.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f65336261643632616138346237366562.clone()), &({ let left = ({ let v_7075695f6e61746976655f313030 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f313030.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":247:71
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":248:7
+                if ({ let left = Value::boolean(!(v_73656c656374.read().call_authored(vec![v_696e6465785f5f39306136653737656637623231623938.clone(), v_657874656e645f5f31613534383230376165646161343561.clone(), Value::boolean(true)])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(v_62617369735f5f65336261643632616138346237366562.clone()), &({ let left = ({ let v_7075695f6e61746976655f313031 = { let value = (v_63757272656e74.read()).borrow().clone(); value }; if v_7075695f6e61746976655f313031.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f313031.clone()).owner(), false) } }).member("revision", true); if left.nullish() { Value::string("") } else { left } }))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":248:92
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":249:7
+                { let v_7075695f6e61746976655f313032 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f313032.clone()).owner(), Value::Undefined, false) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":250:7
+                return Value::boolean(true);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":252:5
+            { let v_7075695f6e61746976655f313033 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b65795f5f63636538616136363530633839623964.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":253:5
+            { let v_7075695f6e61746976655f313034 = v_646566.clone(); expose_method(&owner, Value::string("contextAt"), v_636f6e746578744174.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":254:5
+            { let v_7075695f6e61746976655f313035 = v_646566.clone(); expose_method(&owner, Value::string("reconcile"), {  let v_63757272656e74 = v_63757272656e74.clone(); let v_7265616479 = v_7265616479.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":254:50
+                let v_6f776e65725f5f37393964386233353865383061383463 = { let value = (v_63757272656e74.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":254:67
+                if ({ let left = Value::boolean(!(v_6f776e65725f5f37393964386233353865383061383463.clone()).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":254:91
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":254:105
+                v_73796e63.read().call_authored(vec![v_6f776e65725f5f37393964386233353865383061383463.clone()]);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":254:118
+                return Value::boolean(true);
+            })) }) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":255:5
+            { let v_7075695f6e61746976655f313036 = v_646566.clone(); expose_method(&owner, Value::string("dismiss"), {  let v_637572736f72 = v_637572736f72.clone(); let v_7265616479 = v_7265616479.clone(); let v_656d6974 = v_656d6974.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":255:42
                 if (v_7265616479.read().call_authored(vec![])).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":202:55
-                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f3735 = v_637572736f72.read(); (v_7075695f6e61746976655f3735.clone()).get() }, Value::boolean(false), Value::string("outside")]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":255:55
+                    v_656d6974.read().call_authored(vec![Value::string("close"), { let v_7075695f6e61746976655f313037 = v_637572736f72.read(); (v_7075695f6e61746976655f313037.clone()).get() }, Value::boolean(false), Value::string("outside")]);
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":203:5
-            { let v_7075695f6e61746976655f3736 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":203:44
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":256:5
+            { let v_7075695f6e61746976655f313038 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":256:44
                 if (v_7265616479.read().call_authored(vec![])).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":203:57
-                    { let v_7075695f6e61746976655f3737 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3737.clone()).owner(), Value::Undefined, false) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":256:57
+                    { let v_7075695f6e61746976655f313039 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f313039.clone()).owner(), Value::Undefined, false) };
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":204:5
-            { let v_7075695f6e61746976655f3738 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b65795f5f33653136666361613234643562356135 = v_6b65795f5f33653136666361613234643562356135.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":257:5
+            { let v_7075695f6e61746976655f313130 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b65795f5f63636538616136363530633839623964 = v_6b65795f5f63636538616136363530633839623964.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_5f72756e: Value = arg(&arguments, 0);
                 let v_6576656e74: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":205:7
-                if (v_6b65795f5f33653136666361613234643562356135.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("shiftKey", false)), &(Value::boolean(true)))), { let left = Value::boolean(strict_equal(&((v_6576656e74.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e74.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } }])).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":205:108
-                    { let v_7075695f6e61746976655f3739 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f3739.clone()) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":258:7
+                if (v_6b65795f5f63636538616136363530633839623964.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("shiftKey", false)), &(Value::boolean(true)))), { let left = Value::boolean(strict_equal(&((v_6576656e74.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e74.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } }])).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":258:108
+                    { let v_7075695f6e61746976655f313131 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f313131.clone()) };
                 }
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":207:11
-            v_73796e63.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_6c6162656c = v_6c6162656c.clone(); let v_7461626c65 = v_7461626c65.clone(); let v_726f7773 = v_726f7773.clone(); let v_636f6c756d6e73 = v_636f6c756d6e73.clone(); let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_72756e5f5f39656636646635343466353536393832: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":208:7
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":260:11
+            v_73796e63.initialize({  let v_637572736f72 = v_637572736f72.clone(); let v_657870616e646564 = v_657870616e646564.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_6c6162656c = v_6c6162656c.clone(); let v_6465736372697074696f6e = v_6465736372697074696f6e.clone(); let v_7461626c65 = v_7461626c65.clone(); let v_726f7773 = v_726f7773.clone(); let v_636f6c756d6e73 = v_636f6c756d6e73.clone(); let v_666f637573 = v_666f637573.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_7265616479 = v_7265616479.clone(); let v_6b696e64 = v_6b696e64.clone(); let v_636f756e74 = v_636f756e74.clone(); let v_6d696e = v_6d696e.clone(); let v_6d6178 = v_6d6178.clone(); let v_7365656b = v_7365656b.clone(); let v_656d6974 = v_656d6974.clone(); let v_7265717565737452657665616c = v_7265717565737452657665616c.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_72756e5f5f37306636363434393364333530653437: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":261:7
                 if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":208:21
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":261:21
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":209:13
-                let v_7469636b65745f5f63383763303339616431316635383666 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":209:31
-                { let value = v_72756e5f5f39656636646635343466353536393832.clone(); *(v_63757272656e74.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":210:13
-                let v_70726f7073 = { let v_7075695f6e61746976655f3830 = v_72756e5f5f39656636646635343466353536393832.clone(); read_props(&(v_7075695f6e61746976655f3830.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":211:7
-                { let v_7075695f6e61746976655f3831 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f3831.clone(), if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("searchlist")))) } else { left } }).truthy() { Value::string("listbox") } else { { let left = (v_70726f7073.clone()).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } } }, Value::string("reason: collection role")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":212:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":212:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":262:13
+                let v_7469636b65745f5f30646466366662663930636166613963 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":262:31
+                { let value = v_72756e5f5f37306636363434393364333530653437.clone(); *(v_63757272656e74.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":263:13
+                let v_70726f7073 = { let v_7075695f6e61746976655f313132 = v_72756e5f5f37306636363434393364333530653437.clone(); read_props(&(v_7075695f6e61746976655f313132.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":264:7
+                { let v_7075695f6e61746976655f313133 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f313133.clone(), if ({ let left = { let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("points")))); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("tracklist")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("filterlist")))) } else { left } }).truthy() { Value::string("listbox") } else { { let left = (v_70726f7073.clone()).member("mode", false); if left.nullish() { Value::string("listbox") } else { left } } }, Value::string("reason: collection role")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":265:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":265:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":213:7
-                { let v_7075695f6e61746976655f3832 = v_7461626c65.read(); state_set(v_7075695f6e61746976655f3832.clone(), Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("table")))), Value::string("reason: collection table semantics")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":214:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":214:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":266:7
+                { let v_7075695f6e61746976655f313134 = v_7461626c65.read(); state_set(v_7075695f6e61746976655f313134.clone(), Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("table")))), Value::string("reason: collection table semantics")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":267:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":267:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":215:7
-                { let v_7075695f6e61746976655f3833 = v_726f7773.read(); state_set(v_7075695f6e61746976655f3833.clone(), v_636f756e74.read().call_authored(vec![]), Value::string("reason: collection rows")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":216:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":216:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":268:7
+                { let v_7075695f6e61746976655f313135 = v_726f7773.read(); state_set(v_7075695f6e61746976655f313135.clone(), v_636f756e74.read().call_authored(vec![]), Value::string("reason: collection rows")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":269:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":269:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":217:7
-                { let v_7075695f6e61746976655f3834 = v_636f6c756d6e73.read(); state_set(v_7075695f6e61746976655f3834.clone(), { let left = (v_70726f7073.clone()).member("columns", false); if left.nullish() { Value::number(0.0) } else { left } }, Value::string("reason: collection columns")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":218:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":218:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":270:7
+                { let v_7075695f6e61746976655f313136 = v_636f6c756d6e73.read(); state_set(v_7075695f6e61746976655f313136.clone(), { let left = (v_70726f7073.clone()).member("columns", false); if left.nullish() { Value::number(0.0) } else { left } }, Value::string("reason: collection columns")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":271:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":271:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":219:7
-                { let v_7075695f6e61746976655f3835 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f3835.clone(), { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: collection name")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":220:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":220:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":272:7
+                { let v_7075695f6e61746976655f313137 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f313137.clone(), { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: collection name")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":273:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":273:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":221:7
-                { let v_7075695f6e61746976655f3836 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f3836.clone(), { let left = (v_70726f7073.clone()).member("disabled", false); if left.nullish() { Value::boolean(false) } else { left } }, Value::string("reason: collection policy")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":222:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":222:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":274:7
+                { let v_7075695f6e61746976655f313138 = v_6465736372697074696f6e.read(); state_set(v_7075695f6e61746976655f313138.clone(), { let left = (v_70726f7073.clone()).member("description", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: collection description")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":275:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":275:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":223:7
-                { let v_7075695f6e61746976655f3837 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f3837.clone()).owner(), { let v_7075695f6e61746976655f3838 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3838.clone()).get() }) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":224:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":224:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":276:7
+                { let v_7075695f6e61746976655f313139 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f313139.clone(), { let left = (v_70726f7073.clone()).member("disabled", false); if left.nullish() { Value::boolean(false) } else { left } }, Value::string("reason: collection policy")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":277:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":277:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":225:13
-                let v_7265717565737465645f5f66663965366438396166386135326663 = { let left = (v_70726f7073.clone()).member("cursor", false); if left.nullish() { Value::number(0.0) } else { left } };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":226:13
-                let v_6163636570746564 = if ({ let left = number_is_finite(&(v_7265717565737465645f5f66663965366438396166386135326663.clone())); if left.truthy() { Value::boolean(strict_equal(&(Value::number((v_7265717565737465645f5f66663965366438396166386135326663.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }).truthy() { v_6d6178.read().call_authored(vec![Value::number(0.0), v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), v_7265717565737465645f5f66663965366438396166386135326663.clone()])]) } else { Value::number(0.0) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":227:7
-                { let v_7075695f6e61746976655f3839 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f3839.clone(), if ({ let relational_left = v_6b696e64.read().call_authored(vec![v_6163636570746564.clone()]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_6163636570746564.clone() } else { v_6d6178.read().call_authored(vec![Value::number(0.0), v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)])]) }, Value::string("reason: accepted collection cursor")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":228:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":228:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":278:7
+                { let v_7075695f6e61746976655f313230 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f313230.clone()).owner(), { let v_7075695f6e61746976655f313231 = v_64697361626c6564.read(); (v_7075695f6e61746976655f313231.clone()).get() }) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":279:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":279:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":229:7
-                { let v_7075695f6e61746976655f3930 = v_657870616e646564.read(); state_set(v_7075695f6e61746976655f3930.clone(), { let left = (v_70726f7073.clone()).member("expanded", false); if left.nullish() { Value::number(-(Value::number(1.0)).scalar_number()) } else { left } }, Value::string("reason: accepted expanded item")) };
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":230:7
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f63383763303339616431316635383666.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":230:41
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":280:13
+                let v_7265717565737465645f5f38633239316230636561396132643234 = { let left = (v_70726f7073.clone()).member("cursor", false); if left.nullish() { Value::number(0.0) } else { left } };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":281:13
+                let v_6163636570746564 = if ({ let left = number_is_finite(&(v_7265717565737465645f5f38633239316230636561396132643234.clone())); if left.truthy() { Value::boolean(strict_equal(&(Value::number((v_7265717565737465645f5f38633239316230636561396132643234.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }).truthy() { v_6d6178.read().call_authored(vec![Value::number(0.0), v_6d696e.read().call_authored(vec![Value::number((v_636f756e74.read().call_authored(vec![])).scalar_number() - (Value::number(1.0)).scalar_number()), v_7265717565737465645f5f38633239316230636561396132643234.clone()])]) } else { Value::number(0.0) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":282:7
+                { let v_7075695f6e61746976655f313232 = v_637572736f72.read(); state_set(v_7075695f6e61746976655f313232.clone(), if ({ let relational_left = v_6b696e64.read().call_authored(vec![v_6163636570746564.clone()]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_6163636570746564.clone() } else { v_6d6178.read().call_authored(vec![Value::number(0.0), v_7365656b.read().call_authored(vec![Value::number(0.0), Value::number(1.0), v_636f756e74.read().call_authored(vec![]), Value::boolean(false)])]) }, Value::string("reason: accepted collection cursor")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":283:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":283:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":231:7
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":284:7
+                { let v_7075695f6e61746976655f313233 = v_657870616e646564.read(); state_set(v_7075695f6e61746976655f313233.clone(), { let left = (v_70726f7073.clone()).member("expanded", false); if left.nullish() { Value::number(-(Value::number(1.0)).scalar_number()) } else { left } }, Value::string("reason: accepted expanded item")) };
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":285:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":285:41
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":289:7
+                if ({ let left = v_7265616479.read().call_authored(vec![]); if left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("mode", false)), &(Value::string("filterlist")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":290:9
+                    if (Value::boolean(strict_equal(&(v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f313234 = v_637572736f72.read(); (v_7075695f6e61746976655f313234.clone()).get() }])), &(Value::number(0.0))))).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":290:39
+                        v_656d6974.read().call_authored(vec![Value::string("select"), Value::number(-(Value::number(1.0)).scalar_number()), Value::boolean(false), Value::string("reconcile")]);
+                    } else {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":291:14
+                        if (Value::boolean(!strict_equal(&((v_70726f7073.clone()).member("cursor", false)), &({ let v_7075695f6e61746976655f313235 = v_637572736f72.read(); (v_7075695f6e61746976655f313235.clone()).get() })))).truthy() {
+                            // Source "frontend/proto-ui/src/collection-control.proto.ts":291:49
+                            v_656d6974.read().call_authored(vec![Value::string("select"), { let v_7075695f6e61746976655f313236 = v_637572736f72.read(); (v_7075695f6e61746976655f313236.clone()).get() }, Value::boolean(false), Value::string("reconcile")]);
+                        }
+                    }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":292:9
+                    if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":292:43
+                        return Value::Undefined;
+                    }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":293:9
+                    if ({ let relational_left = v_6b696e64.read().call_authored(vec![{ let v_7075695f6e61746976655f313237 = v_637572736f72.read(); (v_7075695f6e61746976655f313237.clone()).get() }]); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":293:37
+                        v_7265717565737452657665616c.read().call_authored(vec![{ let v_7075695f6e61746976655f313238 = v_637572736f72.read(); (v_7075695f6e61746976655f313238.clone()).get() }]);
+                    }
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":294:9
+                    if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30646466366662663930636166613963.clone()))); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":294:43
+                        return Value::Undefined;
+                    }
+                }
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":296:7
                 if ({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":231:21
-                    { let v_7075695f6e61746976655f3931 = v_72756e5f5f39656636646635343466353536393832.clone(); request_update(&(v_7075695f6e61746976655f3931.clone()).owner()) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":296:21
+                    { let v_7075695f6e61746976655f313239 = v_72756e5f5f37306636363434393364333530653437.clone(); request_update(&(v_7075695f6e61746976655f313239.clone()).owner()) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":233:5
-            { let v_7075695f6e61746976655f3932 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":234:5
-            { let v_7075695f6e61746976655f3933 = v_646566.clone(); register_life(&owner, "mounted", {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_72756e5f5f35363539376232613461383236383766: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":234:40
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":298:5
+            { let v_7075695f6e61746976655f313330 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":299:5
+            { let v_7075695f6e61746976655f313331 = v_646566.clone(); register_life(&owner, "mounted", {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_72756e5f5f64643863366331636131306164353664: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":299:40
                 if (Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":234:57
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":299:57
                     { let value = Value::boolean(true); *(v_6174746163686564.read()).borrow_mut() = value; }
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":234:74
-                    v_73796e63.read().call_authored(vec![v_72756e5f5f35363539376232613461383236383766.clone()]);
-                    // Source "frontend/proto-ui/src/collection-control.proto.ts":234:85
-                    if (({ let v_7075695f6e61746976655f3934 = v_72756e5f5f35363539376232613461383236383766.clone(); read_props(&(v_7075695f6e61746976655f3934.clone()).owner(), false) }).member("autoFocus", false)).truthy() {
-                        // Source "frontend/proto-ui/src/collection-control.proto.ts":234:116
-                        { let v_7075695f6e61746976655f3935 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3935.clone()).owner(), Value::Undefined, false) };
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":299:74
+                    v_73796e63.read().call_authored(vec![v_72756e5f5f64643863366331636131306164353664.clone()]);
+                    // Source "frontend/proto-ui/src/collection-control.proto.ts":299:85
+                    if (({ let v_7075695f6e61746976655f313332 = v_72756e5f5f64643863366331636131306164353664.clone(); read_props(&(v_7075695f6e61746976655f313332.clone()).owner(), false) }).member("autoFocus", false)).truthy() {
+                        // Source "frontend/proto-ui/src/collection-control.proto.ts":299:116
+                        { let v_7075695f6e61746976655f313333 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f313333.clone()).owner(), Value::Undefined, false) };
                     }
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":235:5
-            { let v_7075695f6e61746976655f3936 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("mode"), Value::string("label"), Value::string("cursor"), Value::string("expanded"), Value::string("revision"), Value::string("disabled"), Value::string("autoFocus"), Value::string("columns")]))), false, v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":236:5
-            { let v_7075695f6e61746976655f3937 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:39
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":300:5
+            { let v_7075695f6e61746976655f313334 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("mode"), Value::string("label"), Value::string("description"), Value::string("cursor"), Value::string("expanded"), Value::string("revision"), Value::string("disabled"), Value::string("autoFocus"), Value::string("columns"), Value::string("orientation")]))), false, v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":301:5
+            { let v_7075695f6e61746976655f313335 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":301:39
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:48
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":301:48
                 { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":236:66
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":301:66
                 { let value = Value::Json(Json::Null); *(v_63757272656e74.read()).borrow_mut() = value; }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":237:5
-            { let v_7075695f6e61746976655f3938 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:43
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":302:5
+            { let v_7075695f6e61746976655f313336 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_63757272656e74 = v_63757272656e74.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":302:43
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:52
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":302:52
                 { let value = Value::boolean(true); *(v_646973706f736564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:69
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":302:69
                 { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":237:87
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":302:87
                 { let value = Value::Json(Json::Null); *(v_63757272656e74.read()).borrow_mut() = value; }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":238:5
-            { let v_7075695f6e61746976655f3939 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
-            // Source "frontend/proto-ui/src/collection-control.proto.ts":239:5
-            return { let callable={ let pui_native_100={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":303:5
+            { let v_7075695f6e61746976655f313337 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
+            // Source "frontend/proto-ui/src/collection-control.proto.ts":304:5
+            return { let callable={ let pui_native_138={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "frontend/proto-ui/src/collection-control.proto.ts":239:26
-                return { let v_7075695f6e61746976655f313031 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
-            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_100.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_100.call)(arg(&arguments,0))})} }; match callable {
-      Value::NativeFunction{render,..} => Value::Renderer(render),
-      Value::Renderer(render) => Value::Renderer(render),
-      Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
+                // Source "frontend/proto-ui/src/collection-control.proto.ts":304:26
+                return { let v_7075695f6e61746976655f313339 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
+            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_138.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_138.call)(arg(&arguments,0))})} }; match callable {
+      Value::NativeFunction{identity,render} => capture_renderer(Value::NativeFunction{identity,render:render.clone()},render),
+      Value::Renderer(adapter) => Value::Renderer(adapter),
+      Value::Function(callback) => capture_renderer(Value::Function(callback.clone()),Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
       _ => panic!("checked setup result must be a callable")
     } };
         })) }.call_authored(vec![definition_capability(&owner)]);
@@ -1076,6 +1383,7 @@ pub struct GeneratedData0 {
               dispatch(&focus_owner, "host:focus", false, event_fields("host:focus"));
               if ready(&focus_owner) && focus_owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
               });
+              notify_native_change(cx);
           });
           let blur_owner = owner_ref.clone();
           let on_blur = cx.on_blur(&focus, window, move |view, window, cx| {
@@ -1089,8 +1397,25 @@ pub struct GeneratedData0 {
               dispatch(&blur_owner, "host:blur", false, event_fields("host:blur"));
               if ready(&blur_owner) && blur_owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
               });
+              notify_native_change(cx);
           });
-          vec![on_focus, on_blur]
+          // A native slot descendant can start this root's keyboard press
+          // while the root FocusHandle itself is not focused. Its departure
+          // from the physical subtree is distinct from the root's own blur.
+          let focus_out_owner = Rc::downgrade(&owner_ref);
+          let on_focus_out = cx.on_focus_out(&focus, window, move |view, _, window, cx| {
+              let Some(owner) = focus_out_owner.upgrade() else { return; };
+              native_host_callback(&owner, "focus-out", || {
+              let epoch = owner.borrow().epoch;
+              if !ready(&owner) || owner.borrow().window_id != Some(window.window_handle().window_id()) || view.focus.contains_focused(window, cx) { return; }
+              // This retires only an existing root press lease. Do not forge
+              // host:blur or change the root's own Focus observation here.
+              native_press_blur(&owner);
+              if ready(&owner) && owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
+              });
+              notify_native_change(cx);
+          });
+          vec![on_focus, on_blur, on_focus_out]
           } else { Vec::new() };
           let global_key_capture = subscribe_global_key_capture(&owner_ref, cx);
           let window_input = window_input_needed(&owner_ref).then(|| cx.focus_handle().tab_stop(false));
@@ -1117,12 +1442,14 @@ pub struct GeneratedData0 {
           self._window_activation.take();
           let owner = self.owner.clone();
           let subscription = cx.observe_window_activation(window, move |view, window, cx| {
+              let deactivated = owner.borrow().window_id == Some(window.window_handle().window_id()) && !window.is_window_active();
               native_host_callback(&owner, "window-activation", || {
-                  if owner.borrow().window_id == Some(window.window_handle().window_id()) && !window.is_window_active() {
+                  if deactivated {
                       native_window_blur(&owner);
                       view.drive(window, cx).unwrap_or_else(|error| throw_value(error));
                   }
               });
+              if deactivated { notify_native_change(cx); }
           });
           self._window_activation = Some((id, subscription));
       }
@@ -1176,9 +1503,11 @@ pub struct GeneratedData0 {
           self.bind_window_activation(window, cx);
           #[cfg(feature = "experimental-focus-tree")] self.bind_entry_readiness(window, cx);
           let drive = self.owner.borrow().native_drive.as_ref().expect("live native owner drive").clone();
-          // Rendering projects the current source; only drive may consume its
-          // pending observer signal. A parent native Render can call an exposed
-          // method before this child is laid out and before deferred drive runs.
+          // Drawing consumes only repaint dirtiness. A parent Render can call
+          // an exposed method before this child is laid out: its independent
+          // pending_native_events flag survives until the coalesced drive wakes
+          // the consumer. Repeated slot projection cannot create a notify loop.
+          self.owner.borrow_mut().dirty = false;
           let snapshot = self.owner.borrow().projection.clone().expect("live native projection");
           self.focus = self.focus.clone().tab_stop(native_tab_participation(&self.owner));
           let element = paint_native_root(&snapshot, &self.owner, &self.focus, format!("compiled-root-{}", Rc::as_ptr(&self.owner) as usize), drive);

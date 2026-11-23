@@ -240,8 +240,7 @@ pub fn automation_header(
                         .child(div().truncate().child(format!("自动化 · {label}")))
                         .child("▾")
                         .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| {
-                            let position = ev.native_event().map(ClickEvent::position).unwrap_or_else(|| window.mouse_position());
-                            show_automation_target_picker(ed, pick_owner.clone(), position, window, cx);
+                            show_automation_target_picker(ed, pick_owner.clone(), ev.position(), window, cx);
                             cx.stop_propagation();
                         })),
                 ),

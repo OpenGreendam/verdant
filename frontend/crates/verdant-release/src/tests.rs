@@ -111,8 +111,8 @@ fn source_offer_requires_exact_membership_bytes_modes_and_external_selection() {
 const PUBLIC_TOOL_SOURCE_FILES: &[&str] = &[
     "tools/a11y/README.md", "tools/a11y/observe-atspi.py", "tools/a11y/run-isolated.py",
     "tools/native-input/README.md", "tools/native-input/ci.py", "tools/native-input/probe.py", "tools/native-input/controls.py",
-    "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py",
-    "tools/native-input/test_ci.py", "tools/native-input/test_probe.py",
+    "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py", "tools/native-input/x11_keymap.py",
+    "tools/native-input/test_ci.py", "tools/native-input/test_probe.py", "tools/native-input/test_x11_keymap.py",
     "frontend/scripts/generate-agent-skills.py",
     "frontend/scripts/generate-factory-presets.py", "frontend/scripts/verify-ffp-corpus.py",
 ];
@@ -142,7 +142,8 @@ fn source_repository() -> tempfile::TempDir {
 fn selected_public_tool_sources_survive_the_real_source_archive_guard() {
     let root = source_repository();
     let additional_docs = ["frontend/proto-ui/README.md", "frontend/proto-ui/VALIDATION-COMPLETION-2026-11-22.md",
-        "frontend/proto-ui/NATIVE-INPUT-2026-11-22.json"];
+        "frontend/proto-ui/NATIVE-INPUT-2026-11-22.json",
+        "frontend/proto-ui/VALIDATION-INTEGRATION-2026-11-23.json", "frontend/proto-ui/CONTROL-MIGRATION.md"];
     for path in additional_docs {
         files::write_new(&root.path().join(path), b"synthetic validation documentation\n", false).unwrap();
     }
@@ -171,6 +172,7 @@ fn unreviewed_python_paths_still_fail_source_selection_and_embedded_proofs() {
     for path in ["tools/a11y/unreviewed.py", "tools/a11y/nested/observe-atspi.py",
         "tools/a11y-copy/observe-atspi.py", "tools/native-input/unreviewed.py",
         "tools/native-input/nested/probe.py", "tools/native-input-copy/probe.py",
+        "tools/native-input/nested/x11_keymap.py", "tools/native-input-copy/test_x11_keymap.py",
         "tools/unreviewed.py", "backend/worker.py", "frontend/scripts/unreviewed.py",
         "frontend/scripts/nested/generate-agent-skills.py", "frontend/scripts-copy/generate-factory-presets.py",
         "frontend/verify-ffp-corpus.py"] {

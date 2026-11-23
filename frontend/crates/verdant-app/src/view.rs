@@ -32,6 +32,13 @@ use crate::ui_controls::{
     splitter_bar,
 };
 
+fn select_parameter_lane(ed:&mut Editor,param:Param,window:&mut Window,cx:&mut Context<Editor>) {
+    ed.cancel_edits(verdant_session::CancelReason::Escape,window,cx);ed.point_selection.clear();
+    if let Some(slot)=ed.integrations.lanes.iter().position(|value|*value==param) {ed.integrations.active_panel=slot;}
+    else {let slot=ed.integrations.active_panel.min(ed.integrations.lanes.len()-1);ed.integrations.lanes[slot]=param;}
+    ed.param=param;cx.notify();
+}
+
 const RULER_H: f32 = 24.0;
 const KEYS_W: f32 = 52.0;
 
@@ -72,9 +79,6 @@ fn device_status_text(status: DeviceStatus) -> String {
 /// Timeline layout and drawing, cached independently of the surrounding controls.
 pub struct StaticEditor {
     editor: WeakEntity<Editor>,
-    lane_scroll: gpui::ScrollHandle,
-    lane_surface: crate::proto_scroll::NativeScroll,
-    active_lane: Option<(usize, Param)>,
 }
 
 impl StaticEditor {
@@ -82,9 +86,7 @@ impl StaticEditor {
         if let Some(owner) = editor.upgrade() {
             cx.observe(&owner, |_, _, cx| cx.notify()).detach();
         }
-        let lane_scroll = gpui::ScrollHandle::new();
-        let lane_surface = crate::proto_scroll::NativeScroll::new(lane_scroll.clone());
-        Self { editor, lane_scroll, lane_surface, active_lane: None }
+        Self { editor }
     }
 }
 
@@ -93,17 +95,7 @@ impl Render for StaticEditor {
         let Some(editor) = self.editor.upgrade() else {
             return div().into_any_element();
         };
-        let active_lane = {
-            let ed = editor.read(cx);
-            (ed.bottom == Bottom::Editor).then_some((ed.integrations.active_panel, ed.param))
-        };
-        if self.active_lane != active_lane {
-            if let Some((slot, _)) = active_lane {
-                self.lane_scroll.scroll_to_item(slot);
-            }
-            self.active_lane = active_lane;
-        }
-        editor.update(cx, |ed, cx| ed.bottom_content(window, &self.lane_scroll, &self.lane_surface, cx))
+        editor.update(cx, |ed, cx| ed.bottom_content(window, cx))
     }
 }
 
@@ -304,7 +296,8 @@ pub(crate) fn switch(on: bool, th: Theme) -> Div {
 /// AdwSwitchRow: title (and optional subtitle) with a switch; the whole row toggles.
 fn switch_row(ed: &Editor, cmd: Cmd, key: &'static str, title: &str, subtitle: Option<String>, on: bool, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
     let th = ed.theme;
-    crate::proto_controls::action(key, title.to_string()).role(Role::Switch).aria_selected(on)
+    crate::proto_controls::action(key, title.to_string()).authority(format!("{}:{cmd:?}",crate::proto_controls::editor_authority(ed)))
+        .role(Role::Switch).aria_selected(on)
         .flex().items_center().gap(px(12.0)).cursor_pointer()
         .child(div().flex_1().min_w_0().flex().flex_col()
             .child(div().text_sm().text_color(th.text).child(title.to_string()))
@@ -473,8 +466,7 @@ impl Editor {
                 .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
                 .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, w, cx| {
                     // The popover's tail points at the button's lower edge.
-                    let position = ev.position();
-                    ed.main_menu(gpui::point(position.x, px((bar_h + btn) / 2.0 + 2.0)), w, cx)
+                    ed.main_menu(gpui::point(ev.position().x, px((bar_h + btn) / 2.0 + 2.0)), w, cx)
                 })))
             .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "属性面板", "right-dock-toggle", self.right_dock_visible(), cx))
             .children(captions)
@@ -498,18 +490,6 @@ impl Editor {
     /// Left Track & Voice Panel: sleek track setup, Singer/Language/Engine `<Select>` dropdowns,
     /// track mix & automation controls, and quick track list switcher.
     fn left_track_panel(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let th = self.theme;
-        let title = if self.session.selection.is_empty() && self.integrations.selected_clip.is_none() { "轨道" } else { "选择" };
-        let editor = cx.entity();
-        div().id("inspector").w(px(self.layout.inspector_width)).h_full().flex_none().flex().flex_col().bg(th.surface)
-            .child(pane_header(th).px(px(16.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
-            .child(div().flex_1().min_h_0().child(crate::proto_scroll::content("left-panel-scroll", "轨道与选择属性", move |_, cx| {
-                editor.update(cx, |ed, cx| ed.left_track_content(cx))
-            })))
-            .into_any_element()
-    }
-
-    fn left_track_content(&self, cx: &mut Context<Self>) -> AnyElement {
         let th = self.theme;
         let project = self.store().snapshot();
         let Some(track) = project.track(&self.session.track) else {
@@ -601,7 +581,23 @@ impl Editor {
                     ),
             );
 
-        div().flex().flex_col().pb(px(18.0)).children(selection).child(track_section).child(mix_section).into_any_element()
+        let title = if self.session.selection.is_empty() && self.integrations.selected_clip.is_none() { "轨道" } else { "选择" };
+        div()
+            .id("inspector")
+            .w(px(self.layout.inspector_width))
+            .h_full()
+            .flex_none()
+            .flex()
+            .flex_col()
+            .bg(th.surface)
+            .child(pane_header(th).px(px(16.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
+            .child(
+                crate::proto_scroll::viewport("left-panel-scroll", "轨道与选择检查器", "vertical")
+                    .flex_1()
+                    .min_h_0()
+                    .child(div().flex().flex_col().pb(px(18.0)).children(selection).child(track_section).child(mix_section)),
+            )
+            .into_any_element()
     }
 
     /// Synthesizer V Studio-style Right Property Dock.
@@ -664,19 +660,12 @@ impl Editor {
                     .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
             );
 
-        let editor = cx.entity();
-        let body = crate::proto_scroll::content("right-dock-scroll", "属性面板", move |_, cx| {
-            editor.update(cx, |ed, cx| {
-                let project = ed.store().snapshot();
-                let Some(track) = project.track(&ed.session.track) else { return div().into_any_element(); };
-                match ed.layout.right_dock_tab {
-                    RightDockTab::VoiceTimbre => ed.right_dock_voice_tab(&project, cx),
-                    RightDockTab::Dictionary => ed.right_dock_dictionary_tab(&project, cx),
-                    RightDockTab::RenderInserts => ed.right_dock_render_inserts_tab(track, cx),
-                    RightDockTab::HistorySystem => ed.right_dock_history_system_tab(cx),
-                }.into_any_element()
-            })
-        });
+        let body = match tab {
+            RightDockTab::VoiceTimbre => self.right_dock_voice_tab(&project, cx),
+            RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
+            RightDockTab::RenderInserts => self.right_dock_render_inserts_tab(track, cx),
+            RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
+        };
 
         div()
             .id("right-property-dock")
@@ -687,7 +676,7 @@ impl Editor {
             .flex_col()
             .bg(th.surface)
             .child(header)
-            .child(div().flex_1().min_h_0().child(body))
+            .child(crate::proto_scroll::viewport("right-dock-scroll", "属性面板", "vertical").flex_1().min_h_0().child(body))
             .into_any_element()
     }
 
@@ -1241,8 +1230,7 @@ impl Editor {
                 select_button("choose-device", Some("volume-2"), dev_summary, "选择音频输出设备", th).on_click(cx.listener(
                     |ed, ev: &crate::proto_controls::Activation, window, cx| {
                         let items = ed.device_menu_items();
-                        let position = ev.position();
-                        ed.show_menu(position, items, window, cx);
+                        ed.show_menu(ev.position(), items, window, cx);
                     },
                 )),
             )
@@ -1286,14 +1274,6 @@ impl Editor {
     }
 
     fn editor_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let editor = cx.entity();
-        div().h(px(40.0)).w_full().min_w_0().flex_none().child(
-            crate::proto_scroll::native_content("editor_header-region", "音符编辑工具栏", move |scroll, _, cx| {
-                editor.update(cx, |ed, cx| ed.editor_header_document(scroll, cx).into_any_element())
-            }).axes("horizontal"))
-    }
-
-    fn editor_header_document(&self, scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let scale_active = !self.integrations.scale_intervals.is_empty();
         let scale_label = if scale_active {
@@ -1302,15 +1282,13 @@ impl Editor {
             "音阶高亮".into()
         };
 
-        div()
-            .id("editor-header-scroll")
+        crate::proto_scroll::viewport("editor-header-scroll", "钢琴卷帘工具栏", "horizontal")
             .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
             .flex()
             .items_center()
-            .overflow_x_scroll().track_scroll(scroll)
             .whitespace_nowrap()
             .gap(px(5.0))
             .px(px(8.0))
@@ -1318,16 +1296,19 @@ impl Editor {
             .border_b_1()
             .border_color(th.shade)
             // Tools: an icon toggle group (labels are the tooltips / names).
-            .child(div().id("tool-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
+            .child(div().id("tool-group").role(Role::RadioGroup).aria_label("编辑工具").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
                 .children([
                     (Cmd::SetToolPointer, Tool::Pointer, "mouse-pointer-2", "指针 (V)"),
                     (Cmd::SetToolPencil, Tool::Pencil, "pencil", "铅笔 (P)"),
                     (Cmd::SetToolEraser, Tool::Eraser, "eraser", "橡皮 (E)"),
                     (Cmd::SetToolPitch, Tool::Pitch, "spline", "音高笔"),
-                ].into_iter().map(|(cmd, tool, icon_name, label)| {
-                    let on = self.tool == tool;
+                ].into_iter().enumerate().map(|(index,(cmd, tool, icon_name, label))| {
+                    let on = self.tool == tool; let entity=cx.entity();
                     crate::ui_controls::flat_command_button(self, cmd, Arg::None, "", SharedString::from(format!("tool-{icon_name}")), on, cx)
-                        .aria_label(label).size(px(26.0)).px_0()
+                        .role(Role::RadioButton).aria_label(label).size(px(26.0)).px_0()
+                        .navigation(index,4,move|index,window,cx| {if let Some(command)=[Cmd::SetToolPointer,Cmd::SetToolPencil,Cmd::SetToolEraser,Cmd::SetToolPitch].get(index) {
+                            entity.update(cx,|ed,cx|controls::dispatch(ed,*command,Arg::None,window,cx));
+                        }})
                         .child(svg().path(icon(icon_name)).size(px(15.0)).text_color(th.text))
                 })))
             .child(numeric_pill(self, Num::SnapGridTicks, Arg::None, "snap", true, cx).flex_none())
@@ -1341,27 +1322,17 @@ impl Editor {
             .child(crate::ui_controls::flat_icon_command_button(self, Cmd::ToggleF0Overlay, "activity", "F0 对照", "show-f0", self.show_f0, cx).h(px(28.0)).flex_none())
     }
 
-    fn lane_tabs(&self, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> impl IntoElement {
-        let editor = cx.entity(); let lane_scroll = lane_scroll.clone();
-        div().h(px(40.0)).w_full().min_w_0().flex_none().child(
-            crate::proto_scroll::native_content("lane-tabs-region", "参数泳道选择", move |scroll, _, cx| {
-                editor.update(cx, |ed, cx| ed.lane_tabs_document(scroll, &lane_scroll, cx).into_any_element())
-            }).axes("horizontal"))
-    }
-
-    fn lane_tabs_document(&self, scroll: &gpui::ScrollHandle, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> impl IntoElement {
+    fn lane_tabs(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let route = self.route();
         let caps = self.scheduler.capabilities.as_ref();
-        let mut tabs = div()
-            .id("lane-tabs-scroll")
+        let mut tabs = crate::proto_scroll::viewport("lane-tabs-scroll", "参数泳道标签", "horizontal")
             .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
             .flex()
             .items_center()
-            .overflow_x_scroll().track_scroll(scroll)
             .whitespace_nowrap()
             .gap(px(4.0))
             .px(px(8.0))
@@ -1369,8 +1340,8 @@ impl Editor {
             .border_t_1()
             .border_color(th.shade);
         // Parameter lanes: one toggle group (AdwToggleGroup).
-        let mut group = div().id("lane-group").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control);
-        for (param, has_data) in params::ALL.into_iter().zip(self.active_param_data()) {
+        let mut group = div().id("lane-group").role(Role::TabList).aria_label("参数泳道").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control);
+        for (index,(param, has_data)) in params::ALL.into_iter().zip(self.active_param_data()).enumerate() {
             let active = param == self.param;
             let shown = self.integrations.lanes.contains(&param);
             let supported = params::support(param, route, caps).is_effective();
@@ -1381,21 +1352,12 @@ impl Editor {
             }
             // A parameter shown in another lane is marked; clicking it goes there.
             if shown && !active { tab_btn = tab_btn.font_weight(FontWeight::SEMIBOLD); }
-            let lane_scroll = lane_scroll.clone();
-            group = group.child(tab_btn.h(px(24.0)).text_sm().on_click(cx.listener(move |ed, _, window, cx| {
-                ed.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
-                ed.point_selection.clear();
-                // Go to the lane that shows it, or show it in the active lane.
-                if let Some(slot) = ed.integrations.lanes.iter().position(|p| *p == param) {
-                    ed.integrations.active_panel = slot;
-                } else {
-                    let slot = ed.integrations.active_panel.min(ed.integrations.lanes.len() - 1);
-                    ed.integrations.lanes[slot] = param;
-                }
-                ed.param = param;
-                lane_scroll.scroll_to_item(ed.integrations.active_panel);
-                cx.notify();
-            })));
+            let entity=cx.entity();
+            group=group.child(tab_btn.role(Role::Tab).h(px(24.0)).text_sm()
+                .navigation(index,params::ALL.len(),move|index,window,cx| {if let Some(param)=params::ALL.get(index) {
+                    entity.update(cx,|ed,cx|select_parameter_lane(ed,*param,window,cx));
+                }})
+                .on_click(cx.listener(move|ed,_,window,cx|select_parameter_lane(ed,param,window,cx))));
         }
         tabs = tabs.child(group);
         tabs.child(div().flex_1()).child(
@@ -1404,24 +1366,14 @@ impl Editor {
     }
 
     fn curve_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let editor = cx.entity();
-        div().h(px(40.0)).w_full().min_w_0().flex_none().child(
-            crate::proto_scroll::native_content("curve_toolbar-region", "参数曲线工具栏", move |scroll, _, cx| {
-                editor.update(cx, |ed, cx| ed.curve_toolbar_document(scroll, cx).into_any_element())
-            }).axes("horizontal"))
-    }
-
-    fn curve_toolbar_document(&self, scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
-        div()
-            .id("curve-toolbar-scroll")
+        crate::proto_scroll::viewport("curve-toolbar-scroll", "曲线工具栏", "horizontal")
             .h(px(40.0))
             .w_full()
             .min_w_0()
             .flex_none()
             .flex()
             .items_center()
-            .overflow_x_scroll().track_scroll(scroll)
             .whitespace_nowrap()
             .gap(px(5.0))
             .px(px(8.0))
@@ -1501,8 +1453,13 @@ impl Editor {
         self.layout.arrange_height + 34.0 + rows.min(2) as f32 * AUTO_LANE_H as f32
     }
 
-    fn arrangement_rows(&self, cx: &mut Context<Self>) -> AnyElement {
-        let th = self.theme; let entity = cx.entity();
+    fn arrangement_content(&self, cx: &mut Context<Self>) -> AnyElement {
+        let th = self.theme;
+        let entity = cx.entity();
+        let locale = i18n::current(cx);
+        let arrangement_semantics = Surface::Arrangement.semantics(locale);
+        self.playback.clear_arrangement_anchors();
+
         let track_height = self.project().tracks.len() as f64 * self.arrange_track_height;
         let expanded_tracks: Vec<_> = self
             .project()
@@ -1539,23 +1496,6 @@ impl Editor {
             );
         }
 
-        div().min_h(px(content_h as f32)).flex().flex_col()
-            .child(div().h(px(track_height as f32)).flex_none().flex()
-                .child(crate::arrange::track_headers(self, cx))
-                .child(div().flex_1().min_w_0().relative()
-                    .child(crate::arrange::region_lanes(entity.clone()))
-                    .child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Arrange)))))
-            .children(auto_rows).into_any_element()
-    }
-
-    fn arrangement_content(&self, cx: &mut Context<Self>) -> AnyElement {
-        let th = self.theme;
-        let entity = cx.entity();
-        let locale = i18n::current(cx);
-        let arrangement_semantics = Surface::Arrangement.semantics(locale);
-        self.playback.clear_arrangement_anchors();
-
-
         div()
             .id("arrangement")
             .role(arrangement_semantics.role)
@@ -1563,7 +1503,7 @@ impl Editor {
             .aria_description(arrangement_semantics.description)
             .key_context("Arrange")
             .track_focus(&self.focus_arrange)
-            .on_key_down(cx.listener(crate::editor::integrations::audio_edit_ui::key_down))
+            
             .on_action(cx.listener(|ed, _: &CopyNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Copy,window,cx){ed.notice(error);cx.notify();} }))
             .on_action(cx.listener(|ed, _: &CutNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Cut,window,cx){ed.notice(error);cx.notify();} }))
             .on_action(cx.listener(|ed, _: &PasteNotes, window, cx| { if let Err(error)=ed.run_audio_ui(crate::editor::integrations::audio_edit_ui::AudioUiAction::Paste,window,cx){ed.notice(error);cx.notify();} }))
@@ -1599,12 +1539,33 @@ impl Editor {
                             .child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::ArrangeRuler))),
                     ),
             )
-            .child(div().flex_1().min_h_0().child({
-                let editor = entity.clone();
-                crate::proto_scroll::content("arrangement-scroll", "编曲轨道", move |_, cx| {
-                    editor.update(cx, |ed, cx| ed.arrangement_rows(cx))
-                })
-            }))
+            .child(
+                crate::proto_scroll::viewport("arrangement-scroll", "编曲区", "vertical")
+                    .flex_1()
+                    .min_h_0()
+                    .child(
+                        div()
+                            .min_h(px(content_h as f32))
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .h(px(track_height as f32))
+                                    .flex_none()
+                                    .flex()
+                                    .child(crate::arrange::track_headers(self, cx))
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .relative()
+                                            .child(crate::arrange::region_lanes(entity.clone()))
+                                            .child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Arrange))),
+                                    ),
+                            )
+                            .children(auto_rows),
+                    ),
+            )
             .child(
                 div()
                     .flex()
@@ -1614,70 +1575,17 @@ impl Editor {
             .into_any_element()
     }
 
-    fn parameter_lane_rows(&self, lane_scroll: &gpui::ScrollHandle, cx: &mut Context<Self>) -> AnyElement {
-        let th = self.theme; let entity = cx.entity();
-        let lanes_semantics = Surface::Lanes.semantics(i18n::current(cx));
-        let slot_count = self.integrations.lanes.len().max(1);
-        // Lanes keep usable drawing heights inside one bounded vertical viewport.
-        let each_lane_h = if slot_count == 1 { self.layout.lane_height } else { (self.layout.lane_height / slot_count as f32).max(72.0) };
-        div().id("parameter-lanes-scroll").size_full().min_h_0().flex().flex_col()
-            .overflow_y_scroll().track_scroll(lane_scroll)
-                        .children((0..slot_count).map(|slot| {
-                        let param = self.integrations.lanes.get(slot).copied().unwrap_or(self.param);
-                        let active_slot = slot_count > 1 && self.integrations.active_panel == slot;
-                        div()
-                            .id(("parameter-lane", slot))
-                            .role(lanes_semantics.role)
-                            .aria_label(lanes_semantics.label)
-                            .aria_description(lanes_semantics.description)
-                            .h(px(each_lane_h))
-                            .flex_none()
-                            .flex()
-                            .border_t_1()
-                            .border_color(th.shade)
-                            .child(
-                                div()
-                                    .w(px(KEYS_W))
-                                    .flex_none()
-                                    .p(px(4.0))
-                                    .flex()
-                                    .flex_col()
-                                    .items_center()
-                                    .justify_between()
-                                    .bg(if active_slot { mix(th.surface, th.accent, 0.16) } else { th.surface })
-                                    .border_r_1()
-                                    .border_color(th.shade)
-                                    .text_xs()
-                                    .child(div().font_weight(FontWeight::SEMIBOLD).child(param.short()))
-                                    .when(slot_count > 1, |d| d.child(crate::proto_controls::action(("remove-lane", slot), format!("移除 {} 泳道", param.short()))
-                                        .size(px(22.0)).rounded(px(11.0)).flex().items_center().justify_center().hover(move |s| s.bg(th.hover))
-                                        .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
-                                        .on_click(cx.listener(move |ed, _, _, cx| ed.remove_lane(slot, cx)))))
-                                    .child(div().text_size(px(9.0)).text_color(th.text_tertiary).child(match param {
-                                        Param::Pit => format!("±{:.0}¢", self.pit_range_cents),
-                                        Param::Dyn => "dB".into(),
-                                        Param::Vibrato => "¢".into(),
-                                        _ => "0-127".into(),
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .relative()
-                                    .child(crate::lanes::lane(self, entity.clone(), param, slot))
-                                    .when(slot == 0, |d| d.child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Lane)))),
-                            )
-                    })).into_any_element()
-    }
-
-    fn bottom_content(&mut self, window: &mut Window, lane_scroll: &gpui::ScrollHandle, lane_surface: &crate::proto_scroll::NativeScroll, cx: &mut Context<Self>) -> AnyElement {
+    fn bottom_content(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let th = self.theme;
         let entity = cx.entity();
         let locale = i18n::current(cx);
         let roll_semantics = Surface::Roll.semantics(locale);
+        let lanes_semantics = Surface::Lanes.semantics(locale);
         let mixer_semantics = Surface::Mixer.semantics(locale);
         self.playback.clear_bottom_anchors();
+        let slot_count = self.integrations.lanes.len().max(1);
+        // Lanes keep usable drawing heights inside one bounded vertical viewport.
+        let each_lane_h = if slot_count == 1 { self.layout.lane_height } else { (self.layout.lane_height / slot_count as f32).max(72.0) };
 
         let bottom = match self.bottom {
             Bottom::Editor => Some(
@@ -1766,7 +1674,7 @@ impl Editor {
                                                     .inset_0()
                                                     .key_context("PianoRoll")
                                                     .track_focus(&self.focus_roll)
-                                                    .child(self.compiled_roll.clone()),
+                                                    .child(crate::proto_roll::view(self.compiled_roll.clone())),
                                             )
                                             .child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Roll))),
                                     ),
@@ -1815,14 +1723,66 @@ impl Editor {
                     )
                     // Resizable Splitter between Roll and Parameter Lanes
                     .child(splitter_bar(entity.clone(), SplitterKind::LaneHeight, th))
-                    .child(self.lane_tabs(lane_scroll, cx))
+                    .child(self.lane_tabs(cx))
                     .child(self.curve_toolbar(cx))
-                    .child(div().h(px(self.layout.lane_height)).max_h(gpui::relative(0.4)).min_h_0().flex_none().child({
-                        let editor = entity.clone(); let scroll = lane_scroll.clone();
-                        crate::proto_scroll::content("parameter-lanes-region", "参数泳道", move |_, cx| {
-                            editor.update(cx, |ed, cx| ed.parameter_lane_rows(&scroll, cx))
-                        }).native_scroll(lane_surface.clone())
-                    }))
+                    .child(crate::proto_scroll::viewport("parameter-lanes-scroll", "参数泳道", "vertical")
+                        .reveal_item(self.integrations.active_panel, format!("{}:{}:{:?}:{:?}",
+                            self.project().project_id, self.document_generation, self.integrations.lanes, self.param))
+                        .h(px(self.layout.lane_height))
+                        .max_h(gpui::relative(0.4))
+                        .min_h_0()
+                        .flex_none()
+                        .flex()
+                        .flex_col()
+                        // Headers scroll the lane stack; canvases retain their
+                        // shared timeline wheel/zoom handling.
+                        .children((0..slot_count).map(|slot| {
+                        let param = self.integrations.lanes.get(slot).copied().unwrap_or(self.param);
+                        let active_slot = slot_count > 1 && self.integrations.active_panel == slot;
+                        div()
+                            .id(("parameter-lane", slot))
+                            .role(lanes_semantics.role)
+                            .aria_label(lanes_semantics.label)
+                            .aria_description(lanes_semantics.description)
+                            .h(px(each_lane_h))
+                            .flex_none()
+                            .flex()
+                            .border_t_1()
+                            .border_color(th.shade)
+                            .child(
+                                div()
+                                    .w(px(KEYS_W))
+                                    .flex_none()
+                                    .p(px(4.0))
+                                    .flex()
+                                    .flex_col()
+                                    .items_center()
+                                    .justify_between()
+                                    .bg(if active_slot { mix(th.surface, th.accent, 0.16) } else { th.surface })
+                                    .border_r_1()
+                                    .border_color(th.shade)
+                                    .text_xs()
+                                    .child(div().font_weight(FontWeight::SEMIBOLD).child(param.short()))
+                                    .when(slot_count > 1, |d| d.child(crate::proto_controls::action(("remove-lane", slot), format!("移除 {} 泳道", param.short()))
+                                        .size(px(22.0)).rounded(px(11.0)).flex().items_center().justify_center().hover(move |s| s.bg(th.hover))
+                                        .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
+                                        .on_click(cx.listener(move |ed, _, _, cx| ed.remove_lane(slot, cx)))))
+                                    .child(div().text_size(px(9.0)).text_color(th.text_tertiary).child(match param {
+                                        Param::Pit => format!("±{:.0}¢", self.pit_range_cents),
+                                        Param::Dyn => "dB".into(),
+                                        Param::Vibrato => "¢".into(),
+                                        _ => "0-127".into(),
+                                    })),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .relative()
+                                    .child(crate::lanes::lane(self, entity.clone(), param, slot))
+                                    .when(slot == 0, |d| d.child(div().absolute().inset_0().child(self.playback.anchor(crate::clock::Surface::Lane)))),
+                            )
+                    })))
                     .into_any_element(),
             ),
             Bottom::Mixer => Some(

@@ -86,9 +86,10 @@ impl Scope {
             Self::App => "Verdant",
             Self::Document => "Verdant && !LyricEditor && !TextPrompt",
             Self::Workspace => "(Arrange || PianoRoll || Mixer || NoteTable) && !LyricEditor && !TextPrompt",
-            Self::Arrange => "Arrange", Self::Roll => "PianoRoll", Self::Notes => "PianoRoll || NoteTable",
-            Self::Timeline => "Arrange || PianoRoll || Mixer",
-            Self::Escape => "(Arrange || PianoRoll || Mixer || NoteTable) && !NoteTablePoint",
+            Self::Arrange => "Arrange && !LyricEditor && !TextPrompt", Self::Roll => "PianoRoll && !LyricEditor && !TextPrompt",
+            Self::Notes => "(PianoRoll || NoteTable) && !LyricEditor && !TextPrompt",
+            Self::Timeline => "(Arrange || PianoRoll || Mixer) && !LyricEditor && !TextPrompt",
+            Self::Escape => "(Arrange || PianoRoll || Mixer || NoteTable) && !NoteTablePoint && !LyricEditor && !TextPrompt",
             Self::Text => "LyricEditor || TextPrompt", Self::Lyric => "LyricEditor",
         }
     }
@@ -117,7 +118,7 @@ enum ShortcutTarget {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TextCommand {
-    Submit, Advance, Retreat, Cancel, Undo, Space, Backspace, Delete,
+    Submit, Advance, Retreat, Cancel, Undo, Redo, Space, Backspace, Delete,
     Left, Right, SelectLeft, SelectRight, Home, End, SelectAll, Paste,
 }
 
@@ -145,8 +146,8 @@ macro_rules! shortcuts {
 shortcuts![
     "应用与工程" => [
     ("secondary-z", Document, "撤销", Undo),
-    ("secondary-shift-z", App, "重做", Redo),
-    ("secondary-y", App, "重做", Redo),
+    ("secondary-shift-z", Document, "重做", Redo),
+    ("secondary-y", Document, "重做", Redo),
     ("secondary-shift-h", App, "撤销历史…", crate::commands::ShowHistory),
     ("secondary-n", App, "新建工程", NewProject),
     ("secondary-o", App, "打开工程…", OpenProject),
@@ -211,7 +212,7 @@ shortcuts![
     ],
     "轨道" => [
     ("secondary-alt-n", App, "新建轨道", NewTrack),
-    ("secondary-backspace", App, "删除轨道", DeleteTrack),
+    ("secondary-backspace", Document, "删除轨道", DeleteTrack),
     ("up", Arrange, "上一条轨道", PrevTrack),
     ("down", Arrange, "下一条轨道", NextTrack),
     ("m", Workspace, "轨道静音开关", MuteTrack),
@@ -325,6 +326,8 @@ shortcuts![
     ("shift-tab", Lyric, "提交并编辑上一个音符", text::Retreat),
     ("escape", Text, "取消文本编辑", text::Cancel),
     ("secondary-z", Text, "撤销文本编辑", text::Undo),
+    ("secondary-shift-z", Text, "重做文本输入", text::Redo),
+    ("secondary-y", Text, "重做文本输入", text::Redo),
     ("space", Text, "输入空格", text::Space),
     ("backspace", Text, "删除前一个字符", text::Backspace),
     ("delete", Text, "删除后一个字符", text::Delete),
@@ -362,7 +365,8 @@ struct ShortcutRow {
     keys: gpui::SharedString,
 }
 
-/// The window renders these exact rows, generated from every installed binding.
+/// The window renders installed application bindings and native text routes
+/// from the same registry, preserving both discoverability and ownership.
 fn cheat_sheet(mac: bool) -> Vec<ShortcutRow> {
     SHORTCUTS.iter().map(|shortcut| ShortcutRow { shortcut, keys: display_keys(shortcut.keys, mac).into() }).collect()
 }
@@ -409,10 +413,10 @@ pub fn open(cx: &mut App) {
     ) { OPEN.with(|o| *o.borrow_mut() = Some(h)); }
 }
 
-impl Shortcuts {
-    fn native_content(&self, window: &Window) -> gpui::AnyElement {
+impl Render for Shortcuts {
+    fn render(&mut self, window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let th = Theme::for_appearance(window.appearance());
-        div().id("shortcuts").bg(th.surface).text_color(th.text)
+        crate::proto_scroll::viewport("shortcuts", "键盘快捷键", "vertical").size_full().bg(th.surface).text_color(th.text)
             .font_family(self.font.clone()).p(px(20.)).flex().flex_col().gap(px(10.))
             .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child("键盘快捷键"))
             .child(div().text_sm().text_color(th.text_secondary)
@@ -427,13 +431,7 @@ impl Shortcuts {
                     .child(div().flex().flex_col().gap(px(2.))
                         .child(row.shortcut.label)
                         .child(div().text_xs().text_color(th.text_secondary).child(row.shortcut.scope.label()))))
-            })).into_any_element()
-    }
-}
-impl Render for Shortcuts {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let entity = cx.entity();
-        crate::proto_scroll::content("compiled-shortcuts-scroll", "键盘快捷键", move |window, cx| entity.read(cx).native_content(window))
+            }))
     }
 }
 

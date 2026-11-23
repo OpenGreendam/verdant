@@ -2,20 +2,40 @@
 
 Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生成原生组件，`rust-data-v1` 生成只依赖 Rust 标准库的类型化决策函数。保留的 Rust 源码全部由上游 compiler 发射；不要手改 `generated/`。版本、完整 GPUI 来源、工具链要求、共享 SDK 内容和各编译单元的目标由 [compiler.pin.json](compiler.pin.json) 绑定。
 
+## 本轮 Draft 整合状态
+
+当前候选选择性整合 Verdant [PR #7](https://github.com/OpenGreendam/verdant/pull/7) 与 [PR #8](https://github.com/OpenGreendam/verdant/pull/8) 的有效修复，继续保留 18 类交互对应 14 个编译入口、Adwaita 绘图、音乐领域层和完整验收门禁。此次整合进一步把编辑操作选择、连续值精度和输入生命周期放进作者源码；没有采用另一分支中退回原生滚动策略、删除既有快捷键保护或缩减完整 GUI 测试的改动。
+
+**当前远端恢复后的候选尚未完成严格 fresh producer、完整 Node、完整 GUI/SDK 与跨平台 CI 的重新验收。** 应用源码 commit、最终 compiler pin、生成 SDK 摘要和对应日志将在实际完成后写入 [本轮机器记录](VALIDATION-INTEGRATION-2026-11-23.json)。恢复前的 producer/203 项 Node 结果及下文上一轮 237 项 GUI 结果保留为历史检查点，不能转移到当前候选。
+
+`gpui-source-v1` 仍是实验性 profile。本文记录实际源码和消费者边界，不将 Draft、profile 状态或未执行的平台验收描述为稳定承诺。
+
 ## 当前边界
 
 本轮将其余应用交互扩展到 **12 个原生编译组件 + 2 个标准库决策单元**；完整的 18 类映射、宿主边界与验证范围见 [CONTROL-MIGRATION.md](CONTROL-MIGRATION.md)。下表保留原有四个基础单元的职责，新增的十个单元与它们共用生成、pin、receipt 和 CI 门禁。
 
 | 单元 | 原型拥有的职责 | Rust 宿主拥有的职责 |
 |---|---|---|
-| `pitch-gesture-surface` | 原生根、尺寸/裁剪和 slot；共享 SDK 的 artifact owner | 卷帘绘图、音乐坐标、音高采样、领域预览与提交；上游 MoveGesture lease 的宿主绑定 |
+| `pitch-gesture-surface` | 原生根、尺寸/裁剪、slot 与 pitch 手势入口；共享 SDK owner | `proto_roll.rs` |
 | `note-gesture-planner` | 移动、复制、resize、框选的纯决策函数和有序效果 | pointer identity、不可变守卫事实、revision、领域数据、效果执行和原生 capture |
 | `control-gesture-planner` | 曲线/连续参数的纯决策函数和归一化拖动计算 | 图形命中、坐标与参数单位、preview、最终采样和工程提交 |
-| `normalized-knob` | 每实例的值/phase、props 同步、取消、键盘、焦点、Slider 辅助功能语义和提交事件 | Adwaita 绘图 slot、移动距离、参数单位、当前目标/工程 revision 校验和领域提交 |
+| `normalized-knob` | 值/phase、受控提交、复位、取消、键盘、焦点、Slider 辅助功能、精确输入请求 | `proto_knob.rs`、内置设备编辑器 |
+| `action-control` | 按压/激活、禁用、选择/展开、上下文请求、键盘与辅助功能操作；目标变化取消旧按压，实时标签更新保留相同命令 | `proto_controls.rs`、按钮、离散控件、Tabs、窗口标题操作 |
+| `collection-control` | 游标、选择、遍历、展开、搜索结果导航、上下文请求、滚动/最近边缘揭示与过期 revision 拒绝 | `proto_collection.rs`、菜单、音符表格、点列表、轨道/历史/浏览器列表 |
+| `continuous-control` | 数值预览/提交、精度与量化、受控值接受、细调、复位、取消、键盘与数值辅助功能 | `proto_scalar.rs`、推子/声像、数值字段、分隔条、时间线滚动条 |
+| `editor-surface` | 操作选择、lease/phase/阈值、吸附、Shift 轴约束、边缘滚动、取消、焦点和统一缩放导航 | `proto_editor_surface.rs`、编曲/卷帘/曲线/自动化/标尺/EQ 绘制 |
+| `performance-key` | 按键触发、保持/重复、松开与失焦停止、辅助功能激活 | `proto_performance_key.rs`、参考键盘与演奏键盘 |
+| `drag-source` | 可消费一次的拖放 lease、revision、取消、键盘/辅助功能目的地选择 | `proto_drag.rs`、调制映射 |
+| `overlay-control` | 可见性、默认/取消响应、焦点进入/约束/恢复 | `proto_overlay.rs`、模态与导出窗口 |
+| `text-field` | 文本/IME/选区/撤销、焦点、提交/取消/前进与数值文本策略 | `proto_text.rs`、歌词、精确值、工作流、插件搜索 |
+| `graph-point` | 每个图形把手的双轴预览/提交、阈值/细调、复位、键盘轴切换与辅助功能 | `devices/graph_control.rs` |
+| `scroll-region` | 文档/视口滚动请求、页面/边缘按键、最近边缘揭示与可选焦点范围 | `proto_scroll.rs`、说明、表单、参数泳道及原生滚动引擎 |
 
 前三项属于 **Proto 编译的 gesture planner + native GPUI surface**。note/control 由上游 data target 生成独立的 Rust 函数，不创建组件实例、不执行组件 setup，也不链接 GPUI。`normalized-knob` 是真实有状态组件实例：它复用 control planner 的同一份 TS 来源，原型对交互和公开语义负责，宿主不再为该旋钮另存一份 phase 状态机。slot 和自绘是合法组成方式；是否由原型承担交互契约，不能由有无 slot 判断。
 
 旋钮的 `props.value` 是宿主接受的归一化值；`defaultValue` 只表示重置目标。拖动时公开 `value` 可以显示预览，提交前恢复到已接受值，再发出 `{ value, revision }` 提案。宿主接受后通过 props 发布新值，拒绝时不会留下未接受的显示值。`revision` 是不透明的来源标识，宿主可将工程、store 与参数身份纳入其中。值、revision 或 disabled 改变会取消当前交互；键盘接管先取消指针预览，再从已接受值步进，Shift 使用十分之一的步长。公开状态、焦点和事件回调后的 epoch 检查防止重入更新被旧操作覆盖。
+
+滚动采用编译源声明的 ScrollSurface：一般内容通过 `proto_scroll::viewport`，列表、菜单等通过显式 lease 绑定真实原生引擎。具体构造点会随窗口接入改变，本文不把上一轮的 21/5 统计当作当前总数；原统计保留在历史机器记录中。音符、控制点、历史和参数泳道的显示位置继续由编译源的滚动/最近边缘揭示策略决定。
 
 辅助功能除了 Slider 的名称、范围、值和 disabled 状态，还声明 `increment`、`decrement`、`setValue` 动作。SDK 将 AccessKit `NumericValue` 解码为原型事件的有限数值；缺失、错类型或非有限数据不分发。原型中的写值动作也先取消旧预览，再走同一受控提交事件。Linux AT-SPI 当前通过 `Value.CurrentValue` setter 请求 SetValue；不能把检查到了 Slider role 或模拟一个 host event 计作实际平台写值通过。
 
@@ -28,6 +48,15 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 旋钮的捕获拖动可以继续越过控件 hitbox。上游 press adapter 因 hover 离开而发出的 `press.cancel` 不结束这个独立的 move lease；失焦、detach、失去所有权等真正的 lease 取消通过公开 `cancel` 方法清理原型。
 
 曲线图在 prepaint 时另外保存这一帧对应的权威参数快照。若参数或 revision 在绘制后、按下前改变，旧帧的拖动、右键菜单和双击写入都会被拒绝；重绘后可以正常编辑。动画和预览值只决定绘制及命中位置，拖动起点必须来自已接受的权威参数，避免把动画中的旧值写回工程。
+
+### 本轮进一步统一的源码语义
+
+- `EditorSurface` 以同一 lease 决定区域/音符/曲线/音素/标尺操作、选择方式、吸附、Shift 轴约束、边缘滚动，以及滚轮、pinch、工具栏和快捷键的导航请求。宿主只提供命中/几何事实并执行音乐事务；旧取消携带旧 pointer、revision 和 lease，不能取消下一次接触。保留编曲的三像素阈值和原有音频快捷键/焦点协议。
+- `PerformanceKey` 保留短促参考键触发、持续音符、最高 C 键和旧 note-off 所有者校验，并补强重复按键、指针与键盘重叠、窗口停用、隐藏、卸载与延迟 note-on 退役。触摸不借用鼠标 capture；丢失的鼠标 capture 不能完成新 owner 的接触。
+- 连续值与图形把手由源决定精度、量化、细调和提交阶段；应用不能把渲染动画或临时预览当作新的接受基准。图形背景双击也核对帧快照和 live surface，发出源动作后再次核对实际 authority。
+- TextField 继续组合上游 `asInputEditor`。宿主镜像源接受的规范化文本，并按 draft generation、view epoch 与挂载状态截断旧事件批次；搜索导航先由源发出，再直接交给既有 Collection `filterKey` 协议。IME 组合期间保留本地编辑语义，列表 reveal 仍使用同一真实引擎。歌词/重命名提示以新的实例身份拒绝同名重开窗口的旧提交。
+- Overlay 尊重子字段已阻止的默认键动作；每次排队响应交付前核对 present/mounted/disposed、view epoch、revision、open 与 disabled。一个响应导致关闭、替换或重开后，后续旧响应不能继续执行。
+- 配置 `submitOnEnter` 的 Action 对一次物理 Enter 只发出 submit。即使提交回调同步替换 props，随后原生 `press.start`/`press.commit` 也不能再激活新命令；Space、指针和普通 Enter 保持既有激活行为。接收端保留原始位置、修饰键、输入来源与命令 authority。
 
 ## 再生成与两类检查
 
@@ -79,18 +108,34 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --recover-publication
 
 ## 准入与证据
 
-PR #5 首轮修复的历史版本和当时尚未完成的范围见 [首轮验收记录](VALIDATION-2026-11-22.md)，该轮后续修复结果见 [历史修复验收](VALIDATION-COMPLETION-2026-11-22.md)。下方历史结果固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。它们不证明后来新增的控件已通过。全部控件迁移的入口、职责与验收范围见 [迁移清单](CONTROL-MIGRATION.md)，运行结果必须绑定对应提交的 CI Checks。
+本轮最终检查见 [整合机器记录](VALIDATION-INTEGRATION-2026-11-23.json)，当前仍待完整重跑。以下表格是**上一轮已执行的历史快照**，绑定应用源码快照 [`f325638d`](https://github.com/OpenGreendam/verdant/commit/f325638dcd7cb4169e52d9eff7796825eccd4ebb) 与编译器 [`5912f817`](https://github.com/Proto-UI/Proto-UI/commit/5912f817581f89785e75c26e324a76c97257dc60)。执行范围、来源身份和日志摘要见 [上一轮机器记录](VALIDATION-2026-11-23.json)，职责清单、证据层次和历史修复见 [迁移记录](MIGRATION-2026-11-23.md#验证与证据层次)。
+
+| 上一轮检查范围 | 该快照的实际结果 |
+|---|---|
+| 严格 producer | 14 个单元、81 个编译产物的 fresh 与 retained 检查均通过；保留完整来源 receipts、唯一 SDK 和 GPUI 身份 |
+| 应用工具与作者 Runtime | 82 项规则检查通过；完整 Node 测试 173/173，通过且 0 skip，其中作者 Runtime 88 项、工具回归 85 项 |
+| 上游源码与类型 | 聚焦源码回归 206/206；TypeScript 检查退出码 0 |
+| Verdant 使用的现代 GPUI | 原生 SDK 26/26；完整 `verdant-gui` suite 237/237，均无失败、忽略或筛选掉的测试 |
+| Cargo 图与 headless | 完整 locked/all-features resolve graph 通过，唯一 GPUI/SDK，session 原生依赖为 0；session、protocol 和两个 data crate 的本地测试共 33 项通过，此次本地运行不声明基础镜像隔离 |
+| 实际 Rust source mutation | baseline 实测 0.55、variant 实测 0.6；variant 使用旧 0.55 预期时按要求断言失败，实验整体通过 |
+| 上游默认 GPUI 的托管 CI | [run 45071732309](https://github.com/Proto-UI/Proto-UI/actions/runs/45071732309) 在 macOS 15 和 Ubuntu 24.04 上分别通过原生消费者 39/39、数值辅助功能 8/8、SDK 27/27；两边均执行了旧版宿主的真实选区通知回归 |
+
+这些结果分别证明源码语义、生成 Rust、依赖边界和框架输入行为，不相加为“总验收项”。默认 GPUI 的 27 项 SDK 回归与 Verdant 现代 GPUI 的 26 项使用不同宿主 API 分支；后者不能代替前者。当前候选的逐屏视觉、打包后 OS 输入、物理触摸、系统 IME 与读屏验收仍按平台单独记录，不继承下面 #79 的历史成功状态。
+
+上一轮旋钮集成的历史版本见 [首轮验收记录](VALIDATION-2026-11-22.md) 和 [后续修复验收](VALIDATION-COMPLETION-2026-11-22.md)。后文历史表固定到实现 head `a55bdcd4cc73e3a48cdfc956151e9934cc865f48` 和 [Frontend #79](https://github.com/OpenGreendam/verdant/actions/runs/45026004598)；实际被检出、测试和打包的 PR merge commit 是 `9e6cd34715b9da4b733466b95d749764e5c410b3`。关联讨论位于 [PR #5](https://github.com/OpenGreendam/verdant/pull/5)。这些记录不随当前分支和后续文档提交改写。
+
+全部控件迁移的入口与职责同时列于 [迁移清单](CONTROL-MIGRATION.md)；当前完成状态以整合记录和对应提交的实际 CI 执行为准。
 
 TOML admission 使用 parser，按实际 `package` 名检查普通/build/dev 和 target-specific 的所有依赖表，支持 alias、子表、多行和注释。它检查声明；另一个门禁调用完整 `cargo metadata --locked --all-features`，沿全部 workspace members 的 resolve graph 检查 GPUI package ID/source/rev 和唯一 SDK，同时按实际 workspace/manifest 身份追踪 session 的所有可达边，拒绝原生组件、GPUI、SDK 和图像支持。两个 data crate 必须可达且没有依赖；不能改个包名躲过路径核验。`--no-deps` 或扫描 Cargo.lock 字符串不能替代这一检查。
 
 ```sh
-corepack pnpm@10.32.1 --dir frontend/proto-ui test
-PROTO_UI_UPSTREAM="$PWD/../Proto-UI" corepack pnpm@10.32.1 --dir frontend/proto-ui test
+NODE_OPTIONS=--max-old-space-size=512 PROTO_UI_UPSTREAM="$PWD/../Proto-UI" node --test --test-concurrency=1 frontend/proto-ui/tools/test/*.test.mjs
 (cd frontend && cargo fetch --locked)
 node frontend/proto-ui/tools/check-cargo-gpui.mjs --offline
 
 (cd frontend && cargo test --locked -p verdant-ui-protocol -p verdant-session)
-(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui)
+(cd frontend && cargo test --locked -p verdant-app --bin verdant-gui -- --test-threads=1)
+(cd frontend && cargo test --locked -p proto-ui-gpui-native --features test-support,gpui/test-support --lib -- --test-threads=1)
 ```
 
 离线 Cargo graph 检查前，需要在 `frontend/` 中执行过 `cargo fetch --locked`。Rust 测试进入该目录执行，使 rustup 采用其中的固定工具链。
@@ -127,10 +172,10 @@ Rust 各 crate 的数量是 Linux 总数中的子集，不重复相加。macOS/W
 
 ## 上游依据
 
-以下链接固定到本次 compiler pin；实验性目标的能力不能从当前 main 或旧 source audit 推断。
+上一轮数值辅助功能修复 [PR #1710](https://github.com/Proto-UI/Proto-UI/pull/1710) 已合入上游 main；本次迁移的通用能力与修复通过 [PR #1730](https://github.com/Proto-UI/Proto-UI/pull/1730) 回馈。它们包括条件辅助功能、共享 Input 编辑、原生通知/焦点/初次 hover 生命周期、真实滚动引擎绑定，以及同时兼容默认与现代 GPUI 的文本选区通知，详见 [迁移记录](MIGRATION-2026-11-23.md#上游回馈)。上一轮 pin 将这些能力锁定到 `5912f817581f89785e75c26e324a76c97257dc60` 并完成当时的 fresh 检查。本轮继续整合 [PR #1731](https://github.com/Proto-UI/Proto-UI/pull/1731) 的适用修复；最终身份以当前 pin、receipts 和整合记录的实际重新生成为准，不能用旧 source audit 或历史运行替代。
 
-- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/64b1ebecf38c87795bdc404c6a1ab883712ad7f9/packages/compiler/README.md)
-- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/64b1ebecf38c87795bdc404c6a1ab883712ad7f9/packages/compiler/src/compile.ts)
-- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/64b1ebecf38c87795bdc404c6a1ab883712ad7f9/packages/compiler/src/rust-data.ts)
-- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/64b1ebecf38c87795bdc404c6a1ab883712ad7f9/internal/compiler/gpui-accessibility-value.md)
-- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/64b1ebecf38c87795bdc404c6a1ab883712ad7f9/packages/prototypes/base/src/slider/root.proto.ts)
+- [Compiler README：宿主组成、workspace GPUI、共享 SDK 和证据边界](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/README.md)
+- [compile.ts：compileFile、来源图和 nativeSdkPath](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/src/compile.ts)
+- [rust-data.ts：类型化标准库决策函数与来源图](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/compiler/src/rust-data.ts)
+- [GPUI 数值辅助功能契约与验证范围](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/internal/compiler/gpui-accessibility-value.md)
+- [Base Slider Root：承载语义的 slot 原型](https://github.com/Proto-UI/Proto-UI/blob/3b0d2dab0555ef6a7c4869c2d2b45ec531b77861/packages/prototypes/base/src/slider/root.proto.ts)

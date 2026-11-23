@@ -69,6 +69,7 @@ impl Editor {
         };
         controls = controls.child(
             crate::ui_controls::select_button("track-singer-picker", Some("mic-vocal"), singer_name, "选择轨道歌手", th)
+                .authority(crate::proto_controls::editor_authority(self))
                 .on_click(cx.listener(move |ed, _, window, cx| open_singers(ed, window, cx)))
                 .on_a11y_action(AccessibleAction::Click, crate::view::a11y_listener(cx, move |ed, _, window, cx| open_singers(ed, window, cx))),
         );
@@ -119,10 +120,8 @@ impl Editor {
         let open_lang_a11y = open_lang_menu.clone();
         controls = controls.child(
             crate::ui_controls::select_button("track-language-picker", Some("globe"), lang_display, "选择演唱语言", th)
-                .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| {
-                    let position = ev.position();
-                    open_lang_menu(ed, position, window, cx)
-                }))
+                .authority(crate::proto_controls::editor_authority(self))
+                .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| open_lang_menu(ed, ev.position(), window, cx)))
                 .on_a11y_action(AccessibleAction::Click, crate::view::a11y_listener(cx, move |ed, _, window, cx| open_lang_a11y(ed, window.mouse_position(), window, cx))),
         );
         controls.when(segmented, |c| {

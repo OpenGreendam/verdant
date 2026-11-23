@@ -487,9 +487,9 @@ pub struct GeneratedData0 {
                 // Source "frontend/proto-ui/src/overlay-control.proto.ts":89:24
                 return { let v_7075695f6e61746976655f3630 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
             }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_59.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_59.call)(arg(&arguments,0))})} }; match callable {
-      Value::NativeFunction{render,..} => Value::Renderer(render),
-      Value::Renderer(render) => Value::Renderer(render),
-      Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
+      Value::NativeFunction{identity,render} => capture_renderer(Value::NativeFunction{identity,render:render.clone()},render),
+      Value::Renderer(adapter) => Value::Renderer(adapter),
+      Value::Function(callback) => capture_renderer(Value::Function(callback.clone()),Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
       _ => panic!("checked setup result must be a callable")
     } };
         })) }.call_authored(vec![definition_capability(&owner)]);
@@ -509,6 +509,7 @@ pub struct GeneratedData0 {
               dispatch(&focus_owner, "host:focus", false, event_fields("host:focus"));
               if ready(&focus_owner) && focus_owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
               });
+              notify_native_change(cx);
           });
           let blur_owner = owner_ref.clone();
           let on_blur = cx.on_blur(&focus, window, move |view, window, cx| {
@@ -522,8 +523,25 @@ pub struct GeneratedData0 {
               dispatch(&blur_owner, "host:blur", false, event_fields("host:blur"));
               if ready(&blur_owner) && blur_owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
               });
+              notify_native_change(cx);
           });
-          vec![on_focus, on_blur]
+          // A native slot descendant can start this root's keyboard press
+          // while the root FocusHandle itself is not focused. Its departure
+          // from the physical subtree is distinct from the root's own blur.
+          let focus_out_owner = Rc::downgrade(&owner_ref);
+          let on_focus_out = cx.on_focus_out(&focus, window, move |view, _, window, cx| {
+              let Some(owner) = focus_out_owner.upgrade() else { return; };
+              native_host_callback(&owner, "focus-out", || {
+              let epoch = owner.borrow().epoch;
+              if !ready(&owner) || owner.borrow().window_id != Some(window.window_handle().window_id()) || view.focus.contains_focused(window, cx) { return; }
+              // This retires only an existing root press lease. Do not forge
+              // host:blur or change the root's own Focus observation here.
+              native_press_blur(&owner);
+              if ready(&owner) && owner.borrow().epoch == epoch { view.drive(window, cx).unwrap_or_else(|error| throw_value(error)); }
+              });
+              notify_native_change(cx);
+          });
+          vec![on_focus, on_blur, on_focus_out]
           } else { Vec::new() };
           let global_key_capture = subscribe_global_key_capture(&owner_ref, cx);
           let window_input = window_input_needed(&owner_ref).then(|| cx.focus_handle().tab_stop(false));
@@ -550,12 +568,14 @@ pub struct GeneratedData0 {
           self._window_activation.take();
           let owner = self.owner.clone();
           let subscription = cx.observe_window_activation(window, move |view, window, cx| {
+              let deactivated = owner.borrow().window_id == Some(window.window_handle().window_id()) && !window.is_window_active();
               native_host_callback(&owner, "window-activation", || {
-                  if owner.borrow().window_id == Some(window.window_handle().window_id()) && !window.is_window_active() {
+                  if deactivated {
                       native_window_blur(&owner);
                       view.drive(window, cx).unwrap_or_else(|error| throw_value(error));
                   }
               });
+              if deactivated { notify_native_change(cx); }
           });
           self._window_activation = Some((id, subscription));
       }
@@ -609,9 +629,11 @@ pub struct GeneratedData0 {
           self.bind_window_activation(window, cx);
           #[cfg(feature = "experimental-focus-tree")] self.bind_entry_readiness(window, cx);
           let drive = self.owner.borrow().native_drive.as_ref().expect("live native owner drive").clone();
-          // Rendering projects the current source; only drive may consume its
-          // pending observer signal. A parent native Render can call an exposed
-          // method before this child is laid out and before deferred drive runs.
+          // Drawing consumes only repaint dirtiness. A parent Render can call
+          // an exposed method before this child is laid out: its independent
+          // pending_native_events flag survives until the coalesced drive wakes
+          // the consumer. Repeated slot projection cannot create a notify loop.
+          self.owner.borrow_mut().dirty = false;
           let snapshot = self.owner.borrow().projection.clone().expect("live native projection");
           self.focus = self.focus.clone().tab_stop(native_tab_participation(&self.owner));
           let element = paint_native_root(&snapshot, &self.owner, &self.focus, format!("compiled-root-{}", Rc::as_ptr(&self.owner) as usize), drive);

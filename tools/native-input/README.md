@@ -59,6 +59,16 @@ lookup through `snapshot`, `nodes` and `node`, stopping before the accessibility
 transport. They reject another window's matching name, a wrong role, the legacy
 label and ambiguous native matches.
 
+The control journey selects AT-SPI's actual `push button` role for dialog
+actions and still requires the observed node to have physical focus. In
+[run 45140053560](https://github.com/OpenGreendam/verdant/actions/runs/45140053560),
+X11 had already focused the **取消** push button, but the former generic
+`button` selector could not find it. The same run's Wayland trace delivered
+the temporary Unicode keycodes without their X11-only symbol mappings;
+the actual textbox consequently contained `AB` instead of `音😀AB`. Its
+original 22 cases passed, while the expanded six control cases remained
+incomplete. Those results are retained separately from any later rerun.
+
 ### Retained failed attempts
 
 The replacement local environment loaded the official Debian 13 D-Bus/GI
@@ -157,7 +167,7 @@ isolated AT-SPI runner. It creates private Lavapipe/fontconfig/XDG settings,
 sets a two-CPU affinity and an 8 GiB **per-process address-space** limit, and
 records those actual limits. This is not an aggregate cgroup memory claim.
 It terminates only the process groups it created. It needs Xvfb,
-xdotool, Weston 13 or 14 (including its desktop shell and debug client), Lavapipe,
+xdotool, xkbcomp (`x11-xkb-utils`), Weston 13 or 14 (including its desktop shell and debug client), Lavapipe,
 fonts and the AT-SPI/Python dependencies described in `tools/a11y/README.md`.
 It records the actual `weston --version` and `--help` output; it does not label
 Ubuntu's Weston 13 as the Weston 14 used in the earlier remote baseline.
@@ -166,6 +176,27 @@ log entry, and its observed X11 dimensions must match that entry. Missing,
 invalid or multiple output IDs fail; dimensions never select a guessed ID.
 With installed system packages, missing GSettings schemas cause a failure;
 the wrapper does not compile or change system schemas.
+
+For `--suite controls`, the wrapper uses `x11_keymap.py` to install persistent
+Unicode key symbols on the Xvfb display it just created, before either Weston
+or Verdant starts. It chooses unused keys, preserves existing bindings and
+modifiers, and reads the compiled keymap back from that private X server.
+The original, prepared and observed keymaps and their binding record are
+retained with the run. `xdotool` then sends ordinary XTest key events using
+these symbols, including the characters outside the BMP; no text is assigned
+through application state or an accessibility text setter. The actual
+AT-SPI text, character selections, focus, saved project and undo/cancel
+checks remain the acceptance evidence. This Unicode keyboard route does
+not claim input-method composition coverage or change a user's desktop map.
+
+Weston's X11 backend rebuilds its keyboard map from `_XKB_RULES_NAMES`, so
+the controls harness also writes the observed keycodes, types, compatibility
+and symbols into a private named layout. It sets and reads back that property
+on its own Xvfb, then actually recompiles those observed names with
+`libxkbcommon` and verifies every required symbol and keycode again. Weston
+inherits the same private `XKB_CONFIG_ROOT`. The property bytes, component
+files, compiled result and hashes are retained; an Xvfb-only readback cannot
+stand in for this check or for the complete 28 real-window cases.
 
 For an already prepared display/compositor and AT-SPI session, invoke the
 probe directly:

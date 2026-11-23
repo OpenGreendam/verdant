@@ -1,21 +1,25 @@
 """Production-control journeys driven through the OS and the AT-SPI tree.
 
 These cases run in a separate application/project from the original knob
-suite. Unicode clipboard/key input is deliberately not described as an IME test.
+suite. Unicode key injection is deliberately not described as an IME test.
 """
 
 import copy
 import math
-import os
-import signal
-import subprocess
 
 
 CONTROL_CASES = ("text-selection-focus", "collection-scroll-cancel", "mixer-pan")
 TEXT_INITIAL = "音😀AB"
-TEXT_ASSISTIVE = "音😀Z"
-TEXT_ACCEPTED = "音😺Z"
+TEXT_ASSISTIVE = "音😀乐"
+TEXT_ACCEPTED = "音😺乐"
+TEXT_CANCELED = "不应保存"
+# The isolated display prepares these symbols before Weston or Verdant starts.
+# XTest continues to deliver keyboard events; no editor/AT text write is used.
+UNICODE_KEY_INPUTS = (TEXT_INITIAL, TEXT_ASSISTIVE, TEXT_ACCEPTED, TEXT_CANCELED)
 LIBRARY_TITLE = "插件预设库 — Verdant"
+# The compiled Collection owns this authored label and native ListBox role.
+COLLECTION_NAME = "匹配的预设"
+COLLECTION_ROLE = "list box"
 SEARCH_NAME = "搜索名称、类别、作者、标签与用途"
 SEARCH_MISSING = "verdant-no-matching-preset-79f2"
 
@@ -63,62 +67,9 @@ class ControlCases:
     def type_unicode(self, value):
         if self.held:
             raise RuntimeError("Text journey must not release an unrelated held pointer")
-        if any(ord(character) > 0x7f for character in value):
-            self.paste_unicode(value)
-            return
         self.xdo("type", "--clearmodifiers", "--delay", 45, "--", value)
         self.log_input("text-route", route="XTest key events; no input-method composition", value=value)
         self.pause()
-
-    def paste_unicode(self, value):
-        # XTest's synthesized keymap dropped Unicode input on the observed
-        # X11 path. Use the actual private display's clipboard, never an
-        # editor expose method or a fake input-handler callback.
-        if not self.args.clipboard_writer or not self.args.clipboard_reader:
-            raise RuntimeError("Unicode clipboard transport requires observed native clipboard tools")
-        if self.args.backend == "x11":
-            write = [str(self.args.clipboard_writer), "-selection", "clipboard", "-in", "-quiet", "-target", "UTF8_STRING"]
-            read = [str(self.args.clipboard_reader), "-selection", "clipboard", "-out", "-target", "UTF8_STRING"]
-        else:
-            write = [str(self.args.clipboard_writer), "--foreground", "--type", "text/plain;charset=utf-8"]
-            read = [str(self.args.clipboard_reader), "--no-newline", "--type", "text/plain;charset=utf-8"]
-        log_name = f"clipboard-{len(self.clipboard_processes):02}.log"
-        stream = (self.output / log_name).open("wb")
-        child = subprocess.Popen(write, stdin=subprocess.PIPE, stdout=stream, stderr=stream,
-                                 env=self.input_env, start_new_session=True)
-        record = {"pid": child.pid, "ownedProcessGroup": child.pid, "command": write, "log": log_name}
-        self.clipboard_processes.append((child, stream, record))
-        self.report.setdefault("clipboardProcesses", []).append(record)
-        child.stdin.write(value.encode("utf-8"))
-        child.stdin.close()
-        def clipboard():
-            result = subprocess.run(read, env=self.input_env, capture_output=True, text=True, timeout=3)
-            if child.poll() is not None and result.returncode:
-                raise RuntimeError(f"Owned clipboard writer exited: {child.returncode}; inspect {log_name}")
-            return result
-        result = self.wait(clipboard, lambda item: item.returncode == 0 and item.stdout == value,
-                           "the real private display clipboard to contain the requested Unicode")
-        self.log_input("clipboard-observation", command=read, value=result.stdout, exitCode=result.returncode)
-        self.key("ctrl+v")
-        self.log_input("text-route", route="Native clipboard + XTest Ctrl+V; no input-method composition",
-                       backend=self.args.backend, value=value)
-        self.pause()
-
-    def cleanup_clipboards(self):
-        for child, stream, record in self.clipboard_processes:
-            try:
-                if child.poll() is None:
-                    os.killpg(child.pid, signal.SIGTERM)
-                    try:
-                        child.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(child.pid, signal.SIGKILL)
-                        child.wait(timeout=3)
-                record["returnCodeAfterCleanup"] = child.returncode
-            except (OSError, subprocess.SubprocessError) as error:
-                self.report.setdefault("cleanupErrors", []).append(f"Owned clipboard cleanup: {error}")
-            finally:
-                stream.close()
 
     def save_controls(self, name, pan, revision, before=None):
         saved = self.save(-8.0, revision)
@@ -161,7 +112,7 @@ class ControlCases:
             raise RuntimeError("AT-SPI rejected the real text selection action")
         self.record("text-assistive-selection", control={"text": self.text(field, TEXT_INITIAL, [[2, 4]]),
                     "action": {"method": "Text.SetSelection", "arguments": [0, 2, 4], "accepted": accepted}})
-        self.type_unicode("Z")
+        self.type_unicode("乐")
         self.record("text-assistive-edited", control={"text": self.text(field, TEXT_ASSISTIVE)})
         self.key("Home")
         self.key("Right")
@@ -186,8 +137,8 @@ class ControlCases:
         undone = self.save_controls(before["trackName"], before["panPermille"], before["revision"] + 2)
         self.record("text-single-undo", control={"undoCount": 1})
         field = self.rename_prompt()
-        self.type_unicode("discarded-rename")
-        self.text(field, "discarded-rename")
+        self.type_unicode(TEXT_CANCELED)
+        self.text(field, TEXT_CANCELED)
         self.key("Escape")
         self.wait(lambda: self.nodes("轨道名称", "dialog"), lambda nodes: not nodes, "rename prompt cancellation")
         self.save_controls(before["trackName"], before["panPermille"], undone["revision"], undone)
@@ -200,7 +151,7 @@ class ControlCases:
 
     def collection_observation(self):
         options = self.library_options()
-        viewport_node = self.node("预设列表", "document frame")
+        viewport_node = self.node(COLLECTION_NAME, COLLECTION_ROLE)
         viewport = viewport_node["windowExtents"]
         return {"viewportReference": viewport_node["reference"], "viewport": viewport,
                 "options": [{"reference": node["reference"], "name": node["name"],
@@ -243,7 +194,7 @@ class ControlCases:
         self.key("Home")
         self.record("collection-home", control=self.selected_option(first))
         initial_visible = {row["name"] for row in self.collection_observation()["options"] if row["visible"]}
-        self.move(*self.point(self.node("预设列表")))
+        self.move(*self.point(self.node(COLLECTION_NAME, COLLECTION_ROLE)))
         self.xdo("click", "--repeat", 8, "--delay", 60, 5)
         scrolled = self.wait(self.collection_observation,
                              lambda item: {row["name"] for row in item["options"] if row["visible"]} != initial_visible,
@@ -404,7 +355,7 @@ def validate_control_trace(observations, final):
             require("focused" in focus.get("states", []) and "focused" in node.get("states", []),
                     f"{label}: focus summary differs from the actual tree")
         if "viewport" in control:
-            node = tree_node(label, control.get("viewportReference"), "document frame", "预设列表")
+            node = tree_node(label, control.get("viewportReference"), COLLECTION_ROLE, COLLECTION_NAME)
             require(node.get("windowExtents") == control["viewport"],
                     f"{label}: viewport bounds differ from the actual tree")
             actual = [node for node in detail["tree"]["nodes"]

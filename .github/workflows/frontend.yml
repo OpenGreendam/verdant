@@ -248,7 +248,7 @@ jobs:
         run: |
           sudo apt-get update 2>&1 | tee .ci/native-input-evidence/apt-update.log
           sudo apt-get install --no-install-recommends -y \
-            xvfb xauth xdotool x11-xkb-utils xkb-data weston xclip wl-clipboard \
+            xvfb xauth xdotool x11-xkb-utils xkb-data weston \
             dbus-daemon dbus-x11 at-spi2-core gir1.2-atspi-2.0 \
             python3-dbus python3-gi python3-pyatspi gsettings-desktop-schemas \
             fontconfig fonts-dejavu-core fonts-noto-cjk \
@@ -379,19 +379,14 @@ jobs:
           host="$PWD/target/release/verdant-plughost"
           if [ "$RUNNER_OS" = Windows ]; then host="$host.exe"; fi
           VERDANT_PLUGIN_HOST="$host" cargo test --offline --locked --release -p verdant-plugins --test builtin_signal export_hosts_process_at_each_admitted_rate -- --ignored
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui theme::tests
           cargo test --offline --locked --release -p verdant-ui-protocol -p verdant-session
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui host_pointer::tests
-          # Exercise all compiled control owners and their real native bindings
-          # on every platform; the former knob-only filter omitted new controls.
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui proto_
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui devices::
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui table::
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui menu::
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui commands::
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui files::
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui roll::native_tests
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui pointer_boundary_tests
+          # The compiler migration spans text, collections, overlays and editing
+          # surfaces as well as knobs. Exercise the complete application suite
+          # on every native runner, including the generated SDK regressions.
+          cargo test --offline --locked --release -p verdant-app --bin verdant-gui -- --test-threads=1
+          cargo test --offline --locked --release -p proto-ui-gpui-native --features test-support,gpui/test-support --lib -- --test-threads=1
+          # Exercise the selection notification path enabled by the app itself.
+          cargo test --offline --locked --release -p proto-ui-gpui-native --features test-support,gpui/test-support,gpui-modern-element-api,gpui-text-selection-notification --lib -- --test-threads=1
           cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
           if [ "$RUNNER_OS" = Windows ]; then
             cargo test --offline --locked --release -p verdant-cli windows_path_tests

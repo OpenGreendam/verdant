@@ -607,18 +607,16 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, _cx: &mut Contex
         "choices":2, "defaultChoice":1, "cancelChoice":0});
     let draw_editor = entity.clone(); let basis = revision.clone();
     let draw = std::rc::Rc::new(move |handle: &verdant_overlay_control::OverlayControlHandle, focus: &gpui::FocusHandle, window: &mut Window, cx: &mut gpui::App| {
-        let binding = window.use_keyed_state("modal-dialog-native-scroll", cx, |_, _| {
-            let scroll = gpui::ScrollHandle::new();
-            let target = crate::proto_scroll::NativeScroll::new(scroll.clone()); (scroll, target)
-        });
-        let (scroll, target) = binding.read(cx).clone();
-        let editor = draw_editor.clone(); let focus = focus.clone(); let handle = handle.clone(); let basis = basis.clone();
-        crate::proto_scroll::content("compiled-modal-dialog-scroll", "对话框内容", move |_, cx| {
-            editor.update(cx, |ed, cx| {
+        let viewport = window.use_keyed_state("modal-form-viewport", cx, |_,_| gpui::ScrollHandle::new());
+        let entity = draw_editor.clone(); let handle = handle.clone(); let focus = focus.clone(); let basis = basis.clone();
+        let content: crate::proto_scroll::Draw = std::rc::Rc::new(move |_,_,engine,_,cx| {
+            entity.update(cx, |ed,cx| {
                 ed.focus_dialog = focus.clone();
-                native_modal_dialog_layer(ed, &cx.entity(), handle.clone(), basis.clone(), &scroll, cx).unwrap_or_else(|| div().into_any_element())
+                native_modal_dialog_layer(ed, &cx.entity(), handle.clone(), basis.clone(), engine.expect("modal viewport binding"), cx).unwrap_or_else(||div().into_any_element())
             })
-        }).tab_stop(false).native_scroll(target).into_any_element()
+        });
+        crate::proto_scroll::region("compiled-modal-scroll", serde_json::json!({"label":"对话框设置", "role":"group", "trapFocus":false,"tabStop":false}), content)
+            .scroll_engine(crate::proto_scroll::Engine::Native(viewport)).into_any_element()
     });
     let editor = entity.downgrade();
     let response = std::rc::Rc::new(move |index: usize, window: &mut Window, cx: &mut gpui::App| {
@@ -630,7 +628,7 @@ pub fn modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, _cx: &mut Contex
 }
 
 fn native_modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, handle: verdant_overlay_control::OverlayControlHandle,
-    revision: String, scroll: &gpui::ScrollHandle, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
+    revision: String, engine: crate::proto_scroll::EngineBinding, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
     let dialog = ed.modal_dialog.clone()?;
     let th = ed.theme;
     let (title, body): (&str, Div) = match dialog {
@@ -673,8 +671,8 @@ fn native_modal_dialog_layer(ed: &Editor, entity: &Entity<Editor>, handle: verda
                     .key_context("ModalDialog")
                     .w(px(560.0))
                     .max_h(px(680.0))
-                    .overflow_y_scroll()
-                    .track_scroll(scroll)
+                    .overflow_y_scroll().track_scroll(&engine.handle(cx))
+                    .on_scroll_wheel(move |_,window,cx| engine.notify_input(window,cx))
                     .p(px(18.0))
                     .rounded(px(12.0))
                     .bg(th.popover)

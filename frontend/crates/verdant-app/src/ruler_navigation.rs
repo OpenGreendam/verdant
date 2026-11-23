@@ -33,10 +33,11 @@ pub(crate) fn is_active(editor: EntityId, cx: &App) -> bool {
     active(cx).is_some_and(|scrub| scrub.editor == editor)
 }
 
-pub(crate) fn cancel(editor: EntityId, _: &mut Window, cx: &mut App) {
+pub(crate) fn cancel(editor: EntityId, window: &mut Window, cx: &mut App) {
     if active(cx).is_some_and(|scrub| scrub.editor == editor) {
         cx.global_mut::<RulerState>().scrub = None;
         cx.global_mut::<RulerState>().input = None;
+        crate::proto_editor_surface::cancel_from_editor(editor,window,cx);
     }
 }
 
