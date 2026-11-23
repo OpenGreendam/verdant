@@ -2,7 +2,7 @@
 //! logs belong to ProjectPersistence; preferences never live in the install prefix.
 
 use std::path::{Path, PathBuf};
-use gpui::{App, AppContext, Bounds, Context, FocusHandle, IntoElement, KeyDownEvent, Point, Render, ScrollHandle, Size, Window, WindowBounds, WindowOptions, div, prelude::*, px};
+use gpui::{App, AppContext, Bounds, Context, IntoElement, Point, Render, Size, Window, WindowBounds, WindowOptions, div, prelude::*, px};
 use crate::editor::Editor;
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -495,36 +495,37 @@ fn resolve_score_options(format:verdant_exchange::Format,mut options:verdant_exc
 }
 
 #[derive(Clone,Copy,PartialEq,Eq)]
-enum ScoreOptionControl{Utf8,Cp932,Ppq,Preserve,Track(Option<usize>),Cancel,Export}
+enum ScoreOptionControl{Utf8,Cp932,Preserve,Track(Option<usize>),Cancel,Export}
 
 struct ScoreExportDialog{
     format:verdant_exchange::Format,
     options:verdant_exchange::ExportOptions,
     tracks:Vec<String>,
-    ppq:String,
-    replace_ppq:bool,
-    controls:Vec<(ScoreOptionControl,FocusHandle)>,
-    focus:FocusHandle,
-    scroll:ScrollHandle,
+    ppq:gpui::Entity<crate::proto_text::Field>,
+    instance:String,
     send:async_channel::Sender<verdant_exchange::ExportOptions>,
     error:std::option::Option<std::string::String>,
 }
 
 impl ScoreExportDialog{
     fn new(format:verdant_exchange::Format,options:verdant_exchange::ExportOptions,tracks:Vec<String>,send:async_channel::Sender<verdant_exchange::ExportOptions>,window:&mut Window,cx:&mut Context<Self>)->Self{
-        use ScoreOptionControl::*;
-        let mut kinds=Vec::new();
-        if format==verdant_exchange::Format::Ust{kinds.extend([Utf8,Cp932]);}
-        if format==verdant_exchange::Format::Midi{kinds.push(Ppq);}
-        kinds.push(Preserve);
-        if format!=verdant_exchange::Format::Ust{kinds.push(Track(None));}
-        kinds.extend((0..tracks.len()).map(|i|Track(Some(i))));
-        kinds.extend([Cancel,Export]);
-        let controls=kinds.into_iter().map(|k|(k,cx.focus_handle())).collect::<Vec<_>>();
-        let focus=cx.focus_handle();
-        window.focus(&controls[0].1,cx);
-        let ppq=options.midi_ppq.map(|p|p.to_string()).unwrap_or_default();
-        Self{format,options,tracks,ppq,replace_ppq:true,controls,focus,scroll:ScrollHandle::default(),send,error:None}
+        let mut options=options;
+        if format==verdant_exchange::Format::Ust&&options.track.is_none()&&!tracks.is_empty(){options.track=Some(0);}
+        let value=options.midi_ppq.map(|p|p.to_string()).unwrap_or_default();
+        let ppq=crate::proto_text::Field::with_options("MIDI PPQ；留空为自动",&value,crate::theme::Theme::for_appearance(window.appearance()),
+            crate::proto_text::Options { select_all:true, submit_on_enter:true, cancel_on_escape:true,
+                numeric:Some(crate::proto_text::Numeric { min:1., max:32767., step:1., default:480. }), ..Default::default() },window,cx);
+        cx.subscribe_in(&ppq,window,|view:&mut Self,_,event,window,cx| {
+            match event {
+                crate::proto_text::Event::Submit { .. }=>view.activate(ScoreOptionControl::Export,window,cx),
+                crate::proto_text::Event::Cancel=>window.remove_window(),
+                crate::proto_text::Event::Changed { .. }|crate::proto_text::Event::Replaced { .. }=>view.error=None,
+                crate::proto_text::Event::Failure(error)=>view.error=Some(error.clone()),
+                _=>{},
+            }
+            cx.notify();
+        }).detach();
+        Self{format,options,tracks,ppq,instance:verdant_domain::NoteId::generate().to_string(),send,error:None}
     }
 
     fn activate(&mut self,control:ScoreOptionControl,window:&mut Window,cx:&mut Context<Self>){
@@ -532,11 +533,10 @@ impl ScoreExportDialog{
         match control{
             Utf8=>self.options.ust_encoding=verdant_exchange::UstEncoding::Utf8,
             Cp932=>self.options.ust_encoding=verdant_exchange::UstEncoding::Cp932,
-            Ppq=>self.replace_ppq=true,
             Preserve=>self.options.preserve_extensions=!self.options.preserve_extensions,
             Track(track)=>self.options.track=track,
             Cancel=>{window.remove_window();return;}
-            Export=>match resolve_score_options(self.format,self.options.clone(),&self.ppq){
+            Export=>match resolve_score_options(self.format,self.options.clone(),self.ppq.read(cx).value()){
                 Ok(options)=>{if self.send.try_send(options).is_ok(){window.remove_window();return;}self.error=Some("原工程窗口已关闭，请重新导出".into());}
                 Err(error)=>self.error=Some(error),
             },
@@ -544,45 +544,35 @@ impl ScoreExportDialog{
         cx.notify();
     }
 
-    fn key_down(&mut self,event:&KeyDownEvent,window:&mut Window,cx:&mut Context<Self>){
-        let key=event.keystroke.key.as_str();
-        let index=self.controls.iter().position(|(_,focus)|focus.is_focused(window)).unwrap_or(0);
-        let control=self.controls[index].0;
-        if key=="tab"{
-            let len=self.controls.len();let next=if event.keystroke.modifiers.shift{(index+len-1)%len}else{(index+1)%len};
-            window.focus(&self.controls[next].1,cx);self.replace_ppq=true;
-        }else if key=="escape"{window.remove_window();}
-        else if key=="enter"{self.activate(if control==ScoreOptionControl::Cancel{control}else{ScoreOptionControl::Export},window,cx);}
-        else if key=="space"&&control!=ScoreOptionControl::Ppq{self.activate(control,window,cx);}
-        else if control==ScoreOptionControl::Ppq{
-            match key{
-                "backspace"|"delete"=>{if self.replace_ppq||key=="delete"{self.ppq.clear();}else{self.ppq.pop();}self.replace_ppq=false;}
-                "up"|"down"=>{let value=self.ppq.parse::<i32>().unwrap_or(480);self.ppq=(value+if key=="up"{1}else{-1}).clamp(1,32767).to_string();self.replace_ppq=true;}
-                digits if digits.len()==1&&digits.as_bytes()[0].is_ascii_digit()=>{if self.replace_ppq{self.ppq.clear();self.replace_ppq=false;}if self.ppq.len()<5{self.ppq.push_str(digits);}}
-                _=>return,
-            }
-            self.error=None;
-        }else{return;}
-        window.prevent_default();cx.stop_propagation();cx.notify();
-    }
-
-    fn control(&self,kind:ScoreOptionControl,label:String,selected:bool,window:&Window,cx:&mut Context<Self>)->gpui::Stateful<gpui::Div>{
-        let focus=self.controls.iter().find(|(k,_)|*k==kind).expect("dialog control").1.clone();
+    fn control(&self,kind:ScoreOptionControl,label:String,selected:bool,window:&Window,cx:&mut Context<Self>)->crate::proto_controls::Action{
         let th=crate::theme::Theme::for_appearance(window.appearance());
-        let focused=focus.is_focused(window);
-        div().id(gpui::SharedString::from(format!("score-option-{}",self.controls.iter().position(|(k,_)|*k==kind).unwrap())))
-            .role(if kind==ScoreOptionControl::Ppq{gpui::Role::SpinButton}else{gpui::Role::Button})
-            .aria_label(if kind==ScoreOptionControl::Ppq{format!("MIDI PPQ：{label}")}else{label.clone()})
-            .aria_selected(selected).track_focus(&focus)
-            .when(kind==ScoreOptionControl::Ppq,|d|d.aria_value(label.clone()).aria_min_numeric_value(1.).aria_max_numeric_value(32767.).aria_numeric_value_step(1.))
-            .p(px(8.)).rounded(px(4.)).border_1().border_color(if focused{th.accent}else{th.control})
+        let id=match kind { ScoreOptionControl::Utf8=>"utf8".into(),ScoreOptionControl::Cp932=>"cp932".into(),
+            ScoreOptionControl::Preserve=>"preserve".into(),ScoreOptionControl::Track(track)=>format!("track-{track:?}"),
+            ScoreOptionControl::Cancel=>"cancel".into(),ScoreOptionControl::Export=>"export".into() };
+        let role=match kind { ScoreOptionControl::Preserve=>gpui::Role::CheckBox,
+            ScoreOptionControl::Utf8|ScoreOptionControl::Cp932|ScoreOptionControl::Track(_)=>gpui::Role::RadioButton,_=>gpui::Role::Button };
+        let button=crate::proto_controls::action(gpui::SharedString::from(format!("score-option-{id}")),label.clone())
+            .role(role).when(!matches!(kind,ScoreOptionControl::Cancel|ScoreOptionControl::Export),|d|d.aria_selected(selected))
+            .p(px(8.)).rounded(px(4.)).border_1().border_color(th.control).focus_visible(|s|s.border_color(th.accent))
             .bg(if selected{th.selection}else{th.control}).text_sm().text_color(th.text)
-            .child(label).on_click(cx.listener(move|view,_,window,cx|{window.focus(&focus,cx);view.activate(kind,window,cx);} ))
+            .child(label).on_click(cx.listener(move|view,_,window,cx|view.activate(kind,window,cx)));
+        let entity=cx.entity();
+        match kind {
+            ScoreOptionControl::Utf8|ScoreOptionControl::Cp932=>button.navigation(if kind==ScoreOptionControl::Utf8{0}else{1},2,
+                move|index,window,cx|entity.update(cx,|view,cx|view.activate(if index==0{ScoreOptionControl::Utf8}else{ScoreOptionControl::Cp932},window,cx))),
+            ScoreOptionControl::Track(track)=>{
+                let all=self.format!=verdant_exchange::Format::Ust;
+                let offset=usize::from(all);
+                button.navigation(track.map(|index|index+offset).unwrap_or(0),self.tracks.len()+offset,
+                    move|index,window,cx|entity.update(cx,|view,cx|view.activate(ScoreOptionControl::Track(if all&&index==0{None}else{Some(index-offset)}),window,cx)))
+            },
+            _=>button,
+        }
     }
 }
 
-impl Render for ScoreExportDialog{
-    fn render(&mut self,window:&mut Window,cx:&mut Context<Self>)->impl IntoElement{
+impl ScoreExportDialog{
+    fn native_form(&mut self,window:&mut Window,cx:&mut Context<Self>)->gpui::AnyElement{
         use ScoreOptionControl::*;
         let th=crate::theme::Theme::for_appearance(window.appearance());
         let mut form=div().flex().flex_col().gap(px(10.))
@@ -595,7 +585,7 @@ impl Render for ScoreExportDialog{
         }
         if self.format==verdant_exchange::Format::Midi{
             form=form.child("MIDI PPQ（每四分音符 tick 数，1–32767）")
-                .child(self.control(Ppq,if self.ppq.is_empty(){"自动".into()}else{self.ppq.clone()},false,window,cx))
+                .child(self.ppq.clone())
                 .child(div().text_xs().text_color(th.text_secondary).child("点击后直接输入数字；↑↓ 微调，Delete 清空为自动。自动保留来源分辨率；来源超过 32767 时使用 960。"));
         }
         form=form.child(self.control(Preserve,format!("{} 保留来源扩展",if self.options.preserve_extensions{"☑"}else{"☐"}),self.options.preserve_extensions,window,cx))
@@ -604,13 +594,30 @@ impl Render for ScoreExportDialog{
         if self.format!=verdant_exchange::Format::Ust{form=form.child(self.control(Track(None),"全部轨道".into(),self.options.track.is_none(),window,cx));}
         for(index,name)in self.tracks.iter().enumerate(){form=form.child(self.control(Track(Some(index)),format!("第 {} 轨 · {}",index+1,name),self.options.track==Some(index),window,cx));}
         if let Some(error)=&self.error{form=form.child(div().text_sm().text_color(th.error).child(error.clone()));}
-        form=form.child(div().text_xs().text_color(th.text_secondary).child("Tab 切换，空格选择，Enter 继续，Esc 取消。"))
+        form=form.child(div().text_xs().text_color(th.text_secondary).child("Tab 切换，空格或 Enter 选择，Esc 取消；选择保存位置继续导出。"))
             .child(div().flex().justify_end().gap(px(8.))
             .child(self.control(Cancel,"取消 · Esc".into(),false,window,cx))
             .child(self.control(Export,"选择保存位置… · Enter".into(),false,window,cx)));
-        div().id("score-export-options").role(gpui::Role::Dialog).aria_label("乐谱导出选项").track_focus(&self.focus)
-            .size_full().overflow_y_scroll().track_scroll(&self.scroll).p(px(20.)).bg(th.surface).text_color(th.text)
-            .on_key_down(cx.listener(Self::key_down)).child(form)
+        div().id("score-export-options").p(px(20.)).bg(th.surface).text_color(th.text).child(form).into_any_element()
+    }
+}
+impl Render for ScoreExportDialog{
+    fn render(&mut self,_window:&mut Window,cx:&mut Context<Self>)->impl IntoElement{
+        let entity=cx.entity();
+        let draw:crate::proto_overlay::Draw=std::rc::Rc::new(move|_,_,_,_| {
+            let entity=entity.clone();
+            crate::proto_scroll::content("compiled-score-export-scroll","乐谱导出选项",move|window,cx|
+                entity.update(cx,|view,cx|view.native_form(window,cx))).tab_stop(false).into_any_element()
+        });
+        let entity=cx.entity().downgrade();
+        let response:crate::proto_overlay::Response=std::rc::Rc::new(move|index,window,cx| {
+            let _=entity.update(cx,|view,cx| {
+                if view.ppq.read(cx).is_composing(){return;}
+                view.activate(if index==0{ScoreOptionControl::Cancel}else{ScoreOptionControl::Export},window,cx);
+            });
+        });
+        crate::proto_overlay::overlay("compiled-score-export-dialog",serde_json::json!({"label":"乐谱导出选项","role":"dialog",
+            "open":true,"choices":2,"defaultChoice":1,"cancelChoice":0,"revision":self.instance}),draw,response)
     }
 }
 

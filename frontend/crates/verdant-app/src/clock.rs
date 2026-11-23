@@ -356,10 +356,10 @@ impl Render for LcdView {
         // digits from shifting.
         div().size_full().flex().items_center().gap(px(10.0)).pl(px(12.0)).pr(px(4.0)).rounded(px(8.0)).bg(th.control)
             .font_family(ui_font.clone()).font_features(crate::theme::tabular_figures())
-            .child(div().id("lcd-position").flex_1()
-                .on_mouse_down(gpui::MouseButton::Right, {
+            .child(crate::proto_controls::action("lcd-position", format!("播放位置，小节:拍:细分:刻度 {}，时间 {}", position.musical, position.time)).flex_1()
+                .on_context_menu({
                     let editor = editor.clone();
-                    move |ev: &gpui::MouseDownEvent, window, cx| editor.update(cx, |ed, cx| {
+                    move |ev: &crate::proto_controls::Activation, window, cx| editor.update(cx, |ed, cx| {
                         use crate::editor::{MenuAction as M, WorkflowAction as A};
                         use crate::menu::MenuItem as I;
                         let pb = ed.playback_settings();
@@ -374,17 +374,16 @@ impl Render for LcdView {
                             I::action("在播放头编辑 / 新增速度…", M::Workflow(A::EditTempo(ed.tempo().tick_at(ed.frame_playhead).max(0.0) as i64))),
                             I::action("在播放头编辑 / 新增拍号…", M::Workflow(A::EditMeter(ed.tempo().tick_at(ed.frame_playhead).max(0.0) as i64))),
                         ];
-                        ed.show_menu(ev.position, items, window, cx);
+                        ed.show_menu(ev.position(), items, window, cx);
                     })
                 }).min_w_0().h_full().flex().flex_col().items_center().justify_center()
-                .aria_label(format!("播放位置，小节:拍:细分:刻度 {}，时间 {}", position.musical, position.time))
                 .child(div().text_size(px(15.0)).line_height(px(18.0)).font_weight(gpui::FontWeight::SEMIBOLD).whitespace_nowrap().child(position.musical))
                 .child(div().text_size(px(11.5)).line_height(px(14.0)).whitespace_nowrap().text_color(th.text_secondary).child(position.time)))
             .when(!compact, |d| d.child(div().w(px(56.0)).h_full().flex_none().flex().flex_col().items_center().justify_center()
                 .whitespace_nowrap()
                 .child(div().text_size(px(13.0)).line_height(px(16.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(format!("{:.1}", position.bpm)))
                 .child(div().text_size(px(11.0)).line_height(px(14.0)).text_color(th.text_secondary).child(format!("BPM · {}", position.signature)))))
-            .when(!compact, |d| d.child(div().id("transport-follow").role(Role::Button).aria_label("跟随播放头").aria_selected(follow)
+            .when(!compact, |d| d.child(crate::proto_controls::action("transport-follow", "跟随播放头").aria_selected(follow)
                 .flex_none().h(px(28.0)).px(px(8.0)).flex().items_center().rounded(px(6.0)).text_size(px(12.0))
                 .when(follow, |d| d.bg(th.checked))
                 .text_color(if follow { th.text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.checked } else { th.hover }))

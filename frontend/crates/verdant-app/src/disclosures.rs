@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FocusHandle, FontWeight, IntoElement,
-    KeyDownEvent, Render, Role, ScrollHandle, WeakEntity, Window, WindowBounds,
+    Render, Role, WeakEntity, Window, WindowBounds,
     WindowHandle, WindowOptions, div, prelude::*, px, size,
 };
 
@@ -96,7 +96,6 @@ fn license_block(title: &'static str, text: &'static str, th: Theme) -> gpui::Di
 pub struct Disclosures {
     font: gpui::SharedString,
     focus: FocusHandle,
-    scroll: ScrollHandle,
     editor: Option<WeakEntity<Editor>>,
     save_error: std::option::Option<std::string::String>,
 }
@@ -139,9 +138,8 @@ fn open_window(editor: Option<WeakEntity<Editor>>, cx: &mut App) {
             window.set_window_title(i18n::current(cx).text(Key::DisclosuresWindowTitle));
             cx.new(|cx| {
                 let focus = cx.focus_handle();
-                window.focus(&focus, cx);
                 cx.observe_global::<Locale>(|_, cx| cx.notify()).detach();
-                Disclosures { font, focus, scroll: ScrollHandle::default(), editor, save_error: None }
+                Disclosures { font, focus, editor, save_error: None }
             })
         },
     ) {
@@ -165,45 +163,25 @@ impl Disclosures {
 }
 
 impl Render for Disclosures {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let locale = i18n::current(cx); let semantics = Surface::Disclosures.semantics(locale);
+        let props = serde_json::json!({"label":semantics.label, "description":semantics.description, "role":"document", "autoFocus":true});
+        let entity = cx.entity();
+        let draw = std::rc::Rc::new(move |_handle: &verdant_scroll_region::ScrollRegionHandle, focus: &FocusHandle, window: &mut Window, cx: &mut App| {
+            entity.update(cx, |view, cx| { view.focus = focus.clone(); view.native_content(window, cx) })
+        });
+        crate::proto_scroll::region("compiled-disclosures-scroll", props, draw)
+    }
+}
+
+impl Disclosures {
+    fn native_content(&self, window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
         let th = Theme::for_appearance(window.appearance());
         let locale = i18n::current(cx);
-        let semantics = Surface::Disclosures.semantics(locale);
         window.set_window_title(locale.text(Key::DisclosuresWindowTitle));
         let mut content = div()
             .id("disclosures")
-            .role(semantics.role)
-            .aria_label(semantics.label)
-            .aria_description(semantics.description)
-            .track_focus(&self.focus)
-            .size_full()
-            .overflow_y_scroll()
-            .track_scroll(&self.scroll)
-            .on_key_down(cx.listener(|view, event: &KeyDownEvent, window, cx| {
-                if event.keystroke.key == "tab" {
-                    if event.keystroke.modifiers.shift { window.focus_prev(cx); }
-                    else { window.focus_next(cx); }
-                    cx.stop_propagation();
-                    return;
-                }
-                // Focused language buttons retain their native Space/Enter behavior.
-                if event.keystroke.key == "space" && !view.focus.is_focused(window) { return; }
-                let mut offset = view.scroll.offset();
-                let limit = view.scroll.max_offset().y;
-                let page = window.viewport_size().height * 0.8;
-                offset.y = match event.keystroke.key.as_str() {
-                    "up" => offset.y + px(40.),
-                    "down" => offset.y - px(40.),
-                    "pageup" => offset.y + page,
-                    "pagedown" | "space" => offset.y - page,
-                    "home" => px(0.),
-                    "end" => -limit,
-                    _ => return,
-                }.clamp(-limit, px(0.));
-                view.scroll.set_offset(offset);
-                cx.stop_propagation();
-                cx.notify();
-            }))
+            .w_full()
             .bg(th.surface)
             .text_color(th.text)
             .font_family(self.font.clone())
@@ -217,20 +195,19 @@ impl Render for Disclosures {
                     .flex_none().flex().flex_col().gap(px(6.0))
                     .child(heading(locale.text(Key::Language), th))
                     .child(body(locale.text(Key::LanguageHelp), th))
-                    .child(div().flex().gap(px(8.0)).children(Locale::ALL.into_iter().map(|choice| {
-                        div().id(choice.code()).role(Role::Button).aria_label(choice.native_name())
+                    .child(div().flex().gap(px(8.0)).children(Locale::ALL.into_iter().enumerate().map(|(index, choice)| {
+                        let entity = cx.entity();
+                        crate::proto_controls::action(choice.code(), choice.native_name()).role(Role::RadioButton)
+                            .navigation(index, Locale::ALL.len(), move |index, _, cx| {
+                                if let Some(choice) = Locale::ALL.get(index) { entity.update(cx, |view, cx| view.choose_locale(*choice, cx)); }
+                            })
                             .aria_selected(choice == locale).tab_index(0)
                             .px(px(10.0)).py(px(6.0)).rounded(px(4.0)).border_1().border_color(th.shade)
                             .bg(if choice == locale { th.control_pressed } else { th.control })
                             .focus(|style| style.border_color(th.accent))
                             .text_sm().child(choice.native_name())
                             .on_click(cx.listener(move |view, _, _, cx| view.choose_locale(choice, cx)))
-                            .on_key_down(cx.listener(move |view, event: &KeyDownEvent, _, cx| {
-                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                                    view.choose_locale(choice, cx);
-                                    cx.stop_propagation();
-                                }
-                            }))
+
                     }))),
             );
         }
@@ -250,6 +227,6 @@ impl Render for Disclosures {
             .child(license_block(locale.text(Key::GpuiLicense), GPUI_LICENSE, th))
             .child(license_block(locale.text(Key::DiffSingerLicense), DIFFSINGER_LICENSE, th))
             .child(license_block(locale.text(Key::OpenVpiLicense), OPENVPI_NOTICE, th))
-            .child(license_block(locale.text(Key::VerdantLicense), VERDANT_LICENSE, th))
+            .child(license_block(locale.text(Key::VerdantLicense), VERDANT_LICENSE, th)).into_any_element()
     }
 }

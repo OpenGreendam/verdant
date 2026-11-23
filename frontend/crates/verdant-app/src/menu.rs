@@ -187,14 +187,19 @@ impl MenuItem {
     pub fn is_separator(&self) -> bool { self.label.is_empty() }
     fn row_height(&self) -> f32 { if self.is_separator() { 9.0 } else if self.header { 22.0 } else { 26.0 } }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct OpenMenu {
+    /// A dismissed menu cannot lend its callbacks to a later opening at the
+    /// same anchor, even when its content and document revision are identical.
+    instance: String,
     pub window: gpui::AnyWindowHandle,
     pub anchor: Point<Pixels>,
     pub items: Vec<MenuItem>,
     pub selected: usize,
     pub previous_focus: Option<FocusHandle>,
     expanded: Option<usize>,
+    scroll: gpui::ScrollHandle,
+    native_scroll: crate::proto_scroll::NativeScroll,
 }
 
 impl OpenMenu {
@@ -226,13 +231,9 @@ impl Editor {
 
     fn activate_menu_item(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(menu) = self.menu.as_mut().filter(|menu| menu.window == window.window_handle()) else { return; };
-        let Some((index, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
+        let Some((_, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
         match &item.command {
-            Some(MenuCommand::Submenu(_)) => {
-                menu.expanded = (menu.expanded != Some(index)).then_some(index);
-                menu.selected = index;
-                cx.notify();
-            }
+            Some(MenuCommand::Submenu(_)) => {},
             Some(MenuCommand::Editor(command)) => {
                 let command = command.clone();
                 self.close_menu(window, cx);
@@ -280,7 +281,9 @@ impl Editor {
         let previous_focus = self.menu.as_ref().filter(|m| m.window == window.window_handle())
             .and_then(|m| m.previous_focus.clone()).or_else(|| window.focused(cx));
         let selected = items.iter().position(|i| i.enabled && i.command.is_some()).unwrap_or(0);
-        self.menu = Some(OpenMenu { window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None });
+        let scroll = gpui::ScrollHandle::new();
+        let native_scroll = crate::proto_scroll::NativeScroll::new(scroll.clone());
+        self.menu = Some(OpenMenu { instance: verdant_domain::TrackId::generate().to_string(), window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None, scroll, native_scroll });
         window.focus(&self.focus_menu, cx);
         cx.notify();
     }
@@ -532,7 +535,59 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
     ]
 }
 
-pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
+fn collection_revision(ed: &Editor, menu: &OpenMenu) -> String {
+    // Expanded children change the row-to-command mapping. Old virtual row
+    // callbacks must therefore expire when the submenu topology changes.
+    format!("{}:{}:{}:{:?}:{:?}:{:?}:{:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.expanded, menu.items)
+}
+
+pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, _window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
+    let revision = collection_revision(ed, menu);
+    let items = menu.rows().map(|(_, _, item)| if !item.enabled || item.command.is_none() { 0 }
+        else if matches!(&item.command, Some(MenuCommand::Submenu(_))) { 2 } else { 1 }).collect();
+    let expanded = menu.rows().enumerate().find_map(|(row, (index, child, _))|
+        (!child && menu.expanded == Some(index)).then_some(row as i64)).unwrap_or(-1);
+    let props = serde_json::json!({"mode":"menu", "label":"上下文菜单", "cursor":menu.selected,
+        "expanded": expanded, "revision":revision, "autoFocus":true, "disabled":false});
+    let draw_editor = cx.entity(); let snapshot = menu.clone(); let basis = revision.clone();
+    let draw = std::rc::Rc::new(move |handle: &verdant_collection_control::CollectionControlHandle, _focus: &gpui::FocusHandle, _window: &mut Window, _cx: &mut gpui::App| {
+        let editor = draw_editor.clone(); let snapshot = snapshot.clone(); let basis = basis.clone(); let handle = handle.clone();
+        let target = snapshot.native_scroll.clone();
+        crate::proto_scroll::content("compiled-context-menu-scroll", "菜单选项", move |window, cx| {
+            editor.update(cx, |ed, cx| native_context_menu_layer(ed, &snapshot, handle.clone(), basis.clone(), window, cx).into_any_element())
+        }).tab_stop(false).native_scroll(target).into_any_element()
+    });
+    let editor = cx.entity().downgrade();
+    let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
+        let _ = editor.update(cx, |ed, cx| {
+            let Some(menu) = ed.menu.as_ref().filter(|menu| menu.window == window.window_handle()) else { return };
+            if payload.get("revision").and_then(serde_json::Value::as_str) != Some(collection_revision(ed, menu).as_str()) { return; }
+            let index = crate::proto_controls::source_integer(payload.get("index")).unwrap_or(-1);
+            match name {
+                "close" => ed.close_menu(window, cx),
+                "activate" if index >= 0 => ed.activate_menu_item(index as usize, window, cx),
+                "select" if index >= 0 => { if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; menu.scroll.scroll_to_item(index as usize); } cx.notify(); },
+                "expand" => {
+                    if let Some(menu) = ed.menu.as_mut() {
+                        let previous_parent = menu.rows().enumerate().find_map(|(row, (source, child, _))|
+                            (!child && menu.expanded == Some(source)).then_some(row));
+                        let target = if index >= 0 { menu.rows().nth(index as usize).map(|(source, _, _)| source) } else { None };
+                        menu.expanded = target;
+                        if index >= 0 { menu.selected = index as usize; }
+                        else if let Some(parent) = previous_parent { menu.selected = parent; }
+                    }
+                    cx.notify();
+                },
+                _ => {},
+            }
+        });
+    });
+    crate::proto_collection::collection("compiled-context-menu", props, items, draw, sink)
+}
+
+fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_collection_control::CollectionControlHandle,
+    revision: String, window: &Window, _cx: &mut Context<Editor>) -> impl IntoElement {
+
     let th = ed.theme;
     let win = window.viewport_size();
     let width = px(328.0).min(win.width);
@@ -540,46 +595,14 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
     // Reserve a check column only in menus that contain toggles.
     let checks = menu.rows().any(|(_, _, item)| item.checked.is_some());
     let place = popover_placement(menu.anchor, (width.as_f32(), height.as_f32()), (win.width.as_f32(), win.height.as_f32()));
-    let selected = menu.selected;
-    let list = div().id("context-menu").role(gpui::Role::Menu).aria_label("上下文菜单")
-        .key_context("ContextMenu").track_focus(&ed.focus_menu).occlude()
-        .w_full().max_h(height).overflow_y_scroll()
+    let selected = handle.state("cursor").ok().and_then(|v| crate::proto_controls::source_index(Some(&v))).unwrap_or(menu.selected);
+    let key_handle = handle.clone();
+    let list = div().id("context-menu")
+        .key_context("ContextMenu").occlude()
+        .w_full().max_h(height).overflow_y_scroll().track_scroll(&menu.scroll)
         .p(px(6.0)).rounded(px(12.0)).bg(th.popover).border_1().border_color(th.shade).shadow_lg()
         .text_sm().text_color(th.text)
-        .on_key_down(cx.listener(|ed, ev: &KeyDownEvent, window, cx| {
-            if ed.menu.as_ref().is_none_or(|menu| menu.window != window.window_handle()) { return; }
-            let key = ev.keystroke.key.as_str();
-            if !matches!(key, "up" | "down" | "home" | "end" | "enter" | "space" | "escape" | "tab" | "left" | "right") { return; }
-            if matches!(key, "left" | "right") && !ed.menu.as_ref().is_some_and(|menu|
-                menu.expanded.is_some() || menu.rows().nth(menu.selected).is_some_and(|(_, _, item)|
-                    matches!(&item.command, Some(MenuCommand::Submenu(_))))) { return; }
-            window.prevent_default(); cx.stop_propagation();
-            if matches!(key, "escape" | "tab") { ed.close_menu(window, cx); return; }
-            if matches!(key, "enter" | "space") {
-                if let Some(row) = ed.menu.as_ref().map(|menu| menu.selected) { ed.activate_menu_item(row, window, cx); }
-                return;
-            }
-            let Some(menu) = ed.menu.as_mut() else { return };
-            if key == "left" {
-                if let Some(index) = menu.expanded.take() { menu.selected = index; cx.notify(); }
-                return;
-            }
-            if key == "right" {
-                let submenu = menu.rows().nth(menu.selected).and_then(|(index, _, item)|
-                    matches!(&item.command, Some(MenuCommand::Submenu(_))).then_some(index));
-                if let Some(index) = submenu {
-                    menu.expanded = Some(index);
-                    menu.selected = index + 1;
-                    cx.notify();
-                }
-                return;
-            }
-            let enabled: Vec<usize> = menu.rows().enumerate().filter(|(_, (_, _, item))| item.enabled && item.command.is_some()).map(|(i, _)| i).collect();
-            if enabled.is_empty() { return; }
-            let current = enabled.iter().position(|i| *i == menu.selected).unwrap_or(0);
-            let i = match key { "home" => 0, "end" => enabled.len() - 1, "up" => (current + enabled.len() - 1) % enabled.len(), _ => (current + 1) % enabled.len() };
-            menu.selected = enabled[i]; cx.notify();
-        }))
+        .on_key_down(move |event, window, cx| crate::proto_collection::key(&key_handle, event, window, cx))
         .children(menu.rows().enumerate().map(|(i, (index, child, item))| {
             if item.is_separator() {
                 return div().h(px(9.0)).mx(px(8.0)).flex().items_center()
@@ -593,26 +616,30 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &Window, cx: &mu
             let enabled = item.enabled;
             let submenu = matches!(&item.command, Some(MenuCommand::Submenu(_)));
             let expanded = submenu && menu.expanded == Some(index);
-            div().id(SharedString::from(format!("menu-item-{i}"))).role(gpui::Role::MenuItem)
+            let choose = handle.clone(); let choose_revision = revision.clone();
+            let hover = handle.clone(); let hover_revision = revision.clone();
+            crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone())
+                .role(if item.checked.is_some() { gpui::Role::MenuItemCheckBox } else { gpui::Role::MenuItem })
+                .disabled(!enabled)
+                .tab_index(-1)
                 .aria_label(item.label.clone())
                 .when_some(item.checked, |d, on| d.aria_selected(on))
-                .a11y_synthetic_children(move |builder| {
-                    if !enabled { builder.parent_node().set_disabled(); }
-                    if submenu { builder.parent_node().set_expanded(expanded); }
-                })
+                .when(submenu, |d| d.aria_expanded(expanded))
                 .when(i == selected && enabled, |d| d.aria_active_descendant().bg(th.hover))
                 .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0))
                 .text_color(if enabled { th.text } else { th.text_tertiary })
                 .when(checks, |d| d.child(div().w(px(18.0)).flex_none().text_color(th.accent).child(if item.checked == Some(true) { "✓" } else { "" })))
                 .child(div().when(child, |d| d.pl(px(16.0))).flex_1().truncate().child(item.label.clone()))
                 .when(!item.hint.is_empty(), |d| d.child(div().ml(px(12.0)).flex_none().text_xs().text_color(th.text_secondary).child(if expanded { "⌄".into() } else { item.hint.clone() })))
-                .on_mouse_move(cx.listener(move |ed, _, _, cx| { if enabled { if let Some(m) = ed.menu.as_mut() { if m.selected != i { m.selected = i; cx.notify(); } } } }))
-                .on_click(cx.listener(move |ed, _, window, cx| {
-                    if enabled { ed.activate_menu_item(i, window, cx); }
+                .on_mouse_move(move |_, window, cx| {
+                    crate::proto_collection::call(&hover, "selectIndex", vec![i.into(), false.into(), hover_revision.clone().into()], window, cx);
+                })
+                .on_click(move |_, window, cx| {
+                    crate::proto_collection::call(&choose, "choose", vec![i.into(), false.into(), choose_revision.clone().into()], window, cx);
                     cx.stop_propagation();
-                })).into_any_element()
+                }).into_any_element()
         }))
-        .on_mouse_down_out(cx.listener(|ed, _, window, cx| ed.close_menu(window, cx)));
+        .on_mouse_down_out(move |_, window, cx| crate::proto_collection::call(&handle, "dismiss", vec![], window, cx));
     let (popover, border) = (th.popover, th.shade);
     div().absolute().left(px(place.x)).top(px(place.y)).w(width)
         .child(list)

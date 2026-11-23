@@ -19,12 +19,13 @@ import sys
 import tarfile
 
 from probe import CASES, INITIAL_GAIN, sha256
+from controls import CONTROL_CASES, validate_control_trace
 
 
 PROGRAM_PATHS = {'verdant-gui': 'libexec/verdant/verdant-gui', 'verdant-worker': 'bin/verdant-worker'}
 PROGRAM_ROLES = {'verdant-gui': 'gpui', 'verdant-worker': 'worker'}
 SOURCE_FILES = ('frontend/Cargo.lock', 'frontend/proto-ui/compiler.pin.json',
-                'tools/native-input/probe.py', 'tools/native-input/run-linux-isolated.py',
+                'tools/native-input/probe.py', 'tools/native-input/controls.py', 'tools/native-input/run-linux-isolated.py',
                 'tools/native-input/ci.py', 'tools/native-input/x11_screenshot.py',
                 'tools/a11y/run-isolated.py', 'tools/a11y/observe-atspi.py')
 
@@ -182,7 +183,8 @@ def run_backend(args):
                '--deps-root', str(args.deps_root), '--repo', str(repo),
                '--binary', identity['programs']['verdant-gui']['path'],
                '--worker-binary', identity['programs']['verdant-worker']['path'],
-               '--backend', args.backend, '--run-dir', str(args.run_dir), '--python', sys.executable]
+               '--backend', args.backend, '--suite', args.suite,
+               '--run-dir', str(args.run_dir), '--python', sys.executable]
     # No diagnostic options are accepted by this CI entry point.
     result = subprocess.run(command, env=env)
     verify_identity(identity, repo)
@@ -203,6 +205,8 @@ def validate_run(identity, backend, run):
     harness = json.loads((run / 'harness.json').read_text())
     evidence = run / 'evidence'
     report = json.loads((evidence / 'result.json').read_text())
+    if harness.get('suite', 'original') != 'original' or report.get('suite', 'original') != 'original':
+        raise RuntimeError(f'{backend}: original knob trace cannot be replaced by another suite')
     if harness.get('format') != 'verdant.isolated-native-run.v1' or harness.get('ok') is not True \
             or harness.get('exitCode') != 0 or harness.get('probeOptions') != []:
         raise RuntimeError(f'{backend}: isolated harness failed or used diagnostic filters')
@@ -271,10 +275,82 @@ def validate_run(identity, backend, run):
             if not surface:
                 raise RuntimeError('Wayland: every window must have a measured scene graph surface')
             evidence_file(evidence, surface['evidence'])
-    return {'backend': backend, 'cases': report['cases'], 'binary': report['binary'], 'worker': report['worker'],
+    return {'backend': backend, 'suite': 'original', 'cases': report['cases'], 'binary': report['binary'], 'worker': report['worker'],
             'elapsedSeconds': report['elapsedSeconds'], 'finalProject': summaries[-1]['savedProject'],
             'steps': summaries, 'windowMappings': report['windowMappings'], 'weston': harness.get('weston'),
             'waylandProtocol': report.get('waylandProtocol'), 'tolerances': report['tolerances'],
+            'resultSha256': sha256(evidence / 'result.json'), 'harnessSha256': sha256(run / 'harness.json')}
+
+
+def validate_control_run(identity, backend, run):
+    harness = json.loads((run / 'harness.json').read_text())
+    evidence = run / 'evidence'
+    report = json.loads((evidence / 'result.json').read_text())
+    if harness.get('format') != 'verdant.isolated-native-run.v1' or harness.get('ok') is not True \
+            or harness.get('exitCode') != 0 or harness.get('probeOptions') != []:
+        raise RuntimeError(f'{backend} controls: isolated harness failed or used diagnostic filters')
+    if report.get('format') != 'verdant.native-input-observation.v1' or report.get('ok') is not True \
+            or report.get('skipSetValue') is not False or report.get('cleanupErrors'):
+        raise RuntimeError(f'{backend} controls: probe failed or cleanup/skip evidence is incomplete')
+    if any(item.get('backend') != backend or item.get('suite') != 'controls' for item in (harness, report)):
+        raise RuntimeError(f'{backend} controls: backend/suite mismatch')
+    if report.get('cases') != [{'name': name, 'status': 'passed'} for name in CONTROL_CASES]:
+        raise RuntimeError(f'{backend} controls: all 3 expected cases must pass exactly once')
+    for name, report_key, harness_key in [('verdant-gui', 'binary', 'binarySha256'),
+                                          ('verdant-worker', 'worker', 'workerSha256')]:
+        digest = identity['programs'][name]['sha256']
+        if report.get(report_key, {}).get('sha256') != digest or harness.get(harness_key) != digest:
+            raise RuntimeError(f'{backend} controls: {name} observation does not match the verified package')
+    observations, summaries = [], []
+    for step in report.get('steps', []):
+        detail_file = evidence_file(evidence, step['evidence'])
+        detail = json.loads(detail_file.read_text())
+        screenshot = evidence_file(evidence, step['screenshot'])
+        project_file = evidence_file(evidence, str(PurePosixPath(step['evidence']).with_suffix('.verp')))
+        project = json.loads(project_file.read_text())
+        saved = step['savedProject']
+        if any(detail.get(key) != step.get(key) for key in ('label', 'case', 'savedProject', 'control', 'pointerHeld', 'window', 'windowReference')) \
+                or sha256(project_file) != saved['sha256']:
+            raise RuntimeError(f'{backend} controls: raw step/document evidence differs: {step["label"]}')
+        track = project['tracks'][0]
+        if saved['revision'] != project['revision'] or saved['trackName'] != track['name'] \
+                or saved['panPermille'] != track.get('pan_permille', 0) \
+                or saved['gainDb'] != track['instrument']['params']['gain']:
+            raise RuntimeError(f'{backend} controls: summary does not describe the retained project')
+        if not screenshot.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'):
+            raise RuntimeError(f'{backend} controls: missing PNG observation')
+        observations.append((detail, project))
+        summaries.append({'label': step['label'], 'case': step.get('case'), 'savedProject': saved,
+                          'observedNormalizedValues': step['observedNormalizedValues'],
+                          'targetFocused': ['focused' in node.get('states', []) for node in detail.get('target', [])],
+                          'control': detail.get('control'), 'pointerHeld': step['pointerHeld'],
+                          'window': step['window'], 'windowReference': step['windowReference'],
+                          'evidenceSha256': sha256(detail_file), 'screenshotSha256': sha256(screenshot)})
+    validate_control_trace(observations, json.loads((evidence / 'project.verp').read_text()))
+    if sha256(evidence / 'project.verp') != summaries[-1]['savedProject']['sha256']:
+        raise RuntimeError(f'{backend} controls: final project differs from the last retained snapshot')
+    if backend == 'wayland':
+        if harness.get('weston', {}).get('major') not in (13, 14):
+            raise RuntimeError('Wayland controls: supported Weston version was not recorded')
+        protocol = report.get('waylandProtocol', {})
+        events = protocol.get('incomingEvents', {})
+        pointer = events.get('wl_pointer', {})
+        if not pointer.get('button') or not events.get('wl_keyboard', {}).get('key') \
+                or not any(pointer.get(key) for key in ('axis', 'axis_discrete', 'axis_value120')):
+            raise RuntimeError('Wayland controls: missing real pointer/keyboard/wheel protocol events')
+        expected = [False, False, False, False, True, True]
+        if protocol.get('expectedEscapeContacts') != expected \
+                or [event['pointerHeld'] for event in protocol.get('contactEvidence', {}).get('escapeKeyEvents', [])] != expected:
+            raise RuntimeError('Wayland controls: cancellation did not preserve the actual held mixer pointer')
+        for mapping in report.get('windowMappings', []):
+            surface = mapping.get('mapping', {}).get('sceneGraphSurface')
+            if not surface:
+                raise RuntimeError('Wayland controls: every window needs measured compositor geometry')
+            evidence_file(evidence, surface['evidence'])
+    return {'backend': backend, 'suite': 'controls', 'cases': report['cases'],
+            'binary': report['binary'], 'worker': report['worker'], 'elapsedSeconds': report['elapsedSeconds'],
+            'finalProject': summaries[-1]['savedProject'], 'steps': summaries, 'windowMappings': report['windowMappings'],
+            'weston': harness.get('weston'), 'waylandProtocol': report.get('waylandProtocol'), 'tolerances': report['tolerances'],
             'resultSha256': sha256(evidence / 'result.json'), 'harnessSha256': sha256(run / 'harness.json')}
 
 
@@ -282,7 +358,10 @@ def compact_summary(report):
     """Only verified observations; this is also printed for job-log retrieval."""
     identity = report.get('package', {})
     summary = {'format': 'verdant.native-input-ci-summary.v1', 'ok': report['ok'],
-               'expectedCasesPerBackend': 11, 'passedCases': sum(len(run['cases']) for run in report['runs']),
+               'expectedCasesPerBackend': 11, 'expectedControlCasesPerBackend': 3,
+               'passedCases': sum(len(run['cases']) for run in report['runs']),
+               'originalPassedCases': sum(len(run['cases']) for run in report['runs'] if run['suite'] == 'original'),
+               'controlPassedCases': sum(len(run['cases']) for run in report['runs'] if run['suite'] == 'controls'),
                'sourceCommit': identity.get('sourceCommit'), 'sourceSelectionSha256': identity.get('sourceSelectionSha256'),
                'compilerRevision': identity.get('compilerRevision'), 'manifestSha256': identity.get('manifestSha256'),
                'archiveSha256': identity.get('archive', {}).get('sha256'),
@@ -296,11 +375,12 @@ def compact_summary(report):
                     continue
                 saved = step['savedProject']
                 observations.append({'label': step['label'], 'gainDb': saved['gainDb'],
+                                     'trackName': saved.get('trackName'), 'panPermille': saved.get('panPermille'),
                                      'revision': saved['revision'], 'projectSha256': saved['sha256'],
                                      'normalizedValues': step['observedNormalizedValues'], 'focused': step['targetFocused'],
                                      'pointerHeld': step['pointerHeld'], 'window': step['window']})
             cases.append({**case, 'observations': observations})
-        summary['runs'].append({'backend': run['backend'], 'cases': cases,
+        summary['runs'].append({'backend': run['backend'], 'suite': run['suite'], 'cases': cases,
                                'binarySha256': run['binary']['sha256'], 'workerSha256': run['worker']['sha256'],
                                'elapsedSeconds': run['elapsedSeconds'], 'finalProject': run['finalProject'],
                                'westonVersion': (run.get('weston') or {}).get('version'),
@@ -336,7 +416,7 @@ def retain_run(run, destination):
 def check(args):
     output = args.output.absolute()
     output.parent.mkdir(parents=True, exist_ok=True)
-    report = {'format': 'verdant.native-input-ci.v1', 'ok': False, 'expectedCasesPerBackend': 11,
+    report = {'format': 'verdant.native-input-ci.v1', 'ok': False, 'expectedCasesPerBackend': 11, 'expectedControlCasesPerBackend': 3,
               'runs': [], 'errors': [], 'retention': {}}
     identity = None
     try:
@@ -345,19 +425,23 @@ def check(args):
         report['package'] = identity
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         report['errors'].append(f'Package identity: {error}')
-    for backend, run in [('x11', args.x11_run), ('wayland', args.wayland_run)]:
+    runs = [('x11', 'original', args.x11_run), ('wayland', 'original', args.wayland_run),
+            ('x11', 'controls', args.controls_x11_run), ('wayland', 'controls', args.controls_wayland_run)]
+    for backend, suite, run in runs:
+        name = backend if suite == 'original' else f'{suite}-{backend}'
         try:
             if identity is None:
                 raise RuntimeError('No verified package identity')
-            report['runs'].append(validate_run(identity, backend, run))
+            validate = validate_run if suite == 'original' else validate_control_run
+            report['runs'].append(validate(identity, backend, run))
         except (OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
-            report['errors'].append(f'{backend}: {error}')
+            report['errors'].append(f'{name}: {error}')
         finally:
             try:
-                report['retention'][backend] = retain_run(run, output.parent / backend)
+                report['retention'][name] = retain_run(run, output.parent / name)
             except OSError as error:
-                report['errors'].append(f'{backend} evidence retention: {error}')
-    report['ok'] = not report['errors'] and len(report['runs']) == 2
+                report['errors'].append(f'{name} evidence retention: {error}')
+    report['ok'] = not report['errors'] and len(report['runs']) == 4
     write_json(output, report)
     summary = compact_summary(report)
     write_json(output.with_name('summary.json'), summary)
@@ -381,8 +465,9 @@ def arguments():
         run_parser.add_argument('--' + option, type=Path, required=True)
     run_parser.add_argument('--deps-root', type=Path, default=Path('/'))
     run_parser.add_argument('--backend', choices=('x11', 'wayland'), required=True)
-    check_parser = commands.add_parser('check', help='Require 22 passes and retain all ordinary evidence files')
-    for option in ('package-info', 'x11-run', 'wayland-run', 'output'):
+    run_parser.add_argument('--suite', choices=('original', 'controls'), default='original')
+    check_parser = commands.add_parser('check', help='Require the original 22 and 6 control passes, retaining all raw evidence')
+    for option in ('package-info', 'x11-run', 'wayland-run', 'controls-x11-run', 'controls-wayland-run', 'output'):
         check_parser.add_argument('--' + option, type=Path, required=True)
     return parser.parse_args()
 

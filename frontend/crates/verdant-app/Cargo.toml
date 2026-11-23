@@ -13,6 +13,8 @@ path = "src/main.rs"
 [dependencies]
 gpui.workspace = true
 gpui_platform.workspace = true
+# The pinned GPUI fork exposes the platform text-selection notification API.
+proto-ui-gpui-native = { path = "../../proto-ui/generated/pitch-gesture-surface/.proto-ui/gpui-native", features = ["gpui-text-selection-notification"] }
 verdant-domain = { path = "../verdant-domain" }
 verdant-session = { path = "../verdant-session" }
 verdant-ui-protocol = { path = "../verdant-ui-protocol" }
@@ -24,8 +26,18 @@ verdant-import = { path = "../verdant-import" }
 verdant-exchange = { path = "../verdant-exchange" }
 verdant-midi = { path = "../verdant-midi" }
 verdant-media = { path = "../verdant-media" }
-verdant-pitch-gesture-surface = { package = "generated-gpui-cf24f4a63e06497c7d284f96518bbd7d", path = "../../proto-ui/generated/pitch-gesture-surface" }
-verdant-normalized-knob = { package = "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a", path = "../../proto-ui/generated/normalized-knob" }
+verdant-pitch-gesture-surface = { package = "generated-gpui-88bb62f34d9cf95379de7f80ed921570", path = "../../proto-ui/generated/pitch-gesture-surface" }
+verdant-normalized-knob = { package = "generated-gpui-399a274560efeefb94013f4809bf3990", path = "../../proto-ui/generated/normalized-knob" }
+verdant-action-control = { package = "generated-gpui-4b54a5e1dd893facd862b48e3d4a5cad", path = "../../proto-ui/generated/action-control" }
+verdant-collection-control = { package = "generated-gpui-9870101a29c015d0c1243b8777d30ef5", path = "../../proto-ui/generated/collection-control" }
+verdant-continuous-control = { package = "generated-gpui-9af25c23412de3aab36d90fdbff9c74d", path = "../../proto-ui/generated/continuous-control" }
+verdant-editor-surface = { package = "generated-gpui-3fce531bc2c3803d6da5161bd0f4a861", path = "../../proto-ui/generated/editor-surface" }
+verdant-performance-key = { package = "generated-gpui-6a8c56401c6a119a6044ee492004cd68", path = "../../proto-ui/generated/performance-key" }
+verdant-drag-source = { package = "generated-gpui-53ae84ff97aef996f58c5e7b9ee2807e", path = "../../proto-ui/generated/drag-source" }
+verdant-overlay-control = { package = "generated-gpui-85648bff6bfd573853bfeeaafc714ab9", path = "../../proto-ui/generated/overlay-control" }
+verdant-text-field = { package = "generated-gpui-790fb0b7906a4d690b15d15e9ecb5013", path = "../../proto-ui/generated/text-field" }
+verdant-graph-point = { package = "generated-gpui-d401e83250fdefddd7121f4948207c06", path = "../../proto-ui/generated/graph-point" }
+verdant-scroll-region = { package = "generated-gpui-64aa510973f2e2c2408e51491fae629e", path = "../../proto-ui/generated/scroll-region" }
 serde.workspace = true
 serde_json.workspace = true
 semver.workspace = true
@@ -36,3 +48,4 @@ env_logger = { version = "0.11", default-features = false, features = ["auto-col
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+proto-ui-gpui-native = { path = "../../proto-ui/generated/pitch-gesture-surface/.proto-ui/gpui-native", features = ["test-support"] }

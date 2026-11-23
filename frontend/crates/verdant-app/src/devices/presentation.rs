@@ -6,15 +6,16 @@ pub(super) fn page(ed: &Editor, target: &Target) -> u8 {
     workflow::read_workspace(ed, target).editor_page.min(2)
 }
 
-pub(super) fn button(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> gpui::Stateful<gpui::Div> {
-    div().id(id).role(Role::Button).tab_index(0).cursor_pointer()
+pub(super) fn button(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
+    let label = label.into();
+    crate::proto_controls::action(id, label.clone()).role(Role::Button).tab_index(0).cursor_pointer()
         .flex_none().flex().items_center().justify_center().min_h(gpui::rems(30./16.))
         .px(gpui::rems(10./16.)).py(gpui::rems(4./16.)).rounded(gpui::rems(6./16.))
         .border_1().border_color(if selected { with_alpha(th.accent, 0.45) } else { with_alpha(th.text, 0.) })
         .bg(if selected { th.checked } else { with_alpha(th.text, 0.) })
         .hover(move |s| s.bg(th.hover)).focus(move |s| s.border_color(th.accent))
         .text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-        .text_color(if selected { th.accent } else { th.text_secondary }).child(label.into())
+        .text_color(if selected { th.accent } else { th.text_secondary }).child(label)
 }
 
 fn page_command(target: Target, index: u8, cx: &Context<Editor>) -> SemanticCommand {
@@ -42,18 +43,12 @@ pub(super) fn tabs(ed: &Editor, target: &Target, cx: &mut Context<Editor>) -> gp
         .p(gpui::rems(2./16.)).rounded(gpui::rems(8./16.)).bg(th.control)
         .children([(0u8, "编辑"), (1, "高级"), (2, "计量")].into_iter().map(|(index, label)| {
             let command = page_command(target.clone(), index, cx);
-            let key_command = command.clone();
-            let previous = page_command(target.clone(), (selected + 2) % 3, cx);
-            let next = page_command(target.clone(), (selected + 1) % 3, cx);
+            let navigate: Vec<_> = (0..3).map(|page| page_command(target.clone(), page, cx)).collect();
             semantic_click(button(format!("device-page-{}-{index}", target.slot), label, selected == index, th)
                 .role(Role::Tab).aria_selected(selected == index).aria_label(format!("{label}工作区"))
                 .when(selected == index, |d| d.bg(th.card).text_color(th.text).border_color(th.shade)), command)
-                .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
-                    let command = match event.keystroke.key.as_str() {
-                        "enter" | "space" => &key_command, "left" => &previous, "right" => &next, _ => return,
-                    };
-                    command(None, window, cx);
-                    window.prevent_default(); cx.stop_propagation();
+                .navigation(index as usize, 3, move |index, window, cx| {
+                    if let Some(command) = navigate.get(index) { command(None, window, cx); }
                 })
         })).into_any_element()
 }
@@ -62,20 +57,15 @@ pub(super) fn section_header(ed: &Editor, target: &Target, label: &str, count: u
     let state = workflow::read_workspace(ed, target);
     let expanded = state.expanded_sections.contains(label); let th = ed.theme;
     let command = section_command(target.clone(), label.to_string(), cx);
-    let key_command = command.clone();
-    semantic_click(div().id(format!("device-section-{}-{label}", target.slot)).role(Role::Button).tab_index(0)
-        .aria_label(format!("{label} · {count} 个参数")).aria_selected(expanded)
+    semantic_click(crate::proto_controls::action(format!("device-section-{}-{label}", target.slot), label.to_string()).role(Role::Button).tab_index(0)
+        .aria_label(format!("{label} · {count} 个参数")).aria_expanded(expanded)
         .flex().items_center().gap(gpui::rems(10./16.)).w_full().min_h(gpui::rems(42./16.))
         .px(gpui::rems(12./16.)).rounded(gpui::rems(8./16.)).bg(th.card)
         .border_1().border_color(th.shade).hover(move |s|s.bg(th.hover)).focus(move |s|s.border_color(th.accent)).cursor_pointer()
         .child(div().text_sm().text_color(th.text_secondary).child(if expanded { "⌄" } else { "›" }))
         .child(div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(label.to_string()))
         .child(div().text_xs().text_color(th.text_secondary).child(format!("{count} 个参数"))), command)
-        .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
-            if !matches!(event.keystroke.key.as_str(), "enter" | "space") { return; }
-            key_command(None, window, cx);
-            window.prevent_default(); cx.stop_propagation();
-        }).into_any_element()
+        .into_any_element()
 }
 
 pub(super) fn caption(title: &str, detail: &str, th: Theme) -> gpui::AnyElement {

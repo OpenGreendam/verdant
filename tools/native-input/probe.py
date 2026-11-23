@@ -24,6 +24,7 @@ import traceback
 import uuid
 
 from x11_screenshot import capture
+from controls import CONTROL_CASES, ControlCases
 
 
 CASES = ("keyboard", "drag", "escape", "focus", "exit", "detach",
@@ -149,6 +150,7 @@ def arguments():
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True, help="New, disposable evidence directory")
     parser.add_argument("--backend", choices=("x11", "wayland"), required=True)
+    parser.add_argument("--suite", choices=("original", "controls"), default="original")
     parser.add_argument("--input-display", required=True, help="Explicit private X11/XTest display")
     parser.add_argument("--outer-window", help="Nested Weston's X11 host window ID")
     parser.add_argument("--wayland-windowed", action="store_true",
@@ -163,9 +165,12 @@ def arguments():
     parser.add_argument("--surface-scale", type=float, default=1.0)
     parser.add_argument("--timeout", type=float, default=25)
     parser.add_argument("--skip-set-value", action="store_true")
-    parser.add_argument("--only", action="append", choices=("preflight", *CASES),
+    parser.add_argument("--only", action="append", choices=("preflight", *CASES, *CONTROL_CASES),
                         help="Run only selected cases; preflight always runs")
     args = parser.parse_args()
+    allowed = CASES if args.suite == "original" else CONTROL_CASES
+    if args.only and any(name not in ("preflight", *allowed) for name in args.only):
+        parser.error("Diagnostic cases must belong to the selected suite")
     if args.backend == "wayland" and not args.outer_window:
         parser.error("Wayland needs --outer-window for the actual XTest-to-Weston route")
     if args.wayland_windowed and (args.backend != "wayland" or not args.weston_debug):
@@ -179,7 +184,7 @@ def arguments():
     return args
 
 
-class Probe:
+class Probe(ControlCases):
     def __init__(self, args):
         self.args = args
         self.binary = args.binary.resolve(strict=True)
@@ -214,6 +219,7 @@ class Probe:
         self.report = {
             "format": "verdant.native-input-observation.v1", "ok": False,
             "backend": args.backend,
+            "suite": args.suite,
             "inputRoute": "XTest → X11 → Verdant" if args.backend == "x11"
                           else "XTest → nested Weston X11 host → Wayland → Verdant",
             "scope": "Real OS/protocol observation; no physical screen reader or hardware touch device",
@@ -465,6 +471,7 @@ class Probe:
         content = self.project.read_bytes()
         project = json.loads(content)
         return {"revision": project["revision"], "gainDb": project["tracks"][0]["instrument"]["params"]["gain"],
+                "trackName": project["tracks"][0]["name"], "panPermille": project["tracks"][0].get("pan_permille", 0),
                 "sha256": hashlib.sha256(content).hexdigest(), "projectId": project["project_id"],
                 "mtimeNs": self.project.stat().st_mtime_ns}
 
@@ -832,14 +839,17 @@ class Probe:
     def run(self):
         try:
             self.launch()
-            selected = set(self.args.only or CASES)
+            cases = CASES if self.args.suite == "original" else CONTROL_CASES
+            selected = set(self.args.only or cases)
             operations = {"keyboard": self.keyboard, "drag": self.drag, "escape": self.escape,
                           "focus": self.focus_handoff, "exit": self.exit_window, "detach": self.detach,
                           "set-value": self.set_value, "set-value-during-drag": self.set_value_during_drag,
                           "lease-reusable": lambda: self.drag("lease-reusable", 18),
                           "native-window-close": self.native_window_close,
                           "native-preset-cancel": self.native_preset_cancel}
-            for name in CASES:
+            if self.args.suite == "controls":
+                operations = self.control_operations()
+            for name in cases:
                 if name not in selected:
                     continue
                 if self.args.skip_set_value and name.startswith("set-value"):

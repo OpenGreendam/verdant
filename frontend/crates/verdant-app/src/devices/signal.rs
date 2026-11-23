@@ -30,17 +30,17 @@ pub(super) fn panel(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             if waveform { "波形" } else { "频谱" }, if waveform { wave_ms } else { window_ms }, snapshot.frames_total as f64 / snapshot.sample_rate.max(1.))));
     for (show_waveform, label) in [(false, "频谱"), (true, "波形")] {
         header = header.child(crate::ui_controls::selectable_button(format!("signal-mode-{slot}-{show_waveform}"), label, waveform == show_waveform, th)
-            .tab_index(0)
+            .role(Role::Tab).tab_index(0)
             .on_click(cx.listener(move |ed, _, _, cx| {
                 ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now())).signal_waveform = show_waveform;
                 cx.notify();
             }))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                    ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now())).signal_waveform = show_waveform;
-                    window.prevent_default(); cx.stop_propagation(); cx.notify();
-                }
-            })));
+            .navigation(usize::from(show_waveform), 2, { let editor = cx.entity(); move |index, _, cx| {
+                editor.update(cx, |ed, cx| {
+                    ed.device_anim.entry(key).or_insert_with(|| DeviceAnim::settled(Vec::new(), Instant::now())).signal_waveform = index == 1;
+                    cx.notify();
+                });
+            }}));
     }
     let reset_target = owner.clone();
     header = header.child(crate::ui_controls::selectable_button(format!("meters-reset-{slot}"), "重置计量", false, th)

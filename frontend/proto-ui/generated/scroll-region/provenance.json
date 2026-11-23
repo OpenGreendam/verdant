@@ -1,0 +1,117 @@
+{
+  "source": {
+    "file": "frontend/proto-ui/src/scroll-region.proto.ts",
+    "exportName": "default",
+    "sha256": "e4c64b0962ee7d9ee362b76ace8c1a02591e00aab91e277d97f87f6ea5265d7c"
+  },
+  "irVersion": 7,
+  "backend": "gpui-source-v1",
+  "nativeSdk": {
+    "schemaVersion": 1,
+    "name": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "dependencyMode": "workspace",
+    "contentSha256": "fa06806ac4d3860f457786700ed6870fb8bd7761857b8128ecaac070c5f748e2",
+    "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
+    "bundled": false
+  },
+  "observableSemantics": {
+    "version": "proto-ui-observables-v1",
+    "props": {
+      "input": "full-raw-snapshot",
+      "update": "explicit",
+      "initialNotification": "silent"
+    },
+    "state": {
+      "write": "synchronous",
+      "notifications": "fifo-recorded-snapshot-v1",
+      "update": "explicit"
+    },
+    "context": {
+      "update": "explicit",
+      "identity": "nominal"
+    },
+    "lifecycle": {
+      "update": "coalescible-intent",
+      "completion": "host-commit-before-updated",
+      "detach": "preserve-owner",
+      "disposal": "invalidate-retained-handles"
+    },
+    "composition": {
+      "nativeChildren": "ordinary-host-slots",
+      "sharedIdentity": "explicit-artifact-link"
+    }
+  },
+  "sourceResolution": {
+    "version": 1,
+    "imports": {},
+    "packages": []
+  },
+  "profile": "gpui-source-v1",
+  "dependencies": [
+    {
+      "name": "gpui",
+      "version": "workspace",
+      "role": "target"
+    },
+    {
+      "name": "serde",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "role": "host-bridge"
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "=1.13.3",
+      "role": "target"
+    },
+    {
+      "name": "data-url",
+      "version": "=0.3.2",
+      "role": "target"
+    },
+    {
+      "name": "image",
+      "version": "=0.25.10",
+      "role": "target"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "frontend/proto-ui/src/scroll-region.proto.ts",
+      "sha256": "f7e8311b8c85e327748bb264dcb1c9aa632311c8d57caba5b35eef1dd9fe707b"
+    }
+  ],
+  "generatedSha256": "ee4a25d72b178f5cff95b7166696ca6e2d4a2942be06765b51f4b1057ebe52ed",
+  "artifacts": [
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "ee4a25d72b178f5cff95b7166696ca6e2d4a2942be06765b51f4b1057ebe52ed"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "aeb941960633b5f37e69029796ec8caf295c2d8ffbc31de4b4b783343dfa3ed0"
+    },
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "86a7fe79c7974a89508809bb2a9a8394e3c361a01d7a8880eb368a0ce2c4162e"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "c9248152ce0b697ed55aa9759840370451b910740c8c22fa5da48ed844bb89c9"
+    }
+  ]
+}

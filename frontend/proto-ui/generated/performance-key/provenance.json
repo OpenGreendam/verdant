@@ -1,0 +1,117 @@
+{
+  "source": {
+    "file": "frontend/proto-ui/src/performance-key.proto.ts",
+    "exportName": "default",
+    "sha256": "f549038609f06eb1f6e9de379a4426cde441f45f8c9c34b8afb5de058749b63b"
+  },
+  "irVersion": 7,
+  "backend": "gpui-source-v1",
+  "nativeSdk": {
+    "schemaVersion": 1,
+    "name": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "dependencyMode": "workspace",
+    "contentSha256": "fa06806ac4d3860f457786700ed6870fb8bd7761857b8128ecaac070c5f748e2",
+    "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
+    "bundled": false
+  },
+  "observableSemantics": {
+    "version": "proto-ui-observables-v1",
+    "props": {
+      "input": "full-raw-snapshot",
+      "update": "explicit",
+      "initialNotification": "silent"
+    },
+    "state": {
+      "write": "synchronous",
+      "notifications": "fifo-recorded-snapshot-v1",
+      "update": "explicit"
+    },
+    "context": {
+      "update": "explicit",
+      "identity": "nominal"
+    },
+    "lifecycle": {
+      "update": "coalescible-intent",
+      "completion": "host-commit-before-updated",
+      "detach": "preserve-owner",
+      "disposal": "invalidate-retained-handles"
+    },
+    "composition": {
+      "nativeChildren": "ordinary-host-slots",
+      "sharedIdentity": "explicit-artifact-link"
+    }
+  },
+  "sourceResolution": {
+    "version": 1,
+    "imports": {},
+    "packages": []
+  },
+  "profile": "gpui-source-v1",
+  "dependencies": [
+    {
+      "name": "gpui",
+      "version": "workspace",
+      "role": "target"
+    },
+    {
+      "name": "serde",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "role": "host-bridge"
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "=1.13.3",
+      "role": "target"
+    },
+    {
+      "name": "data-url",
+      "version": "=0.3.2",
+      "role": "target"
+    },
+    {
+      "name": "image",
+      "version": "=0.25.10",
+      "role": "target"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "frontend/proto-ui/src/performance-key.proto.ts",
+      "sha256": "37dbb70e61342b923e6ea4c5a2696decc880e9ee9934cda5438aebacd7d91189"
+    }
+  ],
+  "generatedSha256": "f0cc557a199bd1ef69ada991042cfcee947a53fea36bfa2bfc01913302910bfa",
+  "artifacts": [
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "f0cc557a199bd1ef69ada991042cfcee947a53fea36bfa2bfc01913302910bfa"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "c7bbdacc66943ddeab2ba122d315082889e215ef50f74dc4ffbde59e5aaeaf36"
+    },
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "ed3262abf4bd9d94cac3050b0c9e173b409133c3444fb63bebc378532a5e05c3"
+    }
+  ]
+}
