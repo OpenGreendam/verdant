@@ -31,8 +31,8 @@ const SCOPES: &[&str] = &["frontend", "backend", "tools", "spec", "docs", ".gith
 const PUBLIC_PYTHON_SOURCES: &[&str] = &[
     "tools/a11y/observe-atspi.py", "tools/a11y/run-isolated.py",
     "tools/native-input/ci.py", "tools/native-input/probe.py", "tools/native-input/controls.py",
-    "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py",
-    "tools/native-input/test_ci.py", "tools/native-input/test_probe.py",
+    "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py", "tools/native-input/x11_keymap.py",
+    "tools/native-input/test_ci.py", "tools/native-input/test_probe.py", "tools/native-input/test_x11_keymap.py",
     "frontend/scripts/generate-agent-skills.py",
     "frontend/scripts/generate-factory-presets.py", "frontend/scripts/verify-ffp-corpus.py",
 ];
