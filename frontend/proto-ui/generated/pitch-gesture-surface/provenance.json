@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "a3552fe04a37d8cf1dc82084fb5934af8ca846e082df3a72d68702f88aaebd3a",
+    "contentSha256": "fa06806ac4d3860f457786700ed6870fb8bd7761857b8128ecaac070c5f748e2",
     "path": ".proto-ui/gpui-native",
     "bundled": true
   },
@@ -91,17 +91,17 @@
       "sha256": "2fd4b73f88ec7d01454e5fba5e626897800fd22a9b897e5dc02a8f655e09d159"
     }
   ],
-  "generatedSha256": "28b1c57cc51a29dcd9b0b735eb30e59106aeeebca104382ad9b5ef447471d494",
+  "generatedSha256": "68e6bae09b1b3401a4418f413eb90f3f2ac5cff31280d43afc92a264e2d300ef",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "28b1c57cc51a29dcd9b0b735eb30e59106aeeebca104382ad9b5ef447471d494"
+      "sha256": "68e6bae09b1b3401a4418f413eb90f3f2ac5cff31280d43afc92a264e2d300ef"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "bf81ab90c1b779d746824e89d380c1b3265d4c66b873a560ae74236e5d836dc7"
+      "sha256": "8dca6b976b28a5e3493e19b5c88348174a897f1ce3329d6df94c831f2ff0d597"
     },
     {
       "path": ".proto-ui/gpui-native/LICENSE",
@@ -111,7 +111,7 @@
     {
       "path": ".proto-ui/gpui-native/Cargo.toml",
       "kind": "source",
-      "sha256": "1ba98e2753931029fc808a6ae5f7b164b7f2cd449fe2737d9f5c349a9b47379e"
+      "sha256": "0445c63fb76ec734234269db002bbce74c8c3177fa075840e7222daee5be6f59"
     },
     {
       "path": ".proto-ui/gpui-native/src/lib.rs",
@@ -121,12 +121,12 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "5af6b303c7e242b544ae1c7ca689835e5f237f9bb9872d8f018c4a2da8973665"
+      "sha256": "f5afdf01ed963ac92579f82b5a07d6c28553ebbefc0aad2cb5e4f9f4b435e4b4"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-a11y.rs",
       "kind": "source",
-      "sha256": "17b62da4b7240fe6ee9e00c739d9afc2e1fa43b467f676e56422df6ba90ede26"
+      "sha256": "13b164229af3ec8aac0e9f7cd56c3f265895a72276b3f88e2e908607a9d6fa10"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-host.rs",
@@ -186,7 +186,7 @@
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "71769f2755d944afa798cfb4715c7fb4c5697f34f7b7ed28a2723b32dd99385d"
+      "sha256": "892ce56c05ef03948e16c80fb4d441eb381730f5e776b7a5c5b81abb3f30246a"
     }
   ]
 }

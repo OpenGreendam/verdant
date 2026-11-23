@@ -2085,7 +2085,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-0e127593c8881e3cfbb716f56d021e88"
+name = "generated-gpui-399a274560efeefb94013f4809bf3990"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2095,7 +2095,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-0f56d5a6819f41b9780adcb3b40f63d9"
+name = "generated-gpui-3fce531bc2c3803d6da5161bd0f4a861"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2105,7 +2105,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-1095bf5e219aeb38e989ba37084c2497"
+name = "generated-gpui-4b54a5e1dd893facd862b48e3d4a5cad"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2115,7 +2115,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-2ce14ca4a0013dfde972c1fba12487ff"
+name = "generated-gpui-53ae84ff97aef996f58c5e7b9ee2807e"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2125,7 +2125,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-592e87848350368d2b7ce1a771842f14"
+name = "generated-gpui-64aa510973f2e2c2408e51491fae629e"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2135,7 +2135,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-6012b390eaecf9b1d4e65f4aaf390322"
+name = "generated-gpui-6a8c56401c6a119a6044ee492004cd68"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2145,7 +2145,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-6df3b4baf3b871fe05f0d666d79d88a2"
+name = "generated-gpui-790fb0b7906a4d690b15d15e9ecb5013"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2155,7 +2155,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-7979336e563dd6c9a48dd40c3aecac7e"
+name = "generated-gpui-85648bff6bfd573853bfeeaafc714ab9"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2165,7 +2165,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-a65732c58dfcc8e6b9f62b38692c6a29"
+name = "generated-gpui-88bb62f34d9cf95379de7f80ed921570"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2175,7 +2175,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-b8f8e244dac0df4f4611d3e51ba13395"
+name = "generated-gpui-9870101a29c015d0c1243b8777d30ef5"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2185,7 +2185,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-dbb31cd3f3da7e7935e3b34012331e0e"
+name = "generated-gpui-9af25c23412de3aab36d90fdbff9c74d"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -2195,7 +2195,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-fbbe0e3ae5af96f49b0a223dd2f8db95"
+name = "generated-gpui-d401e83250fdefddd7121f4948207c06"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -4915,6 +4915,7 @@ dependencies = [
 name = "proto-ui-gpui-native"
 version = "0.2.0"
 dependencies = [
+ "accesskit_consumer",
  "data-url",
  "gpui",
  "image",
@@ -6737,18 +6738,18 @@ dependencies = [
  "async-channel",
  "chrono",
  "env_logger",
- "generated-gpui-0e127593c8881e3cfbb716f56d021e88",
- "generated-gpui-0f56d5a6819f41b9780adcb3b40f63d9",
- "generated-gpui-1095bf5e219aeb38e989ba37084c2497",
- "generated-gpui-2ce14ca4a0013dfde972c1fba12487ff",
- "generated-gpui-592e87848350368d2b7ce1a771842f14",
- "generated-gpui-6012b390eaecf9b1d4e65f4aaf390322",
- "generated-gpui-6df3b4baf3b871fe05f0d666d79d88a2",
- "generated-gpui-7979336e563dd6c9a48dd40c3aecac7e",
- "generated-gpui-a65732c58dfcc8e6b9f62b38692c6a29",
- "generated-gpui-b8f8e244dac0df4f4611d3e51ba13395",
- "generated-gpui-dbb31cd3f3da7e7935e3b34012331e0e",
- "generated-gpui-fbbe0e3ae5af96f49b0a223dd2f8db95",
+ "generated-gpui-399a274560efeefb94013f4809bf3990",
+ "generated-gpui-3fce531bc2c3803d6da5161bd0f4a861",
+ "generated-gpui-4b54a5e1dd893facd862b48e3d4a5cad",
+ "generated-gpui-53ae84ff97aef996f58c5e7b9ee2807e",
+ "generated-gpui-64aa510973f2e2c2408e51491fae629e",
+ "generated-gpui-6a8c56401c6a119a6044ee492004cd68",
+ "generated-gpui-790fb0b7906a4d690b15d15e9ecb5013",
+ "generated-gpui-85648bff6bfd573853bfeeaafc714ab9",
+ "generated-gpui-88bb62f34d9cf95379de7f80ed921570",
+ "generated-gpui-9870101a29c015d0c1243b8777d30ef5",
+ "generated-gpui-9af25c23412de3aab36d90fdbff9c74d",
+ "generated-gpui-d401e83250fdefddd7121f4948207c06",
  "gpui",
  "gpui_platform",
  "proto-ui-gpui-native",
