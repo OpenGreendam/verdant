@@ -57,6 +57,52 @@ class ProbeHelpers(unittest.TestCase):
             probe.collection_scroll_cancel()
         probe.click.assert_called_once_with(selected)
 
+    def collection_probe(self):
+        current, other = [':1.3', '/frame/1'], [':1.3', '/frame/0']
+        viewport = {'reference': [':1.3', '/collection'], 'name': '匹配的预设',
+                    'role': 'list box', 'windowReference': current, 'windowExtents': [168, 148, 716, 340]}
+        first = {'reference': [':1.3', '/option/0'], 'name': 'Deep Sub', 'role': 'list item',
+                 'windowReference': current, 'states': ['selected'], 'windowExtents': [168, 148, 716, 24]}
+        hidden = {**first, 'reference': [':1.3', '/option/19'], 'name': 'Soft Pad',
+                  'states': [], 'windowExtents': [168, 604, 716, 24]}
+        snapshot = {'nodes': [viewport, first, hidden,
+            {**viewport, 'reference': [':1.3', '/other/collection'], 'windowReference': other},
+            {**viewport, 'reference': [':1.3', '/legacy'], 'name': '预设列表', 'role': 'document frame'},
+            {**viewport, 'reference': [':1.3', '/wrong-role'], 'role': 'document frame'},
+            {**first, 'reference': [':1.3', '/other/option'], 'windowReference': other},
+        ]}
+        probe = object.__new__(Probe)
+        probe.active_frame_reference = current
+        probe.snapshot = lambda: snapshot
+        probe.args = SimpleNamespace(timeout=0)
+        probe.process = None
+        return probe, snapshot, viewport
+
+    def test_collection_observation_uses_the_compiled_listbox_in_its_current_window(self):
+        # Both retained native failures already expose this exact ListBox;
+        # the obsolete document-frame selector never reached its real rows.
+        probe, _, viewport = self.collection_probe()
+        observed = probe.collection_observation()
+        self.assertEqual(observed['viewportReference'], viewport['reference'])
+        self.assertEqual(observed['viewport'], [168, 148, 716, 340])
+        self.assertEqual([row['reference'] for row in observed['options']],
+                         [[':1.3', '/option/0'], [':1.3', '/option/19']])
+        self.assertEqual([row['visible'] for row in observed['options']], [True, False])
+        self.assertEqual([row['selected'] for row in observed['options']], [True, False])
+
+    def test_collection_observation_rejects_missing_wrong_or_ambiguous_listbox(self):
+        for mutation in ('missing', 'role', 'name', 'window', 'duplicate'):
+            with self.subTest(mutation=mutation):
+                probe, snapshot, viewport = self.collection_probe()
+                if mutation == 'missing': snapshot['nodes'].remove(viewport)
+                elif mutation == 'role': viewport['role'] = 'document frame'
+                elif mutation == 'name': viewport['name'] = '预设列表'
+                elif mutation == 'window': viewport['windowReference'] = [':1.3', '/other-frame']
+                else: snapshot['nodes'].append({**viewport, 'reference': [':1.3', '/duplicate']})
+                message = 'Ambiguous accessible target' if mutation == 'duplicate' else 'Timed out waiting'
+                with self.assertRaisesRegex(RuntimeError, message):
+                    probe.collection_observation()
+
     def test_text_journey_selects_the_native_push_button_after_tab(self):
         frame = [':1.3', '/frame/0']
         field = {'reference': [':1.3', '/input'], 'name': '输入文字…', 'role': 'entry',
@@ -300,8 +346,8 @@ def synthetic_control_observations():
                 nodes.append(focus)
         if 'viewport' in control:
             control['viewportReference'] = [':1.2', '/viewport']
-            nodes.append({'reference': control['viewportReference'], 'name': '预设列表',
-                          'role': 'document frame', 'windowExtents': copy.deepcopy(control['viewport'])})
+            nodes.append({'reference': control['viewportReference'], 'name': '匹配的预设',
+                          'role': 'list box', 'windowExtents': copy.deepcopy(control['viewport'])})
             nodes.extend({'reference': item['reference'], 'name': item['name'], 'role': 'list item',
                           'states': ['selected'] if item['selected'] else [], 'windowExtents': copy.deepcopy(item['bounds'])}
                          for item in control['options'])
@@ -443,6 +489,20 @@ class ControlEvidenceRefusals(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'actual tree'):
                     validate_control_trace(self.observations, self.final)
 
+    def test_collection_viewport_requires_exact_raw_role_label_and_current_window(self):
+        for mutation in ('role', 'name', 'window', 'duplicate-reference'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                detail = self.detail('collection-open')
+                viewport = next(node for node in detail['tree']['nodes']
+                                if node.get('reference') == detail['control']['viewportReference'])
+                if mutation == 'role': viewport['role'] = 'document frame'
+                elif mutation == 'name': viewport['name'] = '预设列表'
+                elif mutation == 'window': viewport['windowReference'] = [':1.2', '/another-window']
+                else: detail['tree']['nodes'].append(copy.deepcopy(viewport))
+                with self.assertRaises(RuntimeError):
+                    validate_control_trace(self.observations, self.final)
+
     def test_collection_summary_cannot_replace_raw_selection_bounds_or_focus(self):
         for mutation in ('selection', 'viewport', 'inventory', 'search-focus'):
             with self.subTest(mutation=mutation):
@@ -452,7 +512,7 @@ class ControlEvidenceRefusals(unittest.TestCase):
                 if mutation == 'selection':
                     next(node for node in nodes if node.get('states') == ['selected'])['states'] = []
                 elif mutation == 'viewport':
-                    next(node for node in nodes if node.get('name') == '预设列表')['windowExtents'] = [0, 0, 5, 5]
+                    next(node for node in nodes if node.get('reference') == detail['control']['viewportReference'])['windowExtents'] = [0, 0, 5, 5]
                 elif mutation == 'inventory':
                     nodes.remove(next(node for node in nodes if node.get('role') == 'list item'))
                 else:

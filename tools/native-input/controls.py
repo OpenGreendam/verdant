@@ -17,6 +17,9 @@ TEXT_CANCELED = "不应保存"
 # XTest continues to deliver keyboard events; no editor/AT text write is used.
 UNICODE_KEY_INPUTS = (TEXT_INITIAL, TEXT_ASSISTIVE, TEXT_ACCEPTED, TEXT_CANCELED)
 LIBRARY_TITLE = "插件预设库 — Verdant"
+# The compiled Collection owns this authored label and native ListBox role.
+COLLECTION_NAME = "匹配的预设"
+COLLECTION_ROLE = "list box"
 SEARCH_NAME = "搜索名称、类别、作者、标签与用途"
 SEARCH_MISSING = "verdant-no-matching-preset-79f2"
 
@@ -148,7 +151,7 @@ class ControlCases:
 
     def collection_observation(self):
         options = self.library_options()
-        viewport_node = self.node("预设列表", "document frame")
+        viewport_node = self.node(COLLECTION_NAME, COLLECTION_ROLE)
         viewport = viewport_node["windowExtents"]
         return {"viewportReference": viewport_node["reference"], "viewport": viewport,
                 "options": [{"reference": node["reference"], "name": node["name"],
@@ -191,7 +194,7 @@ class ControlCases:
         self.key("Home")
         self.record("collection-home", control=self.selected_option(first))
         initial_visible = {row["name"] for row in self.collection_observation()["options"] if row["visible"]}
-        self.move(*self.point(self.node("预设列表")))
+        self.move(*self.point(self.node(COLLECTION_NAME, COLLECTION_ROLE)))
         self.xdo("click", "--repeat", 8, "--delay", 60, 5)
         scrolled = self.wait(self.collection_observation,
                              lambda item: {row["name"] for row in item["options"] if row["visible"]} != initial_visible,
@@ -352,7 +355,7 @@ def validate_control_trace(observations, final):
             require("focused" in focus.get("states", []) and "focused" in node.get("states", []),
                     f"{label}: focus summary differs from the actual tree")
         if "viewport" in control:
-            node = tree_node(label, control.get("viewportReference"), "document frame", "预设列表")
+            node = tree_node(label, control.get("viewportReference"), COLLECTION_ROLE, COLLECTION_NAME)
             require(node.get("windowExtents") == control["viewport"],
                     f"{label}: viewport bounds differ from the actual tree")
             actual = [node for node in detail["tree"]["nodes"]
