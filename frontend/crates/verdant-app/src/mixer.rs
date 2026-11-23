@@ -993,11 +993,16 @@ mod escape_route_tests {
             let initial_revision = window.update(cx, |editor, _, _| editor.revision().get()).unwrap();
             let (handle, accepted, start) = cx.update_window(window.into(), |_, window, cx| {
                 let label = if master { "主声像" } else { "轨道声像" };
-                let owner = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter().find(|owner| {
+                // The numeric pill has the same name and a spinbutton role.
+                // Locate the actual pan slider in this single-track fixture.
+                let candidates = verdant_continuous_control::native::gpui_native_owner::all_owners().into_iter().filter(|owner| {
                     let owner = owner.borrow();
                     owner.mounted && owner.window_id == Some(window.window_handle().window_id())
                         && owner.props.get("label").and_then(serde_json::Value::as_str) == Some(label)
-                }).expect("actual Mixer renders its compiled pan control");
+                        && owner.props.get("role").and_then(serde_json::Value::as_str) == Some("slider")
+                }).collect::<Vec<_>>();
+                assert_eq!(candidates.len(), 1, "one Mixer slider: master={master} replace_capture={replace_capture} label={label}");
+                let owner = candidates.into_iter().next().unwrap();
                 let handle = ContinuousControlHandle { owner };
                 let accepted = handle.state("value").unwrap().as_f64().unwrap();
                 let start = handle.owner.borrow().bounds.expect("mounted pan bounds").center();
@@ -1016,7 +1021,8 @@ mod escape_route_tests {
             crate::native_test_support::frames(window, cx);
             let contact = window.update(cx, |editor, _, _| {
                 assert!(editor.has_proto_pointer_contact());
-                assert!(if master { editor.master_drag.is_some() } else { editor.mixer_drag.is_some() });
+                assert!(if master { editor.master_drag.is_some() } else { editor.mixer_drag.is_some() },
+                    "preview buffer: master={master} replace_capture={replace_capture} props={:?}", handle.owner.borrow().props);
                 assert_eq!(editor.revision().get(), initial_revision, "preview never writes the project");
                 assert!(editor.session.selection.contains(&selected));
                 editor.proto_pointer_contact.as_ref().and_then(std::rc::Weak::upgrade).unwrap()
