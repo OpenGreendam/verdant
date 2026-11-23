@@ -7,7 +7,7 @@
 //! trim. Preview-only drags commit once on release, including cross-track moves.
 //! Horizontal scrolling and editor navigation use the session viewport bounds.
 use std::collections::{HashMap, HashSet};
-use gpui::{App, BorderStyle, Bounds, ClickEvent, Context, DispatchPhase, Entity, FontWeight, Hitbox, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TouchDragEvent, TouchPhase, PinchEvent, Pixels, ScrollDelta, ScrollEvent, SharedString, Window, canvas, div, fill, prelude::*, px, quad};
+use gpui::{App, BorderStyle, Bounds, Context, DispatchPhase, Entity, FontWeight, Hitbox, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, TouchDragEvent, TouchPhase, PinchEvent, Pixels, ScrollDelta, ScrollEvent, SharedString, Window, canvas, div, fill, prelude::*, px, quad};
 use verdant_backend::{PhrasePlan, SlotStatus};
 use verdant_domain::{Project,Revision,TrackId,Command,CommandBatch};
 use verdant_session::PointerId;
@@ -195,7 +195,7 @@ fn native_track_headers(ed: &Editor, handle: &verdant_collection_control::Collec
             .child(div().flex().items_center().gap(px(5.0))
                 .child(div().text_size(px(10.5)).text_color(th.text_tertiary).w(px(15.0)).flex_none().child(format!("{:02}", i + 1)))
                 .child(crate::proto_controls::action("color", "切换轨道颜色").size(px(11.0)).rounded(px(3.0)).bg(th.track(track.color.as_deref()))
-                    .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| ed.cycle_color(&color, cx))))
+                    .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| ed.cycle_color(&color, cx))))
                 .child(div().flex_1().truncate().text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).child(track.name.clone()))
                 .child(crate::ui_controls::selectable_command_button(ed, CommandId::ToggleTrackAutomation, CommandArg::Track(track.id.clone()), "A", SharedString::from(format!("auto-btn-{}", track.id)), auto_expanded, cx)
                     .h(hdr_h).w(px(23.0)).px(px(0.0)).rounded(px(4.0)).aria_label("展开/收起自动化曲线"))
@@ -224,7 +224,7 @@ fn native_track_headers(ed: &Editor, handle: &verdant_collection_control::Collec
                     ("静音", "切换音频片段静音", AudioRegionEdit::Mute),
                 ].into_iter().map(|(label,description,edit)| {
                     crate::proto_controls::action(SharedString::from(format!("audio-region-{label}")), description).px(px(4.0)).rounded(px(2.0)).bg(th.control).cursor_pointer()
-                        .child(label).on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
+                        .child(label).on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, window, cx| {
                              edit_audio_region(ed,edit,cx);cx.stop_propagation();
                         }))
                 })))
@@ -261,14 +261,19 @@ fn native_region_lanes(editor: Entity<Editor>, input: crate::proto_editor_surfac
         let mut texts = Texts::new(); let mut labels = Vec::new();
         paint_regions(&editor, bounds, window, cx, &mut texts, &mut labels); flush_texts(window, cx, bounds, texts);
         for (clip_bounds, label) in labels { flush_texts(window, cx, clip_bounds, label); }
-        let e = editor.clone();
+        let e = editor.clone(); let policy = input.clone();
         crate::proto_editor_surface::install_pointer_input(&input, bounds, &hitbox, window, move |event, window, cx| {
             use crate::proto_editor_surface::PointerPhase;
             e.update(cx, |ed, cx| match event.phase {
-                PointerPhase::Begin | PointerPhase::Context => region_down(ed,event.x,event.y,
+                PointerPhase::Begin | PointerPhase::Context => region_down(&policy,ed,event.x,event.y,
                     if event.phase == PointerPhase::Context { MouseButton::Right } else { MouseButton::Left },
                     event.clicks,event.modifiers.control,event.modifiers.shift,event.modifiers.alt,event.pointer,event.position,window,cx),
-                PointerPhase::Sample => { region_moved(ed,event.pointer,event.x,event.y,event.modifiers.alt,cx); true }
+                PointerPhase::Sample => {
+                    if let Some(intent) = policy.motion(ed,event.x,event.y,event.modifiers,window,cx) {
+                        region_moved(ed,event.pointer,event.x,event.y,!intent.snap,cx);
+                    }
+                    true
+                }
                 PointerPhase::Finish => { region_up(ed,event.pointer,window,cx); true }
             })
         });
@@ -276,8 +281,9 @@ fn native_region_lanes(editor: Entity<Editor>, input: crate::proto_editor_surfac
         let e = editor.clone();let gate=input.clone();
         window.on_mouse_event(move |ev: &PinchEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble || !hitbox.is_hovered(window) { return; }
-            if !gate.pinch(1.0+f64::from(ev.delta),window,cx) {return;}
-            e.update(cx, |ed, cx| { ed.arrange.zoom_x_at((ev.position - bounds.origin).x.as_f32() as f64, 1.0 + ev.delta as f64); ed.notify_viewport(crate::clock::Space::Arrange, cx); });
+            let Some(intent) = gate.pinch(1.0+f64::from(ev.delta),window,cx) else {return;};
+            e.update(cx, |ed, cx| { if intent.apply(&mut ed.arrange, (f64::from(ev.position.x - bounds.origin.x), 0.)) { ed.notify_viewport(crate::clock::Space::Arrange, cx); } });
+            cx.stop_propagation();
         });
     }).size_full()
 }
@@ -289,9 +295,7 @@ pub(crate) fn install_timeline_scroll(editor:&Entity<Editor>,bounds:Bounds<Pixel
         if phase != DispatchPhase::Bubble || !hitbox.is_hovered(window) { return; }
         let Some(intent)=input.wheel(event.delta,event.modifiers,true,window,cx) else { return };
         editor.update(cx,|ed,cx| {
-            if intent.kind=="zoom-x" { ed.arrange.zoom_x_at(f64::from(event.position.x-bounds.origin.x),1.0015f64.powf(intent.amount)); }
-            else { ed.arrange.pan_px(intent.x,intent.y); }
-            ed.notify_viewport(crate::clock::Space::Arrange,cx);
+            if intent.apply(&mut ed.arrange, (f64::from(event.position.x-bounds.origin.x), 0.)) { ed.notify_viewport(crate::clock::Space::Arrange,cx); }
         });
         cx.stop_propagation();
     });
@@ -499,6 +503,7 @@ fn lane_menu(ed:&mut Editor,track:TrackId,tick:f64,position:gpui::Point<Pixels>,
 
 /// Movement (px) before a region press turns into a drag.
 pub(crate) const DRAG_THRESHOLD: f64 = 3.0;
+
 /// Smallest on-screen beat before arrangement snapping moves to whole bars.
 const MIN_BEAT_PX: f64 = 14.0;
 /// Track-area snapping follows the meter at the current zoom: beats when a
@@ -559,17 +564,35 @@ fn authored_hit(ed:&Editor,track:&TrackId,tick:f64,row_y:f64)->Option<AuthoredTa
     let index=ed.arrange_cache.tracks.get(track)?;let has_parts=index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_)));
     index.authored.iter().rev().find(|region|tick>=region.start as f64&&tick<region.end as f64&&match region.target{AuthoredTarget::Part(_)=>row_y<27.,AuthoredTarget::Audio(_)=>!has_parts||row_y>=27.}).map(|region|region.target.clone())
 }
-fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,extend_selection:bool,unsnapped:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
+fn region_down(input:&crate::proto_editor_surface::Input,ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_at_click:bool,extend_selection:bool,unsnapped:bool,pointer:PointerId,position:gpui::Point<Pixels>,window:&mut Window,cx:&mut Context<Editor>)->bool{
     let row=(y/ed.arrange_track_height).floor()as usize;let Some(track)=ed.project().tracks.get(row).map(|t|t.id.clone())else{return false;};
-    if !matches!(button,MouseButton::Left|MouseButton::Right)||!ed.select_track(track.clone(),cx){return false;}
     let tick=ed.arrange.x_to_tick(x);let hit=authored_hit(ed,&track,tick,y-row as f64*ed.arrange_track_height);
-    if ed.integrations.audio_edit.range_tool&&button==MouseButton::Left{
-        let tick=if unsnapped{tick.max(0.)}else{arrange_snap(ed,tick).max(0)as f64};
+    let hit_kind=match hit.as_ref(){Some(AuthoredTarget::Part(_))=>"part",Some(AuthoredTarget::Audio(_))=>"audio",None=>"empty"};
+    let(mut left,mut right,mut fade_in,mut fade_out,mut fade_band)=(-1.,-1.,-1.,-1.,false);
+    if let Some(index)=ed.arrange_cache.tracks.get(&track) {
+        if let Some(region)=hit.as_ref().and_then(|target|index.authored.iter().find(|region|region.target.same(target))) {
+            left=(x-ed.arrange.tick_to_x(region.start as f64)).abs();right=(x-ed.arrange.tick_to_x(region.end as f64)).abs();
+            if let Some(clip)=region.clip.as_ref() {
+                let has_parts=index.authored.iter().any(|region|matches!(region.target,AuthoredTarget::Part(_)));
+                let top=row as f64*ed.arrange_track_height+if has_parts{27.}else{3.};
+                fade_band=y>=top&&y<top+10.;
+                let tempo=ed.tempo();let seconds=tempo.seconds_at(region.start as f64);let rate=clip.source.sample_rate as f64*clip.playback_rate;
+                fade_in=(x-ed.arrange.tick_to_x(tempo.tick_at(seconds+clip.fade_in_frames as f64/rate))).abs();
+                fade_out=(x-ed.arrange.tick_to_x(tempo.tick_at(seconds+(clip.duration_frames-clip.fade_out_frames)as f64/rate))).abs();
+            }
+        }
+    }
+    let Some(intent)=input.intent(ed,"regionGesture",vec![hit_kind.into(),ed.integrations.audio_edit.range_tool.into(),
+        (button==MouseButton::Right).into(),extend_selection.into(),split_at_click.into(),(clicks as u64).into(),
+        left.into(),right.into(),fade_in.into(),fade_out.into(),fade_band.into(),unsnapped.into()],window,cx) else{return false;};
+    if !ed.select_track(track.clone(),cx){return false;}
+    if intent.kind=="range"{
+        let tick=if intent.snap{arrange_snap(ed,tick).max(0)as f64}else{tick.max(0.)};
         ed.integrations.audio_edit.range_drag=Some(crate::editor::integrations::audio_edit_ui::RangeDrag{pointer,anchor_tick:tick,anchor_track:row});
         ed.select_audio_range(crate::editor::integrations::audio_edit_ui::AudioRange{tracks:vec![track],start_tick:tick,end_tick:tick});
         cx.notify();return true;
     }
-    let Some(target)=hit else{if button==MouseButton::Right{lane_menu(ed,track,tick,position,window,cx);}else if clicks>=2{create_part_at(ed,&track,tick,window,cx);}else{ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;ed.run_menu_action(crate::editor::MenuAction::SeekTick(tick.max(0.).round()as i64),window,cx);}cx.notify();return false;};
+    let Some(target)=hit else{match intent.kind.as_str(){"lane-menu"=>lane_menu(ed,track,tick,position,window,cx),"create-part"=>create_part_at(ed,&track,tick,window,cx),"seek"=>{ed.integrations.selected_clip=None;ed.integrations.audio_edit.selected.clear();ed.integrations.audio_edit.range=None;ed.run_menu_action(crate::editor::MenuAction::SeekTick(tick.max(0.).round()as i64),window,cx);},_=>{}}cx.notify();return false;};
     use crate::editor::WorkflowAction as A;use crate::editor::MenuAction as M;use crate::menu::MenuItem as I;
     let(start,end,min_left,max_right,audio_seconds)=match &target{
         AuthoredTarget::Part(id)=>{
@@ -579,40 +602,26 @@ fn region_down(ed:&mut Editor,x:f64,y:f64,button:MouseButton,clicks:usize,split_
         }
         AuthoredTarget::Audio(id)=>{
             ed.integrations.selected_clip=Some((track.clone(),id.clone()));let Ok(clip)=ed.selected_audio_clip()else{return false;};
-            ed.select_audio_clip(&clip,extend_selection,true);
-            if extend_selection&&button==MouseButton::Left{cx.notify();return false;}
+            ed.select_audio_clip(&clip,intent.selection=="extend",true);
+            if intent.kind=="select"{cx.notify();return false;}
             let tempo=ed.tempo();let start_seconds=clip.start_seconds(&tempo);let duration=clip.duration_seconds();let rate=clip.source.sample_rate as f64*clip.playback_rate;
             let before=if clip.reversed{clip.source.frames-clip.source_offset_frames-clip.duration_frames}else{clip.source_offset_frames};
             let after=if clip.reversed{clip.source_offset_frames}else{clip.source.frames-clip.source_offset_frames-clip.duration_frames};
             (clip.start_tick,clip.end_tick(&tempo).ceil()as i64,tempo.tick_at((start_seconds-before as f64/rate).max(0.)).ceil()as i64,tempo.tick_at(start_seconds+duration+after as f64/rate).floor()as i64,Some(duration))
         }
     };
-    if button==MouseButton::Right{
+    if intent.kind=="region-menu"{
         let items=match &target{AuthoredTarget::Part(id)=>{let muted=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(id).map(|p|p.muted)).unwrap_or(false);vec![
             I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("精确位置…",M::Workflow(A::MovePart)),I::action("精确裁剪…",M::Workflow(A::TrimPart)),I::separator(),
             I::action("在此分割",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制片段",M::Workflow(A::DuplicatePart(true))),I::action("独立复制片段",M::Workflow(A::DuplicatePart(false))),I::action("取消片段链接",M::Workflow(A::UnlinkPart)),I::separator(),
             I::action("静音",M::Workflow(A::MutePart)).checked(muted),I::action("删除片段",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>ed.audio_menu_items()};ed.show_menu(position,items,window,cx);return false;
     }
-    if split_at_click && matches!(target,AuthoredTarget::Audio(_)) {
+    if intent.kind=="split" {
         edit_audio_region(ed,AudioRegionEdit::Split(arrange_snap(ed,tick)),cx);return false;
     }
-    if clicks>=2&&matches!(target,AuthoredTarget::Audio(_)){let items=ed.audio_menu_items();ed.show_menu(position,items,window,cx);return false;}
-    if clicks>=2{ed.bottom=Bottom::Editor;let target=(start as f64-ed.session.viewport.width*0.1/ed.session.viewport.px_per_tick).max(0.);let dx=(target-ed.session.viewport.start_tick)*ed.session.viewport.px_per_tick;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);cx.notify();return false;}
-    let mut mode=if (x-ed.arrange.tick_to_x(start as f64)).abs()<7.{RegionDragMode::Left}else if(x-ed.arrange.tick_to_x(end as f64)).abs()<7.{RegionDragMode::Right}else{RegionDragMode::Move};
-    let mut fade_frames=0;
-    if matches!(target,AuthoredTarget::Audio(_)) {
-        if let Ok(clip)=ed.selected_audio_clip(){
-            let has_parts=ed.arrange_cache.tracks.get(&track).is_some_and(|index|index.authored.iter().any(|r|matches!(r.target,AuthoredTarget::Part(_))));
-            let top=row as f64*ed.arrange_track_height+if has_parts{27.}else{3.};
-            let tempo=ed.tempo();let seconds=tempo.seconds_at(start as f64);let rate=clip.source.sample_rate as f64*clip.playback_rate;
-            let fade_in_x=ed.arrange.tick_to_x(tempo.tick_at(seconds+clip.fade_in_frames as f64/rate));
-            let fade_out_x=ed.arrange.tick_to_x(tempo.tick_at(seconds+(clip.duration_frames-clip.fade_out_frames)as f64/rate));
-            if y>=top&&y<top+10.{
-                if (x-fade_in_x).abs()<7.{mode=RegionDragMode::FadeIn;fade_frames=clip.fade_in_frames;}
-                else if (x-fade_out_x).abs()<7.{mode=RegionDragMode::FadeOut;fade_frames=clip.fade_out_frames;}
-            }
-        }
-    }
+    if intent.kind=="open-part"{ed.bottom=Bottom::Editor;let target=(start as f64-ed.session.viewport.width*0.1/ed.session.viewport.px_per_tick).max(0.);let dx=(target-ed.session.viewport.start_tick)*ed.session.viewport.px_per_tick;ed.session.viewport.pan_px(dx,0.);window.focus(&ed.focus_roll,cx);cx.notify();return false;}
+    let mode=match intent.kind.as_str(){"move-region"=>RegionDragMode::Move,"resize-left"=>RegionDragMode::Left,"resize-right"=>RegionDragMode::Right,"fade-in"=>RegionDragMode::FadeIn,"fade-out"=>RegionDragMode::FadeOut,_=>return false};
+    let fade_frames=ed.selected_audio_clip().ok().map_or(0,|clip|match mode{RegionDragMode::FadeIn=>clip.fade_in_frames,RegionDragMode::FadeOut=>clip.fade_out_frames,_=>0});
     let audio=if matches!(target,AuthoredTarget::Audio(_)){
         ed.selected_audio_clip().ok().map(|clip|{
             let tempo=ed.tempo();let seconds=clip.start_seconds(&tempo);let rate=clip.source.sample_rate as f64*clip.playback_rate;

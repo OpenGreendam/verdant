@@ -5,7 +5,7 @@
 //! Inserts and stereo peak/clip metering shared with offline WAV export.
 
 use gpui::{
-    AccessibleAction, BorderStyle, ClickEvent, Context, DispatchPhase, Entity, FontWeight,
+    AccessibleAction, BorderStyle, Context, DispatchPhase, Entity, FontWeight,
     HitboxBehavior, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Role,
     SharedString, canvas, div, fill, point, prelude::*, px, quad,
 };
@@ -172,7 +172,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                         .gap(px(2.0))
                         .child(div().text_xs().truncate().child(format!("{} · {}", slot + 1, spec.name)))
                         .child(div().text_size(px(9.0)).truncate().text_color(if warning { th.warning } else { th.text_secondary }).child(state))
-                        .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                             ed.open_master_insert_editor(slot, cx);
                             cx.stop_propagation();
                         })),
@@ -184,7 +184,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                         .child(
                             route_button("master-insert-bypass", if spec.bypass { "启用" } else { "旁通" }, spec.bypass, th).authority(mixer_revision(ed))
                                 .disabled(busy)
-                                .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                                     if !busy { ed.toggle_master_insert_bypass(slot, cx); }
                                     cx.stop_propagation();
                                 })),
@@ -192,7 +192,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                         .child(
                             route_button("master-insert-remove", "移除", false, th).authority(mixer_revision(ed))
                                 .disabled(busy)
-                                .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                                     if !busy { ed.remove_master_insert(slot, cx); }
                                     cx.stop_propagation();
                                 })),
@@ -238,7 +238,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
         .child(
             route_button("add-master-insert", "+ 主总线插入…", false, th).authority(mixer_revision(ed))
                 .flex_none()
-                .on_click(cx.listener(|ed, _: &ClickEvent, window, cx| {
+                .on_click(cx.listener(|ed, _: &crate::proto_controls::Activation, window, cx| {
                     master_plugin_picker(ed, window.mouse_position(), window, cx);
                     cx.stop_propagation();
                 })),
@@ -360,7 +360,7 @@ fn strip(
                 .flex_col()
                 .child(div().text_xs().truncate().child(format!("{} · {}", slot + 1, spec.name)))
                 .child(div().text_size(px(9.0)).truncate().text_color(if warning { th.warning } else { th.text_secondary }).child(state))
-                .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                     if expected_key.is_none_or(|key| ed.live_insert(&open_track, slot).is_some_and(|handle| handle.key() == key)) && ed.select_track(open_track.clone(), cx) {
                         ed.open_insert_editor(&open_track, slot, cx);
                     }
@@ -443,7 +443,7 @@ fn strip(
                         .rounded(px(6.0))
                         .hover(move |s| s.bg(th.hover))
                         .child(gpui::svg().path(crate::assets::icon("menu")).size(px(14.0)).text_color(th.text))
-                        .on_click(cx.listener(move |ed, _: &ClickEvent, window, cx| {
+                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, window, cx| {
                             ed.track_menu(header_menu.clone(), window.mouse_position(), window, cx);
                             cx.stop_propagation();
                         })),
@@ -538,7 +538,7 @@ fn parameter_panel(ed: &Editor, cx: &mut Context<Editor>) -> Option<gpui::AnyEle
                 .items_center()
                 .gap(px(8.0))
                 .child(div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(spec.name.clone()))
-                .child(route_button("close-params", "关闭", false, th).authority(mixer_revision(ed)).flex_none().px(px(7.0)).on_click(cx.listener(|ed, _: &ClickEvent, _, cx| {
+                .child(route_button("close-params", "关闭", false, th).authority(mixer_revision(ed)).flex_none().px(px(7.0)).on_click(cx.listener(|ed, _: &crate::proto_controls::Activation, _, cx| {
                     ed.insert_panel = None;
                     cx.notify();
                 }))),
@@ -581,7 +581,7 @@ fn parameter_panel(ed: &Editor, cx: &mut Context<Editor>) -> Option<gpui::AnyEle
                     th,
                 ).authority(mixer_revision(ed))
                 .flex_none()
-                .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                     if !busy {
                         ed.show_insert_params(refresh_track.clone(), refresh_slot, cx);
                     }
@@ -633,7 +633,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 .items_center()
                 .gap(px(8.0))
                 .child(div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(format!("主总线 · {}", spec.name)))
-                .child(route_button("close-master-params", "关闭", false, th).authority(mixer_revision(ed)).flex_none().px(px(7.0)).on_click(cx.listener(|ed, _: &ClickEvent, _, cx| {
+                .child(route_button("close-master-params", "关闭", false, th).authority(mixer_revision(ed)).flex_none().px(px(7.0)).on_click(cx.listener(|ed, _: &crate::proto_controls::Activation, _, cx| {
                     ed.master_insert_panel = None;
                     cx.notify();
                 }))),
@@ -645,7 +645,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 .child(
                     route_button("master-param-bypass", if spec.bypass { "启用" } else { "旁通" }, spec.bypass, th).authority(mixer_revision(ed))
                         .disabled(busy)
-                        .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                             if !busy { ed.toggle_master_insert_bypass(slot, cx); }
                             cx.stop_propagation();
                         })),
@@ -653,7 +653,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 .child(
                     route_button("master-param-remove", "移除", false, th).authority(mixer_revision(ed))
                         .disabled(busy)
-                        .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                             if !busy { ed.remove_master_insert(slot, cx); }
                             cx.stop_propagation();
                         })),
@@ -662,7 +662,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
     if let Some(handle) = ed.live_master_insert(slot) {
         if handle.has_editor() || (spec.format == "builtin" && verdant_plugins::builtin_dsp::has_native_editor(&spec.id)) {
             panel = panel.child(route_button("master-native-editor", "打开原生插件窗口", false, th).authority(mixer_revision(ed)).flex_none().on_click(cx.listener(
-                move |ed, _: &ClickEvent, _, cx| {
+                move |ed, _: &crate::proto_controls::Activation, _, cx| {
                     ed.open_master_insert_editor(slot, cx);
                     cx.stop_propagation();
                 },
@@ -681,7 +681,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 ).authority(mixer_revision(ed))
                 .flex_none()
                 .disabled(busy)
-                .on_click(cx.listener(move |ed, _: &ClickEvent, _, cx| {
+                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
                     if !busy { ed.show_master_insert_params(slot, cx); }
                     cx.stop_propagation();
                 })),
@@ -754,7 +754,12 @@ fn mixer_scalar(editor: Entity<Editor>, track: Option<TrackId>, control: MixerCo
         move |sample, bounds, initial| {
             if pan {
                 let delta = sample.total_delta.x / (f64::from(bounds.size.width) - 16.0).max(1.0) * 200.0;
-                Sample { value: initial + delta, fine: initial + delta * 0.1, jump: false }
+                // The audio/project boundary stores integer permille. Give
+                // the source that same value before it publishes a preview,
+                // so a normal repaint echoes this gesture instead of looking
+                // like a competing authoritative edit.
+                Sample { value: ((initial + delta) * 10.0).round() / 10.0,
+                    fine: ((initial + delta * 0.1) * 10.0).round() / 10.0, jump: false }
             } else {
                 let delta = -sample.total_delta.y / (f64::from(bounds.size.height) - 14.0).max(1.0);
                 let origin = fader_pos((initial * 1000.0).round() as i32);
@@ -832,12 +837,23 @@ mod pointer_boundary_tests {
     struct Harness { editor: Entity<Editor>, master: bool, control: MixerControl }
     impl Render for Harness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            let track = self.editor.read(cx).session.track.clone();
+            let ed = self.editor.read(cx);
+            let track = ed.session.track.clone();
+            // Use the production preview/project readback. A constant value
+            // would conceal precision loss when a gesture survives a frame.
+            let raw = if self.master {
+                let settings = ed.master_bus();
+                if self.control == MixerControl::Pan { settings.pan_permille } else { settings.gain_millidecibels }
+            } else {
+                let header = ed.mixer_drag.as_ref().filter(|drag| drag.track == track)
+                    .map(|drag| drag.header.clone()).unwrap_or_else(|| ed.project().track(&track).unwrap().header());
+                if self.control == MixerControl::Pan { header.pan_permille } else { header.gain_millidecibels }
+            };
             let control = match (self.master, self.control) {
-                (false, MixerControl::Pan) => pan_control(self.editor.clone(), track, 0).into_any_element(),
-                (false, MixerControl::Fader) => fader(self.editor.clone(), track, 0).into_any_element(),
-                (true, MixerControl::Pan) => master_pan_control(self.editor.clone(), 0).into_any_element(),
-                (true, MixerControl::Fader) => master_fader(self.editor.clone(), 0).into_any_element(),
+                (false, MixerControl::Pan) => pan_control(self.editor.clone(), track, raw).into_any_element(),
+                (false, MixerControl::Fader) => fader(self.editor.clone(), track, raw).into_any_element(),
+                (true, MixerControl::Pan) => master_pan_control(self.editor.clone(), raw).into_any_element(),
+                (true, MixerControl::Fader) => master_fader(self.editor.clone(), raw).into_any_element(),
             };
             div().size_full().child(div().w(px(140.0)).h(px(120.0)).child(control))
                 .child(canvas(|_, _, _| {}, |_, _, window, _| {
@@ -919,6 +935,54 @@ mod pointer_boundary_tests {
                     if control == MixerControl::Pan { 1000 } else { -96_000 }, "the in-window final sample reaches the domain boundary exactly once");
                 assert!(host.editor.read(cx).mixer_drag.is_none() && host.editor.read(cx).master_drag.is_none());
                 assert!(window.captured_hitbox().is_none());
+            }).unwrap();
+        } }
+    }
+
+    #[gpui::test]
+    fn pan_previews_survive_quantized_repaint_and_commit_once(cx: &mut TestAppContext) {
+        for master in [false, true] { for fine in [false, true] {
+            let window = open(cx, master, MixerControl::Pan);
+            window.update(cx, |host, window, cx| down(host, window, cx)).unwrap();
+            crate::native_test_support::frames(window, cx);
+            for x in [80.0, 95.0] {
+                window.update(cx, |_, window, cx| {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                        position: point(px(x), px(60.0)), pressed_button: Some(MouseButton::Left),
+                        modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                    }), cx);
+                    cx.notify();
+                }).unwrap();
+                crate::native_test_support::frames(window, cx);
+                window.update(cx, |host, window, cx| {
+                    let source = source(window);
+                    assert_eq!(source.state("phase").unwrap(), serde_json::json!("dragging"),
+                        "integer audio preview must remain the current gesture after repaint");
+                    let ed = host.editor.read(cx);
+                    let raw = if master { ed.master_drag.as_ref().expect("master preview survives").settings.pan_permille }
+                        else { ed.mixer_drag.as_ref().expect("track preview survives").header.pan_permille };
+                    assert_eq!(source.state("value").unwrap().as_f64(), Some(raw as f64 / 10.0));
+                    assert_eq!(ed.revision().get(), 0, "preview does not write an undo step");
+                }).unwrap();
+            }
+            window.update(cx, |host, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: point(px(95.0), px(60.0)), button: MouseButton::Left,
+                    modifiers: gpui::Modifiers { shift: fine, ..Default::default() }, ..Default::default()
+                }), cx);
+                let ed = host.editor.read(cx);
+                assert_eq!(ed.revision().get(), 1, "one completed drag creates one transaction");
+                let raw = if master { crate::mix::MasterBusSettings::from_project(ed.project()).pan_permille }
+                    else { ed.project().track(&ed.session.track).unwrap().header().pan_permille };
+                assert_eq!(raw, if fine { 40 } else { 403 });
+                assert!(ed.mixer_drag.is_none() && ed.master_drag.is_none());
+                assert!(window.captured_hitbox().is_none());
+                cx.notify();
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                assert_eq!(source(window).state("phase").unwrap(), serde_json::json!("idle"));
+                assert_eq!(host.editor.read(cx).revision().get(), 1);
             }).unwrap();
         } }
     }

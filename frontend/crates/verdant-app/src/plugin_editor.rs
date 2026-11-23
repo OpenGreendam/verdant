@@ -81,7 +81,7 @@ impl NativePluginWindow {
             ToolbarAction::Tools => { self.tools_open = !self.tools_open; cx.notify(); }
             ToolbarAction::Keyboard => {
                 self.keyboard_open = !self.keyboard_open;
-                if !self.keyboard_open { self.release_notes(window,cx); }
+                if !self.keyboard_open { self.cancel_keyboard_input(window, cx); }
                 cx.notify();
             }
             ToolbarAction::Fullscreen => window.toggle_fullscreen(),
@@ -129,10 +129,7 @@ impl NativePluginWindow {
             }
         });
     }
-    fn release_notes(&mut self, window:&mut Window, cx: &mut gpui::App) {
-        if let Some(view)=window.root::<NativePluginWindow>().flatten(){
-            crate::proto_performance_key::cancel_scope(&format!("native-keyboard-{:?}",view.entity_id()),window,cx);
-        }
+    fn release_notes(&mut self, cx: &mut gpui::App) {
         let held: Vec<_> = self.held_notes.iter().copied().collect();
         let had_preview = std::mem::take(&mut self.preview_started);
         for key in held { self.note(key, false, cx); }
@@ -146,6 +143,14 @@ impl NativePluginWindow {
                 }
             });
         }
+    }
+
+    fn cancel_keyboard_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Source contact retirement precedes audio release. An accepted key
+        // can still be waiting in the deferred native-to-audio delivery queue.
+        let scope = format!("native-keyboard-{:?}", cx.entity_id());
+        crate::proto_performance_key::cancel_scope(&scope, window, cx);
+        self.release_notes(cx);
     }
 
     /// Only open effect windows poll their own host. IPC/FFT work runs on the
@@ -252,7 +257,7 @@ impl Editor {
                     cx.observe(&observed, |_, _, cx| cx.notify()).detach();
                     cx.observe_window_activation(window, |view: &mut NativePluginWindow, window, cx| {
                         if !window.is_window_active() {
-                            view.release_notes(window,cx);
+                            view.cancel_keyboard_input(window, cx);
                             let _ = view.editor.update(cx, |ed, cx| {
                                 ed.cancel_device_drag_in(window.window_handle(), cx);
                                 ed.close_menu(window, cx);
@@ -386,6 +391,7 @@ impl Render for NativePluginWindow {
                     if instrument_window { crate::proto_performance_key::route_key(&keyboard_up,&event.keystroke.key,false,window,cx); }
                 })
                 .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if window.default_prevented() { return; }
                     let key=event.keystroke.key.as_str();
                     if instrument_window && keyboard_open && !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt
                         && key_editor.read(cx).menu.is_none()
@@ -531,6 +537,18 @@ mod tests {
         }), cx);
     }
 
+    fn performance_key(note: u8, window: &Window) -> verdant_performance_key::PerformanceKeyHandle {
+        let mut owners = verdant_performance_key::native::gpui_native_owner::all_owners().into_iter().filter(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.declared_events.contains("pressedChange")
+                && crate::proto_controls::source_integer(owner.props.get("note")) == Some(i64::from(note))
+        });
+        let owner = owners.next().expect("the production keyboard mounts the authored note");
+        assert!(owners.next().is_none(), "one source control owns this note in this window");
+        verdant_performance_key::PerformanceKeyHandle { owner }
+    }
+
     // GPUI keeps handle_a11y_action crate-private. These tests enter the exact
     // semantic callback shared by the rendered mouse/accessible handlers while
     // using real window input, compiled leases and the durable project store.
@@ -673,6 +691,152 @@ mod tests {
             release_knob(new_start, window, cx);
             assert_eq!(editor.read(cx).revision().get(), 1, "only the replacement drag commits");
             assert!(!editor.read(cx).has_proto_pointer_contact());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn repeated_keypresses_without_held_flag_schedule_only_one_note(cx: &mut TestAppContext) {
+        let (_, _, windows) = native_windows(cx, 1);
+        let native = windows[0];
+        cx.update_window(native.into(), |_, window, cx| {
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            window.focus(&view.read(cx).focus.clone(), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        for _ in 0..2 {
+            cx.update_window(native.into(), |_, window, cx| {
+                for _ in 0..100 {
+                    window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                        keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false, prefer_character_input: false,
+                    }), cx);
+                }
+                assert_eq!(performance_key(60, window).state("pressed").unwrap(), serde_json::json!(true));
+            }).unwrap();
+            crate::native_test_support::frames(native, cx);
+            native.update(cx, |view, _, _| assert_eq!(view.held_notes.iter().copied().collect::<Vec<_>>(), vec![60])).unwrap();
+        }
+        cx.update_window(native.into(), |_, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::KeyUp(gpui::KeyUpEvent { keystroke: gpui::Keystroke::parse("a").unwrap() }), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| assert!(view.held_notes.is_empty())).unwrap();
+        cx.update_window(native.into(), |_, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false, prefer_character_input: false,
+            }), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| assert!(view.held_notes.contains(&60), "a new physical press is admitted after release")).unwrap();
+    }
+
+    #[gpui::test]
+    fn early_key_release_or_keyboard_close_cancels_the_deferred_note(cx: &mut TestAppContext) {
+        let (_, editor, windows) = native_windows(cx, 1);
+        let native = windows[0];
+        cx.update_window(native.into(), |_, window, cx| {
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            window.focus(&view.read(cx).focus.clone(), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        cx.update_window(native.into(), |_, window, cx| {
+            let key = gpui::Keystroke::parse("a").unwrap();
+            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent { keystroke: key.clone(), is_held: false, prefer_character_input: false }), cx);
+            window.dispatch_event(gpui::PlatformInput::KeyUp(gpui::KeyUpEvent { keystroke: key }), cx);
+            assert_eq!(performance_key(60, window).state("pressed").unwrap(), serde_json::json!(false));
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| assert!(view.held_notes.is_empty(), "release before delivery cannot start a note")).unwrap();
+        cx.update_window(native.into(), |_, window, cx| {
+            for key in ["a", "s"] {
+                window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                    keystroke: gpui::Keystroke::parse(key).unwrap(), is_held: false, prefer_character_input: false,
+                }), cx);
+            }
+            assert_eq!(performance_key(60, window).state("pressed").unwrap(), serde_json::json!(true));
+            assert_eq!(performance_key(62, window).state("pressed").unwrap(), serde_json::json!(true));
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            assert!(view.read(cx).held_notes.is_empty(), "both source admissions precede deferred delivery");
+            toolbar_command(editor.downgrade(), view.downgrade(), ToolbarAction::Keyboard)(None, window, cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| {
+            assert!(!view.keyboard_open);
+            assert!(view.held_notes.is_empty(), "queued input cannot restart the closed keyboard");
+            assert!(!view.preview_started);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn window_deactivation_cancels_authored_typing_and_releases_audio(cx: &mut TestAppContext) {
+        let (_, _, windows) = native_windows(cx, 1);
+        let native = windows[0];
+        cx.update_window(native.into(), |_, window, cx| {
+            window.activate_window();
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            window.focus(&view.read(cx).focus.clone(), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        let key = cx.update_window(native.into(), |_, window, cx| {
+            assert!(window.is_window_active());
+            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false, prefer_character_input: false,
+            }), cx);
+            performance_key(60, window)
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| assert!(view.held_notes.contains(&60))).unwrap();
+        gpui::VisualTestContext::from_window(native.into(), cx).deactivate_window();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, window, _| {
+            assert!(!window.is_window_active());
+            assert!(view.keyboard_open, "window loss does not hide the keyboard");
+            assert!(view.held_notes.is_empty());
+            assert!(!view.preview_started);
+            assert_eq!(key.state("pressed").unwrap(), serde_json::json!(false), "source typing cannot outlive its window's active input scope");
+        }).unwrap();
+        cx.update_window(native.into(), |_, window, cx| {
+            window.activate_window();
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            window.focus(&view.read(cx).focus.clone(), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        cx.update_window(native.into(), |_, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::KeyUp(gpui::KeyUpEvent { keystroke: gpui::Keystroke::parse("a").unwrap() }), cx);
+            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: gpui::Keystroke::parse("a").unwrap(), is_held: false, prefer_character_input: false,
+            }), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| assert!(view.held_notes.contains(&60), "reactivation accepts a fresh physical press")).unwrap();
+    }
+
+    #[gpui::test]
+    fn keyboard_scope_retirement_prevents_queued_note_on(cx: &mut TestAppContext) {
+        let (_, _, windows) = native_windows(cx, 1);
+        let native = windows[0];
+        cx.update_window(native.into(), |_, window, cx| {
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            window.focus(&view.read(cx).focus.clone(), cx);
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        cx.update_window(native.into(), |_, window, cx| {
+            window.dispatch_event(gpui::PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: gpui::Keystroke::parse("s").unwrap(), is_held: false, prefer_character_input: false,
+            }), cx);
+            let key = performance_key(62, window);
+            assert_eq!(key.state("pressed").unwrap(), serde_json::json!(true));
+            let view = window.root::<NativePluginWindow>().flatten().unwrap();
+            assert!(view.read(cx).held_notes.is_empty(), "audio delivery is still pending");
+            // Enter the production window-loss boundary before the queued
+            // audio callback. The test above separately drives platform loss.
+            view.update(cx, |view, cx| view.cancel_keyboard_input(window, cx));
+            assert!(view.read(cx).keyboard_open, "this case cannot rely on the hidden-keyboard guard");
+            assert_eq!(key.state("pressed").unwrap(), serde_json::json!(false));
+        }).unwrap();
+        crate::native_test_support::frames(native, cx);
+        native.update(cx, |view, _, _| {
+            assert!(view.held_notes.is_empty(), "a retired source cannot deliver a late note-on");
+            assert!(!view.preview_started);
         }).unwrap();
     }
 

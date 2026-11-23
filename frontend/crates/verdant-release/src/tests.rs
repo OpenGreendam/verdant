@@ -110,7 +110,7 @@ fn source_offer_requires_exact_membership_bytes_modes_and_external_selection() {
 
 const PUBLIC_TOOL_SOURCE_FILES: &[&str] = &[
     "tools/a11y/README.md", "tools/a11y/observe-atspi.py", "tools/a11y/run-isolated.py",
-    "tools/native-input/README.md", "tools/native-input/ci.py", "tools/native-input/probe.py",
+    "tools/native-input/README.md", "tools/native-input/ci.py", "tools/native-input/probe.py", "tools/native-input/controls.py",
     "tools/native-input/run-linux-isolated.py", "tools/native-input/x11_screenshot.py",
     "tools/native-input/test_ci.py", "tools/native-input/test_probe.py",
     "frontend/scripts/generate-agent-skills.py",

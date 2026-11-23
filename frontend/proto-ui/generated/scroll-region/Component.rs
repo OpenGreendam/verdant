@@ -17,17 +17,19 @@
           _ => false,
       }
   }
-  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("description").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("role").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("autoFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("scope").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("axes").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("revealIndex").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("revealRevision").map_or(true, |prop| prop.is_null() || prop.is_string()) }
+  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("description").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("role").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("autoFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("trapFocus").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("tabStop").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("axes").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("revealIndex").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("revealRevision").map_or(true, |prop| prop.is_null() || prop.is_string()) }
   fn prop_valid(key: &str, value: &Json) -> bool { match key { "label" => value.is_string(),
         "description" => value.is_string(),
         "role" => value.is_string(),
         "autoFocus" => value.is_boolean(),
-        "scope" => value.is_boolean(),
+        "trapFocus" => value.is_boolean(),
+        "tabStop" => value.is_boolean(),
         "axes" => value.is_string(),
         "revealIndex" => value.as_f64().is_some_and(f64::is_finite),
         "revealRevision" => value.is_string(), _ => false } }
   fn check_method(name: &str, arguments: &[Value]) { match name {
           "key" => if !(arguments.len() <= 2 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
+        "keyInput" => if !(arguments.len() <= 4 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
         "revealGeometry" => if !(arguments.len() <= 6 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(4).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(5).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "focusSelf" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
           _ => value_error("unknown exposed method"),
@@ -43,14 +45,16 @@ pub struct GeneratedData0 {
     pub field_2: Option<String>,
     #[serde(rename = "autoFocus", default, skip_serializing_if = "Option::is_none")]
     pub field_3: Option<bool>,
-    #[serde(rename = "scope", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "trapFocus", default, skip_serializing_if = "Option::is_none")]
     pub field_4: Option<bool>,
+    #[serde(rename = "tabStop", default, skip_serializing_if = "Option::is_none")]
+    pub field_5: Option<bool>,
     #[serde(rename = "axes", default, skip_serializing_if = "Option::is_none")]
-    pub field_5: Option<String>,
+    pub field_6: Option<String>,
     #[serde(rename = "revealIndex", default, skip_serializing_if = "Option::is_none")]
-    pub field_6: Option<f64>,
+    pub field_7: Option<f64>,
     #[serde(rename = "revealRevision", default, skip_serializing_if = "Option::is_none")]
-    pub field_7: Option<String>,
+    pub field_8: Option<String>,
 }
   
   pub type GeneratedProps = GeneratedData0;
@@ -79,7 +83,23 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_6(&self, argument_0: f64, argument_1: f64, argument_2: f64, argument_3: f64, argument_4: f64, argument_5: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_6(&self, argument_0: String, argument_1: bool, argument_2: bool, argument_3: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+        let outcome = catch_authored(|| {
+        refresh_native_atoms(&self.owner, window, cx);
+          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
+        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument"))];
+        let callback = self.owner.borrow().exposes.get("keyInput").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("keyInput", &arguments);
+        let result = invoke(&self.owner, "expose-method", &callback, arguments);
+        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
+        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
+        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
+        serde_json::from_value(result).expect("checked exposed method result")
+        });
+        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+        outcome
+    }
+    pub fn method_7(&self, argument_0: f64, argument_1: f64, argument_2: f64, argument_3: f64, argument_4: f64, argument_5: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -95,7 +115,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_7(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
+    pub fn method_8(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -142,9 +162,10 @@ pub struct GeneratedData0 {
   pub struct ScrollRegion { pub owner: OwnerRef, focus: FocusHandle, window_input: Option<FocusHandle>, _focus_subscriptions: Vec<Subscription>, _window_activation: Option<(gpui::WindowId, Subscription)>, _focus_lost: Option<Subscription>, _global_key_capture: Option<Subscription>, _entry_readiness: Option<(gpui::WindowId, Subscription)> }
   impl ScrollRegion {
       pub fn create_props(props: GeneratedProps, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> { Self::create(serde_json::to_value(props).expect("portable Props"), parent, window, cx) }
-      pub fn create(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> {
+      pub fn create(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> { Self::create_with_associations(raw_props,parent,NativeInstanceAssociations::default(),window,cx) }
+      pub fn create_with_associations(raw_props: Json, parent: Option<OwnerWeak>, associations: NativeInstanceAssociations, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> {
           let mut failure = None;
-          let entity = cx.new(|cx| Self::new(raw_props, parent, window, cx).unwrap_or_else(|error| {
+          let entity = cx.new(|cx| Self::new_with_associations(raw_props, parent, associations, window, cx).unwrap_or_else(|error| {
               failure = Some(error);
               // A failed construction still returns normally through GPUI's
               // entity insertion. This inert temporary is dropped immediately
@@ -156,10 +177,12 @@ pub struct GeneratedData0 {
           match failure { Some(error) => Err(error), None => Ok(entity) }
       }
       pub fn new_props(props: GeneratedProps, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> { Self::new(serde_json::to_value(props).expect("portable Props"), parent, window, cx) }
-      pub fn new(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> {
+      pub fn new(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> { Self::new_with_associations(raw_props,parent,NativeInstanceAssociations::default(),window,cx) }
+      pub fn new_with_associations(raw_props: Json, parent: Option<OwnerWeak>, associations: NativeInstanceAssociations, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> {
           catch_authored(|| {
           let owner_ref = Owner::new(raw_props, parent.unwrap_or_default(), accepts_context, accepts_props, prop_valid, style_vocabulary());
           let owner = Rc::downgrade(&owner_ref);
+          set_instance_associations(&owner_ref, associations);
           let focus = cx.focus_handle();
           let view = cx.entity().downgrade();
           let drive_owner=owner.clone(); let drive_focus=focus.clone();
@@ -206,9 +229,10 @@ pub struct GeneratedData0 {
             let v_72657665616c496e646578: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_72657665616c5265766973696f6e: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
             let v_6b6579: LexicalBinding<Value> = lexical_binding();
+            let v_6b6579496e707574: LexicalBinding<Value> = lexical_binding();
             let v_73796e63: LexicalBinding<Value> = lexical_binding();
             // Source "frontend/proto-ui/src/scroll-region.proto.ts":12:5
-            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("description", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("role", record(vec![("type", Value::string("string")), ("default", Value::string("document"))])), ("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("scope", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(true))])), ("axes", record(vec![("type", Value::string("string")), ("default", Value::string("vertical"))])), ("revealIndex", record(vec![("type", Value::string("number")), ("default", Value::number(-(Value::number(1.0)).scalar_number()))])), ("revealRevision", record(vec![("type", Value::string("string")), ("default", Value::string(""))]))])) };
+            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("description", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("role", record(vec![("type", Value::string("string")), ("default", Value::string("document"))])), ("autoFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("trapFocus", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("tabStop", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(true))])), ("axes", record(vec![("type", Value::string("string")), ("default", Value::string("vertical"))])), ("revealIndex", record(vec![("type", Value::string("number")), ("default", Value::number(-(Value::number(1.0)).scalar_number()))])), ("revealRevision", record(vec![("type", Value::string("string")), ("default", Value::string(""))]))])) };
             // Source "frontend/proto-ui/src/scroll-region.proto.ts":15:11
             v_6c6162656c.initialize({ let v_7075695f6e61746976655f31 = v_646566.clone(); create_state(&owner, "string", Value::string("label"), Value::string(""), Value::Undefined) });
             // Source "frontend/proto-ui/src/scroll-region.proto.ts":15:56
@@ -259,22 +283,22 @@ pub struct GeneratedData0 {
             v_72657665616c5265766973696f6e.initialize(Rc::new(std::cell::RefCell::new(Value::string(""))));
             // Source "frontend/proto-ui/src/scroll-region.proto.ts":26:11
             v_6b6579.initialize({  let v_73636f7065 = v_73636f7065.clone(); let v_7363726f6c6c = v_7363726f6c6c.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_61786573 = v_61786573.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e616d65: Value = arg(&arguments, 0);
-                let v_7368696674: Value = arg(&arguments, 1);
+                let v_6e616d655f5f37373832613636303363333634346562: Value = arg(&arguments, 0);
+                let v_73686966745f5f66353537663061656365373439323033: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":27:7
                 if ({ let left = Value::boolean(!({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy()); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":27:34
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":28:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Tab"))))).truthy() {
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("Tab"))))).truthy() {
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":28:29
                     if (Value::boolean(!({ let v_7075695f6e61746976655f3135 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3135.clone()).owner()) }).truthy())).truthy() {
                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":28:52
                         return Value::boolean(false);
                     }
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":28:66
-                    if (v_7368696674.clone()).truthy() {
+                    if (v_73686966745f5f66353537663061656365373439323033.clone()).truthy() {
                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":28:77
                         { let v_7075695f6e61746976655f3136 = v_73636f7065.read(); focus_navigate(&(v_7075695f6e61746976655f3136.clone()).owner(), false, "prev", Value::Undefined) };
                     } else {
@@ -285,16 +309,16 @@ pub struct GeneratedData0 {
                     return Value::boolean(true);
                 }
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":29:13
-                let v_686f72697a6f6e74616c = { let left = Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("horizontal")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("both")))); if left.truthy() { v_7368696674.clone() } else { left } } } else { left } };
+                let v_686f72697a6f6e74616c = { let left = Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("horizontal")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("both")))); if left.truthy() { v_73686966745f5f66353537663061656365373439323033.clone() } else { left } } } else { left } };
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":30:7
-                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowLeft")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowRight")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("vertical")))) } else { left } }).truthy() {
+                if ({ let left = { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("ArrowLeft")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("ArrowRight")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("vertical")))) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":31:9
-                    { let v_7075695f6e61746976655f3138 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3138.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("horizontal")), ("delta", if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowLeft"))))).truthy() { Value::number(-(Value::number(40.0)).scalar_number()) } else { Value::number(40.0) })])) };
+                    { let v_7075695f6e61746976655f3138 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3138.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("horizontal")), ("delta", if (Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("ArrowLeft"))))).truthy() { Value::number(-(Value::number(40.0)).scalar_number()) } else { Value::number(40.0) })])) };
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":31:101
                     return Value::boolean(true);
                 }
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":33:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowUp"))))).truthy() {
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("ArrowUp"))))).truthy() {
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":33:33
                     if (v_686f72697a6f6e74616c.clone()).truthy() {
                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":33:49
@@ -305,7 +329,7 @@ pub struct GeneratedData0 {
                     }
                 } else {
                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":34:12
-                    if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowDown"))))).truthy() {
+                    if (Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("ArrowDown"))))).truthy() {
                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":34:40
                         if (v_686f72697a6f6e74616c.clone()).truthy() {
                             // Source "frontend/proto-ui/src/scroll-region.proto.ts":34:56
@@ -316,7 +340,7 @@ pub struct GeneratedData0 {
                         }
                     } else {
                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":35:12
-                        if ({ let left = Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("PageUp")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string(" ")))); if left.truthy() { v_7368696674.clone() } else { left } } } else { left } }).truthy() {
+                        if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("PageUp")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string(" ")))); if left.truthy() { v_73686966745f5f66353537663061656365373439323033.clone() } else { left } } } else { left } }).truthy() {
                             // Source "frontend/proto-ui/src/scroll-region.proto.ts":35:64
                             if (v_686f72697a6f6e74616c.clone()).truthy() {
                                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":35:80
@@ -327,7 +351,7 @@ pub struct GeneratedData0 {
                             }
                         } else {
                             // Source "frontend/proto-ui/src/scroll-region.proto.ts":36:12
-                            if ({ let left = Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("PageDown")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string(" ")))) } else { left } }).truthy() {
+                            if ({ let left = Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("PageDown")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string(" ")))) } else { left } }).truthy() {
                                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":36:55
                                 if (v_686f72697a6f6e74616c.clone()).truthy() {
                                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":36:71
@@ -338,7 +362,7 @@ pub struct GeneratedData0 {
                                 }
                             } else {
                                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":37:12
-                                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Home"))))).truthy() {
+                                if (Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("Home"))))).truthy() {
                                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":37:35
                                     if (v_686f72697a6f6e74616c.clone()).truthy() {
                                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":37:51
@@ -349,7 +373,7 @@ pub struct GeneratedData0 {
                                     }
                                 } else {
                                     // Source "frontend/proto-ui/src/scroll-region.proto.ts":38:12
-                                    if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("End"))))).truthy() {
+                                    if (Value::boolean(strict_equal(&(v_6e616d655f5f37373832613636303363333634346562.clone()), &(Value::string("End"))))).truthy() {
                                         // Source "frontend/proto-ui/src/scroll-region.proto.ts":38:34
                                         if (v_686f72697a6f6e74616c.clone()).truthy() {
                                             // Source "frontend/proto-ui/src/scroll-region.proto.ts":38:50
@@ -370,192 +394,227 @@ pub struct GeneratedData0 {
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":40:7
                 return Value::boolean(true);
             })) });
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":42:5
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":42:11
+            v_6b6579496e707574.initialize({  let v_6b6579 = v_6b6579.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6e616d655f5f62316264623033333038323631326663: Value = arg(&arguments, 0);
+                let v_73686966745f5f62666637643137303632306262663437: Value = arg(&arguments, 1);
+                let v_636f6d6d616e64: Value = arg(&arguments, 2);
+                let v_616c74: Value = arg(&arguments, 3);
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":43:7
+                if ({ let left = v_636f6d6d616e64.clone(); if !left.truthy() { v_616c74.clone() } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":43:27
+                    return Value::boolean(false);
+                }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":44:7
+                return v_6b6579.read().call_authored(vec![v_6e616d655f5f62316264623033333038323631326663.clone(), v_73686966745f5f62666637643137303632306262663437.clone()]);
+            })) });
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":46:5
             { let v_7075695f6e61746976655f3331 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b6579.read()) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":45:5
-            { let v_7075695f6e61746976655f3332 = v_646566.clone(); expose_method(&owner, Value::string("revealGeometry"), {  let v_7363726f6c6c = v_7363726f6c6c.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_61786573 = v_61786573.clone(); let v_72657665616c496e646578 = v_72657665616c496e646578.clone(); let v_72657665616c5265766973696f6e = v_72657665616c5265766973696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":47:5
+            { let v_7075695f6e61746976655f3332 = v_646566.clone(); expose_method(&owner, Value::string("keyInput"), v_6b6579496e707574.read()) };
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":50:5
+            { let v_7075695f6e61746976655f3333 = v_646566.clone(); expose_method(&owner, Value::string("revealGeometry"), {  let v_7363726f6c6c = v_7363726f6c6c.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_61786573 = v_61786573.clone(); let v_72657665616c496e646578 = v_72657665616c496e646578.clone(); let v_72657665616c5265766973696f6e = v_72657665616c5265766973696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_696e646578: Value = arg(&arguments, 0);
                 let v_7374617274: Value = arg(&arguments, 1);
                 let v_656e64: Value = arg(&arguments, 2);
                 let v_76696577706f72745374617274: Value = arg(&arguments, 3);
                 let v_76696577706f7274456e64: Value = arg(&arguments, 4);
                 let v_6261736973: Value = arg(&arguments, 5);
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":46:7
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":51:7
                 if ({ let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy()); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_6261736973.clone()), &({ let value = (v_72657665616c5265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_696e646578.clone()), &({ let value = (v_72657665616c496e646578.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_696e646578.clone()))).truthy()) } else { left } }; if !left.truthy() { { let relational_left = v_696e646578.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(Value::number((v_696e646578.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_7374617274.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_656e64.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_76696577706f72745374617274.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_76696577706f7274456e64.clone()))).truthy()) } else { left } }; if !left.truthy() { { let relational_left = v_656e64.clone(); let relational_right = v_7374617274.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }; if !left.truthy() { { let relational_left = v_76696577706f7274456e64.clone(); let relational_right = v_76696577706f72745374617274.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":49:57
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":54:57
                     return Value::boolean(false);
                 }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":52:7
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":57:7
                 if ({ let left = { let relational_left = v_7374617274.clone(); let relational_right = v_76696577706f72745374617274.clone(); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) }; if left.truthy() { { let relational_left = v_656e64.clone(); let relational_right = v_76696577706f7274456e64.clone(); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":52:57
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":57:57
                     return Value::boolean(true);
                 }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":53:13
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":58:13
                 let v_64656c7461 = if ({ let relational_left = v_7374617274.clone(); let relational_right = v_76696577706f72745374617274.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() { Value::number((v_7374617274.clone()).scalar_number() - (v_76696577706f72745374617274.clone()).scalar_number()) } else { if ({ let relational_left = v_656e64.clone(); let relational_right = v_76696577706f7274456e64.clone(); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { Value::number((v_656e64.clone()).scalar_number() - (v_76696577706f7274456e64.clone()).scalar_number()) } else { Value::number(0.0) } };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":54:7
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":59:7
                 if (Value::boolean(!strict_equal(&(v_64656c7461.clone()), &(Value::number(0.0))))).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":55:9
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":60:9
                     if (Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("horizontal"))))).truthy() {
-                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":55:36
-                        { let v_7075695f6e61746976655f3333 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3333.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("horizontal")), ("delta", v_64656c7461.clone())])) };
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":60:36
+                        { let v_7075695f6e61746976655f3334 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3334.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("horizontal")), ("delta", v_64656c7461.clone())])) };
                     } else {
-                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":56:14
-                        { let v_7075695f6e61746976655f3334 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3334.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("vertical")), ("delta", v_64656c7461.clone())])) };
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":61:14
+                        { let v_7075695f6e61746976655f3335 = v_7363726f6c6c.read(); scroll_request(&(v_7075695f6e61746976655f3335.clone()).owner(), record(vec![("kind", Value::string("by")), ("axis", Value::string("vertical")), ("delta", v_64656c7461.clone())])) };
                     }
                 }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":58:7
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":63:7
                 return Value::boolean(true);
             })) }) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":60:5
-            { let v_7075695f6e61746976655f3335 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":60:44
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":65:5
+            { let v_7075695f6e61746976655f3336 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":65:44
                 if ({ let left = { let value = (v_6174746163686564.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":60:71
-                    { let v_7075695f6e61746976655f3336 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3336.clone()).owner(), Value::Undefined, false) };
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":65:71
+                    { let v_7075695f6e61746976655f3337 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3337.clone()).owner(), Value::Undefined, false) };
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":61:5
-            { let v_7075695f6e61746976655f3337 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b6579 = v_6b6579.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":66:5
+            { let v_7075695f6e61746976655f3338 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b6579496e707574 = v_6b6579496e707574.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_5f72756e: Value = arg(&arguments, 0);
                 let v_6576656e74: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":61:49
-                if (v_6b6579.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("shiftKey", false)), &(Value::boolean(true))))])).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":61:100
-                    { let v_7075695f6e61746976655f3338 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f3338.clone()) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":66:49
+                if (v_6b6579496e707574.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("shiftKey", false)), &(Value::boolean(true)))), { let left = Value::boolean(strict_equal(&((v_6576656e74.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e74.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } }, Value::boolean(strict_equal(&((v_6576656e74.clone()).member("altKey", false)), &(Value::boolean(true))))])).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":66:178
+                    { let v_7075695f6e61746976655f3339 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f3339.clone()) };
                 }
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":62:11
-            v_73796e63.initialize({  let v_6c6162656c = v_6c6162656c.clone(); let v_6465736372697074696f6e = v_6465736372697074696f6e.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_666f637573 = v_666f637573.clone(); let v_73636f7065 = v_73636f7065.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_61786573 = v_61786573.clone(); let v_72657665616c496e646578 = v_72657665616c496e646578.clone(); let v_72657665616c5265766973696f6e = v_72657665616c5265766973696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_72756e5f5f61616563316231343338313938313832: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":63:7
-                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":63:21
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":63:35
-                let v_7469636b65745f5f32383838333030653036313561366236 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":63:59
-                let v_70726f7073 = { let v_7075695f6e61746976655f3339 = v_72756e5f5f61616563316231343338313938313832.clone(); read_props(&(v_7075695f6e61746976655f3339.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":64:7
-                { let value = if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("axes", false)), &(Value::string("horizontal")))); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("axes", false)), &(Value::string("both")))) } else { left } }).truthy() { (v_70726f7073.clone()).member("axes", false) } else { Value::string("vertical") }; *(v_61786573.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":65:7
-                { let value = { let left = (v_70726f7073.clone()).member("revealIndex", false); if left.nullish() { Value::number(-(Value::number(1.0)).scalar_number()) } else { left } }; *(v_72657665616c496e646578.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":65:46
-                { let value = { let left = (v_70726f7073.clone()).member("revealRevision", false); if left.nullish() { Value::string("") } else { left } }; *(v_72657665616c5265766973696f6e.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":66:7
-                { let v_7075695f6e61746976655f3430 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f3430.clone(), { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: scroll region name")) };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":66:67
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32383838333030653036313561366236.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":66:101
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":67:7
-                { let v_7075695f6e61746976655f3431 = v_6465736372697074696f6e.read(); state_set(v_7075695f6e61746976655f3431.clone(), { let left = (v_70726f7073.clone()).member("description", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: scroll region description")) };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":67:86
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32383838333030653036313561366236.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":67:120
-                    return Value::Undefined;
-                }
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":67:11
+            v_73796e63.initialize({  let v_6c6162656c = v_6c6162656c.clone(); let v_6465736372697074696f6e = v_6465736372697074696f6e.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_666f637573 = v_666f637573.clone(); let v_73636f7065 = v_73636f7065.clone(); let v_7363726f6c6c = v_7363726f6c6c.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_61786573 = v_61786573.clone(); let v_72657665616c496e646578 = v_72657665616c496e646578.clone(); let v_72657665616c5265766973696f6e = v_72657665616c5265766973696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_72756e5f5f36323935333338323032313562313664: Value = arg(&arguments, 0);
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":68:7
-                { let v_7075695f6e61746976655f3432 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f3432.clone(), { let left = (v_70726f7073.clone()).member("role", false); if left.nullish() { Value::string("document") } else { left } }, Value::string("reason: scroll region role")) };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":68:73
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32383838333030653036313561366236.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":68:107
+                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":68:21
                     return Value::Undefined;
                 }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":68:35
+                let v_7469636b65745f5f39393238616531303135663832613563 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":68:59
+                let v_70726f7073 = { let v_7075695f6e61746976655f3430 = v_72756e5f5f36323935333338323032313562313664.clone(); read_props(&(v_7075695f6e61746976655f3430.clone()).owner(), false) };
                 // Source "frontend/proto-ui/src/scroll-region.proto.ts":69:7
-                { let v_7075695f6e61746976655f3433 = v_666f637573.read(); focus_nav(&(v_7075695f6e61746976655f3433.clone()).owner(), if (Value::boolean(strict_equal(&((v_70726f7073.clone()).member("scope", false)), &(Value::boolean(false))))).truthy() { Value::string("none") } else { Value::string("auto") }) };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":69:75
-                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32383838333030653036313561366236.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":69:109
+                { let value = if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("axes", false)), &(Value::string("horizontal")))); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("axes", false)), &(Value::string("both")))) } else { left } }).truthy() { (v_70726f7073.clone()).member("axes", false) } else { Value::string("vertical") }; *(v_61786573.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":70:7
+                if (Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("horizontal"))))).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":70:34
+                    { let v_7075695f6e61746976655f3431 = v_7363726f6c6c.read(); scroll_sync(&(v_7075695f6e61746976655f3431.clone()).owner(), record(vec![("axes", Value::string("horizontal"))])) };
+                } else {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":71:12
+                    if (Value::boolean(strict_equal(&({ let value = (v_61786573.read()).borrow().clone(); value }), &(Value::string("both"))))).truthy() {
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":71:33
+                        { let v_7075695f6e61746976655f3432 = v_7363726f6c6c.read(); scroll_sync(&(v_7075695f6e61746976655f3432.clone()).owner(), record(vec![("axes", Value::string("both"))])) };
+                    } else {
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":72:12
+                        { let v_7075695f6e61746976655f3433 = v_7363726f6c6c.read(); scroll_sync(&(v_7075695f6e61746976655f3433.clone()).owner(), record(vec![("axes", Value::string("vertical"))])) };
+                    }
+                }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":73:7
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39393238616531303135663832613563.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":73:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":70:7
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":74:7
+                { let value = { let left = (v_70726f7073.clone()).member("revealIndex", false); if left.nullish() { Value::number(-(Value::number(1.0)).scalar_number()) } else { left } }; *(v_72657665616c496e646578.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":74:46
+                { let value = { let left = (v_70726f7073.clone()).member("revealRevision", false); if left.nullish() { Value::string("") } else { left } }; *(v_72657665616c5265766973696f6e.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":75:7
+                { let v_7075695f6e61746976655f3434 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f3434.clone(), { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: scroll region name")) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":75:67
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39393238616531303135663832613563.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":75:101
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":76:7
+                { let v_7075695f6e61746976655f3435 = v_6465736372697074696f6e.read(); state_set(v_7075695f6e61746976655f3435.clone(), { let left = (v_70726f7073.clone()).member("description", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: scroll region description")) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":76:86
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39393238616531303135663832613563.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":76:120
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":77:7
+                { let v_7075695f6e61746976655f3436 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f3436.clone(), { let left = (v_70726f7073.clone()).member("role", false); if left.nullish() { Value::string("document") } else { left } }, Value::string("reason: scroll region role")) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":77:73
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39393238616531303135663832613563.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":77:107
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":78:7
+                { let v_7075695f6e61746976655f3437 = v_666f637573.read(); focus_nav(&(v_7075695f6e61746976655f3437.clone()).owner(), if (Value::boolean(strict_equal(&((v_70726f7073.clone()).member("tabStop", false)), &(Value::boolean(false))))).truthy() { Value::string("none") } else { Value::string("auto") }) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":78:77
+                if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39393238616531303135663832613563.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":78:111
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":79:7
                 if ({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":71:9
-                    if ({ let left = Value::boolean(!strict_equal(&((v_70726f7073.clone()).member("scope", false)), &(Value::boolean(false)))); if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3434 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3434.clone()).owner()) }).truthy()) } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":71:57
-                        { let v_7075695f6e61746976655f3435 = v_73636f7065.read(); focus_activate(&(v_7075695f6e61746976655f3435.clone()).owner(), Value::Undefined) };
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:9
+                    if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("trapFocus", false)), &(Value::boolean(true)))); if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3438 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3438.clone()).owner()) }).truthy()) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:60
+                        { let v_7075695f6e61746976655f3439 = v_73636f7065.read(); focus_activate(&(v_7075695f6e61746976655f3439.clone()).owner(), Value::Undefined) };
                     } else {
-                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":72:14
-                        if ({ let left = Value::boolean(strict_equal(&((v_70726f7073.clone()).member("scope", false)), &(Value::boolean(false)))); if left.truthy() { { let v_7075695f6e61746976655f3436 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3436.clone()).owner()) } } else { left } }).truthy() {
-                            // Source "frontend/proto-ui/src/scroll-region.proto.ts":72:61
-                            { let v_7075695f6e61746976655f3437 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f3437.clone()).owner(), Value::Undefined) };
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":81:14
+                        if ({ let left = Value::boolean(!strict_equal(&((v_70726f7073.clone()).member("trapFocus", false)), &(Value::boolean(true)))); if left.truthy() { { let v_7075695f6e61746976655f3530 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3530.clone()).owner()) } } else { left } }).truthy() {
+                            // Source "frontend/proto-ui/src/scroll-region.proto.ts":81:64
+                            { let v_7075695f6e61746976655f3531 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f3531.clone()).owner(), Value::Undefined) };
                         }
                     }
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":73:9
-                    if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32383838333030653036313561366236.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":73:43
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":82:9
+                    if ({ let left = Value::boolean(!strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f39393238616531303135663832613563.clone()))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/scroll-region.proto.ts":82:43
                         return Value::Undefined;
                     }
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":74:9
-                    { let v_7075695f6e61746976655f3438 = v_72756e5f5f61616563316231343338313938313832.clone(); request_update(&(v_7075695f6e61746976655f3438.clone()).owner()) };
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":83:9
+                    { let v_7075695f6e61746976655f3532 = v_72756e5f5f36323935333338323032313562313664.clone(); request_update(&(v_7075695f6e61746976655f3532.clone()).owner()) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":77:5
-            { let v_7075695f6e61746976655f3439 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":78:5
-            { let v_7075695f6e61746976655f3530 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("label"), Value::string("description"), Value::string("role"), Value::string("autoFocus"), Value::string("scope"), Value::string("axes"), Value::string("revealIndex"), Value::string("revealRevision")]))), false, v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":79:5
-            { let v_7075695f6e61746976655f3531 = v_646566.clone(); register_life(&owner, "mounted", {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_72756e5f5f35616266636538363963613335626130: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:7
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":86:5
+            { let v_7075695f6e61746976655f3533 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":87:5
+            { let v_7075695f6e61746976655f3534 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("label"), Value::string("description"), Value::string("role"), Value::string("autoFocus"), Value::string("trapFocus"), Value::string("tabStop"), Value::string("axes"), Value::string("revealIndex"), Value::string("revealRevision")]))), false, v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":88:5
+            { let v_7075695f6e61746976655f3535 = v_646566.clone(); register_life(&owner, "mounted", {  let v_666f637573 = v_666f637573.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_72756e5f5f33373134343338613630376336346665: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":89:7
                 if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:21
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":89:21
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:29
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":89:29
                 { let value = Value::boolean(true); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:46
-                v_73796e63.read().call_authored(vec![v_72756e5f5f35616266636538363963613335626130.clone()]);
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":80:63
-                let v_7469636b65745f5f62396433653764316335353164633130 = { let value = (v_65706f6368.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":81:7
-                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f62396433653764316335353164633130.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy()) } else { left } }; if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":81:54
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":89:46
+                v_73796e63.read().call_authored(vec![v_72756e5f5f33373134343338613630376336346665.clone()]);
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":89:63
+                let v_7469636b65745f5f37396538303861303636343265633737 = { let value = (v_65706f6368.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":90:7
+                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b65745f5f37396538303861303636343265633737.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy()) } else { left } }; if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":90:54
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":82:7
-                if (({ let v_7075695f6e61746976655f3532 = v_72756e5f5f35616266636538363963613335626130.clone(); read_props(&(v_7075695f6e61746976655f3532.clone()).owner(), false) }).member("autoFocus", false)).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":82:38
-                    { let v_7075695f6e61746976655f3533 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3533.clone()).owner(), Value::Undefined, false) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":91:7
+                if (({ let v_7075695f6e61746976655f3536 = v_72756e5f5f33373134343338613630376336346665.clone(); read_props(&(v_7075695f6e61746976655f3536.clone()).owner(), false) }).member("autoFocus", false)).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":91:38
+                    { let v_7075695f6e61746976655f3537 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3537.clone()).owner(), Value::Undefined, false) };
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":84:5
-            { let v_7075695f6e61746976655f3534 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_73636f7065 = v_73636f7065.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":84:39
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":93:5
+            { let v_7075695f6e61746976655f3538 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_73636f7065 = v_73636f7065.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":93:39
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":84:48
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":93:48
                 { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":84:66
-                if ({ let v_7075695f6e61746976655f3535 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3535.clone()).owner()) }).truthy() {
-                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":84:88
-                    { let v_7075695f6e61746976655f3536 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f3536.clone()).owner(), Value::Undefined) };
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":93:66
+                if ({ let v_7075695f6e61746976655f3539 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3539.clone()).owner()) }).truthy() {
+                    // Source "frontend/proto-ui/src/scroll-region.proto.ts":93:88
+                    { let v_7075695f6e61746976655f3630 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f3630.clone()).owner(), Value::Undefined) };
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":85:5
-            { let v_7075695f6e61746976655f3537 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":85:43
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":94:5
+            { let v_7075695f6e61746976655f3631 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":94:43
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":85:52
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":94:52
                 { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":85:70
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":94:70
                 { let value = Value::boolean(true); *(v_646973706f736564.read()).borrow_mut() = value; }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":86:5
-            { let v_7075695f6e61746976655f3538 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into()), ("min-h-0".into(), "min-h-".into())])]) };
-            // Source "frontend/proto-ui/src/scroll-region.proto.ts":87:5
-            return { let callable={ let pui_native_59={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":95:5
+            { let v_7075695f6e61746976655f3632 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into()), ("min-h-0".into(), "min-h-".into())])]) };
+            // Source "frontend/proto-ui/src/scroll-region.proto.ts":96:5
+            return { let callable={ let pui_native_63={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "frontend/proto-ui/src/scroll-region.proto.ts":87:24
-                return { let v_7075695f6e61746976655f3630 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
-            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_59.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_59.call)(arg(&arguments,0))})} }; match callable {
+                // Source "frontend/proto-ui/src/scroll-region.proto.ts":96:24
+                return { let v_7075695f6e61746976655f3634 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
+            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_63.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_63.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{identity,render} => capture_renderer(Value::NativeFunction{identity,render:render.clone()},render),
       Value::Renderer(adapter) => Value::Renderer(adapter),
       Value::Function(callback) => capture_renderer(Value::Function(callback.clone()),Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
@@ -563,6 +622,9 @@ pub struct GeneratedData0 {
     } };
         })) }.call_authored(vec![definition_capability(&owner)]);
           Owner::finish(&owner_ref, renderer);
+          // Establish the App's default-action snapshot before any authored
+          // global key capture can replace focus during the same keystroke.
+          register_sequential_focus_owner(&owner_ref, cx);
           let focus_subscriptions = if native_focus_observation_needed(&owner_ref) {
           let focus_owner = owner_ref.clone();
           let on_focus = cx.on_focus(&focus, window, move |view, window, cx| {
@@ -612,7 +674,7 @@ pub struct GeneratedData0 {
       pub fn set_slot(&mut self, slot: Vec<native::gpui_native_owner::NativeSnapshot>, cx: &mut Context<Self>) -> Result<(), Value> { catch_authored(|| { ensure(&Rc::downgrade(&self.owner)); assert_native_slot_children(&slot); let mut owner = self.owner.borrow_mut(); owner.slot = slot; owner.dirty = true; cx.notify(); }) }
       pub fn set_parent(&mut self, parent: Option<OwnerWeak>, cx: &mut Context<Self>) -> Result<(), Value> { catch_authored(|| { if let Err(error)=set_native_parent(&self.owner, parent.unwrap_or_default()){throw_error("NATIVE_PARENT_INVALID", error)} cx.notify(); }) }
       fn bind_window_activation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-          if !native_focus_observation_needed(&self.owner) && !native::gpui_native_move::move_owner_has_binding(&self.owner) { self._window_activation.take(); return; }
+          if !native_window_observation_needed(&self.owner) { self._window_activation.take(); return; }
           let id = window.window_handle().window_id();
           if self._window_activation.as_ref().is_some_and(|(bound, _)| *bound == id) { return; }
           self._window_activation.take();
@@ -674,6 +736,10 @@ pub struct GeneratedData0 {
           self.bind_window_activation(window, cx);
           #[cfg(feature = "experimental-focus-tree")] self.bind_entry_readiness(window, cx);
           let drive = self.owner.borrow().native_drive.as_ref().expect("live native owner drive").clone();
+          // Drawing consumes only repaint dirtiness. A parent Render can call
+          // an exposed method before this child is laid out: its independent
+          // pending_native_events flag survives until the coalesced drive wakes
+          // the consumer. Repeated slot projection cannot create a notify loop.
           self.owner.borrow_mut().dirty = false;
           let snapshot = self.owner.borrow().projection.clone().expect("live native projection");
           self.focus = self.focus.clone().tab_stop(native_tab_participation(&self.owner));

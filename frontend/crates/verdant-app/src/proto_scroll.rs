@@ -82,11 +82,13 @@ impl RenderOnce for Region {
 
 /// Native key spelling is transport; ScrollRegion owns navigation policy.
 pub(crate) fn key(source: &ScrollRegionHandle, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) {
+    if window.default_prevented() { return; }
     let name = match event.keystroke.key.as_str() {
         "up" => "ArrowUp", "down" => "ArrowDown", "left" => "ArrowLeft", "right" => "ArrowRight",
         "pageup" => "PageUp", "pagedown" => "PageDown", "home" => "Home", "end" => "End", "space" => " ", "tab" => "Tab", _ => return,
     };
-    match source.call("key", vec![name.into(),event.keystroke.modifiers.shift.into()],window,cx) {
+    match source.call("keyInput", vec![name.into(), event.keystroke.modifiers.shift.into(),
+        (event.keystroke.modifiers.control || event.keystroke.modifiers.platform).into(), event.keystroke.modifiers.alt.into()],window,cx) {
         Ok(Value::Bool(true)) => { window.prevent_default(); cx.stop_propagation(); },
         Ok(_) => {}, Err(error) => eprintln!("compiled scroll key: {error:?}"),
     }
@@ -118,7 +120,7 @@ impl RenderOnce for Viewport {
     fn render(self, window:&mut Window, cx:&mut App)->impl IntoElement {
         let mut shell=self.shell;
         let key_id=shell.interactivity().element_id.clone().expect("viewport id");
-        let props=serde_json::json!({"label":self.label.as_ref(),"role":"group","scope":false,"axes":self.axes,
+        let props=serde_json::json!({"label":self.label.as_ref(),"role":"group","trapFocus":false,"tabStop":false,"axes":self.axes,
             "revealIndex":self.reveal.as_ref().map_or(-1.,|(index,_)|*index as f64),"revealRevision":self.reveal.as_ref().map_or("",|(_,revision)|revision.as_str())});
         let parent=crate::proto_parent::current(); let initial_parent=parent.clone(); let initial_props=props.clone();
         let mount=window.use_keyed_state(key_id,cx,move|window,cx| {
@@ -152,14 +154,13 @@ impl RenderOnce for Viewport {
             });
             window.request_animation_frame();
         }
-        let focus=root.read(cx).focus_handle(cx);
         let physical=engine.handle(cx);
         if self.axes!="horizontal" { shell=shell.overflow_y_scroll(); }
         if self.axes!="vertical" { shell=shell.overflow_x_scroll(); }
         // A first, absolute semantic child sits behind the native content. Its
         // declared ScrollSurface is leased to the surrounding physical div;
         // the compiler therefore creates no second scrolling viewport.
-        let shell=shell.track_scroll(&physical).track_focus(&focus)
+        let shell=shell.track_scroll(&physical)
             .on_scroll_wheel(move|_,window,cx|engine.notify_input(window,cx))
             .on_key_down(move|event,window,cx|key(&source,event,window,cx))
             .child(gpui::div().absolute().inset_0().child(root)).children(self.children);
@@ -299,5 +300,63 @@ mod tests {
             assert!((scroll.offset().y + scroll.max_offset().y).as_f32().abs() < 1.);
             drop(owner); assert_eq!(handle.state("atEnd").unwrap(), serde_json::json!(true));
         }).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod input_boundary_tests {
+    use super::*;
+    use gpui::{AppContext, TestAppContext, px, size};
+    use verdant_scroll_region::native::gpui_native_owner::{all_owners,resolved};
+    fn source(name:&str,window:&Window)->OwnerRef {
+        all_owners().into_iter().find(|owner| {let owner=owner.borrow();owner.mounted && owner.window_id==Some(window.window_handle().window_id())
+            && owner.modules.accessible_text.get("name").is_some_and(|value|resolved(value).text()==name)}).unwrap()
+    }
+    struct Keys { consume:bool }
+    impl Render for Keys {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            let consume=self.consume;
+            let draw:Draw=Rc::new(move|_,_,_,_,_|gpui::div().w_full().flex().flex_col()
+                .child(crate::proto_controls::action("scroll-key-child","Key child").h(px(36.)).flex_none().child("Child")
+                    .on_key_down(move|event,window,_| {if consume && event.keystroke.key=="pagedown" {window.prevent_default();}}))
+                .children((0..40).map(|index|gpui::div().h(px(40.)).flex_none().child(format!("Row {index}"))))
+                .into_any_element());
+            region("scroll-input-policy",serde_json::json!({"label":"Key viewport"}),draw)
+        }
+    }
+    #[gpui::test]
+    fn native_scroll_fallback_keeps_modifiers_and_consumed_child_keys_out_of_the_physical_engine(cx:&mut TestAppContext) {
+        let window=cx.open_window(size(px(320.),px(224.)),|_,_|Keys{consume:true});
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();crate::native_test_support::frames(window,cx);
+        window.update(cx,|_,window,cx| {verdant_action_control::ActionControlHandle{owner:source("Key child",window)}.call("focusSelf",vec![],window,cx).unwrap();}).unwrap();
+        for key in ["ctrl-pagedown","cmd-pagedown","alt-end","pagedown"] {
+            cx.simulate_keystrokes(window.into(),key);crate::native_test_support::frames(window,cx);
+            window.update(cx,|_,window,_| {let owner=source("Key viewport",window);let owner=owner.borrow();
+                let engine=owner.modules.scroll.handle.as_ref().unwrap();assert!(engine.max_offset().y>px(1000.));
+                assert_eq!(engine.offset().y,px(0.),"modified or child-consumed key must not scroll: {key}");}).unwrap();
+        }
+        window.update(cx,|host,_,cx| {host.consume=false;cx.notify();}).unwrap();crate::native_test_support::frames(window,cx);
+        cx.simulate_keystrokes(window.into(),"pagedown");crate::native_test_support::frames(window,cx);
+        window.update(cx,|_,window,_| {assert!(source("Key viewport",window).borrow().modules.scroll.handle.as_ref().unwrap().offset().y<px(-100.),"unconsumed child page key still reaches the real source engine");}).unwrap();
+    }
+    struct TabDocument;
+    impl Render for TabDocument {
+        fn render(&mut self,_:&mut Window,_:&mut Context<Self>)->impl IntoElement {
+            let draw:Draw=Rc::new(|_,_,_,_,_|gpui::div().child(crate::proto_controls::action("tab-document-child","Tab document child").h(px(36.)).child("Child")).into_any_element());
+            gpui::div().size_full().flex().flex_col()
+                .child(gpui::div().h(px(150.)).child(region("tab-document",serde_json::json!({"label":"Ordinary document"}),draw)))
+                .child(crate::proto_controls::action("after-document","After document").h(px(36.)).child("After"))
+        }
+    }
+    #[gpui::test]
+    fn native_ordinary_scroll_region_allows_tab_to_leave_its_document(cx:&mut TestAppContext) {
+        let window=cx.open_window(size(px(320.),px(240.)),|_,_|TabDocument);
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();crate::native_test_support::frames(window,cx);
+        window.update(cx,|_,window,cx| {let source=ScrollRegionHandle{owner:source("Ordinary document",window)};
+            assert_eq!(source.state("scopeActive").unwrap(),serde_json::json!(false));source.call("focusSelf",vec![],window,cx).unwrap();}).unwrap();
+        cx.simulate_keystrokes(window.into(),"tab");crate::native_test_support::frames(window,cx);
+        window.update(cx,|_,window,_| {assert_eq!(verdant_action_control::ActionControlHandle{owner:source("Tab document child",window)}.state("focused").unwrap(),serde_json::json!(true));}).unwrap();
+        cx.simulate_keystrokes(window.into(),"tab");crate::native_test_support::frames(window,cx);
+        window.update(cx,|_,window,_| {assert_eq!(verdant_action_control::ActionControlHandle{owner:source("After document",window)}.state("focused").unwrap(),serde_json::json!(true),"ordinary documents must not trap Tab");}).unwrap();
     }
 }

@@ -404,3 +404,41 @@ fn compiled_roll_wheel_keeps_source_modifier_priority_and_native_zoom_anchor(cx:
         }).unwrap();
     }
 }
+
+#[gpui::test]
+fn production_wheel_pinch_and_zoom_commands_use_the_compiled_navigation_intents(cx:&mut TestAppContext) {
+    let window=open(cx,false);
+    window.update(cx,|host,window,cx|{
+        let initial=Viewport{start_tick:2000.0,..host.editor.read(cx).session.viewport};
+        let anchor=(200.,90.);
+        for modifiers in [gpui::Modifiers{control:true,alt:true,shift:true,..Default::default()},
+            gpui::Modifiers{platform:true,alt:true,shift:true,..Default::default()}] {
+            host.editor.update(cx,|ed,_|ed.session.viewport=initial);
+            window.dispatch_event(gpui::PlatformInput::Scroll(ScrollEvent{position:point(px(200.),px(90.)),
+                delta:ScrollDelta::Lines(point(1.,1.)),modifiers,..Default::default()}),cx);
+            let current=host.editor.read(cx).session.viewport;
+            assert!(current.px_per_tick>initial.px_per_tick);
+            assert!((current.x_to_tick(anchor.0)-initial.x_to_tick(anchor.0)).abs()<1e-9);
+            assert_eq!(current.row_height,initial.row_height);
+        }
+        host.editor.update(cx,|ed,_|ed.session.viewport=initial);
+        window.dispatch_event(gpui::PlatformInput::Scroll(ScrollEvent{position:point(px(200.),px(90.)),
+            delta:ScrollDelta::Lines(point(1.,1.)),modifiers:gpui::Modifiers{alt:true,shift:true,..Default::default()},..Default::default()}),cx);
+        let current=host.editor.read(cx).session.viewport;
+        assert!(current.row_height>initial.row_height);
+        assert!((current.y_to_pitch(anchor.1)-initial.y_to_pitch(anchor.1)).abs()<1e-9);
+        assert_eq!(current.px_per_tick,initial.px_per_tick);
+        host.editor.update(cx,|ed,_|ed.session.viewport=initial);
+        window.dispatch_event(gpui::PlatformInput::Pinch(PinchEvent{position:point(px(200.),px(90.)),delta:0.25,..Default::default()}),cx);
+        let current=host.editor.read(cx).session.viewport;
+        assert_eq!(current.px_per_tick,initial.px_per_tick*1.25);
+        assert!((current.x_to_tick(anchor.0)-initial.x_to_tick(anchor.0)).abs()<1e-9);
+        host.editor.update(cx,|ed,cx|{
+            ed.session.viewport=initial;
+            crate::proto_editor_surface::zoom(ed,false,"zoom-in",window,cx);
+            assert_eq!(ed.session.viewport.px_per_tick,initial.px_per_tick*1.25);
+            crate::proto_editor_surface::zoom(ed,false,"zoom-out",window,cx);
+            assert!((ed.session.viewport.px_per_tick-initial.px_per_tick).abs()<1e-9);
+        });
+    }).unwrap();
+}

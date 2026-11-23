@@ -623,7 +623,7 @@ impl Render for ScoreExportDialog {
             let content = std::rc::Rc::new(move |_scroll:&verdant_scroll_region::ScrollRegionHandle, _focus:&gpui::FocusHandle, _engine: Option<crate::proto_scroll::EngineBinding>, window:&mut Window, cx:&mut gpui::App| {
                 entity.update(cx, |view,cx| view.native_content(&handle,&revision,window,cx))
             });
-            crate::proto_scroll::region("score-export-scroll", serde_json::json!({"label":"导出设置", "role":"group", "scope":false}), content).into_any_element()
+            crate::proto_scroll::region("score-export-scroll", serde_json::json!({"label":"导出设置", "role":"group", "trapFocus":false,"tabStop":false}), content).into_any_element()
         });
         let entity = cx.entity().downgrade();
         let response = std::rc::Rc::new(move |index:usize, window:&mut Window, cx:&mut gpui::App| {

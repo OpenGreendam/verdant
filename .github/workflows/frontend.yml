@@ -220,10 +220,10 @@ jobs:
           if-no-files-found: error
 
   native-input:
-    name: Real Linux window input and accessibility (22 cases)
+    name: Real Linux window input and accessibility (22 original + 6 control cases)
     needs: [linux]
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Create OS evidence directory
@@ -271,13 +271,31 @@ jobs:
             --package-info .ci/native-input-evidence/package/package.json \
             --repo "$PWD" --deps-root / --backend wayland \
             --run-dir "$RUNNER_TEMP/verdant-os-wayland"
-      - name: Require both complete observations and retain their evidence
+      - name: Run migrated text, collection, scroll and mixer controls on X11
+        if: ${{ always() && steps.package.outcome == 'success' }}
+        timeout-minutes: 8
+        run: |
+          /usr/bin/python3 -B tools/native-input/ci.py run \
+            --package-info .ci/native-input-evidence/package/package.json \
+            --repo "$PWD" --deps-root / --backend x11 --suite controls \
+            --run-dir "$RUNNER_TEMP/verdant-controls-x11"
+      - name: Run migrated text, collection, scroll and mixer controls on Wayland
+        if: ${{ always() && steps.package.outcome == 'success' }}
+        timeout-minutes: 8
+        run: |
+          /usr/bin/python3 -B tools/native-input/ci.py run \
+            --package-info .ci/native-input-evidence/package/package.json \
+            --repo "$PWD" --deps-root / --backend wayland --suite controls \
+            --run-dir "$RUNNER_TEMP/verdant-controls-wayland"
+      - name: Require all four complete observations and retain their evidence
         if: always()
         run: |
           /usr/bin/python3 -B tools/native-input/ci.py check \
             --package-info .ci/native-input-evidence/package/package.json \
             --x11-run "$RUNNER_TEMP/verdant-os-x11" \
             --wayland-run "$RUNNER_TEMP/verdant-os-wayland" \
+            --controls-x11-run "$RUNNER_TEMP/verdant-controls-x11" \
+            --controls-wayland-run "$RUNNER_TEMP/verdant-controls-wayland" \
             --output .ci/native-input-evidence/result.json
       - name: Upload all OS evidence including failures
         if: always()

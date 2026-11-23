@@ -221,7 +221,9 @@ impl Editor {
     /// Window notifications cannot cancel a capture acquired by another editor
     /// window. Project changes still use the unconditional cancellation path.
     pub(crate) fn cancel_device_drag_in(&mut self, window: gpui::AnyWindowHandle, cx: &mut Context<Self>) {
-        if self.device_drag.as_ref().and_then(|drag| drag.capture.as_ref()).is_some_and(|capture| capture.window() == window) {
+        if self.device_drag.as_ref().is_some_and(|drag|
+            drag.source.as_ref().is_some_and(|source| source.window() == window)
+                || drag.capture.as_ref().is_some_and(|capture| capture.window() == window)) {
             self.cancel_device_drag(cx);
         }
     }
@@ -280,13 +282,13 @@ pub(crate) fn open_parameter_value(editor: &Entity<Editor>, owner: DeviceTarget,
     value_entry::open(editor, Target { track: owner, slot, key }, desc, cx);
 }
 
-pub(crate) type SemanticCommand = Rc<dyn Fn(Option<&gpui::ClickEvent>, &mut Window, &mut gpui::App)>;
+pub(crate) type SemanticCommand = Rc<dyn Fn(Option<&crate::proto_controls::Activation>, &mut Window, &mut gpui::App)>;
 
 /// Semantic activation must not synthesize pointer input. GPUI's default
 /// accessible Click creates a MouseUp which can otherwise commit an unrelated
 /// held preview before a toolbar command hides or changes its input surface.
 pub(crate) fn semantic_command<T: 'static>(editor: gpui::WeakEntity<Editor>, actor: gpui::WeakEntity<T>,
-    command: impl Fn(&mut T, Option<&gpui::ClickEvent>, &mut Window, &mut Context<T>) + 'static) -> SemanticCommand {
+    command: impl Fn(&mut T, Option<&crate::proto_controls::Activation>, &mut Window, &mut Context<T>) + 'static) -> SemanticCommand {
     Rc::new(move |event, window, cx| {
         // Native cancellation calls the authored prototype and can report an
         // error through Editor. Release the read borrow before invoking it.
@@ -298,9 +300,9 @@ pub(crate) fn semantic_command<T: 'static>(editor: gpui::WeakEntity<Editor>, act
 }
 
 pub(crate) fn semantic_click(button: crate::proto_controls::Action, command: SemanticCommand) -> crate::proto_controls::Action {
-    let pointer = command.clone();
-    button.on_click(move |event, window, cx| pointer(Some(event), window, cx))
-        .on_a11y_action(gpui::AccessibleAction::Click, move |_, window, cx| command(None, window, cx))
+    // The accepted event retains its keyboard/assistive origin and semantic
+    // anchor; the compiled action never invents a pointer release for either.
+    button.on_click(move |event, window, cx| command(Some(event), window, cx))
 }
 
 // ---------------------------------------------------------------------------
@@ -540,7 +542,7 @@ fn parameter_command(target: Option<Target>, values: Vec<(String, f64)>, cx: &Co
 /// A dropdown-looking button that opens a menu (AdwComboRow's button).
 pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, authority: String, items: impl Fn(&Editor) -> Vec<crate::menu::MenuItem> + 'static, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let command = semantic_command(cx.weak_entity(), cx.weak_entity(), move |ed, event, window, cx| {
-        let position = event.map_or_else(|| window.mouse_position(), gpui::ClickEvent::position);
+        let position = event.map_or_else(|| window.mouse_position(), crate::proto_controls::Activation::position);
         ed.show_menu(position, items(ed), window, cx);
     });
     semantic_click(crate::proto_controls::action(id, label.clone()).authority(authority).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))

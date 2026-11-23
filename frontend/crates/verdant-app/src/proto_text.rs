@@ -20,6 +20,7 @@ pub(crate) enum Event {
     Cancel,
     Advance { value: String, forward: bool },
     Blur { value: String },
+    Navigation { key: String, value: String, shift: bool, command: bool },
     Failure(String),
 }
 
@@ -31,6 +32,7 @@ pub(crate) struct Options {
     pub cancel_on_escape: bool,
     pub advance_on_tab: bool,
     pub commit_on_blur: bool,
+    pub search_navigation: bool,
     pub inline: bool,
     pub numeric: Option<Numeric>,
 }
@@ -48,6 +50,7 @@ pub(crate) struct Field {
     options: Options,
     pending_reset: bool,
     pending_selection: Option<Range<usize>>,
+    draft_generation: u64,
     callback: Option<Callback>,
     _changes: Subscription,
 }
@@ -66,6 +69,7 @@ impl Field {
             "autoFocus": options.auto_focus, "selectAllOnMount": options.select_all,
             "submitOnEnter": options.submit_on_enter, "cancelOnEscape": options.cancel_on_escape,
             "advanceOnTab": options.advance_on_tab, "commitOnBlur": options.commit_on_blur,
+            "searchNavigation": options.search_navigation,
             "numeric": options.numeric.is_some(),
             "numericMin": options.numeric.as_ref().map(|n| n.min).unwrap_or(0.),
             "numericMax": options.numeric.as_ref().map(|n| n.max).unwrap_or(1.),
@@ -77,19 +81,22 @@ impl Field {
             .unwrap_or_else(|error| panic!("compiled text field setup failed: {error:?}"));
         let focus = root.read(cx).focus_handle(cx);
         let handle = root.read(cx).handle();
+        let accepted = handle.state("value").ok().and_then(|value| value.as_str().map(str::to_string))
+            .expect("compiled text field exposes its accepted value");
         let changes = cx.observe_in(&root, window, |field, _, window, cx| {
             field.flush_reset(window, cx);
             field.drain(window, cx);
             cx.notify();
         });
-        Self { root, handle, focus, value: value.into(), theme, options,
-            pending_reset: false, pending_selection: None, callback: None, _changes: changes }
+        Self { root, handle, focus, value: accepted, theme, options,
+            pending_reset: false, pending_selection: None, draft_generation: 0, callback: None, _changes: changes }
     }
     pub fn value(&self) -> &str { &self.value }
     pub fn is_composing(&self) -> bool {
         !self.pending_reset && self.handle.state("composing").ok().and_then(|value| value.as_bool()).unwrap_or(false)
     }
     pub fn set(&mut self, value: &str, cx: &mut Context<Self>) {
+        self.draft_generation = self.draft_generation.wrapping_add(1);
         self.value = value.into();
         self.pending_reset = true;
         self.pending_selection = Some(0..value.encode_utf16().count());
@@ -109,6 +116,10 @@ impl Field {
         result
     }
     fn epoch(&self) -> Option<u64> { natural(&self.handle.state("viewEpoch").ok()?) }
+    fn current_draft(&self, generation: u64, epoch: Option<u64>) -> bool {
+        let live = { let owner = self.handle.owner.borrow(); owner.present && owner.mounted && !owner.disposed };
+        live && epoch.is_some() && !self.pending_reset && self.draft_generation == generation && self.epoch() == epoch
+    }
     fn publish(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(callback) = self.callback.clone() { callback(event.clone(), window, cx); }
         cx.emit(event);
@@ -119,7 +130,12 @@ impl Field {
             // draft before the source resets its native TextControl lease.
             self.handle.take_events();
             match self.handle.call("resetValue", vec![json!(self.value)], window, cx) {
-                Ok(value) if value == json!(true) => self.pending_reset = false,
+                Ok(value) if value == json!(true) => {
+                    // The authored editor normalizes single-line text. Mirror
+                    // the accepted snapshot, never the raw replacement request.
+                    if let Ok(Value::String(value)) = self.handle.state("value") { self.value = value; }
+                    self.pending_reset = false;
+                },
                 Ok(_) => return, // The first render may precede native mount.
                 Err(error) => { self.publish(Event::Failure(format!("文本替换失败：{error:?}")), window, cx); return; }
             }
@@ -138,7 +154,10 @@ impl Field {
             self.publish(Event::Failure(format!("文本控件未接受操作：{failures:?}")), window, cx);
             return;
         }
+        let generation = self.draft_generation;
+        let epoch = self.epoch();
         for (name, detail) in events {
+            if !self.current_draft(generation, epoch) { return; }
             let event = match decode(&name, detail) {
                 Ok(event) => event,
                 Err(error) => { self.publish(Event::Failure(error), window, cx); continue; }
@@ -165,14 +184,25 @@ impl Field {
                         _ => unreachable!(),
                     }
                 }
+                Output::Navigation(detail) if self.epoch() == Some(detail.view_epoch) && !self.is_composing() => {
+                    self.publish(Event::Navigation { key: detail.key, value: detail.value, shift: detail.shift, command: detail.command }, window, cx);
+                }
                 Output::Selection(detail) if self.epoch() == Some(detail.view_epoch) => {
                     text_select_utf16(&self.handle.owner, detail.start, detail.end, window, cx);
                 }
                 Output::Replacement(detail) if self.epoch() == Some(detail.view_epoch) && !self.is_composing() => {
                     if self.handle.call("resetValue", vec![json!(detail.value)], window, cx).ok() == Some(json!(true)) {
-                        self.value = detail.value.clone();
-                        self.publish(Event::Replaced { value: detail.value }, window, cx);
-                        let _ = self.handle.call("selectRange", vec![json!(detail.start), json!(detail.end)], window, cx);
+                        let Ok(Value::String(value)) = self.handle.state("value") else { continue; };
+                        self.draft_generation = self.draft_generation.wrapping_add(1);
+                        let replacement = self.draft_generation;
+                        self.value = value.clone();
+                        self.publish(Event::Replaced { value: value.clone() }, window, cx);
+                        // A domain callback may retire this editor or replace
+                        // its draft. Never apply the old request's selection then.
+                        if self.current_draft(replacement, epoch) && self.value == value
+                            && self.handle.state("value").ok() == Some(json!(value)) {
+                            let _ = self.handle.call("selectRange", vec![json!(detail.start), json!(detail.end)], window, cx);
+                        }
                     }
                 }
                 _ => {},
@@ -192,6 +222,12 @@ struct CompositionDetail { value: String, #[allow(dead_code)] data: Option<Strin
 struct TerminalDetail { value: String, forward: bool, #[serde(deserialize_with="whole_u64")] view_epoch: u64 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all="camelCase")]
+struct NavigationDetail {
+    key: String, value: String, shift: bool, command: bool,
+    #[serde(deserialize_with="whole_u64")] view_epoch: u64,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all="camelCase")]
 struct SelectionDetail {
     #[serde(deserialize_with="whole_usize")] start: usize,
     #[serde(deserialize_with="whole_usize")] end: usize,
@@ -206,7 +242,7 @@ struct ReplacementDetail {
     #[serde(deserialize_with="whole_u64")] view_epoch: u64,
 }
 fn natural(value: &Value) -> Option<u64> {
-    value.as_u64().or_else(|| value.as_f64().filter(|n| n.is_finite() && *n >= 0. && n.fract() == 0. && *n <= 9_007_199_254_740_991.).map(|n| n as u64))
+    value.as_u64().filter(|n| *n <= 9_007_199_254_740_991).or_else(|| value.as_f64().filter(|n| n.is_finite() && *n >= 0. && n.fract() == 0. && *n <= 9_007_199_254_740_991.).map(|n| n as u64))
 }
 fn whole_u64<'de, D: serde::Deserializer<'de>>(input: D) -> Result<u64, D::Error> {
     natural(&Value::deserialize(input)?).ok_or_else(|| serde::de::Error::custom("expected a nonnegative portable integer"))
@@ -214,7 +250,7 @@ fn whole_u64<'de, D: serde::Deserializer<'de>>(input: D) -> Result<u64, D::Error
 fn whole_usize<'de, D: serde::Deserializer<'de>>(input: D) -> Result<usize, D::Error> {
     usize::try_from(whole_u64(input)?).map_err(serde::de::Error::custom)
 }
-enum Output { Input(InputDetail), Composition(String), CompositionEnd(String), Terminal(String, TerminalDetail), Selection(SelectionDetail), Replacement(ReplacementDetail), Ignored }
+enum Output { Input(InputDetail), Composition(String), CompositionEnd(String), Terminal(String, TerminalDetail), Navigation(NavigationDetail), Selection(SelectionDetail), Replacement(ReplacementDetail), Ignored }
 fn decode(name: &str, value: Value) -> Result<Output, String> {
     let parse = |error: serde_json::Error| format!("文本控件事件 {name} 无效：{error}");
     Ok(match name {
@@ -224,6 +260,13 @@ fn decode(name: &str, value: Value) -> Result<Output, String> {
         "submit" | "cancel" | "advance" | "blurCommit" => Output::Terminal(name.into(), serde_json::from_value(value).map_err(parse)?),
         "selectionRequest" => Output::Selection(serde_json::from_value(value).map_err(parse)?),
         "replacementRequest" => Output::Replacement(serde_json::from_value(value).map_err(parse)?),
+        "navigationRequest" => {
+            let detail: NavigationDetail = serde_json::from_value(value).map_err(parse)?;
+            let valid = if detail.command { !detail.shift && matches!(detail.key.as_str(), "f" | "F") }
+                else { matches!(detail.key.as_str(), "ArrowUp" | "ArrowDown" | "Enter" | "Escape") };
+            if !valid { return Err("文本控件返回无效的集合导航请求".into()); }
+            Output::Navigation(detail)
+        },
         "change" => Output::Ignored,
         _ => return Err(format!("文本控件返回未知事件：{name}")),
     })
@@ -344,7 +387,7 @@ mod tests {
     fn source_json_float_indices_are_validated_without_losing_epoch() {
         assert!(matches!(decode("selectionRequest", json!({"start":0.0,"end":4.0,"viewEpoch":1.0})).unwrap(),
             Output::Selection(SelectionDetail { start: 0, end: 4, view_epoch: 1 })));
-        for bad in [json!(-1.), json!(0.5), json!(9_007_199_254_740_992.0), json!("1")] {
+        for bad in [json!(-1.), json!(0.5), json!(9_007_199_254_740_992.0), json!(9_007_199_254_740_992u64), json!("1")] {
             assert!(decode("selectionRequest", json!({"start":bad,"end":4.,"viewEpoch":1.})).is_err());
         }
     }
@@ -437,5 +480,163 @@ mod tests {
             assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Cancel)).count(), 1);
             assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))));
         }).unwrap();
+    }
+
+    #[test]
+    fn source_navigation_requests_accept_only_the_finite_search_policy() {
+        for (key, shift, command) in [("ArrowLeft",false,false),("ArrowDown",false,true),("f",true,true),("Tab",false,false)] {
+            assert!(decode("navigationRequest",json!({"key":key,"value":"query","shift":shift,"command":command,"viewEpoch":1})).is_err());
+        }
+        assert!(matches!(decode("navigationRequest",json!({"key":"f","value":"query","shift":false,"command":true,"viewEpoch":1})).unwrap(),Output::Navigation(_)));
+    }
+
+    #[gpui::test]
+    fn native_replacement_mirror_uses_the_source_single_line_value(cx: &mut TestAppContext) {
+        let window = open(cx, "old\r\ndraft", false);
+        window.update(cx, |host, _, cx| {
+            assert_eq!(host.field.read(cx).value(), "olddraft");
+            host.field.update(cx, |field, cx| field.set("new\r\nline\n😀", cx));
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let field = host.field.read(cx);
+            assert_eq!(field.value(), "newline😀");
+            assert_eq!(field.handle.state("value").unwrap(), json!("newline😀"));
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Failure(_))));
+        }).unwrap();
+        cx.simulate_input(window.into(), "replaced"); frames(window, cx);
+        window.update(cx, |host, _, cx| assert_eq!(host.field.read(cx).value(), "replaced")).unwrap();
+    }
+
+    #[gpui::test]
+    fn numeric_replacement_retires_terminal_events_from_the_previous_draft(cx: &mut TestAppContext) {
+        let window = open(cx, "1", true);
+        window.update(cx, |host, window, cx| {
+            host.events.clear();
+            host.field.update(cx, |field, cx| {
+                assert_eq!(field.handle.call("stepText", vec![1.into()], window, cx).unwrap(), json!(true));
+                assert_eq!(field.handle.call("requestSubmit", vec![], window, cx).unwrap(), json!(true));
+                field.drain(window, cx);
+            });
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            assert_eq!(host.field.read(cx).value(), "2");
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Replaced { value } if value == "2")).count(), 1);
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Submit { .. } | Event::Failure(_))));
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn text_delivery_stops_when_a_callback_retires_the_native_view(cx: &mut TestAppContext) {
+        use verdant_text_field::native::gpui_native_owner::detach_native_view;
+        let window = open(cx, "draft", false);
+        window.update(cx, |host, window, cx| {
+            host.events.clear();
+            host.field.update(cx, |field, cx| {
+                let owner = field.handle.owner.clone();
+                field.callback = Some(Rc::new(move |event, _, _| {
+                    if matches!(event, Event::Submit { .. }) { detach_native_view(&owner); }
+                }));
+                assert_eq!(field.handle.call("requestSubmit", vec![], window, cx).unwrap(), json!(true));
+                assert_eq!(field.handle.call("requestAdvance", vec![true.into()], window, cx).unwrap(), json!(true));
+                field.drain(window, cx);
+                assert!(!field.handle.owner.borrow().mounted);
+            });
+        }).unwrap();
+        frames(window, cx);
+        window.update(cx, |host, _, _| {
+            assert_eq!(host.events.iter().filter(|event| matches!(event, Event::Submit { value } if value == "draft")).count(), 1);
+            assert!(!host.events.iter().any(|event| matches!(event, Event::Advance { .. } | Event::Failure(_))));
+        }).unwrap();
+    }
+
+    struct SearchHarness {
+        field: Entity<Field>, collection: Option<verdant_collection_control::CollectionControlHandle>,
+        selected: usize, activations: usize, dismissals: usize, failures: Vec<String>,
+    }
+    impl Render for SearchHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let entity = cx.entity();
+            let draw: crate::proto_collection::Draw = Rc::new(move |handle, _, _, _, cx| entity.update(cx, |host, _| {
+                host.collection = Some(handle.clone());
+                div().size_full().child("Search results").into_any_element()
+            }));
+            let entity = cx.entity();
+            let sink: crate::proto_collection::Sink = Rc::new(move |name, payload, _, cx| entity.update(cx, |host, cx| {
+                if matches!(name, "select" | "activate") {
+                    host.selected = crate::proto_controls::source_index(payload.get("index")).expect("source row index");
+                    if name == "activate" { host.activations += 1; }
+                } else if name == "close" { host.dismissals += 1; }
+                cx.notify();
+            }));
+            div().size_full().flex().flex_col().child(self.field.clone())
+                .child(div().flex_1().min_h_0().child(crate::proto_collection::collection("search-results",
+                    json!({"mode":"filterlist","label":"Search results","cursor":self.selected,"revision":"search:1"}),
+                    vec![1;5], draw, sink)))
+        }
+    }
+
+    #[gpui::test]
+    fn native_search_text_routes_collection_requests_and_keeps_platform_ime_navigation_local(cx: &mut TestAppContext) {
+        use gpui::InputHandler;
+        use verdant_text_field::native::gpui_native_owner::native_text_input_for_test;
+        let window = cx.open_window(size(px(320.), px(200.)), |window, cx| {
+            let field = Field::with_options("Search", "query", Theme::for_appearance(window.appearance()),
+                Options { auto_focus:true, search_navigation:true, ..Default::default() }, window, cx);
+            cx.subscribe_in(&field, window, |host: &mut SearchHarness, _, event, window, cx| {
+                match event {
+                    Event::Navigation { key, value, shift, command } => {
+                        if host.field.read(cx).value() != value || host.field.read(cx).is_composing() || !host.field.read(cx).focus.is_focused(window) { return; }
+                        if let Some(collection) = &host.collection {
+                            crate::proto_collection::call(collection,"filterKey",
+                                vec![key.clone().into(),(*shift).into(),(*command).into(),false.into(),true.into(),"search:1".into(),false.into()],window,cx);
+                        }
+                    },
+                    Event::Failure(error) => host.failures.push(error.clone()),
+                    _ => {},
+                }
+            }).detach();
+            SearchHarness { field, collection:None, selected:0, activations:0, dismissals:0, failures:Vec::new() }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window,cx);
+        window.update(cx, |host, window, cx| host.field.update(cx, |field,cx|
+            assert!(field.invoke("selectRange",vec![5.into(),5.into()],window,cx)))).unwrap();
+        crate::native_test_support::frames(window,cx);
+        for (keys, expected) in [("down",1),("down",2),("up",1)] {
+            cx.simulate_keystrokes(window.into(),keys);crate::native_test_support::frames(window,cx);
+            window.update(cx, |host, window, cx| {
+                assert_eq!(host.selected,expected);assert!(host.field.read(cx).focus.is_focused(window));
+                assert_eq!(host.field.read(cx).value(),"query");
+            }).unwrap();
+        }
+        cx.simulate_keystrokes(window.into(),"enter");crate::native_test_support::frames(window,cx);
+        window.update(cx, |host, _, _| assert_eq!(host.activations,1)).unwrap();
+        cx.simulate_keystrokes(window.into(),"left");cx.simulate_input(window.into(),"x");
+        crate::native_test_support::frames(window,cx);
+        let mut input = window.update(cx, |host, window, cx| {
+            let field = host.field.read(cx);assert_eq!(field.value(),"querxy");
+            native_text_input_for_test(&field.handle.owner,window).expect("mounted native editing lease")
+        }).unwrap();
+        cx.update_window(window.into(), |_, window, cx| input.replace_and_mark_text_in_range(Some(0..6),"候选",Some(2..2),window,cx)).unwrap();
+        crate::native_test_support::frames(window,cx);
+        cx.simulate_keystrokes(window.into(),"down up enter escape tab");
+        crate::native_test_support::frames(window,cx);
+        window.update(cx, |host, window, cx| {
+            assert_eq!(host.selected,1);assert_eq!(host.activations,1);assert_eq!(host.dismissals,0);
+            assert!(host.field.read(cx).is_composing());assert!(host.field.read(cx).focus.is_focused(window));
+            assert_eq!(host.field.read(cx).value(),"候选");
+            assert_eq!(input.marked_text_range(window,cx),Some(0..2));
+        }).unwrap();
+        cx.update_window(window.into(), |_, window, cx| input.replace_text_in_range(None,"完成",window,cx)).unwrap();
+        crate::native_test_support::frames(window,cx);
+        cx.simulate_keystrokes(window.into(),"enter");crate::native_test_support::frames(window,cx);
+        window.update(cx, |host, _, cx| {
+            assert_eq!(host.activations,2);assert_eq!(host.field.read(cx).value(),"完成");
+            assert!(!host.field.read(cx).is_composing());assert!(host.failures.is_empty(),"{:?}",host.failures);
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(),"escape");crate::native_test_support::frames(window,cx);
+        window.update(cx, |host, _, _| assert_eq!(host.dismissals,1)).unwrap();
     }
 }

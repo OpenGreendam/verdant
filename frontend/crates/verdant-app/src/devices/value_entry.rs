@@ -96,10 +96,10 @@ impl ValueEntry {
     }
 }
 
-impl Render for ValueEntry {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl ValueEntry {
+    fn render_body(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let th = self.editor.upgrade().map(|ed| ed.read(cx).theme).unwrap_or_else(|| Theme::for_appearance(gpui::WindowAppearance::Dark));
-        div().id("device-value-entry").role(Role::Dialog).aria_label(self.desc.name.clone()).size_full().p(px(18.))
+        div().id("device-value-entry").size_full().p(px(18.))
             .bg(th.surface).text_color(th.text).flex().flex_col().gap(px(10.)).key_context("LyricEditor")
             .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(self.desc.name.clone()))
             .child(self.text.clone())
@@ -111,7 +111,21 @@ impl Render for ValueEntry {
                 })))
                 .child(crate::ui_controls::selectable_button("value-apply", "应用", true, th).on_click(cx.listener(|view, _, window, cx| {
                     view.text.update(cx, |field, cx| { field.invoke("requestSubmit", vec![], window, cx); });
-                }))))
+                })))).into_any_element()
+    }
+}
+
+impl Render for ValueEntry {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let entity = cx.entity(); let response = entity.clone();
+        let revision = format!("{:?}:{}:{}:{}:{}", self.target.track, self.target.key.0, self.desc.id, self.generation, self.base);
+        let props = serde_json::json!({"label":self.desc.name,"revision":revision,"open":true,"choices":2,"defaultChoice":1,"cancelChoice":0});
+        div().size_full().relative().child(crate::proto_overlay::overlay("parameter-value-modal", props,
+            std::rc::Rc::new(move |_, _, _, cx| entity.update(cx, |view, cx| view.render_body(cx))),
+            std::rc::Rc::new(move |choice, window, cx| response.update(cx, |view, cx| {
+                view.text.update(cx, |field, cx| { field.invoke(if choice == 0 {"requestCancel"} else {"requestSubmit"}, vec![], window, cx); });
+            })),
+        ))
     }
 }
 

@@ -44,6 +44,8 @@ struct PluginBrowserWindow {
     search: gpui::Entity<TextField>,
     scanning: bool,
     selected: usize,
+    collection: Option<verdant_collection_control::CollectionControlHandle>,
+    collection_engine: Option<crate::proto_scroll::EngineBinding>,
     message: String,
 }
 
@@ -135,16 +137,24 @@ impl Editor {
             window.set_window_title("插入效果浏览器 — Verdant");
             cx.new(|cx| {
                 let search = TextField::with_options("按名称、厂商或标识搜索插件", "", Theme::for_appearance(window.appearance()),
-                    TextOptions { auto_focus: true, cancel_on_escape: true, ..Default::default() }, window, cx);
+                    TextOptions { auto_focus: true, search_navigation: true, ..Default::default() }, window, cx);
                 cx.subscribe_in(&search, window, |view: &mut PluginBrowserWindow, _, event, window, cx| {
                     match event {
                         TextEvent::Cancel => window.remove_window(),
+                        TextEvent::Navigation { key, value, shift, command } => {
+                            let field = view.search.read(cx);
+                            if field.value() != value || field.is_composing() || !field.focus.is_focused(window) || view.browser.query != *value { return; }
+                            if let Some(source) = view.collection.clone() {
+                                crate::proto_collection::call(&source, "filterKey", vec![key.clone().into(), (*shift).into(), (*command).into(),
+                                    false.into(), true.into(), view.catalog_revision().into(), false.into()], window, cx);
+                            }
+                        },
                         TextEvent::Failure(error) => { view.message = error.clone(); cx.notify(); },
                         _ => cx.notify(),
                     }
                 }).detach();
                 PluginBrowserWindow { editor, generation, browser: verdant_plugins::insert::PluginBrowser::new(client.catalog()),
-                    client, track, slot, search, scanning: false, selected:0, message: String::new() }
+                    client, track, slot, search, scanning: false, selected:0, collection:None, collection_engine:None, message: String::new() }
             })
         }) { self.notice(format!("无法打开插件浏览器：{error}")); cx.notify(); }
     }
@@ -194,7 +204,8 @@ impl PluginBrowserWindow {
             Err(_)=>{self.message="工程窗口已关闭".into();cx.notify();},
         }
     }
-    fn rows(&self,handle:&verdant_collection_control::CollectionControlHandle,basis:&str,engine:crate::proto_scroll::EngineBinding,window:&Window,cx:&mut Context<Self>)->gpui::AnyElement {
+    fn rows(&mut self,handle:&verdant_collection_control::CollectionControlHandle,basis:&str,engine:crate::proto_scroll::EngineBinding,window:&Window,cx:&mut Context<Self>)->gpui::AnyElement {
+        self.collection=Some(handle.clone()); self.collection_engine=Some(engine.clone());
         let th=Theme::for_appearance(window.appearance()); let keyboard=handle.clone();
         let mut rows=div().id("plugin-browser-rows").size_full().overflow_y_scroll().track_scroll(&engine.handle(cx)).flex().flex_col().gap(px(6.))
             .on_scroll_wheel(move|_,window,cx|engine.notify_input(window,cx))
@@ -241,10 +252,22 @@ impl PluginBrowserWindow {
         let sink:crate::proto_collection::Sink=std::rc::Rc::new(move|name,payload,window,cx|{let _=view.update(cx,|view,cx|{
             if payload.get("revision").and_then(serde_json::Value::as_str)!=Some(view.catalog_revision().as_str()){return;}
             if name=="close"{window.remove_window();return;}
+            if name=="command" {
+                match payload.get("key").and_then(serde_json::Value::as_str) {
+                    Some("focus-filter") => { view.search.update(cx, |field, cx| { field.invoke("focusSelf", vec![], window, cx); }); },
+                    Some("reveal") => {
+                        if let (Some(index),Some(source),Some(engine))=(crate::proto_controls::source_index(payload.get("index")),view.collection.clone(),view.collection_engine.clone()) {
+                            crate::proto_collection::reveal_item(source,index,view.catalog_revision(),engine,false,window);
+                        }
+                    },
+                    _ => {},
+                }
+                return;
+            }
             let Some(index)=crate::proto_controls::source_index(payload.get("index"))else{return};
             match name{"select"=>{view.selected=index;cx.notify();},"activate"=>view.insert_entry(index,window,cx),_=>{}}
         });});
-        let collection=crate::proto_collection::collection("plugin-catalog",serde_json::json!({"mode":"listbox","label":"插件目录","cursor":self.selected,"revision":revision}),vec![1;count],draw,sink)
+        let collection=crate::proto_collection::collection("plugin-catalog",serde_json::json!({"mode":"filterlist","label":"插件目录","cursor":self.selected,"revision":revision}),vec![1;count],draw,sink)
             .scroll_engine(crate::proto_scroll::Engine::Native(viewport));
         div().id("plugin-browser").size_full().p(px(18.)).bg(th.surface).text_color(th.text)
             .font_family(crate::theme::system_ui_font(&cx.text_system().all_font_names()))
@@ -902,6 +925,11 @@ impl Editor {
         }
         self.reclaim_inserts(cx);
         self.mark_inserts_applied();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn native_insert_transport_ready(&mut self, cx: &mut Context<Self>) -> bool {
+        self.insert_transport_ready(cx)
     }
 
     pub(super) fn insert_transport_ready(&mut self, cx: &mut Context<Self>) -> bool {

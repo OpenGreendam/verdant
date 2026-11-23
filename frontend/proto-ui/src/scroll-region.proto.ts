@@ -1,7 +1,7 @@
 import { definePrototype, tw, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable, asFocusScope, asScrollSurface } from '@proto.ui/hooks';
 
-type Props = { label?: string; description?: string; role?: string; autoFocus?: boolean; scope?: boolean; axes?: string; revealIndex?: number; revealRevision?: string };
+type Props = { label?: string; description?: string; role?: string; autoFocus?: boolean; trapFocus?: boolean; tabStop?: boolean; axes?: string; revealIndex?: number; revealRevision?: string };
 
 // The native slot supplies document layout. Scroll extents, native wheel
 // projection and focus targets are host facts; keyboard page/edge requests,
@@ -10,7 +10,7 @@ export default definePrototype<Props>({
   name: 'verdant-scroll-region',
   setup(def) {
     def.props.define({ label: { type: 'string', default: '' }, description: { type: 'string', default: '' },
-      role: { type: 'string', default: 'document' }, autoFocus: { type: 'boolean', default: false }, scope: { type: 'boolean', default: true }, axes: { type: 'string', default: 'vertical' },
+      role: { type: 'string', default: 'document' }, autoFocus: { type: 'boolean', default: false }, trapFocus: { type: 'boolean', default: false }, tabStop: { type: 'boolean', default: true }, axes: { type: 'string', default: 'vertical' },
       revealIndex: { type: 'number', default: -1 }, revealRevision: { type: 'string', default: '' } });
     const label = def.state.string('label', ''); const description = def.state.string('description', '');
     const role = def.state.string('role', 'document');
@@ -39,7 +39,12 @@ export default definePrototype<Props>({
       else return false;
       return true;
     };
+    const keyInput = (name: string, shift: boolean, command: boolean, alt: boolean): boolean => {
+      if (command || alt) return false;
+      return key(name, shift);
+    };
     def.expose.method('key', key);
+    def.expose.method('keyInput', keyInput);
     // Layout contributes measured item/viewport edges. The source validates
     // the accepted target and owns nearest-visible reveal policy on that axis.
     def.expose.method('revealGeometry', (index: number, start: number, end: number, viewportStart: number, viewportEnd: number, basis: string): boolean => {
@@ -58,24 +63,28 @@ export default definePrototype<Props>({
       return true;
     });
     def.expose.method('focusSelf', () => { if (attached && !disposed) focus.focusSelf(); });
-    def.event.on('key.down', (_run, event) => { if (key(event.key ?? '', event.shiftKey === true)) event.control.requestDefaultActionPrevention(); });
+    def.event.on('key.down', (_run, event) => { if (keyInput(event.key ?? '', event.shiftKey === true, event.ctrlKey === true || event.metaKey === true, event.altKey === true)) event.control.requestDefaultActionPrevention(); });
     const sync = (run: RunHandle<Props>) => {
       if (disposed) return; const ticket = ++epoch; const props = run.props.get();
       axes = props.axes === 'horizontal' || props.axes === 'both' ? props.axes : 'vertical';
+      if (axes === 'horizontal') scroll.sync({ axes: 'horizontal' });
+      else if (axes === 'both') scroll.sync({ axes: 'both' });
+      else scroll.sync({ axes: 'vertical' });
+      if (epoch !== ticket || disposed) return;
       revealIndex = props.revealIndex ?? -1; revealRevision = props.revealRevision ?? '';
       label.set(props.label ?? '', 'reason: scroll region name'); if (epoch !== ticket || disposed) return;
       description.set(props.description ?? '', 'reason: scroll region description'); if (epoch !== ticket || disposed) return;
       role.set(props.role ?? 'document', 'reason: scroll region role'); if (epoch !== ticket || disposed) return;
-      focus.setNavParticipation(props.scope === false ? 'none' : 'auto'); if (epoch !== ticket || disposed) return;
+      focus.setNavParticipation(props.tabStop === false ? 'none' : 'auto'); if (epoch !== ticket || disposed) return;
       if (attached) {
-        if (props.scope !== false && !scope.isActive()) scope.activate();
-        else if (props.scope === false && scope.isActive()) scope.deactivate();
+        if (props.trapFocus === true && !scope.isActive()) scope.activate();
+        else if (props.trapFocus !== true && scope.isActive()) scope.deactivate();
         if (epoch !== ticket || disposed) return;
         run.update();
       }
     };
     def.lifecycle.onCreated(sync);
-    def.props.watch(['label', 'description', 'role', 'autoFocus', 'scope', 'axes', 'revealIndex', 'revealRevision'], sync);
+    def.props.watch(['label', 'description', 'role', 'autoFocus', 'trapFocus', 'tabStop', 'axes', 'revealIndex', 'revealRevision'], sync);
     def.lifecycle.onMounted((run) => {
       if (disposed) return; attached = true; sync(run); const ticket = epoch;
       if (ticket !== epoch || !attached || disposed) return;

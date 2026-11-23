@@ -59,13 +59,30 @@ impl Library {
         params: Vec<ParamDesc>, factory: Vec<Row>, th: Theme, font: gpui::Font,
         window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = TextField::with_options("搜索名称、类别、作者、标签与用途", "", th,
-            crate::proto_text::Options { auto_focus:true, ..Default::default() }, window, cx);
+            crate::proto_text::Options { auto_focus:true, search_navigation:true, ..Default::default() }, window, cx);
         let name = TextField::new("预设名称", "我的预设", th, window, cx);
         let tags = TextField::new("标签，用逗号分隔", "", th, window, cx);
         let category = TextField::new("类别", "", th, window, cx);
         let author = TextField::new("作者", "", th, window, cx);
         let description = TextField::new("用途与说明", "", th, window, cx);
         for field in [&search, &name, &tags, &category, &author, &description] { cx.observe(field, |_, _, cx| cx.notify()).detach(); }
+        cx.subscribe_in(&search, window, |view: &mut Library, _, event, window, cx| {
+            match event {
+                crate::proto_text::Event::Navigation { key, value, shift, command } => {
+                    let field = view.search.read(cx);
+                    if field.value() != value || field.is_composing() || !field.focus.is_focused(window) || view.save_open { return; }
+                    if let Some(source) = view.browser.clone() {
+                        let revision = view.result_revision(cx);
+                        // TextField has already consumed the physical key.
+                        // Forward its authored request directly to Collection.
+                        crate::proto_collection::call(&source, "filterKey", vec![key.clone().into(), (*shift).into(), (*command).into(),
+                            false.into(), true.into(), revision.into(), false.into()], window, cx);
+                    }
+                },
+                crate::proto_text::Event::Failure(error) => { view.message = error.clone(); cx.notify(); },
+                _ => {},
+            }
+        }).detach();
         if let Some(editor) = editor.upgrade() { cx.observe(&editor, |_, _, cx| cx.notify()).detach(); }
         Self { editor, target, generation, device, params, search, name, tags, category, author, description,
             rows:factory.clone(), factory, selected:None, loaded:None, last_applied:None, original:None,
@@ -439,6 +456,7 @@ impl Library {
         div().id("preset-library").role(Role::Group).aria_label("插件预设库").size_full().bg(th.surface).text_color(th.text)
             .font(self.font.clone()).p(px(16.)).flex().flex_col().gap(px(10.))
             .capture_key_down(cx.listener(|view, event: &gpui::KeyDownEvent, window, cx| {
+                if view.search.read(cx).focus.is_focused(window) { return; }
                 let Some(source) = view.browser.clone() else { return };
                 let composing = [&view.search, &view.name, &view.tags, &view.category, &view.author, &view.description]
                     .iter().any(|field| field.read(cx).is_composing());

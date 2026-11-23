@@ -47,7 +47,7 @@ export default definePrototype<Props>({
     let epoch = 0;
     const ready = (): boolean => current !== null && attached && !disposed && !disabled.get();
     let items: number[] = [];
-    const kind = (index: number): number => items[index] ?? 0;
+    const kind = (index: number): number => Number.isFinite(index) && index % 1 === 0 && index >= 0 && index < items.length ? items[index] ?? 0 : 0;
     const count = (): number => items.length;
     const min = (a: number, b: number): number => a < b ? a : b;
     const max = (a: number, b: number): number => a > b ? a : b;
@@ -82,9 +82,24 @@ export default definePrototype<Props>({
       const mode = owner.props.get().mode;
       if (mode === 'filterlist' || mode === 'tracklist') emit('command', index, false, 'reveal');
     };
-    const select = (index: number, extend: boolean): boolean => {
+    const changeExpansion = (next: number, name: string): boolean => {
+      if (!ready()) return false;
+      const ticket = ++epoch;
+      if (next < 0 && expanded.get() >= 0) {
+        cursor.set(expanded.get(), 'reason: closing submenu restores parent');
+        if (ticket !== epoch || !ready()) return false;
+      }
+      expanded.set(next, 'reason: submenu expansion');
+      if (ticket !== epoch || !ready()) return false;
+      emit('expand', next, false, name);
+      if (current && ticket === epoch) current.update();
+      return true;
+    };
+    const select = (index: number, extend: boolean, explicit: boolean): boolean => {
       if (!ready() || kind(index) === 0) return false;
-      if (index === cursor.get() && !extend) return true;
+      // Explicit selection may choose an initially unselected row or collapse
+      // a range; only repeated hover selection is redundant.
+      if (!explicit && index === cursor.get() && !extend) return true;
       const ticket = ++epoch;
       cursor.set(index, 'reason: collection selection');
       if (ticket !== epoch || !ready()) return false;
@@ -102,9 +117,7 @@ export default definePrototype<Props>({
       if (!ready() || epoch !== ticket) return false;
       if (kind(index) === 2) {
         const next = expanded.get() === index ? -1 : index;
-        expanded.set(next, 'reason: submenu expansion');
-        if (ticket !== epoch || !ready()) return false;
-        emit('expand', next, false, '');
+        return changeExpansion(next, '');
       } else emit('activate', index, extend, '');
       return true;
     };
@@ -129,7 +142,7 @@ export default definePrototype<Props>({
       if (mode === 'points' && name === 'Tab') {
         const next = cursor.get() + (shift ? -1 : 1);
         if (next < 0 || next >= count()) emit('close', cursor.get(), shift, name);
-        else select(next, false);
+        else select(next, false, true);
         return true;
       }
       if (mode === 'points' && (name === 'ArrowUp' || name === 'ArrowDown' || name === '+' || name === '=' || name === '-')) { emit('command', cursor.get(), shift, name); return true; }
@@ -143,12 +156,11 @@ export default definePrototype<Props>({
       }
       if (mode === 'menu' && name === 'ArrowLeft') {
         if (expanded.get() < 0) return false;
-        const parent = expanded.get(); expanded.set(-1, 'reason: submenu close');
-        emit('expand', -1, false, name); select(parent, false); return true;
+        return changeExpansion(-1, name);
       }
       if (mode === 'menu' && name === 'ArrowRight') {
         if (kind(cursor.get()) !== 2) return false;
-        expanded.set(cursor.get(), 'reason: submenu open'); emit('expand', cursor.get(), false, name); return true;
+        return changeExpansion(cursor.get(), name);
       }
       let next = -1;
       if (name === 'Home') next = seek(0, 1, count(), false);
@@ -158,7 +170,8 @@ export default definePrototype<Props>({
       else if (name === 'PageUp') next = seek(max(0, cursor.get() - (mode === 'points' ? 4 : 20)), -1, count(), false);
       else if (name === 'PageDown') next = seek(min(count() - 1, cursor.get() + (mode === 'points' ? 4 : 20)), 1, count(), false);
       else return false;
-      if (next >= 0 && !select(next, shift)) return true;
+      if (next >= 0 && !select(next, shift, true)) return true;
+      else if (next < 0 && !shift && kind(cursor.get()) > 0 && !select(cursor.get(), false, true)) return true;
       if (!ready()) return true;
       const horizontal = current?.props.get().orientation === 'horizontal';
       if (name === 'PageUp') { if (horizontal) scroll.request({ kind: 'page', axis: 'horizontal', direction: 'before' }); else scroll.request({ kind: 'page', axis: 'vertical', direction: 'before' }); }
@@ -206,12 +219,21 @@ export default definePrototype<Props>({
     });
     def.expose.method('selectIndex', (index: number, extend: boolean, basis: string) => {
       if (basis !== (current?.props.get().revision ?? '')) return false;
-      return select(index, extend);
+      return select(index, extend, false);
     });
     // Native virtualized row callbacks carry their accepted collection revision.
     // Selection must not let a suspended callback command a replacement row.
     def.expose.method('keyAt', (index: number, name: string, shift: boolean, command: boolean, basis: string) => {
       if (!current || basis !== (current.props.get().revision ?? '') || !ready() || kind(index) === 0) return false;
+      const mode = current.props.get().mode ?? 'listbox';
+      const handled = name === 'Escape' || name === 'Enter' || name === ' ' || name === 'Home' || name === 'End'
+        || name === 'ArrowLeft' || name === 'ArrowRight' || name === 'ArrowUp' || name === 'ArrowDown'
+        || name === 'PageUp' || name === 'PageDown' || (name === 'Tab' && (mode === 'points' || mode === 'table' || mode === 'menu'))
+        || (mode === 'table' && (name === 'F2' || name === 'Delete' || name === 'Backspace'))
+        || (mode === 'points' && (name === '+' || name === '=' || name === '-'))
+        || (mode === 'filterlist' && command && (name === 'f' || name === 'F'))
+        || (mode === 'tracklist' && (name === 'ContextMenu' || (name === 'F10' && shift)));
+      if (!handled) return false;
       const ticket = ++epoch;
       cursor.set(index, 'reason: addressed collection key');
       if (ticket !== epoch || !ready()) return false;
@@ -221,7 +243,7 @@ export default definePrototype<Props>({
     });
     def.expose.method('selectAndFocus', (index: number, extend: boolean, basis: string) => {
       if (!current || basis !== (current.props.get().revision ?? '')) return false;
-      if (!select(index, extend) || basis !== (current?.props.get().revision ?? '')) return false;
+      if (!select(index, extend, true) || basis !== (current?.props.get().revision ?? '')) return false;
       focus.focusSelf();
       return true;
     });
@@ -251,7 +273,8 @@ export default definePrototype<Props>({
       if (epoch !== ticket || disposed) return;
       focus.setDisabled(disabled.get());
       if (epoch !== ticket || disposed) return;
-      const accepted = max(0, min(count() - 1, props.cursor ?? 0));
+      const requested = props.cursor ?? 0;
+      const accepted = Number.isFinite(requested) && requested % 1 === 0 ? max(0, min(count() - 1, requested)) : 0;
       cursor.set(kind(accepted) > 0 ? accepted : max(0, seek(0, 1, count(), false)), 'reason: accepted collection cursor');
       if (epoch !== ticket || disposed) return;
       expanded.set(props.expanded ?? -1, 'reason: accepted expanded item');

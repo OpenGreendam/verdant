@@ -2,25 +2,15 @@
 //! elapsed time and live clipped bounds, including while the contact is still.
 use std::time::Instant;
 
-use gpui::{
-    App, Bounds, Entity, EntityId, Global, Hitbox, HitboxId, MouseButton, MouseExitEvent,
-    MouseMoveEvent, MouseUpEvent, Pixels, Point, TouchDragEvent, TouchPhase, WeakEntity, Window,
-};
+use gpui::{App, Bounds, Entity, EntityId, Global, Hitbox, Pixels, Point, WeakEntity, Window};
 
 use crate::{clock::Space, editor::{Bottom, Editor}};
-
-#[derive(Clone, Copy, PartialEq)]
-enum Contact {
-    Mouse(HitboxId),
-    Touch(Point<Pixels>),
-}
 
 #[derive(Clone, Copy)]
 struct Scrub {
     editor: EntityId,
     arrange: bool,
     serial: u64,
-    contact: Contact,
     bounds: Bounds<Pixels>,
     clip: Bounds<Pixels>,
     position: Point<Pixels>,
@@ -31,6 +21,7 @@ struct Scrub {
 struct RulerState {
     serial: u64,
     scrub: Option<Scrub>,
+    input: Option<crate::proto_editor_surface::Input>,
 }
 impl Global for RulerState {}
 
@@ -45,13 +36,14 @@ pub(crate) fn is_active(editor: EntityId, cx: &App) -> bool {
 pub(crate) fn cancel(editor: EntityId, window: &mut Window, cx: &mut App) {
     if active(cx).is_some_and(|scrub| scrub.editor == editor) {
         cx.global_mut::<RulerState>().scrub = None;
+        cx.global_mut::<RulerState>().input = None;
         crate::proto_editor_surface::cancel_from_editor(editor,window,cx);
     }
 }
 
 fn begin_contact(
     editor: &Entity<Editor>, arrange: bool, bounds: Bounds<Pixels>, clip: Bounds<Pixels>,
-    contact: Contact, position: Point<Pixels>, window: &mut Window, cx: &mut App,
+    position: Point<Pixels>, input:&crate::proto_editor_surface::Input, window: &mut Window, cx: &mut App,
 ) -> bool {
     if active(cx).is_some() || window.captured_hitbox().is_some() || !clip.contains(&position) {
         return false;
@@ -61,13 +53,12 @@ fn begin_contact(
     }
     let state = cx.global_mut::<RulerState>();
     state.serial = state.serial.wrapping_add(1);
-    let scrub = Scrub { editor: editor.entity_id(), arrange, serial: state.serial, contact, bounds, clip, position, last_frame: None };
+    let scrub = Scrub { editor: editor.entity_id(), arrange, serial: state.serial, bounds, clip, position, last_frame: None };
     state.scrub = Some(scrub);
-    match contact {
-        Contact::Mouse(_) => {},
-        Contact::Touch(_) => window.prevent_default(),
-    }
-    apply_sample(editor, scrub, 0.0, true, cx);
+    state.input = Some(input.clone());
+    // The admitted EditorSurface contact owns capture/touch arbitration. This
+    // state stores only the musical seek geometry and edge-scroll clock.
+    apply_sample(editor, scrub, 0.0, window, cx);
     true
 }
 
@@ -85,13 +76,8 @@ pub(crate) fn install(editor: &Entity<Editor>, arrange: bool, bounds: Bounds<Pix
 }
 
 pub(crate) fn begin_pointer(editor:&Entity<Editor>,arrange:bool,bounds:Bounds<Pixels>,hitbox:&Hitbox,
-    pointer:verdant_session::PointerId,window:&mut Window,cx:&mut App,position:Point<Pixels>)->bool {
-    let contact=match pointer {
-        verdant_session::PointerId::Mouse=>Contact::Mouse(hitbox.id),
-        verdant_session::PointerId::Touch(_)=>Contact::Touch(position),
-        _=>return false,
-    };
-    begin_contact(editor,arrange,bounds,bounds.intersect(&hitbox.content_mask.bounds),contact,position,window,cx)
+    input:&crate::proto_editor_surface::Input,window:&mut Window,cx:&mut App,position:Point<Pixels>)->bool {
+    begin_contact(editor,arrange,bounds,bounds.intersect(&hitbox.content_mask.bounds),position,input,window,cx)
 }
 pub(crate) fn sample(editor:&Entity<Editor>,arrange:bool,position:Point<Pixels>,window:&mut Window,cx:&mut App) {
     if let Some(scrub)=matching(cx,editor.entity_id(),arrange) { move_to(editor,scrub,position,window,cx); }
@@ -104,13 +90,6 @@ fn matching(cx: &App, editor: EntityId, arrange: bool) -> Option<Scrub> {
     active(cx).filter(|scrub| scrub.editor == editor && scrub.arrange == arrange)
 }
 
-fn owns_mouse(scrub: Scrub, window: &Window) -> bool {
-    match scrub.contact {
-        Contact::Mouse(id) => window.captured_hitbox() == Some(id),
-        Contact::Touch(_) => true,
-    }
-}
-
 fn edge(scrub: Scrub) -> (f64, f64) {
     let dx = (scrub.position.x - scrub.bounds.origin.x).as_f32() as f64;
     let left = (scrub.clip.left() - scrub.bounds.left()).as_f32() as f64;
@@ -120,22 +99,17 @@ fn edge(scrub: Scrub) -> (f64, f64) {
     (dx.clamp(left, (right - 1.0).max(left)), outside)
 }
 
-fn pan_velocity(outside_px: f64) -> f64 {
-    if outside_px == 0.0 { return 0.0; }
-    outside_px.signum() * (100.0 + 9.0 * outside_px.abs()).min(2000.0)
-}
-
-fn apply_sample(editor: &Entity<Editor>, scrub: Scrub, elapsed: f64, snap: bool, cx: &mut App) -> bool {
+fn apply_sample(editor: &Entity<Editor>, scrub: Scrub, elapsed: f64, window:&mut Window,cx: &mut App) -> bool {
     let (x, outside) = edge(scrub);
+    let Some(input)=cx.global::<RulerState>().input.clone() else {return false;};
     editor.update(cx, |ed, cx| {
         if !scrub.arrange && ed.bottom != Bottom::Editor { return false; }
+        let Some(intent)=input.ruler_sample(ed,x,outside,elapsed,window,cx) else {return false;};
         let viewport = if scrub.arrange { &mut ed.arrange } else { &mut ed.session.viewport };
         let before = viewport.start_tick;
-        if outside != 0.0 && elapsed > 0.0 {
-            viewport.pan_px(pan_velocity(outside) * elapsed, 0.0);
-        }
-        let raw_tick = viewport.x_to_tick(x);
-        let tick = if snap { ed.session.snap.snap(raw_tick) as f64 } else { raw_tick };
+        viewport.pan_px(intent.delta,0.0);
+        let raw_tick = viewport.x_to_tick(intent.position);
+        let tick = if intent.snap { ed.session.snap.snap(raw_tick) as f64 } else { raw_tick };
         let changed = before != viewport.start_tick;
         let at_start = raw_tick <= 0.0;
         ed.seek_tick(tick.max(0.0));
@@ -143,13 +117,13 @@ fn apply_sample(editor: &Entity<Editor>, scrub: Scrub, elapsed: f64, snap: bool,
         if changed {
             ed.notify_viewport(if scrub.arrange { Space::Arrange } else { Space::Editor }, cx);
         }
-        outside > 0.0 || (outside < 0.0 && !at_start)
+        intent.active && (outside > 0.0 || (outside < 0.0 && !at_start))
     })
 }
 
 fn move_to(editor: &Entity<Editor>, mut scrub: Scrub, position: Point<Pixels>, window: &mut Window, cx: &mut App) {
     scrub.position = position;
-    let at_edge = apply_sample(editor, scrub, 0.0, false, cx);
+    let at_edge = apply_sample(editor, scrub, 0.0, window,cx);
     let schedule = at_edge && scrub.last_frame.is_none();
     if schedule {
         scrub.last_frame = Some(Instant::now());
@@ -162,11 +136,8 @@ fn move_to(editor: &Entity<Editor>, mut scrub: Scrub, position: Point<Pixels>, w
     }
 }
 
-fn finish_at(editor: &Entity<Editor>, mut scrub: Scrub, position: Point<Pixels>, window: &mut Window, cx: &mut App) {
-    if scrub.position != position {
-        scrub.position = position;
-        apply_sample(editor, scrub, 0.0, false, cx);
-    }
+fn finish_at(_: &Entity<Editor>, scrub: Scrub, _: Point<Pixels>, window: &mut Window, cx: &mut App) {
+    // The contact adapter delivered the final accepted sample before finish.
     cancel(scrub.editor, window, cx);
 }
 
@@ -178,13 +149,15 @@ fn next_frame(editor: WeakEntity<Editor>, expected: Scrub, window: &Window) {
             cancel(expected.editor, window, cx);
             return;
         };
-        if !window.is_window_active() || !owns_mouse(scrub, window) {
+        let input=cx.global::<RulerState>().input.clone();
+        if !window.is_window_active() || !input.as_ref().is_some_and(|input|input.contact_current(window,cx)) {
+            if let Some(input)=input {input.cancel(window,cx);}
             cancel(expected.editor, window, cx);
             return;
         }
         let now = Instant::now();
-        let elapsed = now.duration_since(scrub.last_frame.unwrap()).as_secs_f64().min(0.05);
-        let keep = apply_sample(&editor, scrub, elapsed, false, cx);
+        let elapsed = now.duration_since(scrub.last_frame.unwrap()).as_secs_f64();
+        let keep = apply_sample(&editor, scrub, elapsed, window,cx);
         scrub.last_frame = keep.then_some(now);
         cx.global_mut::<RulerState>().scrub = Some(scrub);
         if keep { next_frame(editor.downgrade(), scrub, window); }

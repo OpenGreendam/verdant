@@ -464,7 +464,7 @@ impl Editor {
             .child(crate::proto_controls::action("primary-menu", "主菜单").size(px(btn)).flex().items_center().justify_center().rounded(px(6.0))
                 .hover(move |s| s.bg(th.hover))
                 .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
-                .on_click(cx.listener(move |ed, ev: &gpui::ClickEvent, w, cx| {
+                .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, w, cx| {
                     // The popover's tail points at the button's lower edge.
                     ed.main_menu(gpui::point(ev.position().x, px((bar_h + btn) / 2.0 + 2.0)), w, cx)
                 })))
@@ -1228,7 +1228,7 @@ impl Editor {
                 self.project().tracks.len(), self.project().note_count()), th))
             .child(
                 select_button("choose-device", Some("volume-2"), dev_summary, "选择音频输出设备", th).on_click(cx.listener(
-                    |ed, ev: &gpui::ClickEvent, window, cx| {
+                    |ed, ev: &crate::proto_controls::Activation, window, cx| {
                         let items = ed.device_menu_items();
                         ed.show_menu(ev.position(), items, window, cx);
                     },
@@ -2041,15 +2041,11 @@ impl Render for Editor {
             .on_action(cx.listener(|ed, _: &NudgeRightBar, w, cx| nudge(ed, ed.bar_nudge_delta(true), 0, w, cx)))
             .on_action(cx.listener(|ed, _: &NudgeUpOctave, w, cx| nudge(ed, 0, 12, w, cx)))
             .on_action(cx.listener(|ed, _: &NudgeDownOctave, w, cx| nudge(ed, 0, -12, w, cx)))
-            .on_action(cx.listener(|ed, _: &ZoomIn, _, cx| {
-                let x = ed.session.viewport.width / 2.0;
-                ed.session.viewport.zoom_x_at(x, 1.25);
-                ed.notify_viewport(crate::clock::Space::Editor, cx);
+            .on_action(cx.listener(|ed, _: &ZoomIn, window, cx| {
+                crate::proto_editor_surface::zoom(ed, false, "zoom-in", window, cx);
             }))
-            .on_action(cx.listener(|ed, _: &ZoomOut, _, cx| {
-                let x = ed.session.viewport.width / 2.0;
-                ed.session.viewport.zoom_x_at(x, 0.8);
-                ed.notify_viewport(crate::clock::Space::Editor, cx);
+            .on_action(cx.listener(|ed, _: &ZoomOut, window, cx| {
+                crate::proto_editor_surface::zoom(ed, false, "zoom-out", window, cx);
             }))
             .on_action(cx.listener(|ed, _: &ToggleFollow, _, cx| crate::clock::toggle_follow(ed, cx)))
             .on_action(cx.listener(|ed, _: &ToggleF0, _, cx| {

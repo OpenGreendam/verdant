@@ -32,16 +32,6 @@ struct Mount {
     root: Entity<CollectionControl>, drawing: Entity<Drawing>, props: Value,
     items: Vec<u8>, sink: Sink, engine: Option<EngineBinding>, _changes: Subscription,
 }
-fn deliver(mount: &Entity<Mount>, window: &mut Window, cx: &mut App) {
-    let (events, failures, revision, sink) = mount.update(cx, |mount, cx| {
-        let handle = mount.root.read(cx).handle();
-        (handle.take_events(), handle.take_failures(), mount.props.get("revision").cloned(), mount.sink.clone())
-    });
-    if !failures.is_empty() { eprintln!("compiled collection failed: {failures:?}"); return; }
-    for (name, payload) in events {
-        if payload.get("revision") == revision.as_ref() { sink(&name, &payload, window, cx); }
-    }
-}
 fn props_mode(root: &Entity<CollectionControl>, cx: &App) -> bool {
     root.read(cx).handle().state("mode").ok().and_then(|value| value.as_str().map(str::to_string)).as_deref() == Some("menu")
 }
@@ -61,11 +51,25 @@ impl RenderOnce for Collection {
                 .unwrap_or_else(|error| panic!("compiled collection slot: {error:?}"));
             let weak = cx.entity().downgrade(); let host = window.window_handle();
             let changes = cx.observe(&root, move |mount: &mut Mount, _, cx| {
+                let handle = mount.root.read(cx).handle();
+                let events = handle.take_events(); let failures = handle.take_failures();
+                let revision = mount.props.get("revision").cloned(); let sink = mount.sink.clone();
+                let epoch = handle.owner.borrow().epoch; let owner = handle.owner;
                 mount.drawing.update(cx, |_, cx| cx.notify());
                 let weak = weak.clone();
                 cx.defer(move |cx| {
                     let Some(mount) = weak.upgrade() else { return };
-                    let _ = host.update(cx, |_, window, cx| deliver(&mount, window, cx));
+                    if mount.read(cx).props.get("revision") != revision.as_ref() { return; }
+                    let _ = host.update(cx, |_, window, cx| {
+                        if !failures.is_empty() { eprintln!("compiled collection failed: {failures:?}"); return; }
+                        for (name, payload) in events {
+                            let live = { let owner = owner.borrow(); owner.present && owner.mounted && !owner.disposed && owner.epoch == epoch
+                                && owner.props.get("revision") == revision.as_ref()
+                                && owner.props.get("disabled").and_then(Value::as_bool) != Some(true) };
+                            if !live { return; }
+                            if payload.get("revision") == revision.as_ref() { sink(&name, &payload, window, cx); }
+                        }
+                    });
                 });
                 cx.notify();
             });
@@ -89,8 +93,11 @@ impl RenderOnce for Collection {
             mount.drawing.update(cx, |drawing, cx| { drawing.draw = self.draw; drawing.engine = mount.engine.clone(); cx.notify(); });
             mount.root.clone()
         });
-        if props_mode(&root, cx) { gpui::div().absolute().inset_0().child(root).into_any_element() }
-        else { root.into_any_element() }
+        let menu = props_mode(&root, cx);
+        let keyboard = root.read(cx).handle();
+        let body = gpui::div().on_key_down(move |event, window, cx| key(&keyboard, event, window, cx)).child(root);
+        if menu { body.absolute().inset_0().into_any_element() }
+        else { body.size_full().min_h_0().into_any_element() }
     }
 }
 
@@ -104,6 +111,7 @@ pub(crate) fn key_at(handle: &CollectionControlHandle, index: usize, revision: &
 }
 
 fn dispatch_key(handle: &CollectionControlHandle, origin: Option<(usize, &str)>, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) {
+    if window.default_prevented() { return; }
     let name = native_key(event);
     let mods = event.keystroke.modifiers;
     let (method, args) = match origin {
@@ -130,6 +138,7 @@ fn native_key(event: &gpui::KeyDownEvent) -> &str {
 pub(crate) fn filter_key(handle: &CollectionControlHandle, event: &gpui::KeyDownEvent,
     composing: bool, from_filter: bool, revision: &str, window: &mut Window, cx: &mut App) {
     let mods = event.keystroke.modifiers;
+    if window.default_prevented() { return; }
     let args = vec![native_key(event).into(), mods.shift.into(), (mods.control || mods.platform).into(),
         composing.into(), from_filter.into(), revision.into(), mods.alt.into()];
     match handle.call("filterKey", args, window, cx) {

@@ -69,6 +69,8 @@ impl Render for Instances {
                     .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(format!("{} · {}", item.bus, item.name)))
                     .child(div().text_xs().text_color(th.text_secondary).child(format!("{} · {}", if item.slot == crate::instrument::INSTRUMENT_SLOT { "音符乐器".into() } else { format!("插入 {}", item.slot + 1) }, item.status))))
                 .child(crate::ui_controls::selectable_button(format!("open-instance-{count}"), if item.key.is_some() { "打开界面" } else { "暂不可用" }, false, th)
+                    .disabled(item.key.is_none())
+                    .authority(format!("{}:{:?}:{}:{:?}",crate::proto_controls::editor_authority(ed),item.owner,item.slot,item.key))
                     .aria_description(if item.key.is_some() { "打开当前实例的编辑器" } else { "当前实例没有可用编辑器" }).tab_index(if item.key.is_some() { 0 } else { -1 })
                     .when(item.key.is_none(), |button| button.opacity(0.5).cursor_default())
                     .on_click(move |_, _, cx| {

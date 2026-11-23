@@ -9,10 +9,12 @@ publish = false
 default = ["gpui-modern-element-api"]
 # Host ABI selection for GPUI's blanket IntoElement impl and cached path IDs.
 gpui-modern-element-api = []
+# Requires Window::notify_text_selection_changed; absent from the pinned profile.
+gpui-text-selection-notification = []
 # Requires an explicit local upstream focus-tree patch; not an advertised profile capability.
 experimental-focus-tree = []
 # Native consumer evidence only; no product introspection surface by default.
-test-support = []
+test-support = ["gpui/test-support"]
 
 [dependencies]
 gpui = { workspace = true }

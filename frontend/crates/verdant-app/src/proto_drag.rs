@@ -6,7 +6,7 @@ use gpui::{AnyElement,App,AppContext,Context,Entity,IntoElement,Render,RenderOnc
 use serde_json::{Value,json};
 use verdant_drag_source::{DragSource,DragSourceHandle,native::gpui_native_owner::NativeSnapshot};
 
-type Choose=Rc<dyn Fn(&mut Window,&mut App)>;
+type Choose=Rc<dyn Fn(gpui::Point<gpui::Pixels>,&mut Window,&mut App)>;
 type Draw=Rc<dyn Fn(Input)->AnyElement>;
 #[derive(Clone)]
 pub(crate) struct Input {
@@ -26,7 +26,17 @@ impl Input {
         for (name,payload) in events {
             if name=="cancelled"&&payload.get("lease").and_then(Value::as_f64)==Some(self.lease.get()) { cancel=true; }
             if name=="choose"&&self.live.get()&&payload.get("revision").and_then(Value::as_str)==Some(self.revision.borrow().as_str()) {
-                let callback=self.choose.borrow().clone();callback(window,cx);
+                let anchor={
+                    let owner=self.handle.owner.borrow();
+                    (owner.present && owner.mounted && !owner.disposed
+                        && owner.window_id==Some(window.window_handle().window_id())
+                        && owner.props.get("disabled").and_then(Value::as_bool)!=Some(true)
+                        && owner.props.get("revision").and_then(Value::as_str)==payload.get("revision").and_then(Value::as_str))
+                        .then(||owner.bounds.map(|bounds|bounds.bottom_left())).flatten()
+                };
+                if let Some(anchor)=anchor {
+                    let callback=self.choose.borrow().clone();callback(anchor,window,cx);
+                }
             }
         }
         if cancel&&self.lease.replace(0.)!=0. {
@@ -72,7 +82,7 @@ impl Lease {
 #[derive(IntoElement)]
 pub(crate) struct Source {key:String,label:String,revision:String,disabled:bool,draw:Draw,choose:Choose}
 pub(crate) fn source(key:impl Into<String>,label:impl Into<String>,revision:impl Into<String>,disabled:bool,
-    draw:impl Fn(Input)->AnyElement+'static,choose:impl Fn(&mut Window,&mut App)+'static)->Source {
+    draw:impl Fn(Input)->AnyElement+'static,choose:impl Fn(gpui::Point<gpui::Pixels>,&mut Window,&mut App)+'static)->Source {
     Source{key:key.into(),label:label.into(),revision:revision.into(),disabled,draw:Rc::new(draw),choose:Rc::new(choose)}
 }
 struct Drawing { input:Input,draw:Draw }
@@ -126,5 +136,65 @@ impl RenderOnce for Source {
             mount.drawing.update(cx,|drawing,cx|{drawing.draw=self.draw;cx.notify();});
             mount.root.clone()
         })
+    }
+}
+
+
+#[cfg(test)]
+mod chooser_anchor_tests {
+    use super::*;
+    use gpui::{prelude::*, point, px, size, MouseMoveEvent, PlatformInput, Point, Pixels, TestAppContext};
+    use verdant_drag_source::native::gpui_native_owner::{all_owners, dispatch_accessibility_action, drive_owners};
+
+    struct Harness { anchors: Rc<RefCell<Vec<Point<Pixels>>>> }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let anchors = self.anchors.clone();
+            gpui::div().size_full().p(px(16.)).child(
+                gpui::div().w(px(120.)).h(px(32.)).child(source(
+                    "chooser-anchor", "Chooser anchor", "revision:1", false,
+                    |_| gpui::div().size_full().into_any_element(),
+                    move |anchor, _, _| anchors.borrow_mut().push(anchor),
+                )),
+            )
+        }
+    }
+    fn handle(window: &Window) -> DragSourceHandle {
+        let owner = all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.present && !owner.disposed
+                && owner.window_id == Some(window.window_handle().window_id())
+                && owner.props.get("label").and_then(Value::as_str) == Some("Chooser anchor")
+                && owner.declared_events.contains("choose")
+        }).expect("the actual mounted compiled transfer source");
+        DragSourceHandle { owner }
+    }
+    #[gpui::test]
+    fn keyboard_and_assistive_chooser_anchor_follow_the_live_source_not_the_mouse(cx: &mut TestAppContext) {
+        let anchors = Rc::new(RefCell::new(Vec::new()));
+        let observed = anchors.clone();
+        let window = cx.open_window(size(px(400.), px(240.)), move |_, _| Harness { anchors });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        let expected = window.update(cx, |_, window, cx| {
+            let source = handle(window);
+            let bounds = source.owner.borrow().bounds.expect("source has physical bounds");
+            let focus = source.owner.borrow().modules.focus.native.clone().expect("compiled focus handle");
+            let mouse = point(px(360.), px(210.));
+            assert!(!bounds.contains(&mouse));
+            window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: mouse, ..Default::default() }), cx);
+            window.focus(&focus, cx);
+            bounds.bottom_left()
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        assert_eq!(*observed.borrow(), vec![expected], "keyboard activation anchors the chooser at its current source");
+        window.update(cx, |_, window, cx| {
+            let source = handle(window);
+            dispatch_accessibility_action(&source.owner, "activate", None);
+            drive_owners(window, cx);
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        assert_eq!(*observed.borrow(), vec![expected, expected], "assistive activation uses the same live semantic anchor");
     }
 }

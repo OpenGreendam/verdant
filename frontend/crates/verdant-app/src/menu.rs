@@ -189,6 +189,8 @@ impl MenuItem {
 }
 #[derive(Clone, Debug)]
 pub struct OpenMenu {
+    /// Distinguish repeated openings with identical content and anchor.
+    instance: String,
     pub window: gpui::AnyWindowHandle,
     pub anchor: Point<Pixels>,
     pub items: Vec<MenuItem>,
@@ -276,7 +278,7 @@ impl Editor {
         let previous_focus = self.menu.as_ref().filter(|m| m.window == window.window_handle())
             .and_then(|m| m.previous_focus.clone()).or_else(|| window.focused(cx));
         let selected = items.iter().position(|i| i.enabled && i.command.is_some()).unwrap_or(0);
-        self.menu = Some(OpenMenu { window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None });
+        self.menu = Some(OpenMenu { instance: verdant_domain::TrackId::generate().to_string(), window: window.window_handle(), anchor, items, selected, previous_focus, expanded: None });
         window.focus(&self.focus_menu, cx);
         cx.notify();
     }
@@ -529,7 +531,7 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
 }
 
 fn collection_revision(ed: &Editor, menu: &OpenMenu) -> String {
-    format!("{}:{}:{:?}:{:?}:{:?}", ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.items)
+    format!("{}:{}:{}:{:?}:{:?}:{:?}:{:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.expanded, menu.items)
 }
 
 pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx: &mut Context<Editor>) -> impl IntoElement {
@@ -557,9 +559,12 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
                 "select" if index >= 0 => { if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; } cx.notify(); },
                 "expand" => {
                     if let Some(menu) = ed.menu.as_mut() {
+                        let previous_parent = menu.rows().enumerate().find_map(|(row, (source, child, _))|
+                            (!child && menu.expanded == Some(source)).then_some(row));
                         let target = if index >= 0 { menu.rows().nth(index as usize).map(|(source, _, _)| source) } else { None };
                         menu.expanded = target;
                         if index >= 0 { menu.selected = index as usize; }
+                        else if let Some(parent) = previous_parent { menu.selected = parent; }
                     }
                     cx.notify();
                 },
@@ -607,6 +612,7 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_colle
             let hover = handle.clone(); let hover_revision = revision.clone();
             crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone()).role(if item.checked.is_some() { gpui::Role::MenuItemCheckBox } else { gpui::Role::MenuItem })
                 .authority(format!("{revision}:{i}"))
+                .tab_index(-1)
                 .disabled(!enabled)
                 .aria_label(item.label.clone())
                 .when_some(item.checked, |d, on| d.aria_selected(on))
@@ -673,3 +679,55 @@ pub(crate) fn popover_placement(anchor: Point<Pixels>, (w, h): (f32, f32), (win_
 #[cfg(test)]
 #[path = "menu_file_tests.rs"]
 mod file_tests;
+
+#[cfg(test)]
+mod native_menu_tests {
+    use super::*;
+    use gpui::{AppContext,Entity,Render,TestAppContext,WindowHandle,size};
+    use verdant_collection_control::{CollectionControlHandle,native::gpui_native_owner::{all_owners,resolved}};
+    struct Harness { editor:Entity<Editor> }
+    impl Render for Harness {
+        fn render(&mut self,window:&mut Window,cx:&mut Context<Self>)->impl IntoElement {
+            self.editor.update(cx,|ed,cx|match ed.menu.clone(){Some(menu)=>context_menu_layer(ed,&menu,window,cx).into_any_element(),None=>div().into_any_element()})
+        }
+    }
+    fn items()->Vec<MenuItem> {vec![MenuItem::submenu("Group",vec![MenuItem::disabled("Unavailable"),MenuItem::file("Child",FileAction::Open)]),MenuItem::disabled("Stopped"),MenuItem::file("Later",FileAction::Open)]}
+    fn open(cx:&mut TestAppContext)->WindowHandle<Harness> {
+        let window=cx.open_window(size(px(600.),px(500.)),|window,cx| {
+            let editor=cx.new(|cx|Editor::for_native_test(crate::native_test_support::instrument_project(),window,cx));
+            cx.observe(&editor,|_,_,cx|cx.notify()).detach();
+            editor.update(cx,|ed,cx|ed.show_menu(gpui::point(px(80.),px(40.)),items(),window,cx));Harness{editor}
+        });
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();crate::native_test_support::frames(window,cx);window
+    }
+    fn source(window:&Window)->CollectionControlHandle {
+        let owner=all_owners().into_iter().find(|owner| {let owner=owner.borrow();owner.mounted && owner.window_id==Some(window.window_handle().window_id())
+            && owner.modules.accessible_text.get("name").is_some_and(|value|resolved(value).text()=="上下文菜单")}).unwrap();CollectionControlHandle{owner}
+    }
+    fn revision(source:&CollectionControlHandle)->String {source.owner.borrow().props["revision"].as_str().unwrap().into()}
+    #[gpui::test]
+    fn native_menu_submenu_topology_retires_rows_and_close_restores_its_parent(cx:&mut TestAppContext) {
+        let window=open(cx);
+        let before=window.update(cx,|_,window,cx| {let source=source(window);let before=revision(&source);
+            source.call("key",vec!["ArrowRight".into(),false.into(),false.into()],window,cx).unwrap();before}).unwrap();
+        crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,window,cx| {
+            assert_eq!(host.editor.read(cx).menu.as_ref().unwrap().expanded,Some(0));
+            let source=source(window);let now=revision(&source);assert_ne!(now,before,"expanded row topology changes authority");
+            assert_eq!(source.call("choose",vec![2.into(),false.into(),before.clone().into()],window,cx).unwrap(),serde_json::json!(false));
+            assert_eq!(source.call("selectAndFocus",vec![2.into(),false.into(),now.into()],window,cx).unwrap(),serde_json::json!(true));
+        }).unwrap();crate::native_test_support::frames(window,cx);
+        window.update(cx,|_,window,cx| {source(window).call("key",vec!["ArrowLeft".into(),false.into(),false.into()],window,cx).unwrap();}).unwrap();
+        crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,_,cx| {let ed=host.editor.read(cx);let menu=ed.menu.as_ref().unwrap();assert_eq!(menu.expanded,None);assert_eq!(menu.selected,0);}).unwrap();
+    }
+    #[gpui::test]
+    fn native_menu_reopening_same_content_and_anchor_rejects_the_previous_instance(cx:&mut TestAppContext) {
+        let window=open(cx);let before=window.update(cx,|_,window,_|revision(&source(window))).unwrap();
+        window.update(cx,|host,window,cx|host.editor.update(cx,|ed,cx| {ed.close_menu(window,cx);ed.show_menu(gpui::point(px(80.),px(40.)),items(),window,cx);})).unwrap();
+        crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,window,cx| {let source=source(window);assert_ne!(revision(&source),before);
+            assert_eq!(source.call("choose",vec![0.into(),false.into(),before.into()],window,cx).unwrap(),serde_json::json!(false));
+            assert_eq!(host.editor.read(cx).menu.as_ref().unwrap().expanded,None);}).unwrap();
+    }
+}

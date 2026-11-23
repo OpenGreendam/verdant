@@ -50,7 +50,7 @@ fn source_chip(ed:&Editor,editor:&Entity<Editor>,target:&Target,source:usize,lab
                     *payload.lease.borrow_mut()=lease.clone();
                     cx.new(|cx|DragLabel{label:caption.clone(),theme:th,lease,app:cx.to_async()})
                 }).into_any_element()
-        },move |window,cx| {
+        },move |anchor,window,cx| {
             let _=choose_editor.update(cx,|ed,cx| {
                 if source_authority(ed,&choose_target)!=choose_authority {return;}
                 let Some(params)=current_params(ed,&choose_target)else{return;};
@@ -63,7 +63,7 @@ fn source_chip(ed:&Editor,editor:&Entity<Editor>,target:&Target,source:usize,lab
                     target:choose_target.track.clone(),slot:choose_target.slot,expected_key:Some(choose_target.key),
                     values:vec![(format!("mod{slot}_source"),source as f64),(format!("mod{slot}_target"),index as f64),(format!("mod{slot}_amount"),25.)],
                 })).collect();
-                ed.show_menu(window.mouse_position(),items,window,cx);
+                ed.show_menu(anchor,items,window,cx);
             });
         });
     div().flex_none().w(px(label.chars().count() as f32*12.+20.)).h(px(30.)).child(control).into_any_element()

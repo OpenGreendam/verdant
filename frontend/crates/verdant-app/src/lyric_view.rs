@@ -55,6 +55,8 @@ fn lyric_event(ed: &mut Editor, event: Event, window: &mut Window, cx: &mut Cont
             ed.end_lyric(true, Some(forward), window, cx);
         }
         Event::Cancel => ed.end_lyric(false, None, window, cx),
+        // This editor does not enable the search collection policy.
+        Event::Navigation { .. } => {},
         Event::Failure(error) => { ed.notice(error); cx.notify(); },
     }
 }
@@ -73,7 +75,7 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, _cx: &mut Context<Edi
     let commands = Commands::default();
     let field = proto_text::inline(key, "输入歌词或读音…", lyric.state.text.clone(), th,
         Options { auto_focus: true, select_all: true, submit_on_enter: true, cancel_on_escape: true,
-            advance_on_tab: true, commit_on_blur: true, inline: true, numeric: None },
+            advance_on_tab: true, commit_on_blur: true, inline: true, numeric: None, search_navigation: false },
         move |event, window, cx| {
             let _ = owner.update(cx, |ed, cx| {
                 if ed.document_generation != generation || ed.text_prompt.is_some()
@@ -124,21 +126,46 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, _cx: &mut Context<Edi
 
 /// Prompt confirmation is one domain intent. Text composition and editing
 /// shortcuts remain entirely in the same generated editor used for lyrics.
-pub fn prompt_overlay(ed: &Editor, editor: &Entity<Editor>, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
+pub fn prompt_overlay(ed: &Editor, editor: &Entity<Editor>, _cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
+    let prompt = ed.text_prompt.as_ref()?;
+    let revision = format!("{}:{}:{}", ed.document_generation, prompt.base.get(), prompt.instance);
+    let props = serde_json::json!({"label":prompt.title, "role":"dialog", "open":true,
+        "revision":revision, "choices":2, "defaultChoice":1, "cancelChoice":0});
+    let commands = Commands::default();
+    let draw_commands = commands.clone(); let draw_editor = editor.clone();
+    let generation = ed.document_generation; let instance = prompt.instance.clone();
+    let draw: crate::proto_overlay::Draw = std::rc::Rc::new(move |_, focus, _, cx| {
+        draw_editor.update(cx, |ed, cx| {
+            if ed.document_generation != generation || !ed.text_prompt.as_ref().is_some_and(|prompt| prompt.instance == instance) {
+                return div().into_any_element();
+            }
+            ed.focus_lyric = focus.clone();
+            native_prompt_overlay(ed, &cx.entity(), draw_commands.clone(), cx).unwrap_or_else(|| div().into_any_element())
+        })
+    });
+    let response: crate::proto_overlay::Response = std::rc::Rc::new(move |index, window, cx| {
+        // Even a response from a sibling button goes through the same compiled
+        // input. Its current composition and view epoch guard the domain commit.
+        commands.invoke(if index == 0 { "requestCancel" } else { "requestSubmit" }, vec![], window, cx);
+    });
+    Some(crate::proto_overlay::overlay(SharedString::from(format!("compiled-workflow-prompt-{}", prompt.instance)),
+        props, draw, response).into_any_element())
+}
+
+fn native_prompt_overlay(ed: &Editor, editor: &Entity<Editor>, commands: Commands, cx: &mut Context<Editor>) -> Option<gpui::AnyElement> {
     let prompt = ed.text_prompt.as_ref()?;
     let th = ed.theme;
     let title = prompt.title.clone();
     let generation = ed.document_generation;
     let base = prompt.base;
-    let purpose = std::mem::discriminant(&prompt.purpose);
-    let key = SharedString::from(format!("prompt-text-{generation}-{}-{title}-{purpose:?}", base.get()));
+    let instance = prompt.instance.clone();
+    let key = SharedString::from(format!("prompt-text-{generation}-{instance}"));
     let owner = editor.downgrade();
-    let commands = Commands::default();
     let field = proto_text::inline(key, "输入文字…", prompt.state.text.clone(), th,
         Options { auto_focus: true, select_all: true, submit_on_enter: true, cancel_on_escape: true,
             inline: true, ..Default::default() }, move |event, window, cx| {
             let _ = owner.update(cx, |ed, cx| {
-                if ed.document_generation != generation || !ed.text_prompt.as_ref().is_some_and(|p| p.base == base && std::mem::discriminant(&p.purpose) == purpose) { return; }
+                if ed.document_generation != generation || !ed.text_prompt.as_ref().is_some_and(|p| p.base == base && p.instance == instance) { return; }
                 match event {
                     Event::Changed { value, composing } => { if let Some(p) = &mut ed.text_prompt { mirror(&mut p.state, &value, composing); } cx.notify(); },
                     Event::Replaced { value } | Event::CompositionEnd { value } => { if let Some(p) = &mut ed.text_prompt { mirror(&mut p.state, &value, false); } cx.notify(); },
@@ -152,9 +179,9 @@ pub fn prompt_overlay(ed: &Editor, editor: &Entity<Editor>, cx: &mut Context<Edi
     let cancel = commands.clone();
     let composing = prompt.state.is_composing();
     Some(div().absolute().inset_0().flex().items_center().justify_center().bg(with_alpha(th.window, 0.78)).occlude()
-        .child(div().id("workflow-prompt").role(gpui::Role::Dialog).aria_label(title.clone()).w(px(560.)).p(px(18.)).rounded(px(12.))
+        .child(div().id("workflow-prompt").w(px(560.)).p(px(18.)).rounded(px(12.))
             .bg(th.popover).border_1().border_color(th.shade).shadow_lg().flex().flex_col().gap(px(12.))
-            .key_context("TextPrompt").track_focus(&ed.focus_lyric)
+            .key_context("TextPrompt")
             .child(div().text_sm().child(title)).children(ed.voice_import_details(cx))
             .child(div().h(px(36.)).w_full().overflow_hidden().bg(th.control).border_1().border_color(th.accent).child(field))
             .child(div().flex().justify_end().gap(px(8.))
@@ -169,4 +196,71 @@ pub fn prompt_overlay(ed: &Editor, editor: &Entity<Editor>, cx: &mut Context<Edi
 #[cfg(test)]
 pub(crate) fn edit_unmarked_text(state: &mut verdant_session::TextEditState, edit: impl FnOnce(&mut verdant_session::TextEditState)) {
     if !state.is_composing() { edit(state); }
+}
+
+
+#[cfg(test)]
+mod prompt_instance_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, WindowHandle, size};
+    use crate::editor::PromptPurpose;
+    use verdant_text_field::{TextFieldHandle,native::gpui_native_owner::all_owners};
+
+    struct Harness { editor: Entity<Editor> }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let content=self.editor.update(cx,|editor,cx|prompt_overlay(editor,&cx.entity(),cx));
+            div().size_full().children(content)
+        }
+    }
+    fn text(window: &Window) -> TextFieldHandle {
+        let owner=all_owners().into_iter().find(|owner|{
+            let owner=owner.borrow();owner.present&&owner.mounted&&!owner.disposed
+                &&owner.window_id==Some(window.window_handle().window_id())&&owner.exposes.contains_key("viewEpoch")
+        }).expect("mounted compiled prompt editor");
+        TextFieldHandle { owner }
+    }
+    fn frames(window: WindowHandle<Harness>,cx:&mut TestAppContext){crate::native_test_support::frames(window,cx);}
+
+    #[gpui::test]
+    fn reopened_prompt_rejects_the_still_mounted_previous_instances_submit(cx:&mut TestAppContext) {
+        let window=cx.open_window(size(px(720.),px(320.)),|window,cx|{
+            let editor=cx.new(|cx|Editor::for_native_test(crate::native_test_support::instrument_project(),window,cx));
+            cx.observe(&editor,|_:&mut Harness,_,cx|cx.notify()).detach();
+            Harness{editor}
+        });
+        window.update(cx,|host,window,cx|{
+            window.activate_window();
+            host.editor.update(cx,|editor,cx|{
+                let track=editor.session.track.clone();
+                editor.prompt_text("Track name",PromptPurpose::RenameTrack(track),"First draft",window,cx);
+            });
+        }).unwrap();frames(window,cx);
+        window.update(cx,|host,window,cx|{
+            let previous=text(window);
+            host.editor.update(cx,|editor,cx|{
+                let old=editor.text_prompt.as_ref().unwrap().instance.clone();
+                let base=editor.text_prompt.as_ref().unwrap().base;
+                let track=editor.session.track.clone();
+                editor.finish_prompt(false,window,cx);
+                editor.prompt_text("Track name",PromptPurpose::RenameTrack(track),"Replacement draft",window,cx);
+                let prompt=editor.text_prompt.as_ref().unwrap();
+                assert_ne!(prompt.instance,old);assert_eq!(prompt.base,base);
+            });
+            // The next layout has not removed the old physical root yet.
+            // Its accepted source response must still fail the prompt identity guard.
+            assert_eq!(previous.call("requestSubmit",vec![],window,cx).unwrap(),serde_json::json!(true));
+        }).unwrap();frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            let editor=host.editor.read(cx);
+            assert_eq!(editor.text_prompt.as_ref().unwrap().state.text,"Replacement draft");
+            assert_eq!(editor.revision().get(),0);
+        }).unwrap();
+        cx.simulate_input(window.into(),"Accepted name");cx.simulate_keystrokes(window.into(),"enter");frames(window,cx);
+        window.update(cx,|host,_,cx|{
+            let editor=host.editor.read(cx);assert!(editor.text_prompt.is_none());
+            assert_eq!(editor.project().track(&editor.session.track).unwrap().name,"Accepted name");
+            assert_eq!(editor.revision().get(),1);
+        }).unwrap();
+    }
 }

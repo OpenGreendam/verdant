@@ -157,11 +157,11 @@ impl Editor {
         self.apply_effects(effects, window, cx);
     }
 
-    pub fn begin_curve(&mut self, param: Param, pointer: PointerId, note: Option<NoteId>, point: Option<PointId>, roll: bool, tick: f64, value: f64, screen: (f64, f64), erase: bool) -> bool {
+    pub fn begin_curve(&mut self, param: Param, pointer: PointerId, note: Option<NoteId>, point: Option<PointId>, roll: bool, tick: f64, value: f64, screen: (f64, f64), erase: bool, tool: LaneTool) -> bool {
         if self.session.pointer_owner().is_some() || self.lane_stroke.is_some() || self.mixer_drag.is_some()
             || self.device_drag.is_some() || self.note_creation.is_some() || self.has_proto_pointer_contact() { return false; }
         self.lane_stroke = Some(LaneStroke {
-            param, pointer, note, point, roll, base: self.revision(), tool: if roll { LaneTool::Pencil } else { self.lane_tool },
+            param, pointer, note, point, roll, base: self.revision(), tool,
             origin_screen: screen, axis: None, samples: vec![(tick, value)], erase,
         });
         true
@@ -169,16 +169,13 @@ impl Editor {
 
     /// Roll samples use absolute viewport pitch (MIDI + 0.5 at a row's centre).
     /// Pointer moves only extend UI state; the document changes once on release.
-    pub fn roll_pitch_sample(&mut self, pointer: PointerId, mut tick: f64, mut pitch: f64, screen: (f64, f64), shift: bool) {
+    pub fn roll_pitch_sample(&mut self, pointer: PointerId, mut tick: f64, mut pitch: f64, axis: &str) {
         if !tick.is_finite() || !pitch.is_finite() { return; }
         let vp = self.session.viewport;
         let Some(stroke) = self.lane_stroke.as_mut().filter(|s| s.pointer == pointer && s.roll) else { return };
         let origin = stroke.samples[0];
-        if shift {
-            let (dx, dy) = (screen.0-stroke.origin_screen.0, screen.1-stroke.origin_screen.1);
-            if stroke.axis.is_none() && dx.abs().max(dy.abs()) >= 3.0 { stroke.axis = Some(dx.abs() >= dy.abs()); }
-            match stroke.axis { Some(true) => pitch = origin.1, Some(false) => tick = origin.0, None => {} }
-        } else { stroke.axis = None; }
+        stroke.axis = match axis { "x" => Some(true), "y" => Some(false), _ => None };
+        match stroke.axis { Some(true) => pitch = origin.1, Some(false) => tick = origin.0, None => {} }
         // Coalesce subpixel motion, retaining the current endpoint rather than
         // growing a path whose extra vertices cannot affect the display.
         let sample = (tick.max(0.0), pitch);
@@ -198,19 +195,16 @@ impl Editor {
         cx.notify();
     }
 
-    pub fn curve_sample(&mut self, pointer: PointerId, mut tick: f64, mut value: f64, screen: (f64, f64), shift: bool, alt: bool) {
+    pub fn curve_sample(&mut self, pointer: PointerId, mut tick: f64, mut value: f64, intent: &crate::proto_editor_surface::MotionIntent) {
         let Some(stroke) = self.lane_stroke.as_ref().filter(|s| s.pointer == pointer) else { return };
-        if !alt && stroke.param != Param::Portamento { tick = self.session.snap.snap(tick) as f64; }
+        if intent.snap { tick = self.session.snap.snap(tick) as f64; }
         if let Some(note) = stroke.note.as_ref().and_then(|id| self.active_track().and_then(|t| self.index.note(t, id))) {
             tick = tick.clamp(note.start_tick as f64, note.end_tick() as f64);
         }
         let Some(stroke) = self.lane_stroke.as_mut() else { return };
         let origin = stroke.samples[0];
-        if shift {
-            let (dx, dy) = (screen.0 - stroke.origin_screen.0, screen.1 - stroke.origin_screen.1);
-            if stroke.axis.is_none() && dx.abs().max(dy.abs()) >= 3.0 { stroke.axis = Some(dx.abs() >= dy.abs()); }
-            match stroke.axis { Some(true) => value = origin.1, Some(false) => tick = origin.0, None => {}, }
-        } else { stroke.axis = None; }
+        stroke.axis = match intent.axis.as_str() { "x" => Some(true), "y" => Some(false), _ => None };
+        match stroke.axis { Some(true) => value = origin.1, Some(false) => tick = origin.0, None => {}, }
         value = match stroke.param {
             Param::Pit => value.clamp(-1200.0, 1200.0),
             Param::Dyn => value.clamp(-24.0, 6.0),

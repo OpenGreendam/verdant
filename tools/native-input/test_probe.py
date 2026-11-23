@@ -157,5 +157,159 @@ class ProbeHelpers(unittest.TestCase):
                              wayland_contact_evidence(released_first, [1480, 920])['escapeKeyEvents']))
 
 
+# These fixtures test the evidence gate. They are not native-window results.
+import copy
+import hashlib
+import json
+from controls import (CONTROL_CASES, SEARCH_MISSING, TEXT_ACCEPTED, TEXT_ASSISTIVE,
+                      TEXT_INITIAL, intersects, pan_after_displacement, validate_control_trace)
+
+
+def synthetic_control_observations():
+    baseline = {'revision': 0, 'project_id': 'offline-fixture', 'tracks': [
+        {'name': 'original', 'notes': [], 'instrument': {'params': {'gain': -8.0}}}]}
+
+    def project(revision, name='original', pan=None):
+        result = copy.deepcopy(baseline)
+        result['revision'] = revision
+        result['tracks'][0]['name'] = name
+        if pan is not None:
+            result['tracks'][0]['pan_permille'] = pan
+        return result
+
+    def collection(selected, offset):
+        # The production synth ships exactly twenty presets. PageUp from End
+        # clamps to the first row; a made-up twenty-first row is not required.
+        return {'viewport': [0, 0, 100, 48], 'options': [
+            {'name': f'Preset {index:02}', 'reference': [':1.2', f'/option/{index}'],
+             'selected': index == selected, 'bounds': [0, index * 12 - offset, 100, 12],
+             'visible': 0 <= index * 12 - offset < 48} for index in range(20)]}
+
+    entry = {'name': '输入文字…', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/input']}
+    cancel = {'name': '取消', 'role': 'button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
+    search = {'name': 'search', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/search']}
+    sequence = [
+        ('preflight', 0, {}, None, None),
+        ('text-unicode', 0, {'text': {'text': TEXT_INITIAL}, 'imeComposition': False}, None, None),
+        ('text-astral-selection', 0, {'text': {'text': TEXT_INITIAL, 'selections': [[1, 2]]}}, None, None),
+        ('text-assistive-selection', 0, {'text': {'text': TEXT_INITIAL, 'selections': [[2, 4]]},
+         'action': {'method': 'Text.SetSelection', 'arguments': [0, 2, 4], 'accepted': True}}, None, None),
+        ('text-assistive-edited', 0, {'text': {'text': TEXT_ASSISTIVE}}, None, None),
+        ('text-edited', 0, {'text': {'text': TEXT_ACCEPTED}}, None, None),
+        ('text-focus-forward', 0, {'focused': cancel}, None, None),
+        ('text-focus-back', 0, {'focused': entry, 'text': {'text': TEXT_ACCEPTED}}, None, None),
+        ('text-committed', 1, {}, TEXT_ACCEPTED, None),
+        ('text-single-undo', 2, {}, None, None),
+        ('text-canceled', 2, {}, None, None),
+        ('collection-open', 2, collection(0, 0), None, None),
+        ('collection-end', 2, collection(19, 192), None, None),
+        ('collection-page-up', 2, collection(0, 0), None, None),
+        ('collection-home', 2, collection(0, 0), None, None),
+        ('collection-wheel', 2, collection(0, 48), None, None),
+        ('collection-search-empty', 2, {'text': {'text': SEARCH_MISSING}, 'options': []}, None, None),
+        ('collection-search-navigation', 2, {**collection(1, 0), 'focused': search, 'text': {'text': ''}}, None, None),
+        ('collection-canceled', 2, {}, None, None),
+        ('mixer-preview', 2, {'pan': {'value': {'CurrentValue': 33.3}}, 'width': 100, 'displacement': 14}, None, None),
+        ('mixer-committed', 3, {'pan': {'value': {'CurrentValue': 42.9}}, 'width': 100, 'displacement': 18}, None, 429),
+        ('mixer-single-undo', 4, {}, None, None),
+        ('mixer-canceled-while-held', 4, {'pan': {'value': {'CurrentValue': 0}}}, None, None),
+        ('mixer-canceled', 4, {}, None, None),
+    ]
+    observations = []
+    for label, revision, control, name, pan in sequence:
+        document = project(revision, name or 'original', pan)
+        case = next((case for case in CONTROL_CASES if label.startswith(case.split('-')[0] + '-')), None)
+        detail = {'label': label, 'case': case, 'control': copy.deepcopy(control),
+                  'pointerHeld': label in ('mixer-preview', 'mixer-canceled-while-held'),
+                  'savedProject': {'sha256': hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()},
+                  'tree': {'nodes': [copy.deepcopy(control['focused'])] if 'focused' in control else []}}
+        observations.append((detail, document))
+    return observations, project(4)
+
+
+class ControlEvidenceRefusals(unittest.TestCase):
+    def setUp(self):
+        self.observations, self.final = synthetic_control_observations()
+
+    def detail(self, label):
+        return next(detail for detail, _ in self.observations if detail['label'] == label)
+
+    def document(self, label):
+        return next(document for detail, document in self.observations if detail['label'] == label)
+
+    def test_twenty_factory_rows_and_complete_durable_story_are_admitted(self):
+        validate_control_trace(self.observations, self.final)
+
+    def test_unicode_is_not_ime_and_astral_selection_uses_character_offsets(self):
+        self.detail('text-unicode')['control']['imeComposition'] = True
+        with self.assertRaises(RuntimeError):
+            validate_control_trace(self.observations, self.final)
+        self.setUp()
+        self.detail('text-astral-selection')['control']['text']['selections'] = [[1, 3]]
+        with self.assertRaises(RuntimeError):
+            validate_control_trace(self.observations, self.final)
+
+    def test_assistive_selection_needs_changed_range_and_subsequent_editor_input(self):
+        self.detail('text-assistive-selection')['control']['text']['selections'] = [[1, 2]]
+        with self.assertRaises(RuntimeError):
+            validate_control_trace(self.observations, self.final)
+        self.setUp()
+        self.detail('text-assistive-edited')['control']['text']['text'] = '音乐AB'
+        with self.assertRaises(RuntimeError):
+            validate_control_trace(self.observations, self.final)
+
+    def test_text_commit_cannot_hide_an_unrelated_domain_change(self):
+        self.document('text-committed')['tracks'][0]['instrument']['params']['gain'] = -2
+        with self.assertRaisesRegex(RuntimeError, 'another domain'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_focus_summary_cannot_replace_actual_tree_state(self):
+        self.detail('text-focus-forward')['tree']['nodes'] = []
+        with self.assertRaisesRegex(RuntimeError, 'actual tree'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_scroll_requires_changed_visible_rows_and_consistent_native_geometry(self):
+        self.detail('collection-wheel')['control'] = copy.deepcopy(self.detail('collection-home')['control'])
+        with self.assertRaisesRegex(RuntimeError, 'visible rows'):
+            validate_control_trace(self.observations, self.final)
+        self.setUp()
+        self.detail('collection-wheel')['control']['options'][0]['visible'] = True
+        with self.assertRaisesRegex(RuntimeError, 'platform geometry'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_end_requires_last_row_selected_and_visible(self):
+        self.detail('collection-end')['control']['options'][-1]['selected'] = False
+        with self.assertRaisesRegex(RuntimeError, 'selection/reveal'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_terminal_sample_cannot_commit_last_observed_preview(self):
+        self.document('mixer-committed')['tracks'][0]['pan_permille'] = 333
+        with self.assertRaisesRegex(RuntimeError, 'final sample'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_cancel_requires_held_pointer_and_unchanged_saved_bytes(self):
+        self.detail('mixer-canceled-while-held')['pointerHeld'] = False
+        with self.assertRaisesRegex(RuntimeError, 'before the native'):
+            validate_control_trace(self.observations, self.final)
+        self.setUp()
+        self.detail('text-canceled')['savedProject']['sha256'] = 'changed'
+        with self.assertRaisesRegex(RuntimeError, 'saved bytes'):
+            validate_control_trace(self.observations, self.final)
+
+    def test_missing_or_duplicate_observation_cannot_satisfy_passed_flags(self):
+        with self.assertRaisesRegex(RuntimeError, 'Incomplete'):
+            validate_control_trace(self.observations[:-1], self.final)
+        with self.assertRaisesRegex(RuntimeError, 'Duplicate'):
+            validate_control_trace(self.observations + [self.observations[-1]], self.final)
+
+    def test_nonfinite_or_empty_geometry_cannot_authorize_a_value(self):
+        for width in (0, 16, float('nan'), float('inf')):
+            with self.assertRaises(RuntimeError):
+                pan_after_displacement(0, 5, width)
+        with self.assertRaises(RuntimeError):
+            intersects([0, 0, float('nan'), 10], [0, 0, 10, 10])
+        self.assertFalse(intersects([0, 0, 0, 10], [0, 0, 10, 10]))
+
+
 if __name__ == '__main__':
     unittest.main()

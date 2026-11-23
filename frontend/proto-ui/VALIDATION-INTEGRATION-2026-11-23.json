@@ -1,0 +1,190 @@
+{
+  "schema": "verdant.proto-ui.integration-validation.v1",
+  "recordedForDate": "2026-11-23",
+  "timezone": "Etc/UTC",
+  "status": "pending-final-validation",
+  "sourceRevision": null,
+  "integration": {
+    "baseRevision": "2621c0a9760768d67e23e2fe7e85a893d6e1b170",
+    "comparisonRevision": "832cfb49171fe5982c86f667cfe60f92e906c2fb",
+    "method": "selective positive integration preserving base authority, source scroll/reveal, shortcuts and tests"
+  },
+  "coverage": {
+    "auditedInteractionCategories": 18,
+    "nativeCompilationUnits": 12,
+    "stdOnlyCompilationUnits": 2,
+    "compilationUnits": 14,
+    "expectedCompilerOwnedArtifacts": 81,
+    "inventoryStatus": "pending fresh producer for final candidate",
+    "viewportConstructionSiteCount": null,
+    "explicitNativeScrollContainerCount": null
+  },
+  "upstream": {
+    "revision": null,
+    "sharedSdkContentSha256": null,
+    "status": "pending final clean upstream pin and fresh emission",
+    "profile": "gpui-source-v1",
+    "profileStatus": "experimental",
+    "pullRequests": [
+      "https://github.com/Proto-UI/Proto-UI/pull/1730",
+      "https://github.com/Proto-UI/Proto-UI/pull/1731"
+    ]
+  },
+  "currentEvidence": {
+    "editingRecovery": {
+      "patchSha256": "147f0d7b140e43c8190fe5eae12937a7bcd75b494969b2e3d6ace28454522003",
+      "baseFileHashPreconditions": "15/15 matched before applying remote patch",
+      "sourceFiles": [
+        {
+          "path": "frontend/proto-ui/src/editor-surface.proto.ts",
+          "sha256": "d258f91b501a72f57573f4c445cd9271c5ec59054f0274e849c021743a76666e"
+        },
+        {
+          "path": "frontend/proto-ui/tools/test/advanced-editors.test.mjs",
+          "sha256": "1d53a849e597f3ccf15a5de2ac6e4298dd66c437a0e6375d5a3a702abd3021ba"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/host_pointer.rs",
+          "sha256": "e5843f0e20d2b676af8ed89c3d5c6d2582f8c58e00e1a7c570ff6d3a0cf85fd4"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/proto_editor_surface.rs",
+          "sha256": "18b82e7f4bcb50ab413ea6de0b809f347a6392084d42b51614bfd5cbc662adf8"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/proto_performance_key.rs",
+          "sha256": "b7a66ec911620807b208496ab9ac342a149b9eaaadc5aa9985a70a567154bd9a"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/plugin_editor.rs",
+          "sha256": "cec57783fe2f6e129e1a273c164c0e63660d2aab5dc0ebe3a005ff053b57590b"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/roll.rs",
+          "sha256": "1546ca0644527174272d9c54cc754e2c325687458eae3c419356637bc5c02358"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/roll_native_tests.rs",
+          "sha256": "405f3e77348b7685dd6a04c73325d840ca4853b86f90378508acec7ed7fdc6b9"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/arrange.rs",
+          "sha256": "6084a15122be244ca459bb0ecfe445cc99378ee1db08037d08532d7d4bda1f32"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/lanes.rs",
+          "sha256": "7d2214da842a9c25af7724ca6af7ccfdfb7b0e48727d56a2d3831554bc54b1c7"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/automation_lane.rs",
+          "sha256": "03094d85a57aae4c2f320ffe59a96db6ec65c49205b2f178787ab30005636f18"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/phoneme_lane.rs",
+          "sha256": "6c1b12a3c99587b9ffe0e598490783768c679419d0262fa47562aaa0be7ad65d"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/ruler_navigation.rs",
+          "sha256": "0c345c2a561afd2f5b77868e8c431c412917875412a68c6647a0957b0307b6f2"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/curves.rs",
+          "sha256": "29282dd7bbc9848cba1f93d06e055eb30b6dc51cab6dcd0303170a17788bd4db"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/commands.rs",
+          "sha256": "f0adeef1c779d803e732129dd6f0ee417848de38b5a2f70636651f4d277b0e29"
+        }
+      ],
+      "editorSurfaceMatchesPreRecoveryFrozenSource": true,
+      "oldNamedTestsRemoved": 0,
+      "advancedRuntimeTestInventory": 32,
+      "executedRuntimeTests": null
+    },
+    "rustAstOnly": {
+      "passedFiles": 13,
+      "failedFiles": 0,
+      "diagnostics": 0,
+      "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "typeChecked": false,
+      "linked": false,
+      "evidence": "editing-recovery-ast.json"
+    },
+    "producerFresh": {
+      "status": "pending"
+    },
+    "producerRetained": {
+      "status": "pending"
+    },
+    "sourceRules": {
+      "status": "pending"
+    },
+    "applicationRuntimeAndTools": {
+      "status": "pending"
+    },
+    "applicationNativeFull": {
+      "status": "pending"
+    },
+    "modernWorkspaceSdkFull": {
+      "status": "pending"
+    },
+    "cargoGraphAndHeadless": {
+      "status": "pending"
+    },
+    "sourceMutation": {
+      "status": "pending"
+    },
+    "crossPlatformCiAndPackages": {
+      "status": "pending"
+    },
+    "nativePackagedOsInput": {
+      "status": "pending"
+    }
+  },
+  "historicalEvidence": {
+    "priorCompletedMigration": {
+      "record": "VALIDATION-2026-11-23.json",
+      "sha256": "9c13083ee4913d47eda891f0be5f10cf2a128ffb22cab5000d0ab2e0a663e897",
+      "sourceRevision": "f325638dcd7cb4169e52d9eff7796825eccd4ebb",
+      "upstreamRevision": "5912f817581f89785e75c26e324a76c97257dc60",
+      "status": "historical only; record left unchanged"
+    },
+    "preRecoveryIntegratedCheckpoint": {
+      "upstreamRevision": "19e472face9b64d0f3b90583bd3cd2a7367b1d9d",
+      "sharedSdkContentSha256": "b9cf07645c98130ca5ad0fdd3fa352df669af6e160017c15d51287a1c7954916",
+      "sourceRevision": null,
+      "producer": {
+        "mode": "publish",
+        "ok": true,
+        "freshCompilation": true,
+        "units": 14,
+        "artifacts": 81,
+        "reportedLog": "producer-publish-final.json",
+        "sha256": "14fb31057aec4ea4fbff1878a94d07a031fdbd8a27db274be0673f9638311447"
+      },
+      "applicationRuntimeAndTools": {
+        "passed": 203,
+        "failed": 0,
+        "skipped": 0,
+        "reportedLog": "integrated-node.log"
+      },
+      "independentFreshCheck": {
+        "exitCode": 0,
+        "reportedLog": "integrated-fresh.json"
+      },
+      "nativeBuild": {
+        "status": "interrupted before final native acceptance",
+        "signal": "SIGKILL (-9)",
+        "reportedLog": "integrated-native-app-2.log"
+      },
+      "applicability": "Reported checkpoint in the lost local worktree; cannot count as validation of remote restoration or later upstream changes."
+    }
+  },
+  "limitations": [
+    "AST parsing is not Rust type checking, native execution or packaged OS acceptance.",
+    "Source Runtime tests require a pinned checkout and zero skips; the restored final suite must execute again.",
+    "Historical native SDK and GUI pass counts are tied to their own immutable source identities.",
+    "The final application source revision, compiler pin, SDK digest and generated receipts are pending.",
+    "No GitHub approval, DCO or contributor signature is created by this record."
+  ]
+}

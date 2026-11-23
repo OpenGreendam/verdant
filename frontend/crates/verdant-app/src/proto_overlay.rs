@@ -20,6 +20,7 @@ pub(crate) fn choose(handle: &OverlayControlHandle, index: usize, revision: &str
     }
 }
 pub(crate) fn key(handle: &OverlayControlHandle, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) {
+    if window.default_prevented() { return; }
     let name = match event.keystroke.key.as_str() { "enter" => "Enter", "escape" => "Escape", _ => return };
     match handle.call("key", vec![name.into()], window, cx) {
         Ok(Value::Bool(true)) => { window.prevent_default(); cx.stop_propagation(); },
@@ -48,15 +49,27 @@ impl RenderOnce for Overlay {
             let weak = cx.entity().downgrade(); let host = window.window_handle();
             let changes = cx.observe(&root, move |mount: &mut Mount, _, cx| {
                 let handle = mount.root.read(cx).handle(); let events = handle.take_events(); let failures = handle.take_failures();
-                let revision = mount.props.get("revision").cloned(); let response = mount.response.clone();
+                let revision = mount.props.get("revision").and_then(Value::as_str).unwrap_or_default().to_owned(); let response = mount.response.clone();
+                let epoch = handle.owner.borrow().epoch; let owner = handle.owner;
                 let weak = weak.clone();
                 cx.defer(move |cx| {
-                    let Some(mount) = weak.upgrade() else { return };
-                    if mount.read(cx).props.get("revision") != revision.as_ref() { return; }
                     let _ = host.update(cx, |_, window, cx| {
                         if !failures.is_empty() { eprintln!("compiled overlay failed: {failures:?}"); return; }
                         for (name, payload) in events {
-                            if name != "response" || payload.get("revision") != revision.as_ref() { continue; }
+                            // Each response keeps the emitting view lease. A
+                            // preceding callback may replace or close the modal.
+                            let current = weak.upgrade().is_some_and(|mount| {
+                                mount.read(cx).props.get("revision").and_then(Value::as_str).unwrap_or_default() == revision
+                            });
+                            let live = { let owner = owner.borrow();
+                                owner.present && owner.mounted && !owner.disposed && owner.epoch == epoch
+                                    && owner.window_id == Some(window.window_handle().window_id())
+                                    && owner.props.get("revision").and_then(Value::as_str) == Some(revision.as_str())
+                                    && owner.props.get("open").and_then(Value::as_bool) != Some(false)
+                                    && owner.props.get("disabled").and_then(Value::as_bool) != Some(true)
+                            };
+                            if !current || !live { return; }
+                            if name != "response" || payload.get("revision").and_then(Value::as_str) != Some(revision.as_str()) { continue; }
                             if let Some(index) = crate::proto_controls::source_index(payload.get("index")) { response(index, window, cx); }
                         }
                     });
@@ -145,5 +158,83 @@ mod tests {
             assert_eq!(host.response, Some(0)); assert!(!host.open);
             assert_eq!(named("Outside modal", window).state("focused").unwrap(), serde_json::json!(true));
         }).unwrap();
+    }
+}
+
+
+#[cfg(test)]
+mod deferred_response_tests {
+    use super::*;
+    use std::cell::RefCell;
+    use gpui::{AppContext, TestAppContext, WindowHandle, div, px, size};
+    use verdant_overlay_control::native::gpui_native_owner::{detach_native_view, replace_props};
+
+    struct Harness {
+        handle: Rc<RefCell<Option<OverlayControlHandle>>>, responses: Vec<usize>,
+        child_focus: FocusHandle, consume: bool, retire: u8,
+    }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let handle_slot = self.handle.clone(); let child_focus = self.child_focus.clone(); let consume = self.consume;
+            let draw: Draw = Rc::new(move |handle, _, _, _| {
+                *handle_slot.borrow_mut() = Some(handle.clone());
+                div().id("queued-response-native-child").size_full().track_focus(&child_focus)
+                    .on_key_down(move |event, window, _| {
+                        if consume && matches!(event.keystroke.key.as_str(), "enter" | "escape") {
+                            window.prevent_default();
+                        }
+                    }).into_any_element()
+            });
+            let entity = cx.entity();
+            let response: Response = Rc::new(move |index, _, cx| entity.update(cx, |host, cx| {
+                host.responses.push(index);
+                let handle = host.handle.borrow().as_ref().expect("mounted overlay").clone();
+                match host.retire {
+                    1 => replace_props(&handle.owner, serde_json::json!({"label":"Queued overlay","revision":"queue:2","open":true,"choices":2})),
+                    2 => detach_native_view(&handle.owner),
+                    _ => {},
+                }
+                cx.notify();
+            }));
+            div().size_full().relative().child(overlay("queued-overlay",
+                serde_json::json!({"label":"Queued overlay","revision":"queue:1","open":true,"choices":2}), draw, response))
+        }
+    }
+    fn open(cx: &mut TestAppContext, consume: bool) -> WindowHandle<Harness> {
+        let window = cx.open_window(size(px(320.),px(200.)), move |_,cx| Harness {
+            handle:Rc::new(RefCell::new(None)),responses:Vec::new(),child_focus:cx.focus_handle(),consume,retire:0,
+        });
+        window.update(cx,|_,window,_|window.activate_window()).unwrap();
+        crate::native_test_support::frames(window,cx);window
+    }
+
+    #[gpui::test]
+    fn native_descendant_default_prevention_suppresses_overlay_fallback(cx: &mut TestAppContext) {
+        let window=open(cx,true);
+        window.update(cx,|host,window,cx|window.focus(&host.child_focus,cx)).unwrap();
+        crate::native_test_support::frames(window,cx);
+        cx.simulate_keystrokes(window.into(),"enter escape");crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,_,cx|{assert!(host.responses.is_empty());host.consume=false;cx.notify();}).unwrap();
+        crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,window,cx|window.focus(&host.child_focus,cx)).unwrap();
+        cx.simulate_keystrokes(window.into(),"enter");crate::native_test_support::frames(window,cx);
+        window.update(cx,|host,_,_|assert_eq!(host.responses,vec![1])).unwrap();
+    }
+
+    #[gpui::test]
+    fn each_queued_response_rechecks_the_emitting_overlay_lease(cx: &mut TestAppContext) {
+        for retire in [1,2] {
+            let window=open(cx,false);
+            window.update(cx,|host,window,cx|{
+                host.retire=retire;
+                let handle=host.handle.borrow().as_ref().expect("mounted overlay").clone();
+                for index in [0,1] {
+                    assert_eq!(handle.call("choose",vec![index.into(),"queue:1".into()],window,cx).unwrap(),serde_json::json!(true));
+                }
+            }).unwrap();
+            crate::native_test_support::frames(window,cx);
+            window.update(cx,|host,_,_|assert_eq!(host.responses,vec![0],"retirement mode {retire} must invalidate the remaining delivery")).unwrap();
+            window.update(cx,|_,window,_|window.remove_window()).unwrap();cx.run_until_parked();
+        }
     }
 }
