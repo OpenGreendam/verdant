@@ -193,5 +193,60 @@ class ControlCiRefusals(unittest.TestCase):
             validate_control_run(self.identity, 'x11', self.run)
 
 
+
+class DisplayFdProtocol(unittest.TestCase):
+    def reader(self):
+        return runpy.run_path(str(Path(__file__).with_name('run-linux-isolated.py')))['read_display_number']
+
+    def test_separate_number_and_newline_writes_keep_the_reader_open(self):
+        import os
+        import threading
+        from unittest.mock import patch
+        reader = self.reader()
+        read_fd, write_fd = os.pipe()
+        observed_first = threading.Event()
+        failures = []
+        original_read = os.read
+        def observed_read(fd, size):
+            value = original_read(fd, size)
+            if fd == read_fd and value == b'12':
+                observed_first.set()
+            return value
+        def writer():
+            try:
+                os.write(write_fd, b'12')
+                if not observed_first.wait(2):
+                    raise RuntimeError('Reader did not consume the deliberately split first write')
+                os.write(write_fd, b'\n')
+            except Exception as error:
+                failures.append(error)
+            finally:
+                os.close(write_fd)
+        thread = threading.Thread(target=writer)
+        thread.start()
+        try:
+            with patch('os.read', observed_read):
+                self.assertEqual(reader(read_fd, timeout=2), '12')
+        finally:
+            os.close(read_fd)
+            thread.join(3)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(failures, [])
+
+    def test_truncated_invalid_and_unbounded_lines_are_rejected(self):
+        import os
+        reader = self.reader()
+        for payload in (b'12', b'\n', b'-1\n', b'0\n99', b'0' * 65):
+            with self.subTest(payload=payload):
+                read_fd, write_fd = os.pipe()
+                os.write(write_fd, payload)
+                os.close(write_fd)
+                try:
+                    with self.assertRaises(RuntimeError):
+                        reader(read_fd, timeout=0.2)
+                finally:
+                    os.close(read_fd)
+
+
 if __name__ == '__main__':
     unittest.main()
