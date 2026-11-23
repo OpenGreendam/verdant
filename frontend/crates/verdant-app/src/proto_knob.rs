@@ -235,13 +235,17 @@ pub(crate) struct Contact {
 impl Contact {
     pub(crate) fn is_active(&self) -> bool { self.input.get().is_some() }
 
-    pub(crate) fn cancel_in_window(&self, window: &mut Window, cx: &mut App) {
-        if self.window.get() != Some(window.window_handle()) || !self.is_active() { return; }
+    /// Cancel a live contact in its owning window. Call without an Editor
+    /// borrow: the binding can synchronously drain authored events into it.
+    pub(crate) fn cancel_in_window(&self, window: &mut Window, cx: &mut App) -> bool {
+        if self.window.get() != Some(window.window_handle()) || !self.is_active() { return false; }
         // Look up the live lease at activation time. The Contact does not own
         // it, and cancellation runs now rather than queuing a stale generation
         // that could retire a replacement interaction after the command.
         let lease = self.lease.borrow().as_ref().and_then(std::rc::Weak::upgrade);
-        if let Some(lease) = lease { lease.cancel(MoveGestureCancelReason::HostCancel, window, cx); }
+        let Some(lease) = lease.filter(|lease| lease.is_active()) else { return false; };
+        lease.cancel(MoveGestureCancelReason::HostCancel, window, cx);
+        true
     }
     pub(crate) fn begin(&self, input: MoveGestureInput) -> u64 {
         let next = self.generation.get().checked_add(1).expect("knob contact generation exhausted");

@@ -48,6 +48,26 @@ def sha256(path):
         return hashlib.file_digest(source, 'sha256').hexdigest()
 
 
+def read_display_number(read_fd, timeout=10):
+    """Wait for Xvfb's complete displayfd line, including separate writes."""
+    deadline = time.monotonic() + timeout
+    data = bytearray()
+    with selectors.DefaultSelector() as selector:
+        selector.register(read_fd, selectors.EVENT_READ)
+        while b'\n' not in data:
+            if len(data) >= 64:
+                raise RuntimeError('Private Xvfb display number exceeded its protocol budget')
+            if not selector.select(max(0, deadline - time.monotonic())):
+                raise RuntimeError('Private Xvfb did not publish its complete display number')
+            part = os.read(read_fd, 64 - len(data))
+            if not part:
+                raise RuntimeError('Private Xvfb closed displayfd before its newline')
+            data.extend(part)
+    if not data.endswith(b'\n') or not data[:-1].isdigit():
+        raise RuntimeError('Private Xvfb returned an invalid display number')
+    return data[:-1].decode('ascii')
+
+
 def weston_module_map(deps, library_dirs, major):
     # Do not recursively walk /usr/lib when using installed Ubuntu packages.
     # Both Weston 13 and 14 use name=path entries separated by semicolons.
@@ -191,15 +211,9 @@ def main(args):
         finally:
             os.close(write_fd)
         try:
-            with selectors.DefaultSelector() as selector:
-                selector.register(read_fd, selectors.EVENT_READ)
-                if not selector.select(timeout=10):
-                    raise RuntimeError('Private Xvfb did not publish its display number')
-                display_number = os.read(read_fd, 64).decode().strip()
+            display_number = read_display_number(read_fd)
         finally:
             os.close(read_fd)
-        if not display_number.isdigit():
-            raise RuntimeError('Private Xvfb returned an invalid display number')
         env['DISPLAY'] = ':' + display_number
         wait_for(lambda: xdo('getdisplaygeometry'), lambda result: result.returncode == 0,
                  'private X11 display readiness')
@@ -208,6 +222,10 @@ def main(args):
                  '--binary', str(binary), '--worker-binary', str(worker), '--repo', str(repo),
                  '--output-dir', str(run / 'evidence'), '--backend', args.backend, '--suite', args.suite,
                  '--input-display', env['DISPLAY'], '--xdotool', xdotool]
+        if args.suite == 'controls':
+            writer, reader = ('xclip', 'xclip') if args.backend == 'x11' else ('wl-copy', 'wl-paste')
+            probe.extend(['--clipboard-writer', dependency('usr/bin/' + writer),
+                          '--clipboard-reader', dependency('usr/bin/' + reader)])
         if args.backend == 'wayland':
             weston = dependency('usr/bin/weston')
             debug = dependency('usr/bin/weston-debug')

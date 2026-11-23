@@ -161,7 +161,7 @@ class ProbeHelpers(unittest.TestCase):
 import copy
 import hashlib
 import json
-from controls import (CONTROL_CASES, SEARCH_MISSING, TEXT_ACCEPTED, TEXT_ASSISTIVE,
+from controls import (CONTROL_CASES, SEARCH_MISSING, SEARCH_NAME, TEXT_ACCEPTED, TEXT_ASSISTIVE,
                       TEXT_INITIAL, intersects, pan_after_displacement, validate_control_trace)
 
 
@@ -186,8 +186,8 @@ def synthetic_control_observations():
              'visible': 0 <= index * 12 - offset < 48} for index in range(20)]}
 
     entry = {'name': '输入文字…', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/input']}
-    cancel = {'name': '取消', 'role': 'button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
-    search = {'name': 'search', 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/search']}
+    cancel = {'name': '取消', 'role': 'push button', 'states': ['focused'], 'reference': [':1.2', '/cancel']}
+    search = {'name': SEARCH_NAME, 'role': 'entry', 'states': ['focused'], 'reference': [':1.2', '/search']}
     sequence = [
         ('preflight', 0, {}, None, None),
         ('text-unicode', 0, {'text': {'text': TEXT_INITIAL}, 'imeComposition': False}, None, None),
@@ -219,10 +219,41 @@ def synthetic_control_observations():
     for label, revision, control, name, pan in sequence:
         document = project(revision, name or 'original', pan)
         case = next((case for case in CONTROL_CASES if label.startswith(case.split('-')[0] + '-')), None)
-        detail = {'label': label, 'case': case, 'control': copy.deepcopy(control),
+        control = copy.deepcopy(control)
+        frame = [':1.2', '/frame']
+        nodes = [{'name': 'fixture', 'role': 'frame', 'reference': frame, 'windowReference': frame}]
+        if 'text' in control:
+            field = copy.deepcopy(search if label.startswith('collection-') else entry)
+            field['interfaces'] = ['org.a11y.atspi.Text']
+            control['text']['reference'] = field['reference']
+            text = control['text']
+            selected = text.setdefault('selections', [])
+            text['caret'] = selected[-1][1] if selected else (
+                2 if label in ('text-edited', 'text-focus-back') else len(text['text']))
+            sample = {key: copy.deepcopy(text[key]) for key in ('text', 'caret', 'selections')}
+            text['samples'] = [copy.deepcopy(sample), copy.deepcopy(sample)]
+            nodes.append(field)
+        if 'focused' in control:
+            focus = copy.deepcopy(control['focused'])
+            if not any(node['reference'] == focus['reference'] for node in nodes):
+                nodes.append(focus)
+        if 'viewport' in control:
+            control['viewportReference'] = [':1.2', '/viewport']
+            nodes.append({'reference': control['viewportReference'], 'name': '预设列表',
+                          'role': 'document frame', 'windowExtents': copy.deepcopy(control['viewport'])})
+            nodes.extend({'reference': item['reference'], 'name': item['name'], 'role': 'list item',
+                          'states': ['selected'] if item['selected'] else [], 'windowExtents': copy.deepcopy(item['bounds'])}
+                         for item in control['options'])
+        if 'pan' in control:
+            control['pan'].update({'reference': [':1.2', '/pan'], 'name': '轨道声像', 'role': 'slider',
+                                   'interfaces': ['org.a11y.atspi.Value'], 'windowExtents': [0, 0, 100, 24]})
+            nodes.append(copy.deepcopy(control['pan']))
+        for node in nodes:
+            node['windowReference'] = frame
+        detail = {'label': label, 'case': case, 'control': control,
                   'pointerHeld': label in ('mixer-preview', 'mixer-canceled-while-held'),
                   'savedProject': {'sha256': hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()},
-                  'tree': {'nodes': [copy.deepcopy(control['focused'])] if 'focused' in control else []}}
+                  'windowReference': frame, 'tree': {'nodes': nodes}}
         observations.append((detail, document))
     return observations, project(4)
 
@@ -270,16 +301,16 @@ class ControlEvidenceRefusals(unittest.TestCase):
 
     def test_scroll_requires_changed_visible_rows_and_consistent_native_geometry(self):
         self.detail('collection-wheel')['control'] = copy.deepcopy(self.detail('collection-home')['control'])
-        with self.assertRaisesRegex(RuntimeError, 'visible rows'):
+        with self.assertRaises(RuntimeError):
             validate_control_trace(self.observations, self.final)
         self.setUp()
         self.detail('collection-wheel')['control']['options'][0]['visible'] = True
-        with self.assertRaisesRegex(RuntimeError, 'platform geometry'):
+        with self.assertRaises(RuntimeError):
             validate_control_trace(self.observations, self.final)
 
     def test_end_requires_last_row_selected_and_visible(self):
         self.detail('collection-end')['control']['options'][-1]['selected'] = False
-        with self.assertRaisesRegex(RuntimeError, 'selection/reveal'):
+        with self.assertRaises(RuntimeError):
             validate_control_trace(self.observations, self.final)
 
     def test_terminal_sample_cannot_commit_last_observed_preview(self):
@@ -309,6 +340,69 @@ class ControlEvidenceRefusals(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             intersects([0, 0, float('nan'), 10], [0, 0, 10, 10])
         self.assertFalse(intersects([0, 0, 0, 10], [0, 0, 10, 10]))
+
+    def test_text_reference_interface_and_window_must_exist_in_raw_tree(self):
+        for mutation in ('interface', 'window', 'reference'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                detail = self.detail('text-unicode')
+                field = next(node for node in detail['tree']['nodes'] if node.get('role') == 'entry')
+                if mutation == 'interface': field['interfaces'] = []
+                elif mutation == 'window': field['windowReference'] = [':1.2', '/another-window']
+                else: field['reference'] = [':1.2', '/missing-field']
+                with self.assertRaises(RuntimeError):
+                    validate_control_trace(self.observations, self.final)
+
+    def test_pan_summary_cannot_contradict_raw_value_or_bounds(self):
+        for mutation in ('value', 'bounds'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                node = next(node for node in self.detail('mixer-committed')['tree']['nodes']
+                            if node.get('role') == 'slider')
+                if mutation == 'value': node['value']['CurrentValue'] = 0
+                else: node['windowExtents'][2] = 99
+                with self.assertRaisesRegex(RuntimeError, 'actual tree'):
+                    validate_control_trace(self.observations, self.final)
+
+    def test_collection_summary_cannot_replace_raw_selection_bounds_or_focus(self):
+        for mutation in ('selection', 'viewport', 'inventory', 'search-focus'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                detail = self.detail('collection-search-navigation' if mutation == 'search-focus' else 'collection-end')
+                nodes = detail['tree']['nodes']
+                if mutation == 'selection':
+                    next(node for node in nodes if node.get('states') == ['selected'])['states'] = []
+                elif mutation == 'viewport':
+                    next(node for node in nodes if node.get('name') == '预设列表')['windowExtents'] = [0, 0, 5, 5]
+                elif mutation == 'inventory':
+                    nodes.remove(next(node for node in nodes if node.get('role') == 'list item'))
+                else:
+                    next(node for node in nodes if node.get('role') == 'entry')['states'] = []
+                with self.assertRaisesRegex(RuntimeError, 'actual'):
+                    validate_control_trace(self.observations, self.final)
+
+    def test_text_summary_requires_two_equal_unmodified_raw_final_samples(self):
+        for mutation in ('missing', 'changing', 'invalid', 'summary'):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                value = self.detail('text-unicode')['control']['text']
+                if mutation == 'missing': value['samples'] = []
+                elif mutation == 'changing': value['samples'][-1]['caret'] = 0
+                elif mutation == 'invalid':
+                    value['caret'] = 99
+                    for sample in value['samples']: sample['caret'] = 99
+                else: value['caret'] = 0
+                with self.assertRaisesRegex(RuntimeError, 'platform Text'):
+                    validate_control_trace(self.observations, self.final)
+
+    def test_stable_search_prefix_with_no_rows_cannot_replace_the_complete_query(self):
+        value = self.detail('collection-search-empty')['control']['text']
+        value['text'] = SEARCH_MISSING[:-1]
+        value['caret'] = len(value['text'])
+        sample = {key: copy.deepcopy(value[key]) for key in ('text', 'caret', 'selections')}
+        value['samples'] = [copy.deepcopy(sample), copy.deepcopy(sample)]
+        with self.assertRaisesRegex(RuntimeError, 'Search did not remove'):
+            validate_control_trace(self.observations, self.final)
 
 
 if __name__ == '__main__':

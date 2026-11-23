@@ -1,17 +1,20 @@
 """Production-control journeys driven through the OS and the AT-SPI tree.
 
 These cases run in a separate application/project from the original knob
-suite. Unicode key injection is deliberately not described as an IME test.
+suite. Unicode clipboard/key input is deliberately not described as an IME test.
 """
 
 import copy
 import math
+import os
+import signal
+import subprocess
 
 
 CONTROL_CASES = ("text-selection-focus", "collection-scroll-cancel", "mixer-pan")
 TEXT_INITIAL = "音😀AB"
-TEXT_ASSISTIVE = "音😀乐"
-TEXT_ACCEPTED = "音😺乐"
+TEXT_ASSISTIVE = "音😀Z"
+TEXT_ACCEPTED = "音😺Z"
 LIBRARY_TITLE = "插件预设库 — Verdant"
 SEARCH_NAME = "搜索名称、类别、作者、标签与用途"
 SEARCH_MISSING = "verdant-no-matching-preset-79f2"
@@ -45,20 +48,77 @@ class ControlCases:
 
     def text(self, node, expected=None, selections=None):
         reference = tuple(node["reference"])
-        result = self.wait(lambda: self.observer.read_text(reference),
-                           lambda value: (expected is None or value["text"] == expected)
+        def read():
+            result = self.observer.read_text(reference)
+            # Keep intermediate stable prefixes as well as within-capture
+            # races. The predicate still requires the complete expected text.
+            self.log_input("atspi-observation", method="Text.GetText/GetSelection", reference=list(reference),
+                           value=result)
+            return result
+        result = self.wait(read, lambda value: (expected is None or value["text"] == expected)
                            and (selections is None or value["selections"] == selections),
                            f"real AT-SPI text={expected!r}, selections={selections!r}")
-        self.log_input("atspi-observation", method="Text.GetText/GetSelection", reference=list(reference),
-                       value=result)
         return {"reference": list(reference), **result}
 
     def type_unicode(self, value):
         if self.held:
             raise RuntimeError("Text journey must not release an unrelated held pointer")
+        if any(ord(character) > 0x7f for character in value):
+            self.paste_unicode(value)
+            return
         self.xdo("type", "--clearmodifiers", "--delay", 45, "--", value)
         self.log_input("text-route", route="XTest key events; no input-method composition", value=value)
         self.pause()
+
+    def paste_unicode(self, value):
+        # XTest's synthesized keymap dropped Unicode input on the observed
+        # X11 path. Use the actual private display's clipboard, never an
+        # editor expose method or a fake input-handler callback.
+        if not self.args.clipboard_writer or not self.args.clipboard_reader:
+            raise RuntimeError("Unicode clipboard transport requires observed native clipboard tools")
+        if self.args.backend == "x11":
+            write = [str(self.args.clipboard_writer), "-selection", "clipboard", "-in", "-quiet", "-target", "UTF8_STRING"]
+            read = [str(self.args.clipboard_reader), "-selection", "clipboard", "-out", "-target", "UTF8_STRING"]
+        else:
+            write = [str(self.args.clipboard_writer), "--foreground", "--type", "text/plain;charset=utf-8"]
+            read = [str(self.args.clipboard_reader), "--no-newline", "--type", "text/plain;charset=utf-8"]
+        log_name = f"clipboard-{len(self.clipboard_processes):02}.log"
+        stream = (self.output / log_name).open("wb")
+        child = subprocess.Popen(write, stdin=subprocess.PIPE, stdout=stream, stderr=stream,
+                                 env=self.input_env, start_new_session=True)
+        record = {"pid": child.pid, "ownedProcessGroup": child.pid, "command": write, "log": log_name}
+        self.clipboard_processes.append((child, stream, record))
+        self.report.setdefault("clipboardProcesses", []).append(record)
+        child.stdin.write(value.encode("utf-8"))
+        child.stdin.close()
+        def clipboard():
+            result = subprocess.run(read, env=self.input_env, capture_output=True, text=True, timeout=3)
+            if child.poll() is not None and result.returncode:
+                raise RuntimeError(f"Owned clipboard writer exited: {child.returncode}; inspect {log_name}")
+            return result
+        result = self.wait(clipboard, lambda item: item.returncode == 0 and item.stdout == value,
+                           "the real private display clipboard to contain the requested Unicode")
+        self.log_input("clipboard-observation", command=read, value=result.stdout, exitCode=result.returncode)
+        self.key("ctrl+v")
+        self.log_input("text-route", route="Native clipboard + XTest Ctrl+V; no input-method composition",
+                       backend=self.args.backend, value=value)
+        self.pause()
+
+    def cleanup_clipboards(self):
+        for child, stream, record in self.clipboard_processes:
+            try:
+                if child.poll() is None:
+                    os.killpg(child.pid, signal.SIGTERM)
+                    try:
+                        child.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(child.pid, signal.SIGKILL)
+                        child.wait(timeout=3)
+                record["returnCodeAfterCleanup"] = child.returncode
+            except (OSError, subprocess.SubprocessError) as error:
+                self.report.setdefault("cleanupErrors", []).append(f"Owned clipboard cleanup: {error}")
+            finally:
+                stream.close()
 
     def save_controls(self, name, pan, revision, before=None):
         saved = self.save(-8.0, revision)
@@ -101,7 +161,7 @@ class ControlCases:
             raise RuntimeError("AT-SPI rejected the real text selection action")
         self.record("text-assistive-selection", control={"text": self.text(field, TEXT_INITIAL, [[2, 4]]),
                     "action": {"method": "Text.SetSelection", "arguments": [0, 2, 4], "accepted": accepted}})
-        self.type_unicode("乐")
+        self.type_unicode("Z")
         self.record("text-assistive-edited", control={"text": self.text(field, TEXT_ASSISTIVE)})
         self.key("Home")
         self.key("Right")
@@ -110,7 +170,7 @@ class ControlCases:
         self.type_unicode("😺")
         self.record("text-edited", control={"text": self.text(field, TEXT_ACCEPTED)})
         self.key("Tab")
-        cancel = self.node("取消", "button")
+        cancel = self.node("取消", "push button")
         cancel = self.wait(lambda: self.observer.read(tuple(cancel["reference"])),
                            lambda node: "focused" in node["states"], "one Tab to the dialog cancel button")
         self.record("text-focus-forward", control={"focused": cancel})
@@ -126,8 +186,8 @@ class ControlCases:
         undone = self.save_controls(before["trackName"], before["panPermille"], before["revision"] + 2)
         self.record("text-single-undo", control={"undoCount": 1})
         field = self.rename_prompt()
-        self.type_unicode("不应保存")
-        self.text(field, "不应保存")
+        self.type_unicode("discarded-rename")
+        self.text(field, "discarded-rename")
         self.key("Escape")
         self.wait(lambda: self.nodes("轨道名称", "dialog"), lambda nodes: not nodes, "rename prompt cancellation")
         self.save_controls(before["trackName"], before["panPermille"], undone["revision"], undone)
@@ -140,8 +200,9 @@ class ControlCases:
 
     def collection_observation(self):
         options = self.library_options()
-        viewport = self.node("预设列表")["windowExtents"]
-        return {"viewport": viewport,
+        viewport_node = self.node("预设列表", "document frame")
+        viewport = viewport_node["windowExtents"]
+        return {"viewportReference": viewport_node["reference"], "viewport": viewport,
                 "options": [{"reference": node["reference"], "name": node["name"],
                              "selected": "selected" in node["states"], "bounds": node["windowExtents"],
                              "visible": intersects(node["windowExtents"], viewport)} for node in options]}
@@ -154,7 +215,7 @@ class ControlCases:
 
     def collection_scroll_cancel(self):
         before = self.persisted()
-        self.click(self.node("预设库", "button"))
+        self.click(self.node("预设库", "push button"))
         def frames():
             return [node for node in self.snapshot()["nodes"]
                     if node["role"] in ("frame", "window") and node["name"] == LIBRARY_TITLE]
@@ -298,6 +359,82 @@ def validate_control_trace(observations, final):
         if not condition:
             raise RuntimeError(message)
 
+    def tree_node(label, reference, role, name=None):
+        detail = steps[label][0]
+        require(isinstance(reference, list) and len(reference) == 2,
+                f"{label}: missing platform node reference")
+        matches = [node for node in detail.get("tree", {}).get("nodes", [])
+                   if node.get("reference") == reference
+                   and node.get("windowReference") == detail.get("windowReference")]
+        require(len(matches) == 1, f"{label}: reference is absent or ambiguous in the actual window tree")
+        node = matches[0]
+        require(node.get("role") == role and (name is None or node.get("name") == name),
+                f"{label}: actual tree role/name differs")
+        return node
+
+    for label, (detail, _) in steps.items():
+        frame = detail.get("windowReference")
+        require(isinstance(frame, list) and len(frame) == 2
+                and any(node.get("reference") == frame and node.get("role") in ("frame", "window")
+                        for node in detail.get("tree", {}).get("nodes", [])),
+                f"{label}: actual tree lacks its recorded native frame")
+        expected_case = next((case for case in CONTROL_CASES if label.startswith(case.split('-')[0] + '-')), None)
+        require(detail.get("case") == expected_case, f"{label}: observation belongs to another case")
+        control = observed(label)
+        if "text" in control:
+            name = SEARCH_NAME if label.startswith("collection-") else "输入文字…"
+            node = tree_node(label, control["text"].get("reference"), "entry", name)
+            require("org.a11y.atspi.Text" in node.get("interfaces", []),
+                    f"{label}: actual entry lacks the platform Text interface")
+            value = control["text"]
+            samples = value.get("samples", [])
+            require(isinstance(samples, list) and 2 <= len(samples) <= 8
+                    and samples[-1] == samples[-2]
+                    and samples[-1] == {key: value.get(key) for key in ("text", "caret", "selections")},
+                    f"{label}: platform Text lacks two unchanged raw final samples")
+            caret, selected = value["caret"], value["selections"]
+            require(type(caret) is int and 0 <= caret <= len(value["text"])
+                    and isinstance(selected, list) and all(isinstance(item, list) and len(item) == 2
+                    and all(type(offset) is int for offset in item)
+                    and 0 <= item[0] <= item[1] <= len(value["text"]) for item in selected),
+                    f"{label}: stable platform Text offsets are invalid")
+        if "focused" in control:
+            focus = control["focused"]
+            node = tree_node(label, focus.get("reference"), focus.get("role"), focus.get("name"))
+            require("focused" in focus.get("states", []) and "focused" in node.get("states", []),
+                    f"{label}: focus summary differs from the actual tree")
+        if "viewport" in control:
+            node = tree_node(label, control.get("viewportReference"), "document frame", "预设列表")
+            require(node.get("windowExtents") == control["viewport"],
+                    f"{label}: viewport bounds differ from the actual tree")
+            actual = [node for node in detail["tree"]["nodes"]
+                      if node.get("windowReference") == frame and node.get("role") == "list item"]
+            references = [item.get("reference") for item in control["options"]]
+            require(all(isinstance(reference, list) and len(reference) == 2 for reference in references),
+                    f"{label}: invalid option reference")
+            require(len(references) == len({tuple(reference) for reference in references})
+                    and {tuple(reference) for reference in references} == {tuple(node["reference"]) for node in actual},
+                    f"{label}: option inventory differs from the actual tree")
+            for item in control["options"]:
+                node = tree_node(label, item.get("reference"), "list item", item.get("name"))
+                require(node.get("windowExtents") == item.get("bounds")
+                        and ("selected" in node.get("states", [])) is item.get("selected"),
+                        f"{label}: option state/bounds differ from the actual tree")
+        if label == "collection-search-empty":
+            require(not any(node.get("windowReference") == frame and node.get("role") == "list item"
+                            for node in detail["tree"]["nodes"]),
+                    f"{label}: actual tree still exposes unmatched options")
+        if "pan" in control:
+            pan = control["pan"]
+            node = tree_node(label, pan.get("reference"), "slider", "轨道声像")
+            require("org.a11y.atspi.Value" in node.get("interfaces", [])
+                    and node.get("value") == pan.get("value")
+                    and node.get("windowExtents") == pan.get("windowExtents"),
+                    f"{label}: pan Value/bounds differ from the actual tree")
+            if "width" in control:
+                require(control["width"] == node["windowExtents"][2],
+                        f"{label}: pan displacement uses a different platform width")
+
     baseline = document("preflight")
     require(baseline["revision"] == 0 and len(baseline["tracks"]) == 1, "Unexpected controls project baseline")
     require(baseline["tracks"][0]["instrument"]["params"]["gain"] == -8.0
@@ -324,13 +461,14 @@ def validate_control_trace(observations, final):
             and observed("text-assistive-selection").get("action") ==
                 {"method": "Text.SetSelection", "arguments": [0, 2, 4], "accepted": True},
             "The platform selection action did not change the real editor range")
-    for label, name, role in (("text-focus-forward", "取消", "button"),
+    for label, name, role in (("text-focus-forward", "取消", "push button"),
                               ("text-focus-back", "输入文字…", "entry")):
         focus = observed(label).get("focused", {})
         require(focus.get("name") == name and focus.get("role") == role and "focused" in focus.get("states", []),
                 f"{label}: wrong physical focus target")
         require(any(node.get("reference") == focus.get("reference") and "focused" in node.get("states", [])
                     for node in steps[label][0]["tree"]["nodes"]), f"{label}: focus is absent from the actual tree")
+    require(document("text-focus-forward") == baseline, "Focus traversal changed the durable project")
     require(document("text-committed") == expected_project(1, name=TEXT_ACCEPTED), "Text commit changed another domain field")
     require(document("text-single-undo") == expected_project(2), "Text single undo did not restore the original domain state")
     require(document("text-canceled") == document("text-single-undo"), "Canceled text changed the saved project")
