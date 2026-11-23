@@ -1,0 +1,400 @@
+{
+  "schema": "verdant.proto-ui.mainline-validation.v1",
+  "recordedForDate": "2026-11-23",
+  "recordKind": "completed-ci-evidence-reconciliation",
+  "status": "recorded-integration-merged",
+  "scope": "This document indexes and checks an already completed CI run against the merged source tree. It does not record a new runtime execution of this documentation change or close unexecuted platform obligations.",
+  "source": {
+    "repository": "https://github.com/OpenGreendam/verdant",
+    "pullRequest": "https://github.com/OpenGreendam/verdant/pull/12",
+    "headRevision": "5e19b7de231894c921a6dd69f16e8820b35b8ec3",
+    "executedMergeRevision": "96691e1abdf722d573465ee2d32a4a1588a9191b",
+    "mainMergeRevision": "afd3eda361874f275422263473334daba7575b59",
+    "mergedAt": "2026-11-23T17:03:25Z",
+    "identicalGitTree": "89fb5efa5b4c4226cabf1c1b1ce64744f02e832f",
+    "treeVerification": "Fetched all three Git objects and read each commit tree locally; all three have the identical complete tree."
+  },
+  "compiler": {
+    "revision": "4e499ae25e825e130e740f16af66d70b23a743cf",
+    "sharedSdk": {
+      "owner": "pitch-gesture-surface",
+      "directory": ".proto-ui/gpui-native",
+      "package": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "features": [
+        "gpui-modern-element-api"
+      ],
+      "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    },
+    "executedToolchain": {
+      "node": "v24.22.3",
+      "packageManager": "pnpm@10.32.1",
+      "runner": "pnpm",
+      "packages": {
+        "typescript": "5.9.3",
+        "tsx": "4.21.0"
+      },
+      "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8"
+    },
+    "nativeCompilationUnits": 12,
+    "stdOnlyCompilationUnits": 2,
+    "compilationUnits": 14,
+    "compilerOwnedArtifacts": 81,
+    "auditedInteractionCategories": 18
+  },
+  "workflows": [
+    {
+      "runId": 45212699291,
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291",
+      "name": "frontend",
+      "conclusion": "success"
+    },
+    {
+      "runId": 45212699122,
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699122",
+      "name": "dsh-plugin",
+      "conclusion": "success",
+      "scope": "Workflow tests, not real messaging-channel delivery."
+    }
+  ],
+  "jobs": [
+    {
+      "id": 137825454581,
+      "name": "Proto-UI fresh pinned compilation",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137825454581"
+    },
+    {
+      "id": 137825455233,
+      "name": "Proto-UI retained artifacts and regression tests",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137825455233"
+    },
+    {
+      "id": 137826193888,
+      "name": "Session build without native UI libraries",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137826193888"
+    },
+    {
+      "id": 137827857407,
+      "name": "linux",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137827857407"
+    },
+    {
+      "id": 137827857735,
+      "name": "native (windows-2025, windows-x86_64)",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137827857735"
+    },
+    {
+      "id": 137827857747,
+      "name": "native (macos-15, macos-aarch64)",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137827857747"
+    },
+    {
+      "id": 137847702482,
+      "name": "Real Linux window input and accessibility (22 original + 6 control cases)",
+      "conclusion": "success",
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/job/137847702482"
+    }
+  ],
+  "verification": {
+    "method": "Read the completed job conclusions, decoded original job logs and native-input summary, then matched the current compiler pin and all three Git trees. Counts below retain their execution layer.",
+    "fresh": {
+      "jobId": 137825454581,
+      "freshCompilation": true,
+      "ruleFixtures": 82,
+      "nodePassed": 224,
+      "nodeFailed": 0,
+      "nodeSkipped": 0
+    },
+    "retained": {
+      "jobId": 137825455233,
+      "freshCompilation": false,
+      "passed": 97,
+      "failed": 0,
+      "skipped": 127,
+      "skipScope": "Upstream-dependent cases; full execution is recorded separately in fresh."
+    },
+    "headlessSession": {
+      "jobId": 137826193888,
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "nativeUiLibraries": false
+    },
+    "nativePlatforms": [
+      {
+        "platform": "linux-x86_64",
+        "jobId": 137827857407,
+        "gui": {
+          "passed": 291,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "sdkDefaultTestSupport": {
+          "passed": 53,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "sdkModernElementAndTextSelectionNotification": {
+          "passed": 52,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "packageAndSourceOffer": "passed",
+        "voiceBundled": false
+      },
+      {
+        "platform": "windows-x86_64",
+        "jobId": 137827857735,
+        "gui": {
+          "passed": 291,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "sdkDefaultTestSupport": {
+          "passed": 53,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "sdkModernElementAndTextSelectionNotification": {
+          "passed": 52,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "packageAndSourceOffer": "passed",
+        "voiceBundled": false
+      },
+      {
+        "platform": "macos-aarch64",
+        "jobId": 137827857747,
+        "gui": {
+          "passed": 291,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "sdkDefaultTestSupport": {
+          "passed": 53,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "sdkModernElementAndTextSelectionNotification": {
+          "passed": 52,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        "packageAndSourceOffer": "passed",
+        "voiceBundled": false
+      }
+    ],
+    "workspaceQualification": "Broader Cargo workspace and platform selections retain their resource-dependent ignored or filtered cases. GUI and required SDK counts do not describe every workspace test.",
+    "linuxPackagedInput": {
+      "jobId": 137847702482,
+      "format": "verdant.native-input-ci-summary.v1",
+      "passedCases": 28,
+      "originalPassedCases": 22,
+      "controlPassedCases": 6,
+      "errors": [],
+      "sourceCommit": "96691e1abdf722d573465ee2d32a4a1588a9191b",
+      "sourceSelectionSha256": "5260aa431cd7e7acaea6469c1fde43e847efce888e6dd23cffde4e3860be920a",
+      "compilerRevision": "4e499ae25e825e130e740f16af66d70b23a743cf",
+      "packageManifestSha256": "df611d9db3dcf26076e71b1426c631b950cf05620356840151f37d5d1f721ddf",
+      "linuxPackageArchiveSha256": "c3b84ae0de90df6b35d689c3803efb60de6d32088ab2616a3d0421a89c362ea4",
+      "guiBinarySha256": "62e73ab2e16ec7230e0eafa8ad46ea810641d787c503eda0ba742f00210e1b49",
+      "workerBinarySha256": "29e14d5650fe44f26c9ca89643cf390c9129b4c2bf7d3afc5614f8c9035b1d02",
+      "runs": [
+        {
+          "backend": "x11",
+          "suite": "original",
+          "cases": [
+            {
+              "name": "keyboard",
+              "status": "passed"
+            },
+            {
+              "name": "drag",
+              "status": "passed"
+            },
+            {
+              "name": "escape",
+              "status": "passed"
+            },
+            {
+              "name": "focus",
+              "status": "passed"
+            },
+            {
+              "name": "exit",
+              "status": "passed"
+            },
+            {
+              "name": "detach",
+              "status": "passed"
+            },
+            {
+              "name": "set-value",
+              "status": "passed"
+            },
+            {
+              "name": "set-value-during-drag",
+              "status": "passed"
+            },
+            {
+              "name": "lease-reusable",
+              "status": "passed"
+            },
+            {
+              "name": "native-window-close",
+              "status": "passed"
+            },
+            {
+              "name": "native-preset-cancel",
+              "status": "passed"
+            }
+          ],
+          "resultSha256": "8e1461f9518dfa666de09c5f9586169d60f30ffa3dca9d8c7721c5a783c098c5",
+          "harnessSha256": "7f911aa93ba31c95d406f98c69ceb34801a3ffa1d9113d6ceb88a9a0066d0236"
+        },
+        {
+          "backend": "wayland",
+          "suite": "original",
+          "cases": [
+            {
+              "name": "keyboard",
+              "status": "passed"
+            },
+            {
+              "name": "drag",
+              "status": "passed"
+            },
+            {
+              "name": "escape",
+              "status": "passed"
+            },
+            {
+              "name": "focus",
+              "status": "passed"
+            },
+            {
+              "name": "exit",
+              "status": "passed"
+            },
+            {
+              "name": "detach",
+              "status": "passed"
+            },
+            {
+              "name": "set-value",
+              "status": "passed"
+            },
+            {
+              "name": "set-value-during-drag",
+              "status": "passed"
+            },
+            {
+              "name": "lease-reusable",
+              "status": "passed"
+            },
+            {
+              "name": "native-window-close",
+              "status": "passed"
+            },
+            {
+              "name": "native-preset-cancel",
+              "status": "passed"
+            }
+          ],
+          "resultSha256": "f44ed45bcc299c3e4e30322a085033967d8bc03d0a42efa200e5d882d573b21d",
+          "harnessSha256": "ff820a8856616b6096defe62abe71dbb092b0cf7840c6b2bc4c3f0f4bb8025e2"
+        },
+        {
+          "backend": "x11",
+          "suite": "controls",
+          "cases": [
+            {
+              "name": "text-selection-focus",
+              "status": "passed"
+            },
+            {
+              "name": "collection-scroll-cancel",
+              "status": "passed"
+            },
+            {
+              "name": "mixer-pan",
+              "status": "passed"
+            }
+          ],
+          "resultSha256": "68ed6177abe9a86befade07a6860b99ac5be753fec648ced8df7d4b7c9bece05",
+          "harnessSha256": "5fecd617be0ad976d4f390ba1e47ab77a84f7fa959c6c1ad490ed0dc602a469d"
+        },
+        {
+          "backend": "wayland",
+          "suite": "controls",
+          "cases": [
+            {
+              "name": "text-selection-focus",
+              "status": "passed"
+            },
+            {
+              "name": "collection-scroll-cancel",
+              "status": "passed"
+            },
+            {
+              "name": "mixer-pan",
+              "status": "passed"
+            }
+          ],
+          "resultSha256": "abad527df1db46029e0b8b0ec3e60578be564a033be87d5b58a5d195b926dbca",
+          "harnessSha256": "fc101216377e8240036f95fdeb218e778d971ed81532703dc601a4b59bf75c7c"
+        }
+      ],
+      "rawEvidenceArtifact": {
+        "id": 14839724180,
+        "name": "native-input-linux",
+        "url": "https://github.com/OpenGreendam/verdant/actions/runs/45212699291/artifacts/14839724180",
+        "sizeInBytes": 26315560,
+        "sha256": "3515bcfdcb2559ca8087d9a9d4305f82bf8c3f66b7c2d909e8096e6a4f358461",
+        "expiresAt": "2026-12-07T16:53:47Z",
+        "digestSource": "Read back from GitHub artifact metadata; archive bytes were not downloaded again for this documentation reconciliation."
+      }
+    }
+  },
+  "historicalRecords": [
+    {
+      "path": "VALIDATION-INTEGRATION-2026-11-23.json",
+      "gitBlobSha1": "7ee85a45ae97e3058e52b15d7dc0cca67f582fc8",
+      "status": "preserved-unchanged",
+      "meaning": "Recovery-period pending snapshot; not the status of the completed #12 run."
+    },
+    {
+      "runId": 45202948082,
+      "url": "https://github.com/OpenGreendam/verdant/actions/runs/45202948082",
+      "sourceRevision": "a98f612bd5c2cabee920842574c05d015cf3ed8d",
+      "status": "historical-failed-native-window-gate",
+      "meaning": "Retains the earlier stale Collection observer failure; the later completed run does not relabel this failed source."
+    }
+  ],
+  "remainingScope": [
+    "System IME composition, commit, cancellation and candidate-window placement on each target display session.",
+    "Full screen-reader interaction with notes and control points.",
+    "Physical touch, pen, multi-contact gestures and native device recovery.",
+    "Windows and macOS actual-window input and user-facing application workflows.",
+    "Physical audio, hotplug/recovery, and target-platform plugin windows and DSP.",
+    "Complete authorized bundled voice, clean-user offline first-start synthesis, installation and rollback of each release candidate.",
+    "Real DSH host/channel delivery and receiving-side playback.",
+    "Per-source/per-platform future compiler pins and releases require their own verification."
+  ]
+}

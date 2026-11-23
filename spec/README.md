@@ -8,4 +8,4 @@
 | [编译规格](SPEC.md) | 上游卷帘声明、Rust 产物、宿主接口与重新编译。 |
 | [固定来源](SOURCES.md) | 上游文件、版本、哈希及许可证。 |
 
-控件使用检入的 Rust 源码。卷帘投影与会话手势通过 `frontend/proto-ui/` 的上游编译入口构建。`examples/` 保存带来源的历史格式示例。[编辑器](../frontend/README.md) · [worker](../backend/RUNTIME.md)
+应用交互通过 `frontend/proto-ui/` 的上游编译入口生成 12 个原生 Rust 组件与 2 个标准库决策单元，Rust 宿主保留绘图、音乐领域和操作系统能力。[迁移清单](../frontend/proto-ui/CONTROL-MIGRATION.md)列出 18 类职责；[主线验收记录](../frontend/proto-ui/VALIDATION-MAINLINE-2026-11-23.json)绑定已执行来源与剩余平台范围。`examples/` 保存带来源的历史格式示例。[编辑器](../frontend/README.md) · [worker](../backend/RUNTIME.md)

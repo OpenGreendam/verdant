@@ -13,7 +13,8 @@
 
 ## 发行与原生平台
 
-- [ ] 完成 Windows x64 与 Apple Silicon 的原生构建、包启动、声库安装／回滚及真实渲染。
+- [x] **PR #12 的 Linux、Windows x64 与 Apple Silicon 原生构建、完整 GUI/SDK 测试及包／源码检查已完成；Linux 打包后 X11／Wayland 输入共 28/28。** [对应源码与验收记录](frontend/proto-ui/VALIDATION-MAINLINE-2026-11-23.json)
+- [ ] 在 Windows x64 与 Apple Silicon 上完成实际桌面包启动、声库安装／回滚及真实渲染；#12 已执行的原生构建、GUI/SDK 测试与包检查见[主线验收记录](frontend/proto-ui/VALIDATION-MAINLINE-2026-11-23.json)，每个待发行包仍须分别复验。
 - [ ] 为各平台待发行包取得原生音频、插件 DSP／状态／窗口、Unicode 路径与输入法结果。
 - [ ] 完成音符和控制点的读屏回读与动作、物理多点触摸、声卡掉电和恢复。
 - [ ] 取得随包完整声库的分发依据，并完成全新用户状态下的断网首启真实合成。

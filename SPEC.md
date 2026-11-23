@@ -6,7 +6,7 @@ Verdant 0.1.0 的工程格式、事务、渲染和宿主合同。命令接口见
 
 ### 1.1 已核验的上游边界
 
-桌面编辑器直接编译检入的控件 Rust 源码。卷帘投影与会话手势的状态转换由上游 Proto UI 编译为 Rust，桌面会话实现守卫与领域副作用。上游编译入口、版本和目标见[编译规格](spec/SPEC.md)。
+桌面编辑器消费上游 Proto UI 编译生成的 Rust 控件：12 个原生组件与 2 个标准库决策单元覆盖[迁移清单](frontend/proto-ui/CONTROL-MIGRATION.md)中的 18 类应用交互。Rust 宿主提供 Adwaita 绘图、音乐坐标、领域事务和操作系统能力；会话通过强类型适配器执行生成的手势决策。上游编译入口、版本和目标见[编译规格](spec/SPEC.md)。
 2026-11-13 的上游审阅固定在 Proto-UI `35195a6e6f1ba6a7d800da0029f2683013abd18b`，
 其 GPUI Adapter 使用 `62e5991dd0f0c8a3af8d5e7e9c4652490d468db8`；独立 API 审阅使用
 Zed `48741fd17d0dec28be6ad664b0a06dc7202086be`。
@@ -48,9 +48,9 @@ Zed `48741fd17d0dec28be6ad664b0a06dc7202086be`。
 解压发行包后运行对应程序。桌面、CLI、worker 和安装器使用本地声库目录与原生运行库。[入口](README.md) · [声库安装](docs/verdant-voice.md) · [发行](RELEASE.md)
 
 ```sh
-bin/verdant song.verp
-bin/verdant --import source.ufdata
-bin/verdant --worker-binary /path/to/verdant-worker --workspace /path/to/cache
+bin/verdant gui song.verp
+bin/verdant gui --import source.ufdata
+bin/verdant gui --worker-binary /path/to/verdant-worker --workspace /path/to/cache
 ```
 
 开发构建在开发容器中执行，依赖须事先准备：
@@ -232,9 +232,9 @@ stop 不得静默丢失，换入和旧 buffer 回收须遵守实时边界。设�
 
 ### 13.1 控件源码与卷帘声明
 
-控件和命令表由 `frontend/crates/verdant-app/src/generated/controls.rs` 的检入 Rust 源码实现。
+`frontend/proto-ui/src/` 的 14 个编译入口声明应用交互契约，生成物位于 `frontend/proto-ui/generated/`；`frontend/crates/verdant-app/src/generated/controls.rs` 保留控件与命令表的 Rust 宿主组成。全部类别、生产调用点和领域／系统边界见[迁移清单](frontend/proto-ui/CONTROL-MIGRATION.md)。
 `frontend/proto-ui/src/pitch-gesture-surface.proto.ts` 只声明尺寸、裁剪与 slot 根；卷帘绘图、音乐坐标和领域预览保留在 Rust 宿主。`note-gesture-planner.proto.ts` 声明移动、复制、调整长度与框选的决策，`control-gesture-planner.proto.ts` 声明连续参数决策和归一化拖动计算；二者生成只依赖标准库的类型化 Rust crate，由 `verdant-ui-protocol` 适配后供 session 使用，不依赖 GPUI 或 native SDK。
-`normalized-knob.proto.ts` 是本次完整的有状态组件切片，声明值、phase、props 同步、取消、键盘、焦点和 Slider 辅助功能契约；Adwaita 绘图、参数单位、实时目标校验和领域提交留在 Rust。pitch 与 normalized knob 共用一个 native SDK；两个 data planner 不使用该 SDK。
+`normalized-knob.proto.ts` 声明值、phase、props 同步、取消、键盘、焦点和 Slider 辅助功能契约；动作、集合、连续值、编辑表面、演奏键、拖放、弹层、文本、图形点和滚动区域使用各自原型。Adwaita 绘图、参数单位、实时目标校验和领域提交留在 Rust。12 个原生组件共用一个 native SDK；两个 data planner 不使用该 SDK。
 
 ### 13.2 编译阶段
 
@@ -273,7 +273,7 @@ mount／unmount 管理订阅与手势；后台回调使用弱引用／会话 tok
 锚点缩放、过时任务、取消竞争、能力拒绝、离屏键盘访问、损坏制品、设备丢失与未知编译义务。
 
 Linux 发行与安静 Pride 已用真实本地模型、断网、48 kHz 原生路径核验。
-Windows x86_64/MSVC 与 Apple Silicon 有打包代码，原生验收待完成；不能表述为已发布或已通过。
+[PR #12 的 Frontend #122](https://github.com/OpenGreendam/verdant/actions/runs/45212699291) 已完成 Linux、Windows x86_64/MSVC 与 Apple Silicon 的原生构建、完整 GUI/SDK 测试及包检查，并在 Linux 包上完成 28 项 X11／windowed Wayland 输入场景。结果绑定该运行的来源和归档，详见[主线验收记录](frontend/proto-ui/VALIDATION-MAINLINE-2026-11-23.json)。Windows/macOS 真实桌面操作、声库安装／回滚、真实渲染及完整发行验收仍待完成；测试包没有随附完整声库。
 平台 IME 提交／候选框、完整音符／控制点读屏、物理触摸、音频热插拔和 macOS AU 须分别保留验收结果。
 已有模型／AT-SPI 树／冒烟证据不能覆盖这些范围，见[平台验收](frontend/docs/PLATFORM-ACCEPTANCE.md)。
 
