@@ -1,0 +1,315 @@
+{
+  "schema": "verdant.proto-ui.migration-validation.v1",
+  "recordedAtUtc": "2026-11-22T21:35:11.454660+00:00",
+  "clientDate": "2026-11-23",
+  "clientTimezone": "Asia/Shanghai",
+  "sourceRevision": "f325638dcd7cb4169e52d9eff7796825eccd4ebb",
+  "sourceUrl": "https://github.com/OpenGreendam/verdant/tree/f325638dcd7cb4169e52d9eff7796825eccd4ebb",
+  "upstream": {
+    "repository": "https://github.com/Proto-UI/Proto-UI",
+    "revision": "5912f817581f89785e75c26e324a76c97257dc60",
+    "pullRequest": "https://github.com/Proto-UI/Proto-UI/pull/1730"
+  },
+  "coverage": {
+    "auditedInteractionCategories": 18,
+    "nativeCompilationUnits": 12,
+    "stdOnlyCompilationUnits": 2,
+    "compilationUnits": 14,
+    "compilerOwnedArtifacts": 81,
+    "receipts": 14,
+    "viewportConstructionSites": 21,
+    "explicitLeasedNativeScrollContainers": 5,
+    "productionScrollToItemCalls": 0
+  },
+  "sharedSdk": {
+    "owner": "pitch-gesture-surface",
+    "directory": ".proto-ui/gpui-native",
+    "package": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "features": [
+      "gpui-modern-element-api"
+    ],
+    "contentSha256": "27af6e2995e3c6d9a35ccbc4859a6273ed58b0c613ef4d3247284da1030b4691"
+  },
+  "gpu": {
+    "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
+    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+    "workspace": {
+      "name": "gpui",
+      "git": "https://github.com/cyjin-yl/z3rm",
+      "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "features": [],
+      "defaultFeatures": true
+    }
+  },
+  "executedToolchain": {
+    "node": "v24.22.3",
+    "packageManager": "pnpm@10.32.1",
+    "runner": "corepack pnpm@10.32.1",
+    "packages": {
+      "typescript": "5.9.3",
+      "tsx": "4.21.0"
+    },
+    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8"
+  },
+  "rustToolchain": "1.98.1",
+  "validation": {
+    "compilerSource": {
+      "passed": 206,
+      "failed": 0,
+      "skipped": 0,
+      "files": 15,
+      "actualEmittedRustNumericalTests": true,
+      "log": {
+        "name": "proto-controls-final5912-tests.log",
+        "sha256": "c395a524b067e9be945083974e5eeb86dcbaf3972faffa40ec861db7088591ba"
+      }
+    },
+    "focusedCompilerInputTypeCheck": {
+      "exitCode": 0,
+      "diagnostics": 0,
+      "log": {
+        "name": "proto-controls-final5912-types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "sourceRules": {
+      "passed": 82,
+      "total": 82,
+      "log": {
+        "name": "verdant-final5912-node-rules.log",
+        "sha256": "8aa2e99ab741c05b49ab2d1ed8ae37175f14dd0abbc0273833f7bb89c96f4470"
+      }
+    },
+    "applicationRuntimeAndTools": {
+      "passed": 173,
+      "failed": 0,
+      "skipped": 0,
+      "authoredRuntime": 88,
+      "tools": 85,
+      "testsByFile": {
+        "tools/test/advanced-editors.test.mjs": 23,
+        "tools/test/artifact-publication.test.mjs": 37,
+        "tools/test/common-controls.test.mjs": 28,
+        "tools/test/continuous-control.test.mjs": 9,
+        "tools/test/headless-session.test.mjs": 27,
+        "tools/test/normalized-knob.test.mjs": 23,
+        "tools/test/producer.test.mjs": 21,
+        "tools/test/text-field.test.mjs": 5
+      },
+      "log": {
+        "name": "verdant-final5912-node-tools-runtime.log",
+        "sha256": "831bcd1cb59a8f0caf147ec8d7b96b12d47460f6ee66b0f3ccecf8ba80469197"
+      }
+    },
+    "modernWorkspaceSdk": {
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "log": {
+        "name": "verdant-final5912-sdk.log",
+        "sha256": "3f154b0a45a3a408cde544d1c380663d79a08f82f75bf5b953c1c0e23c3665d4"
+      },
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "proto-ui-gpui-native",
+        "--features",
+        "test-support,gpui/test-support",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    "applicationNative": {
+      "passed": 237,
+      "failed": 0,
+      "ignored": 0,
+      "log": {
+        "name": "verdant-final5912-app.log",
+        "sha256": "ff276e04e1bc264133c8cd2be28a6228bf45632df3078730400c65c0678bd6b5"
+      },
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "verdant-app",
+        "--bin",
+        "verdant-gui",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    "headless": {
+      "exitCode": 0,
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "-p",
+        "verdant-session",
+        "-p",
+        "verdant-ui-protocol",
+        "-p",
+        "verdant-note-gesture-data",
+        "-p",
+        "verdant-control-gesture-data"
+      ],
+      "log": {
+        "name": "verdant-final5912-headless.log",
+        "sha256": "807f15a99ebe911479b7648088408d6b2525331391a600c1d65f6d400a632d9e"
+      },
+      "scope": "Local session/protocol/data tests; full native-free closure checked separately. This local run was not a container-isolation experiment."
+    },
+    "producer": {
+      "publish": "passed",
+      "freshCompilation": "passed",
+      "retainedIdentity": "passed",
+      "units": 14,
+      "artifacts": 81,
+      "implementationUnweakened": true,
+      "logs": [
+        {
+          "name": "verdant-final5912-publish.log",
+          "sha256": "4f18e1505dd145888234d57785057eb733cddd5de5062e318f6c1423b9081c6f"
+        },
+        {
+          "name": "verdant-final5912-fresh.log",
+          "sha256": "baee7492af45334d3991eda4208cb72e364f8b07bfad272c95d4d8820fda2322"
+        },
+        {
+          "name": "verdant-final5912-retained.log",
+          "sha256": "568eacafaea14db8ee8cb5fa4832d90e0532a5ab6ed165d5502e3abd1db40f94"
+        }
+      ]
+    },
+    "lockedCargoGraph": {
+      "passed": true,
+      "allFeatures": true,
+      "allDependencyKinds": true,
+      "gpuiPackages": 1,
+      "sdkPackages": 1,
+      "headlessNativeDependencies": 0,
+      "log": {
+        "name": "verdant-final5912-cargo-graph.log",
+        "sha256": "43f654d5bcea277e45645440581b54141a373105d5393f5e40af7eb94e7c8758"
+      }
+    },
+    "sourceMutation": {
+      "profile": "rust-data-v1",
+      "nativeExecution": true,
+      "baseline": 0.55,
+      "variant": 0.6,
+      "oldExpectationRejectedExitCode": 101,
+      "variants": {
+        "baseline": {
+          "expected": 0.55,
+          "generatedSha256": "6deeb7570506d5f0fb5bac51662e444f44e71ebf446b1828e64418ea6f1fae2a",
+          "upstream": {
+            "repository": "https://github.com/Proto-UI/Proto-UI",
+            "revision": "5912f817581f89785e75c26e324a76c97257dc60"
+          },
+          "target": {
+            "profile": "rust-data-v1",
+            "crateName": "verdant-control-gesture-data",
+            "methods": [
+              "planControlGesture",
+              "dragNormalized"
+            ],
+            "dependencies": []
+          }
+        },
+        "variant": {
+          "expected": 0.6,
+          "generatedSha256": "d0ad540782c1c508164c24a79f80fb20a153d58167de6759094ca22a52717973",
+          "upstream": {
+            "repository": "https://github.com/Proto-UI/Proto-UI",
+            "revision": "5912f817581f89785e75c26e324a76c97257dc60"
+          },
+          "target": {
+            "profile": "rust-data-v1",
+            "crateName": "verdant-control-gesture-data",
+            "methods": [
+              "planControlGesture",
+              "dragNormalized"
+            ],
+            "dependencies": []
+          }
+        }
+      },
+      "log": {
+        "name": "verdant-final5912-source-mutation-run.log",
+        "sha256": "2829de5a6203f06a47900be24e30fe6b7fd9aa452b32e0fbef6179156bb9fa3f"
+      }
+    },
+    "defaultUpstreamGpuiHosted": {
+      "head": "5912f817581f89785e75c26e324a76c97257dc60",
+      "run": 45071732309,
+      "url": "https://github.com/Proto-UI/Proto-UI/actions/runs/45071732309",
+      "platforms": {
+        "ubuntu-24.04": {
+          "consumersPassed": 39,
+          "numericA11yPassed": 8,
+          "sdkPassed": 27
+        },
+        "macos-15": {
+          "consumersPassed": 39,
+          "numericA11yPassed": 8,
+          "sdkPassed": 27
+        }
+      },
+      "failed": 0,
+      "ignored": 0,
+      "legacySelectionRegressionExecutedOnBoth": true,
+      "observedTestLines": [
+        "native-consumer (macos-15)\tExecute generated Rust consumers and resource controls\t2026-11-22T21:24:53.2121660Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s",
+        "native-consumer (macos-15)\tExecute the generated numeric accessibility action bridge\t2026-11-22T21:25:07.8779850Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "native-consumer (macos-15)\tExecute emitted SDK lifecycle and control regressions\t2026-11-22T21:25:18.4436380Z test gpui_native_owner::text_owner_tests::legacy_selection_notifies_the_live_native_input_and_respects_focus ... ok",
+        "native-consumer (macos-15)\tExecute emitted SDK lifecycle and control regressions\t2026-11-22T21:25:18.4455240Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "native-consumer (ubuntu-24.04)\tExecute generated Rust consumers and resource controls\t2026-11-22T21:24:28.6430881Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s",
+        "native-consumer (ubuntu-24.04)\tExecute the generated numeric accessibility action bridge\t2026-11-22T21:24:36.5495456Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "native-consumer (ubuntu-24.04)\tExecute emitted SDK lifecycle and control regressions\t2026-11-22T21:24:41.3972319Z test gpui_native_owner::text_owner_tests::legacy_selection_notifies_the_live_native_input_and_respects_focus ... ok",
+        "native-consumer (ubuntu-24.04)\tExecute emitted SDK lifecycle and control regressions\t2026-11-22T21:24:41.3988057Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+      ]
+    }
+  },
+  "historicalFailures": [
+    {
+      "scope": "SDK double-frame cold hover",
+      "result": "25/26 before current-view hit-test repair; final modern26 and default27 pass."
+    },
+    {
+      "scope": "Table reveal fixture",
+      "result": "Normalized fraction was initially treated as pixels; later its absolute probe used an auto-inset static position26px below the row. Real native measurements showed row128..160 inside viewport0..160; final237 passed with an anchored full-row probe."
+    },
+    {
+      "scope": "Intermediate rustc attempts",
+      "result": "Two local compile attempts were terminated with SIGKILL before executing tests. Heavy compiler work was serialized; final SDK and app executions completed successfully."
+    },
+    {
+      "scope": "Default GPUI compatibility",
+      "runs": [
+        45069335331,
+        45070230468
+      ],
+      "result": "E0599 for a modern-only text-selection API; fixed with the real focused legacy IME-coordinate invalidation path. Final run45071732309 passed both platforms."
+    }
+  ],
+  "boundaries": [
+    "The18-category coverage list is an implementation inventory, not a percent of product code, screen area, or functions.",
+    "GPUI remains responsible for native layout, drawing, OS input transport, IME hosting, and native scroll engines; domain validation and transactions remain in Verdant.",
+    "Local GPUI TestAppContext and hosted native consumers do not certify packaged X11/Wayland, physical touch/IME, screen-reader, or full macOS/Windows app behavior.",
+    "Historical #79 packaged/OS results retain their original app/worker identities and are not inherited by this migration.",
+    "Source mutation proves emitted Rust reacts to the authored data change; it is not a pointer or OS-input test.",
+    "Final documentation changes do not modify the tested source snapshot. PR review and merge are separate from these test results."
+  ]
+}
