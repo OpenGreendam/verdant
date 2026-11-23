@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/Proto-UI/Proto-UI",
-  "revision": "3b0d2dab0555ef6a7c4869c2d2b45ec531b77861",
+  "revision": "4e499ae25e825e130e740f16af66d70b23a743cf",
   "files": [
     {
       "path": "root.proto.ts",

@@ -11,7 +11,7 @@
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "a0e3c07acf8cc62a9d7b0afcf78470428367a306cb644dbe7c85e0aa7a7fdf02",
+    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35",
     "path": ".proto-ui/gpui-native",
     "bundled": true
   },
@@ -121,7 +121,7 @@
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-owner.rs",
       "kind": "source",
-      "sha256": "f0fd0615691ca5deb4d3b2924fa05a9d74a8e8b55705069b5d7b9c00d32c7d32"
+      "sha256": "c93080fead18241e1b4dc1527291ce2c1de35c9d2c13eb73b605579959c1aed6"
     },
     {
       "path": ".proto-ui/gpui-native/src/gpui-native-a11y.rs",
