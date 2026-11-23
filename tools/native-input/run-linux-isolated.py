@@ -21,6 +21,8 @@ import time
 from xml.sax.saxutils import escape
 
 from probe import CASES, CONTROL_CASES
+from controls import UNICODE_KEY_INPUTS
+from x11_keymap import install_unicode_keymap
 
 
 def arguments():
@@ -204,6 +206,13 @@ def main(args):
         wait_for(lambda: xdo('getdisplaygeometry'), lambda result: result.returncode == 0,
                  'private X11 display readiness')
         record['inputDisplay'] = env['DISPLAY']
+        if args.suite == 'controls':
+            # This DISPLAY was just returned by our live Xvfb child. Configure
+            # it before creating Weston so the initial Wayland keymap contains
+            # every Unicode symbol used by the real keyboard journey.
+            record['unicodeKeymap'] = install_unicode_keymap(
+                dependency('usr/bin/xkbcomp'), env, run, UNICODE_KEY_INPUTS)
+            save()
         probe = [str(python), str(repo / 'tools/native-input/probe.py'),
                  '--binary', str(binary), '--worker-binary', str(worker), '--repo', str(repo),
                  '--output-dir', str(run / 'evidence'), '--backend', args.backend, '--suite', args.suite,

@@ -12,6 +12,10 @@ CONTROL_CASES = ("text-selection-focus", "collection-scroll-cancel", "mixer-pan"
 TEXT_INITIAL = "音😀AB"
 TEXT_ASSISTIVE = "音😀乐"
 TEXT_ACCEPTED = "音😺乐"
+TEXT_CANCELED = "不应保存"
+# The isolated display prepares these symbols before Weston or Verdant starts.
+# XTest continues to deliver keyboard events; no editor/AT text write is used.
+UNICODE_KEY_INPUTS = (TEXT_INITIAL, TEXT_ASSISTIVE, TEXT_ACCEPTED, TEXT_CANCELED)
 LIBRARY_TITLE = "插件预设库 — Verdant"
 SEARCH_NAME = "搜索名称、类别、作者、标签与用途"
 SEARCH_MISSING = "verdant-no-matching-preset-79f2"
@@ -110,7 +114,7 @@ class ControlCases:
         self.type_unicode("😺")
         self.record("text-edited", control={"text": self.text(field, TEXT_ACCEPTED)})
         self.key("Tab")
-        cancel = self.node("取消", "button")
+        cancel = self.node("取消", "push button")
         cancel = self.wait(lambda: self.observer.read(tuple(cancel["reference"])),
                            lambda node: "focused" in node["states"], "one Tab to the dialog cancel button")
         self.record("text-focus-forward", control={"focused": cancel})
@@ -126,8 +130,8 @@ class ControlCases:
         undone = self.save_controls(before["trackName"], before["panPermille"], before["revision"] + 2)
         self.record("text-single-undo", control={"undoCount": 1})
         field = self.rename_prompt()
-        self.type_unicode("不应保存")
-        self.text(field, "不应保存")
+        self.type_unicode(TEXT_CANCELED)
+        self.text(field, TEXT_CANCELED)
         self.key("Escape")
         self.wait(lambda: self.nodes("轨道名称", "dialog"), lambda nodes: not nodes, "rename prompt cancellation")
         self.save_controls(before["trackName"], before["panPermille"], undone["revision"], undone)
@@ -324,7 +328,7 @@ def validate_control_trace(observations, final):
             and observed("text-assistive-selection").get("action") ==
                 {"method": "Text.SetSelection", "arguments": [0, 2, 4], "accepted": True},
             "The platform selection action did not change the real editor range")
-    for label, name, role in (("text-focus-forward", "取消", "button"),
+    for label, name, role in (("text-focus-forward", "取消", "push button"),
                               ("text-focus-back", "输入文字…", "entry")):
         focus = observed(label).get("focused", {})
         require(focus.get("name") == name and focus.get("role") == role and "focused" in focus.get("states", []),
