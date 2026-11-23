@@ -230,7 +230,7 @@ jobs:
           if-no-files-found: error
 
   native-input:
-    name: Real Linux window input and accessibility (22 original + 6 control cases) (22 cases)
+    name: Real Linux window input and accessibility (22 original + 6 control cases)
     needs: [linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
