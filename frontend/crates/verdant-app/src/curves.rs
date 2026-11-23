@@ -132,6 +132,15 @@ impl Editor {
     }
 
     pub fn cancel_edits(&mut self, reason: CancelReason, window: &mut Window, cx: &mut Context<Self>) {
+        // The remaining native-only lane/mixer controls predate the owned
+        // planner capture tokens. Limit their cleanup to an active editor
+        // interaction and its currently captured hitbox.
+        let legacy_capture = (self.arrange_drag.is_some() || self.mixer_drag.is_some()
+            || self.master_drag.is_some() || self.numeric_preview.is_some()
+            || self.lane_stroke.as_ref().is_some_and(|stroke| !stroke.roll)
+            || crate::ui_controls::has_numeric_scrub(cx.entity_id(), cx)
+            || crate::roll::has_extra_drag(cx.entity_id(), cx))
+            .then(|| window.captured_hitbox()).flatten();
         crate::ruler_navigation::cancel(cx.entity_id(), window, cx);
         let project = self.store().snapshot();
         let effects = self.session.handle_pointer(&project, self.revision(), PointerId::Mouse, InputEvent::Cancel(reason));
@@ -140,14 +149,17 @@ impl Editor {
         self.note_creation = None;
         self.arrange_drag = None;
         self.mixer_drag = None;
-        self.cancel_control_drags(cx);
+        if matches!(reason, CancelReason::ProjectChanged) { self.cancel_control_drags(cx); }
+        else { self.cancel_control_drags_in(window.window_handle(), cx); }
         self.sync_mixer();
-        window.release_pointer();
+        self.release_roll_capture(window, cx);
+        if legacy_capture.is_some() && window.captured_hitbox() == legacy_capture { window.release_pointer(); }
         self.apply_effects(effects, window, cx);
     }
 
     pub fn begin_curve(&mut self, param: Param, pointer: PointerId, note: Option<NoteId>, point: Option<PointId>, roll: bool, tick: f64, value: f64, screen: (f64, f64), erase: bool) -> bool {
-        if self.session.pointer_owner().is_some() || self.lane_stroke.is_some() || self.mixer_drag.is_some() { return false; }
+        if self.session.pointer_owner().is_some() || self.lane_stroke.is_some() || self.mixer_drag.is_some()
+            || self.device_drag.is_some() || self.note_creation.is_some() || self.has_proto_pointer_contact() { return false; }
         self.lane_stroke = Some(LaneStroke {
             param, pointer, note, point, roll, base: self.revision(), tool: if roll { LaneTool::Pencil } else { self.lane_tool },
             origin_screen: screen, axis: None, samples: vec![(tick, value)], erase,

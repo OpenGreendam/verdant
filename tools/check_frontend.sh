@@ -6,24 +6,25 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 : "${VERDANT_ONNXRUNTIME_LIBRARY:?Set the native ONNX Runtime 1.23.2 library for package validation}"
 : "${VERDANT_ONNXRUNTIME_WHEEL:?Set the pinned ONNX Runtime 1.23.2 wheel for packaging}"
 cd "$repo/frontend"
-# Proto UI compiler producer: the authored unit is compiled by the pinned
-# upstream Proto UI compiler, and the published artifacts must match a fresh
-# compilation byte for byte. Validated retained output allows a missing
-# upstream checkout to skip regeneration; a different upstream revision, a
-# changed authored source or artifact drift fails the gate.
+# Fresh compilation is the default production gate. A retained-only Rust lane
+# must opt in explicitly, and CI makes that lane depend on proto-fresh. Missing
+# upstream sources are never silently accepted as fresh-compilation evidence.
 proto_ui_producer="$repo/frontend/proto-ui/tools/build-proto-ui.mjs"
 proto_ui_rules="$repo/frontend/proto-ui/tools/check-proto-ui-rules.mjs"
 if command -v node >/dev/null 2>&1; then
     node "$proto_ui_rules"
-    set +e
-    node "$proto_ui_producer" --check
-    proto_ui_status=$?
-    set -e
-    case "$proto_ui_status" in
-        0) ;;
-        10) printf 'SKIP proto-ui compiler check: the pinned upstream checkout is absent.\n' ;;
-        *) printf 'proto-ui compiler check failed with status %s.\n' "$proto_ui_status" >&2
-           exit "$proto_ui_status" ;;
+    case "${VERDANT_PROTO_UI_MODE:-fresh}" in
+        fresh)
+            if [ -n "${VERDANT_PROTO_UI_UPSTREAM:-}" ]; then
+                node "$proto_ui_producer" --check --upstream "$VERDANT_PROTO_UI_UPSTREAM"
+            else
+                node "$proto_ui_producer" --check
+            fi ;;
+        retained)
+            printf 'Checking retained Proto-UI artifacts; this lane does not prove fresh compilation.\n'
+            node "$proto_ui_producer" --check-retained ;;
+        *) printf 'VERDANT_PROTO_UI_MODE must be fresh or retained.\n' >&2
+           exit 4 ;;
     esac
 else
     printf 'Proto UI artifact validation requires node.\n' >&2
@@ -32,6 +33,13 @@ fi
 # A cold CI cache must be populated explicitly before offline compilation.
 # Pre-provisioned disconnected containers may set CARGO_NET_OFFLINE=true.
 cargo fetch --locked
+# Full metadata includes build/dev/target-specific edges. It also proves that
+# the real session/protocol closure reaches the std-only data crates without
+# reaching the native components, SDK, GPUI or image support in this workspace.
+mkdir -p "${CARGO_TARGET_DIR:-target}"
+proto_ui_graph="${CARGO_TARGET_DIR:-target}/proto-ui-gpui-graph.json"
+node "$repo/frontend/proto-ui/tools/check-cargo-gpui.mjs" --offline > "$proto_ui_graph"
+cat "$proto_ui_graph"
 cargo build --offline --locked --workspace --features verdant-test-worker/protocol-fixture
 worker_target=$(CDPATH= cd -- "${CARGO_TARGET_DIR:-target}" && pwd)
 reject_package_target() {

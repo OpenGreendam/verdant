@@ -5,227 +5,7 @@
   use std::rc::Rc;
   use serde_json::Value as Json;
   use native::gpui_native_owner::*;
-  std::thread_local! { static v_5f5f7075694d6f64756c6530: Value = {   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-    let v_6d616368696e65: Value = arg(&arguments, 0);
-    let v_70686173655f5f34366438326239666663666166646264: Value = arg(&arguments, 1);
-    let v_6576656e745f5f36616534623138656133613337386366: Value = arg(&arguments, 2);
-    let v_6775617264735f5f32383964323535346566636431663239: Value = arg(&arguments, 3);
-    // Source "pitch-gesture-surface.proto.ts":30:3
-    if ({ let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6d616368696e65.clone()), &(Value::string("marquee")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6d616368696e65.clone()), &(Value::string("move")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6d616368696e65.clone()), &(Value::string("resize")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6d616368696e65.clone()), &(Value::string("duplicate")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":31:5
-        return record(vec![("nextPhase", v_70686173655f5f34366438326239666663666166646264.clone()), ("consumed", Value::boolean(false)), ("effects", Value::Array(Rc::new(vec![])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":34:3
-    if ({ let left = Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("idle")))); if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f36616534623138656133613337386366.clone()), &(Value::string("PointerDown")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":35:5
-        if ({ let left = Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("marquee")))); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_background", false) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":36:7
-            return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.BeginMarqueeGesture"), Value::string("Host.CapturePointer")]))]));
-        }
-        // Source "pitch-gesture-surface.proto.ts":38:5
-        if ({ let left = Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("resize")))); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_resize_handle", false) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":39:7
-            return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.SelectIfUnselectedHit"), Value::string("Session.BeginResizeGesture"), Value::string("Host.CapturePointer")]))]));
-        }
-        // Source "pitch-gesture-surface.proto.ts":41:5
-        if ({ let left = Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("move")))); if left.truthy() { Value::boolean(!((v_6775617264735f5f32383964323535346566636431663239.clone()).member("duplicate_modifier", false)).truthy()) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":42:7
-            if ({ let left = (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_selected_note", false); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("toggle_modifier", false) } else { left } }).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":43:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("idle"), Value::Array(Rc::new(vec![Value::string("Session.ToggleHitNote")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":45:7
-            if ({ let left = (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_note_body", false); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("toggle_modifier", false) } else { left } }).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":46:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.ToggleHitNote"), Value::string("Session.BeginMoveGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":48:7
-            if ({ let left = (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_note_body", false); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("extend_modifier", false) } else { left } }).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":49:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.ExtendSelectionToHit"), Value::string("Session.BeginMoveGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":51:7
-            if ((v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_selected_note", false)).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":52:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.BeginMoveGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":54:7
-            if ((v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_unselected_note", false)).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":55:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.SelectOnlyHitNote"), Value::string("Session.BeginMoveGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-        }
-        // Source "pitch-gesture-surface.proto.ts":58:5
-        if ({ let left = Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("duplicate")))); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("duplicate_modifier", false) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":60:7
-            if ({ let left = (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_unselected_note", false); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("toggle_modifier", false) } else { left } }).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":61:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.ToggleHitNote"), Value::string("Session.BeginDuplicateGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":63:7
-            if ({ let left = (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_selected_note", false); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("toggle_modifier", false) } else { left } }).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":64:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("idle"), Value::Array(Rc::new(vec![Value::string("Session.ToggleHitNote")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":66:7
-            if ({ let left = (v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_note_body", false); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("extend_modifier", false) } else { left } }).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":67:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.ExtendSelectionToHit"), Value::string("Session.BeginDuplicateGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":69:7
-            if ((v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_unselected_note", false)).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":70:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.SelectOnlyHitNote"), Value::string("Session.BeginDuplicateGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":72:7
-            if ((v_6775617264735f5f32383964323535346566636431663239.clone()).member("hit_selected_note", false)).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":73:9
-                return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("armed"), Value::Array(Rc::new(vec![Value::string("Session.BeginDuplicateGesture"), Value::string("Host.CapturePointer")]))]));
-            }
-        }
-    }
-    // Source "pitch-gesture-surface.proto.ts":78:9
-    let v_616374697665 = { let left = Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("armed")))); if !left.truthy() { Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("dragging")))) } else { left } };
-    // Source "pitch-gesture-surface.proto.ts":79:3
-    if ({ let left = Value::boolean(strict_equal(&(v_6576656e745f5f36616534623138656133613337386366.clone()), &(Value::string("PointerMove")))); if left.truthy() { { let left = Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("dragging")))); if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("armed")))); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("pointer_threshold_crossed", false) } else { left } } } else { left } } } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":80:5
-        if (Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("marquee"))))).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":80:32
-            return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("dragging"), Value::Array(Rc::new(vec![Value::string("Session.UpdateMarqueePreview")]))]));
-        }
-        // Source "pitch-gesture-surface.proto.ts":81:5
-        if (Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("resize"))))).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":81:31
-            return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("dragging"), Value::Array(Rc::new(vec![Value::string("Session.UpdateResizePreview")]))]));
-        }
-        // Source "pitch-gesture-surface.proto.ts":82:5
-        return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("dragging"), Value::Array(Rc::new(vec![Value::string("Session.UpdateMovePreview")]))]));
-    }
-    // Source "pitch-gesture-surface.proto.ts":84:3
-    if ({ let left = Value::boolean(strict_equal(&(v_6576656e745f5f36616534623138656133613337386366.clone()), &(Value::string("PointerUp")))); if left.truthy() { Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("dragging")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":85:5
-        if ({ let left = Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("marquee")))); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("base_revision_matches", false) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":86:7
-            return v_5f5f7075694d6f64756c6532.with(|function| function.call_authored(vec![Value::string("Session.CommitMarqueeSelection")]));
-        }
-        // Source "pitch-gesture-surface.proto.ts":88:5
-        if ({ let left = Value::boolean(!strict_equal(&(v_6d616368696e65.clone()), &(Value::string("marquee")))); if left.truthy() { (v_6775617264735f5f32383964323535346566636431663239.clone()).member("base_revision_matches_and_delta_nonzero", false) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":89:7
-            if (Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("move"))))).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":89:31
-                return v_5f5f7075694d6f64756c6532.with(|function| function.call_authored(vec![Value::string("Domain.CommitMoveNotes")]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":90:7
-            if (Value::boolean(strict_equal(&(v_6d616368696e65.clone()), &(Value::string("resize"))))).truthy() {
-                // Source "pitch-gesture-surface.proto.ts":90:33
-                return v_5f5f7075694d6f64756c6532.with(|function| function.call_authored(vec![Value::string("Domain.CommitResizeNotes")]));
-            }
-            // Source "pitch-gesture-surface.proto.ts":91:7
-            return v_5f5f7075694d6f64756c6532.with(|function| function.call_authored(vec![Value::string("Domain.CommitDuplicateNotes")]));
-        }
-        // Source "pitch-gesture-surface.proto.ts":93:5
-        return v_5f5f7075694d6f64756c6532.with(|function| function.call_authored(vec![Value::string("Session.ReportConflictIfStale")]));
-    }
-    // Source "pitch-gesture-surface.proto.ts":95:3
-    if ({ let left = { let left = Value::boolean(strict_equal(&(v_6576656e745f5f36616534623138656133613337386366.clone()), &(Value::string("PointerUp")))); if left.truthy() { Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("armed")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6d616368696e65.clone()), &(Value::string("resize")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":96:5
-        return v_5f5f7075694d6f64756c6532.with(|function| function.call_authored(vec![Value::string("Session.ClickReleaseSelection")]));
-    }
-    // Source "pitch-gesture-surface.proto.ts":98:3
-    if ({ let left = { let left = Value::boolean(strict_equal(&(v_6576656e745f5f36616534623138656133613337386366.clone()), &(Value::string("Cancel")))); if left.truthy() { v_616374697665.clone() } else { left } }; if !left.truthy() { { let left = Value::boolean(strict_equal(&(v_6576656e745f5f36616534623138656133613337386366.clone()), &(Value::string("PointerUp")))); if left.truthy() { Value::boolean(strict_equal(&(v_70686173655f5f34366438326239666663666166646264.clone()), &(Value::string("armed")))) } else { left } } } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":99:5
-        return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("idle"), Value::Array(Rc::new(vec![Value::string("Session.ClearGesturePreview"), Value::string("Host.ReleasePointer")]))]));
-    }
-    // Source "pitch-gesture-surface.proto.ts":101:3
-    return record(vec![("nextPhase", v_70686173655f5f34366438326239666663666166646264.clone()), ("consumed", v_616374697665.clone()), ("effects", Value::Array(Rc::new(vec![])))]);
-})) }; }
-std::thread_local! { static v_5f5f7075694d6f64756c6531: Value = {   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-    let v_6e6578745068617365: Value = arg(&arguments, 0);
-    let v_65666665637473: Value = arg(&arguments, 1);
-    // Source "pitch-gesture-surface.proto.ts":105:3
-    return record(vec![("nextPhase", v_6e6578745068617365.clone()), ("consumed", Value::boolean(true)), ("effects", v_65666665637473.clone())]);
-})) }; }
-std::thread_local! { static v_5f5f7075694d6f64756c6532: Value = {   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-    let v_656666656374: Value = arg(&arguments, 0);
-    // Source "pitch-gesture-surface.proto.ts":109:3
-    return v_5f5f7075694d6f64756c6531.with(|function| function.call_authored(vec![Value::string("idle"), Value::Array(Rc::new(vec![v_656666656374.clone(), Value::string("Session.ClearGesturePreview"), Value::string("Host.ReleasePointer")]))]));
-})) }; }
-std::thread_local! { static v_5f5f7075694d6f64756c6533: Value = {   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-    let v_70686173655f5f62343361643262336162346137626166: Value = arg(&arguments, 0);
-    let v_6576656e745f5f66366638656533373332616435653363: Value = arg(&arguments, 1);
-    let v_6775617264735f5f30303365363566353432303936663066: Value = arg(&arguments, 2);
-    // Source "pitch-gesture-surface.proto.ts":135:3
-    if ({ let left = Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("idle")))); if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f66366638656533373332616435653363.clone()), &(Value::string("PointerDown")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":136:5
-        if (Value::boolean(!((v_6775617264735f5f30303365363566353432303936663066.clone()).member("hit_control", false)).truthy())).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":136:30
-            return record(vec![("nextPhase", Value::string("idle")), ("consumed", Value::boolean(false)), ("effects", Value::Array(Rc::new(vec![])))]);
-        }
-        // Source "pitch-gesture-surface.proto.ts":138:5
-        if ({ let left = (v_6775617264735f5f30303365363566353432303936663066.clone()).member("double_click", false); if !left.truthy() { (v_6775617264735f5f30303365363566353432303936663066.clone()).member("reset_modifier", false) } else { left } }).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":139:7
-            return record(vec![("nextPhase", Value::string("idle")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Select"), Value::string("Control.Reset")])))]);
-        }
-        // Source "pitch-gesture-surface.proto.ts":141:5
-        return record(vec![("nextPhase", Value::string("armed")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Select"), Value::string("Control.Begin"), Value::string("Host.CapturePointer")])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":143:3
-    if ({ let left = Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("armed")))); if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f66366638656533373332616435653363.clone()), &(Value::string("PointerMove")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":145:5
-        if (Value::boolean(!((v_6775617264735f5f30303365363566353432303936663066.clone()).member("threshold_crossed", false)).truthy())).truthy() {
-            // Source "pitch-gesture-surface.proto.ts":145:36
-            return record(vec![("nextPhase", Value::string("armed")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![])))]);
-        }
-        // Source "pitch-gesture-surface.proto.ts":146:5
-        return record(vec![("nextPhase", Value::string("dragging")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Preview")])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":148:3
-    if ({ let left = Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("dragging")))); if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f66366638656533373332616435653363.clone()), &(Value::string("PointerMove")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":149:5
-        return record(vec![("nextPhase", Value::string("dragging")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Preview")])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":151:3
-    if ({ let left = Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("dragging")))); if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f66366638656533373332616435653363.clone()), &(Value::string("PointerUp")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":152:5
-        return record(vec![("nextPhase", Value::string("idle")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Commit"), Value::string("Host.ReleasePointer")])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":154:3
-    if ({ let left = Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("armed")))); if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f66366638656533373332616435653363.clone()), &(Value::string("PointerUp")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":155:5
-        return record(vec![("nextPhase", Value::string("idle")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Discard"), Value::string("Host.ReleasePointer")])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":157:3
-    if ({ let left = { let left = Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("armed")))); if !left.truthy() { Value::boolean(strict_equal(&(v_70686173655f5f62343361643262336162346137626166.clone()), &(Value::string("dragging")))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&(v_6576656e745f5f66366638656533373332616435653363.clone()), &(Value::string("Cancel")))) } else { left } }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":158:5
-        return record(vec![("nextPhase", Value::string("idle")), ("consumed", Value::boolean(true)), ("effects", Value::Array(Rc::new(vec![Value::string("Control.Discard"), Value::string("Host.ReleasePointer")])))]);
-    }
-    // Source "pitch-gesture-surface.proto.ts":160:3
-    return record(vec![("nextPhase", v_70686173655f5f62343361643262336162346137626166.clone()), ("consumed", Value::boolean(false)), ("effects", Value::Array(Rc::new(vec![])))]);
-})) }; }
-std::thread_local! { static v_5f5f7075694d6f64756c6534: Value = {   Value::Function(Rc::new(move |arguments: Vec<Value>| {
-    let v_7374617274: Value = arg(&arguments, 0);
-    let v_64656c7461: Value = arg(&arguments, 1);
-    let v_74726176656c: Value = arg(&arguments, 2);
-    let v_66696e65: Value = arg(&arguments, 3);
-    // Source "pitch-gesture-surface.proto.ts":166:9
-    let v_7370616e = if ({ let relational_left = v_74726176656c.clone(); let relational_right = Value::number(1.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() { v_74726176656c.clone() } else { Value::number(1.0) };
-    // Source "pitch-gesture-surface.proto.ts":167:9
-    let v_72617465 = if (v_66696e65.clone()).truthy() { Value::number(0.1) } else { Value::number(1.0) };
-    // Source "pitch-gesture-surface.proto.ts":168:9
-    let v_6e657874 = add(v_7374617274.clone(), Value::number((Value::number((v_64656c7461.clone()).scalar_number() / (v_7370616e.clone()).scalar_number())).scalar_number() * (v_72617465.clone()).scalar_number()));
-    // Source "pitch-gesture-surface.proto.ts":169:3
-    if ({ let relational_left = v_6e657874.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":169:17
-        return Value::number(0.0);
-    }
-    // Source "pitch-gesture-surface.proto.ts":170:3
-    if ({ let relational_left = v_6e657874.clone(); let relational_right = Value::number(1.0); Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
-        // Source "pitch-gesture-surface.proto.ts":170:17
-        return Value::number(1.0);
-    }
-    // Source "pitch-gesture-surface.proto.ts":171:3
-    return v_6e657874.clone();
-})) }; }
+  
   
   fn style_vocabulary() -> &'static native::gpui_native_style::StyleVocabulary {
       static VOCABULARY: std::sync::OnceLock<native::gpui_native_style::StyleVocabulary> = std::sync::OnceLock::new();
@@ -240,9 +20,7 @@ std::thread_local! { static v_5f5f7075694d6f64756c6534: Value = {   Value::Funct
   fn accepts_props(value: &Json) -> bool { value.is_object() && true }
   fn prop_valid(key: &str, value: &Json) -> bool { match key {  _ => false } }
   fn check_method(name: &str, arguments: &[Value]) { match name {
-          "planNoteGesture" => if !(arguments.len() <= 4 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| (data.is_object() && data.get("hit_background").map_or(false, |field| field.is_boolean()) && data.get("hit_selected_note").map_or(false, |field| field.is_boolean()) && data.get("hit_unselected_note").map_or(false, |field| field.is_boolean()) && data.get("hit_note_body").map_or(false, |field| field.is_boolean()) && data.get("hit_resize_handle").map_or(false, |field| field.is_boolean()) && data.get("toggle_modifier").map_or(false, |field| field.is_boolean()) && data.get("extend_modifier").map_or(false, |field| field.is_boolean()) && data.get("duplicate_modifier").map_or(false, |field| field.is_boolean()) && data.get("pointer_threshold_crossed").map_or(false, |field| field.is_boolean()) && data.get("base_revision_matches").map_or(false, |field| field.is_boolean()) && data.get("base_revision_matches_and_delta_nonzero").map_or(false, |field| field.is_boolean()))))) { value_type_error("invalid exposed method arguments") },
-        "planControlGesture" => if !(arguments.len() <= 3 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| (data.is_object() && data.get("hit_control").map_or(false, |field| field.is_boolean()) && data.get("threshold_crossed").map_or(false, |field| field.is_boolean()) && data.get("reset_modifier").map_or(false, |field| field.is_boolean()) && data.get("double_click").map_or(false, |field| field.is_boolean()))))) { value_type_error("invalid exposed method arguments") },
-        "dragNormalized" => if !(arguments.len() <= 4 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
+  
           _ => value_error("unknown exposed method"),
   } }
   
@@ -250,129 +28,13 @@ std::thread_local! { static v_5f5f7075694d6f64756c6534: Value = {   Value::Funct
 pub struct GeneratedData0 {
 
 }
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GeneratedData1 {
-    #[serde(rename = "hit_background")]
-    pub field_0: bool,
-    #[serde(rename = "hit_selected_note")]
-    pub field_1: bool,
-    #[serde(rename = "hit_unselected_note")]
-    pub field_2: bool,
-    #[serde(rename = "hit_note_body")]
-    pub field_3: bool,
-    #[serde(rename = "hit_resize_handle")]
-    pub field_4: bool,
-    #[serde(rename = "toggle_modifier")]
-    pub field_5: bool,
-    #[serde(rename = "extend_modifier")]
-    pub field_6: bool,
-    #[serde(rename = "duplicate_modifier")]
-    pub field_7: bool,
-    #[serde(rename = "pointer_threshold_crossed")]
-    pub field_8: bool,
-    #[serde(rename = "base_revision_matches")]
-    pub field_9: bool,
-    #[serde(rename = "base_revision_matches_and_delta_nonzero")]
-    pub field_10: bool,
-}
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GeneratedData2 {
-    #[serde(rename = "nextPhase")]
-    pub field_0: String,
-    #[serde(rename = "consumed")]
-    pub field_1: bool,
-    #[serde(rename = "effects")]
-    pub field_2: Vec<String>,
-}
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GeneratedData3 {
-    #[serde(rename = "hit_control")]
-    pub field_0: bool,
-    #[serde(rename = "threshold_crossed")]
-    pub field_1: bool,
-    #[serde(rename = "reset_modifier")]
-    pub field_2: bool,
-    #[serde(rename = "double_click")]
-    pub field_3: bool,
-}
   
   pub type GeneratedProps = GeneratedData0;
   
   #[derive(Clone)]
   pub struct PitchGestureSurfaceHandle { pub owner: OwnerRef }
   impl PitchGestureSurfaceHandle {
-      pub fn method_0(&self, argument_0: String, argument_1: String, argument_2: String, argument_3: GeneratedData1, window: &mut Window, cx: &mut App) -> Result<GeneratedData2, Value> {
-        catch_authored(|| {
-        refresh_native_atoms(&self.owner, window, cx);
-          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
-        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument"))];
-        let callback = self.owner.borrow().exposes.get("planNoteGesture").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
-        check_method("planNoteGesture", &arguments);
-        let result = invoke(&self.owner, "expose-method", &callback, arguments);
-        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
-        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !((result.is_object() && result.get("nextPhase").map_or(false, |field| field.is_string()) && result.get("consumed").map_or(false, |field| field.is_boolean()) && result.get("effects").map_or(false, |field| field.as_array().is_some_and(|items| items.iter().all(|item| item.is_string()))))) { value_type_error("exposed method returned invalid portable data") }
-        serde_json::from_value(result).expect("checked exposed method result")
-        })
-    }
-    pub fn method_1(&self, argument_0: String, argument_1: String, argument_2: GeneratedData3, window: &mut Window, cx: &mut App) -> Result<GeneratedData2, Value> {
-        catch_authored(|| {
-        refresh_native_atoms(&self.owner, window, cx);
-          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
-        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument"))];
-        let callback = self.owner.borrow().exposes.get("planControlGesture").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
-        check_method("planControlGesture", &arguments);
-        let result = invoke(&self.owner, "expose-method", &callback, arguments);
-        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
-        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !((result.is_object() && result.get("nextPhase").map_or(false, |field| field.is_string()) && result.get("consumed").map_or(false, |field| field.is_boolean()) && result.get("effects").map_or(false, |field| field.as_array().is_some_and(|items| items.iter().all(|item| item.is_string()))))) { value_type_error("exposed method returned invalid portable data") }
-        serde_json::from_value(result).expect("checked exposed method result")
-        })
-    }
-    pub fn method_2(&self, argument_0: f64, argument_1: f64, argument_2: f64, argument_3: bool, window: &mut Window, cx: &mut App) -> Result<f64, Value> {
-        catch_authored(|| {
-        refresh_native_atoms(&self.owner, window, cx);
-          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
-        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument"))];
-        let callback = self.owner.borrow().exposes.get("dragNormalized").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
-        check_method("dragNormalized", &arguments);
-        let result = invoke(&self.owner, "expose-method", &callback, arguments);
-        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
-        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !(result.as_f64().is_some_and(f64::is_finite)) { value_type_error("exposed method returned invalid portable data") }
-        serde_json::from_value(result).expect("checked exposed method result")
-        })
-    }
-      /// Calls a compiled data-only module function without accessing an instance.
-      pub fn call_data_method(name: &str, arguments: Vec<Json>) -> Result<Json, Value> {
-          catch_authored(|| match name {
-          "planNoteGesture" => {
-            let arguments: Vec<Value> = arguments.into_iter().map(Value::json).collect();
-            check_method(name, &arguments);
-            let result = v_5f5f7075694d6f64756c6530.with(|function| function.call_authored(arguments));
-            let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !((result.is_object() && result.get("nextPhase").map_or(false, |field| field.is_string()) && result.get("consumed").map_or(false, |field| field.is_boolean()) && result.get("effects").map_or(false, |field| field.as_array().is_some_and(|items| items.iter().all(|item| item.is_string()))))) { value_type_error("exposed method returned invalid portable data") }
-            result
-        },
-        "planControlGesture" => {
-            let arguments: Vec<Value> = arguments.into_iter().map(Value::json).collect();
-            check_method(name, &arguments);
-            let result = v_5f5f7075694d6f64756c6533.with(|function| function.call_authored(arguments));
-            let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !((result.is_object() && result.get("nextPhase").map_or(false, |field| field.is_string()) && result.get("consumed").map_or(false, |field| field.is_boolean()) && result.get("effects").map_or(false, |field| field.as_array().is_some_and(|items| items.iter().all(|item| item.is_string()))))) { value_type_error("exposed method returned invalid portable data") }
-            result
-        },
-        "dragNormalized" => {
-            let arguments: Vec<Value> = arguments.into_iter().map(Value::json).collect();
-            check_method(name, &arguments);
-            let result = v_5f5f7075694d6f64756c6534.with(|function| function.call_authored(arguments));
-            let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !(result.as_f64().is_some_and(f64::is_finite)) { value_type_error("exposed method returned invalid portable data") }
-            result
-        },
-              _ => value_error("unknown or ineligible data method"),
-          })
-      }
+  
       pub fn owner(&self) -> OwnerWeak { Rc::downgrade(&self.owner) }
       pub fn state(&self, name: &str) -> Result<Json, Value> { catch_authored(|| { let state=self.owner.borrow().exposes.get(name).cloned().unwrap_or_else(|| value_error("unknown exposed State")); state.get().data() }) }
       pub fn call(&self, name: &str, arguments: Vec<Json>, window: &mut Window, cx: &mut App) -> Result<Json, Value> {
@@ -453,20 +115,14 @@ pub struct GeneratedData3 {
           let _lexical_owner = enter_lexical_owner(&owner);
           let renderer = { let owner = owner.clone();  Value::Function(Rc::new(move |arguments: Vec<Value>| {
             let v_646566: Value = arg(&arguments, 0);
-            // Source "pitch-gesture-surface.proto.ts":179:5
+            // Source "frontend/proto-ui/src/pitch-gesture-surface.proto.ts":8:5
             { let v_7075695f6e61746976655f30 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into()), ("overflow-hidden".into(), "overflow-hidden".into())])]) };
-            // Source "pitch-gesture-surface.proto.ts":180:5
-            { let v_7075695f6e61746976655f31 = v_646566.clone(); expose_method(&owner, Value::string("planNoteGesture"), v_5f5f7075694d6f64756c6530.with(|value| value.clone())) };
-            // Source "pitch-gesture-surface.proto.ts":181:5
-            { let v_7075695f6e61746976655f32 = v_646566.clone(); expose_method(&owner, Value::string("planControlGesture"), v_5f5f7075694d6f64756c6533.with(|value| value.clone())) };
-            // Source "pitch-gesture-surface.proto.ts":182:5
-            { let v_7075695f6e61746976655f33 = v_646566.clone(); expose_method(&owner, Value::string("dragNormalized"), v_5f5f7075694d6f64756c6534.with(|value| value.clone())) };
-            // Source "pitch-gesture-surface.proto.ts":183:5
-            return { let callable={ let pui_native_4={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
+            // Source "frontend/proto-ui/src/pitch-gesture-surface.proto.ts":9:5
+            return { let callable={ let pui_native_1={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "pitch-gesture-surface.proto.ts":183:26
-                return { let v_7075695f6e61746976655f35 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
-            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_4.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_4.call)(arg(&arguments,0))})} }; match callable {
+                // Source "frontend/proto-ui/src/pitch-gesture-surface.proto.ts":9:26
+                return { let v_7075695f6e61746976655f32 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
+            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_1.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_1.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{render,..} => Value::Renderer(render),
       Value::Renderer(render) => Value::Renderer(render),
       Value::Function(callback) => Value::Renderer(Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),

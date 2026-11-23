@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "proto-ui/generated/pitch-gesture-surface"]
+members = ["crates/*", "proto-ui/generated/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,8 +10,8 @@ publish = false
 rust-version = "1.98"
 
 [workspace.dependencies]
-# P0 decision (see frontend/P0-DECISIONS.md): GPUI pinned to the API snapshot
-# that SPEC.md independently audited (S05-S14) and host-profile.json names.
+# One workspace native identity, checked against compiler.pin.json and Cargo's
+# full resolve graph. Platform behavior is accepted separately; see P0-DECISIONS.
 gpui = { git = "https://github.com/cyjin-yl/z3rm", rev = "e5f2f9db75e97613232b5c1946333e61fa3828ab" }
 gpui_platform = { git = "https://github.com/cyjin-yl/z3rm", rev = "e5f2f9db75e97613232b5c1946333e61fa3828ab", features = ["font-kit", "x11", "wayland"] }
 serde = { version = "1", features = ["derive", "rc"] }

@@ -1,0 +1,121 @@
+{
+  "source": {
+    "file": "frontend/proto-ui/src/normalized-knob.proto.ts",
+    "exportName": "default",
+    "sha256": "960865aa7360a7a7c27073c2c09314e6adb67a3d05c41341269d437dfd8e94d5"
+  },
+  "irVersion": 7,
+  "backend": "gpui-source-v1",
+  "nativeSdk": {
+    "schemaVersion": 1,
+    "name": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "dependencyMode": "workspace",
+    "contentSha256": "f83fcd1dbf8bee0a3de1c8f1f8e298d90c60b7544191b69d6dd83ab3a160e774",
+    "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
+    "bundled": false
+  },
+  "observableSemantics": {
+    "version": "proto-ui-observables-v1",
+    "props": {
+      "input": "full-raw-snapshot",
+      "update": "explicit",
+      "initialNotification": "silent"
+    },
+    "state": {
+      "write": "synchronous",
+      "notifications": "fifo-recorded-snapshot-v1",
+      "update": "explicit"
+    },
+    "context": {
+      "update": "explicit",
+      "identity": "nominal"
+    },
+    "lifecycle": {
+      "update": "coalescible-intent",
+      "completion": "host-commit-before-updated",
+      "detach": "preserve-owner",
+      "disposal": "invalidate-retained-handles"
+    },
+    "composition": {
+      "nativeChildren": "ordinary-host-slots",
+      "sharedIdentity": "explicit-artifact-link"
+    }
+  },
+  "sourceResolution": {
+    "version": 1,
+    "imports": {},
+    "packages": []
+  },
+  "profile": "gpui-source-v1",
+  "dependencies": [
+    {
+      "name": "gpui",
+      "version": "workspace",
+      "role": "target"
+    },
+    {
+      "name": "serde",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0",
+      "role": "target"
+    },
+    {
+      "name": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "role": "host-bridge"
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "=1.13.3",
+      "role": "target"
+    },
+    {
+      "name": "data-url",
+      "version": "=0.3.2",
+      "role": "target"
+    },
+    {
+      "name": "image",
+      "version": "=0.25.10",
+      "role": "target"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
+      "sha256": "13a95ceb48374943fe4c5f98e943dbda0bc6b5da40664a5e3cf3cdfb3778b613"
+    },
+    {
+      "file": "frontend/proto-ui/src/normalized-knob.proto.ts",
+      "sha256": "f9f8dd91d051a1afad3d525ab40ac1d0773ae654e92b541a3511d988ad26416a"
+    }
+  ],
+  "generatedSha256": "33dea373c384a5b573dbf62febad443f857a72c80e4792f575c8044e9900c9d4",
+  "artifacts": [
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "33dea373c384a5b573dbf62febad443f857a72c80e4792f575c8044e9900c9d4"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "fe4c519c09ecd5a7521fef95f570e3f15c3584e6a224560b055b1de60b897e3d"
+    },
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "e093bb013c132e24ab62e3752844256eb99ad45b1acc3af578d29d9e9de024a2"
+    }
+  ]
+}

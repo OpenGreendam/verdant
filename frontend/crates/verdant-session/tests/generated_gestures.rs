@@ -172,3 +172,74 @@ fn selection_modifiers_and_click_release_preserve_existing_semantics() {
     assert_eq!(s.selection.len(), 2);
     feed(&store, &mut s, InputEvent::Cancel(CancelReason::Escape));
 }
+
+#[test]
+fn native_terminal_sample_replaces_the_last_move_before_committing() {
+    let (mut store, mut session) = setup();
+    feed(&store, &mut session, down(Hit::Body("a".into()), Modifiers::default()));
+    feed(&store, &mut session, motion(1240.0, 61.0, (200.0, 90.0)));
+    let effects = feed(&store, &mut session, InputEvent::PointerUpAt {
+        music: MusicPoint { tick: 1480.0, pitch: 63.0 }, screen: (300.0, 70.0), mods: Modifiers::default(),
+    });
+    assert_eq!(effects.iter().filter(|effect| matches!(effect, Effect::ReleasePointer)).count(), 1);
+    assert_eq!(commit(&mut store, &mut session, effects), 1);
+    let note = &store.project().tracks[0].notes[0];
+    assert_eq!((note.start_tick, note.midi_note), (1440, 63));
+    assert_eq!(store.undo_depth(), 1);
+}
+
+#[test]
+fn coalesced_down_up_samples_can_cross_threshold_without_a_move_event() {
+    let (mut store, mut session) = setup();
+    feed(&store, &mut session, down(Hit::Body("a".into()), Modifiers::default()));
+    let effects = feed(&store, &mut session, InputEvent::PointerUpAt {
+        music: MusicPoint { tick: 1240.0, pitch: 62.0 }, screen: (200.0, 80.0), mods: Modifiers::default(),
+    });
+    assert_eq!(commit(&mut store, &mut session, effects), 1);
+    assert_eq!(store.project().tracks[0].notes[0].start_tick, 1200);
+    assert!(session.pointer_owner().is_none());
+}
+
+#[test]
+fn terminal_sample_honors_latest_modifiers_and_rejects_foreign_or_invalid_input() {
+    let (mut store, mut session) = setup();
+    let project = store.snapshot();
+    let revision = store.revision();
+    session.handle_pointer(&project, revision, PointerId::Touch(7), down(Hit::Body("a".into()), Modifiers::default()));
+    let terminal = InputEvent::PointerUpAt {
+        music: MusicPoint { tick: 1480.0, pitch: 64.0 }, screen: (300.0, 70.0),
+        mods: Modifiers { shift: true, ..Default::default() },
+    };
+    assert!(session.handle_pointer(&project, revision, PointerId::Mouse, terminal.clone()).is_empty());
+    assert_eq!(session.pointer_owner(), Some(PointerId::Touch(7)));
+    let effects = session.handle_pointer(&project, revision, PointerId::Touch(7), terminal);
+    assert_eq!(commit(&mut store, &mut session, effects), 1);
+    assert_eq!((store.project().tracks[0].notes[0].start_tick, store.project().tracks[0].notes[0].midi_note), (1440, 60));
+
+    feed(&store, &mut session, down(Hit::Body("a".into()), Modifiers::default()));
+    feed(&store, &mut session, motion(1700.0, 62.0, (200.0, 80.0)));
+    let effects = feed(&store, &mut session, InputEvent::PointerUpAt {
+        music: MusicPoint { tick: f64::NAN, pitch: 62.0 }, screen: (300.0, 70.0), mods: Modifiers::default(),
+    });
+    assert_eq!(effects, [Effect::ReleasePointer]);
+    assert!(session.gesture.is_none() && session.pointer_owner().is_none());
+    assert_eq!(store.undo_depth(), 1, "invalid terminal position must not commit a stale preview");
+}
+
+#[test]
+fn project_change_returns_the_native_release_effect_before_any_late_up() {
+    let (mut store, mut session) = setup();
+    feed(&store, &mut session, down(Hit::Body("a".into()), Modifiers::default()));
+    feed(&store, &mut session, motion(1240.0, 62.0, (200.0, 80.0)));
+    store.apply(store.revision(), CommandBatch::single("other edit", Command::SetLyric {
+        track: session.track.clone(), note_id: "b".into(), text: "坝".into(),
+    })).unwrap();
+    let effects = session.on_project_changed(store.project(), store.revision());
+    assert_eq!(effects.iter().filter(|effect| matches!(effect, Effect::ReleasePointer)).count(), 1);
+    assert!(session.pointer_owner().is_none());
+    let up = feed(&store, &mut session, InputEvent::PointerUpAt {
+        music: MusicPoint { tick: 1480.0, pitch: 62.0 }, screen: (300.0, 70.0), mods: Modifiers::default(),
+    });
+    assert!(up.is_empty());
+    assert_eq!(store.undo_depth(), 1);
+}

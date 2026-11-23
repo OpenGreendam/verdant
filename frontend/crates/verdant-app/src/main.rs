@@ -32,6 +32,7 @@ mod files;
 mod generated {
     pub mod controls;
 }
+mod host_pointer;
 mod index;
 mod instrument;
 mod performance;
@@ -40,9 +41,12 @@ mod lyric_view;
 mod menu;
 mod mix;
 mod mixer;
+#[cfg(test)]
+mod native_test_support;
 mod paint;
 mod phoneme_lane;
 mod proto_roll;
+mod proto_knob;
 mod roll;
 mod ruler_navigation;
 mod shortcuts;

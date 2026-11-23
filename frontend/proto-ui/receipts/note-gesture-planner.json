@@ -1,0 +1,68 @@
+{
+  "schema": "verdant.proto-ui.receipt.v3",
+  "unit": "note-gesture-planner",
+  "source": "frontend/proto-ui/src/note-gesture-planner.proto.ts",
+  "sourceInputs": [
+    {
+      "path": "frontend/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/note-gesture-planner.proto.ts",
+      "sha256": "949e8f82cf31a7269df583049caa5ee27573006901be1605c000292795596ede"
+    },
+    {
+      "path": "node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    }
+  ],
+  "upstream": {
+    "repository": "https://github.com/Proto-UI/Proto-UI",
+    "revision": "5712266648fdbce2f6662636cb83f01eb849adb1"
+  },
+  "packageVersions": {
+    "protoUi": "0.3.0-alpha.2",
+    "packageManager": "pnpm@10.32.1",
+    "nodeEngine": "24.x"
+  },
+  "toolchainRequirements": {
+    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "packages": {
+      "typescript": "5.9.3",
+      "tsx": "4.21.0"
+    }
+  },
+  "target": {
+    "profile": "rust-data-v1",
+    "crateName": "verdant-note-gesture-data",
+    "methods": [
+      "planNoteGesture"
+    ],
+    "dependencies": []
+  },
+  "artifacts": [
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "98be7d5b9364deebf49d00cfc00732c21a95a316644469545c115bc09578f25c"
+    },
+    {
+      "path": "lib.rs",
+      "kind": "source",
+      "sha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2"
+    },
+    {
+      "path": "provenance.json",
+      "kind": "manifest",
+      "sha256": "17cfb4169b329e9067e159d451f66851a8a57acc802a95ec5d99c966fdc7f8fe"
+    }
+  ]
+}

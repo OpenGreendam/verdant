@@ -52,6 +52,87 @@ fn copy_comparison(ed: &mut Editor, target: &Target, cx: &mut Context<Editor>) {
     cx.notify();
 }
 
+#[derive(Clone)]
+pub(super) enum SuiteAction {
+    Compare(usize),
+    CopyComparison,
+    Reset,
+    Library(String),
+    ToggleWetLock,
+    SelectBand(usize),
+    ToggleSolo(usize),
+}
+
+fn command_allowed(ed: &Editor, target: &Target, scope: DeviceScope, project: &str, generation: u64) -> bool {
+    ed.project().project_id == project && ed.document_generation == generation
+        && scope.allows(&target.track, ed) && device_input_available(ed) && target.basis(ed).is_some()
+}
+
+pub(super) fn command(ed: &Editor, target: Target, action: SuiteAction, cx: &Context<Editor>) -> SemanticCommand {
+    let editor = cx.weak_entity();
+    let project = ed.project().project_id.clone();
+    let generation = ed.document_generation;
+    let active_target = target.clone();
+    let active_project = project.clone();
+    let activate = semantic_command(editor.clone(), editor.clone(), move |ed, _, window, cx| {
+        let scope = DeviceScope::for_window(window);
+        if !command_allowed(ed, &active_target, scope, &active_project, generation) || !may_begin_device_input(ed) { return; }
+        match &action {
+            SuiteAction::Compare(index) if *index < 2 => switch_comparison(ed, &active_target, *index, cx),
+            SuiteAction::Compare(_) => {},
+            SuiteAction::CopyComparison => copy_comparison(ed, &active_target, cx),
+            SuiteAction::Reset => {
+                if let Some(params) = current_params(ed, &active_target) {
+                    let defaults = params.iter().filter_map(|p| p.default_value.map(|v| (p.id.clone(), v))).collect();
+                    write_if_current(ed, &active_target, defaults, cx);
+                }
+            }
+            SuiteAction::Library(effect) => {
+                let editor = cx.entity(); let target = active_target.clone(); let effect = effect.clone();
+                let project = active_project.clone(); let source_window = window.window_handle();
+                cx.defer(move |cx| {
+                    // Opening a native window must happen outside the Editor
+                    // borrow; a changed document/selection retires this task.
+                    let allowed = cx.windows().contains(&source_window) && {
+                        let ed = editor.read(cx);
+                        command_allowed(ed, &target, scope, &project, generation) && may_begin_device_input(ed)
+                    };
+                    if allowed { workflow::library::open(editor, target, effect, cx); }
+                });
+            }
+            SuiteAction::ToggleWetLock => {
+                let mut state = workflow::read_workspace(ed, &active_target); state.wet_lock = !state.wet_lock;
+                workflow::write_workspace(ed, &active_target, &state); cx.notify();
+            }
+            SuiteAction::SelectBand(index) => { select_band(ed, active_target.key, *index); cx.notify(); }
+            SuiteAction::ToggleSolo(index) => {
+                if let Some(params) = current_params(ed, &active_target) {
+                    if let Some(solo) = param(&params, "solo") {
+                        let next = if solo.value.round() as usize == *index + 1 { 0. } else { *index as f64 + 1. };
+                        write_if_current(ed, &active_target, vec![("solo".into(), next)], cx);
+                    }
+                }
+            }
+        }
+    });
+    Rc::new(move |event, window, cx| {
+        // Reject an old button before the shared executor can cancel a newer
+        // interaction. Drop this read borrow before authored cancellation.
+        let allowed = editor.upgrade().is_some_and(|editor|
+            command_allowed(editor.read(cx), &target, DeviceScope::for_window(window), &project, generation));
+        if allowed { activate(event, window, cx); }
+    })
+}
+
+pub(super) fn command_button(button: gpui::Stateful<gpui::Div>, command: SemanticCommand) -> gpui::Stateful<gpui::Div> {
+    let key_command = command.clone();
+    semantic_click(button, command).on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
+        if !matches!(event.keystroke.key.as_str(), "enter" | "space") { return; }
+        key_command(None, window, cx);
+        window.prevent_default(); cx.stop_propagation();
+    })
+}
+
 pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey, effect: &str, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = Target { track: owner.clone(), slot, key };
@@ -61,29 +142,14 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
     for index in 0..2 {
         let label = if index == 0 { "A" } else { "B" };
         let selected = comparison.active == index;
-        let target = target.clone();
-        let key_target = target.clone();
-        compare = compare.child(presentation::button(format!("compare-{slot}-{index}"), label, selected, th)
-            .aria_label(format!("切换到参数组 {label}")).tab_index(0).when(busy, |button| button.opacity(0.5))
-            .on_click(cx.listener(move |ed, _, _, cx| switch_comparison(ed, &target, index, cx)))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                    switch_comparison(ed, &key_target, index, cx); window.prevent_default(); cx.stop_propagation();
-                }
-            })));
+        compare = compare.child(command_button(presentation::button(format!("compare-{slot}-{index}"), label, selected, th)
+            .aria_label(format!("切换到参数组 {label}")).tab_index(0).when(busy, |button| button.opacity(0.5)),
+            command(ed, target.clone(), SuiteAction::Compare(index), cx)));
     }
-    let copy_target = target.clone();
-    let key_copy_target = target.clone();
     let copy_label = if comparison.active == 0 { "A → B" } else { "B → A" };
-    compare = compare.child(presentation::button(format!("compare-copy-{slot}"), copy_label, false, th)
-        .aria_label("复制当前参数到另一比较组").tab_index(0).when(busy, |button| button.opacity(0.5))
-        .on_click(cx.listener(move |ed, _, _, cx| copy_comparison(ed, &copy_target, cx)))
-        .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                copy_comparison(ed, &key_copy_target, cx); window.prevent_default(); cx.stop_propagation();
-            }
-        })));
-    let defaults: Vec<(String, f64)> = params.iter().filter_map(|p| p.default_value.map(|v| (p.id.clone(), v))).collect();
+    compare = compare.child(command_button(presentation::button(format!("compare-copy-{slot}"), copy_label, false, th)
+        .aria_label("复制当前参数到另一比较组").tab_index(0).when(busy, |button| button.opacity(0.5)),
+        command(ed, target.clone(), SuiteAction::CopyComparison, cx)));
     let preset_params = params.to_vec();
     let preset_owner = owner.clone();
     let effect = effect.to_string();
@@ -107,31 +173,16 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
         }
         rows
     }, cx);
-    let library_target = target.clone();
-    let lock_target = target.clone();
-    let reset_target = target.clone();
-    let key_defaults = defaults.clone();
     div().flex().flex_wrap().items_center().gap(gpui::rems(6.0/16.)).pb(gpui::rems(8.0/16.)).border_b_1().border_color(th.shade)
         .child(preset)
-        .child(presentation::button(format!("device-library-{slot}"), "预设库", false, th).tab_index(0)
-            .on_click(cx.listener(move |_, _, _, cx| {
-                let editor = cx.entity(); let target = library_target.clone(); let effect = library_effect.clone();
-                cx.defer(move |cx| workflow::library::open(editor, target, effect, cx));
-            })))
-        .when(param(params, "mix").is_some(), |row| row.child(presentation::button(format!("wet-lock-{slot}"), "锁定干湿", wet_lock, th)
-            .role(Role::Switch).aria_selected(wet_lock).tab_index(0)
-            .on_click(cx.listener(move |ed, _, _, cx| {
-                let mut state = workflow::read_workspace(ed, &lock_target); state.wet_lock = !state.wet_lock;
-                workflow::write_workspace(ed, &lock_target, &state); cx.notify();
-            }))))
+        .child(command_button(presentation::button(format!("device-library-{slot}"), "预设库", false, th).tab_index(0),
+            command(ed, target.clone(), SuiteAction::Library(library_effect), cx)))
+        .when(param(params, "mix").is_some(), |row| row.child(command_button(presentation::button(format!("wet-lock-{slot}"), "锁定干湿", wet_lock, th)
+            .role(Role::Switch).aria_selected(wet_lock).tab_index(0),
+            command(ed, target.clone(), SuiteAction::ToggleWetLock, cx))))
         .child(div().flex_1()).child(presentation::tabs(ed, &target, cx)).child(compare)
-        .child(presentation::button(format!("device-reset-{slot}"), "重置", false, th).tab_index(0)
-            .on_click(cx.listener(move |ed, _, _, cx| write_if_current(ed, &reset_target, defaults.clone(), cx)))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                    write_if_current(ed, &target, key_defaults.clone(), cx); window.prevent_default(); cx.stop_propagation();
-                }
-            })))
+        .child(command_button(presentation::button(format!("device-reset-{slot}"), "重置", false, th).tab_index(0),
+            command(ed, target, SuiteAction::Reset, cx)))
         .into_any_element()
 }
 
@@ -349,18 +400,13 @@ fn control(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usi
     knob(editor.clone(), Target { track: owner.clone(), slot, key }, d.clone(), &d.name, th, 42.0).into_any_element()
 }
 
-fn band_tabs(ed: &Editor, key: InsertKey, slot: usize, count: usize, selected: usize, prefix: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
+fn band_tabs(ed: &Editor, owner: &DeviceTarget, key: InsertKey, slot: usize, count: usize, selected: usize, prefix: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     div().flex().flex_wrap().gap(gpui::rems(4.0/16.)).children((0..count).map(|index| {
         let label = format!("{prefix} {}", index + 1);
-        crate::ui_controls::selectable_button(format!("band-tab-{slot}-{index}"), label, index == selected, th)
-            .role(Role::Tab).tab_index(0).border_color(with_alpha(band_color(index), 0.8))
-            .on_click(cx.listener(move |ed, _, _, cx| { select_band(ed, key, index); cx.notify(); }))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                    select_band(ed, key, index); window.prevent_default(); cx.stop_propagation(); cx.notify();
-                }
-            }))
+        command_button(crate::ui_controls::selectable_button(format!("band-tab-{slot}-{index}"), label, index == selected, th)
+            .role(Role::Tab).tab_index(0).border_color(with_alpha(band_color(index), 0.8)),
+            command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx))
     })).into_any_element()
 }
 
@@ -391,7 +437,7 @@ pub(super) fn compressor_sidechain(ed: &Editor, editor: &Entity<Editor>, owner: 
     let ids:Vec<_>=["freq","gain","q"].map(|s|format!("{prefix}_{s}")).into_iter().collect();let refs:Vec<_>=ids.iter().map(String::as_str).collect();
     div().flex().flex_col().gap(gpui::rems(8./16.))
         .child(graph(editor.clone(),Target{track:owner.clone(),slot,key},params.to_vec(),"comp-sidechain-eq","压缩器六段侧链均衡",th,painter,handles,None,None).w_full().h(gpui::rems(160./16.)))
-        .child(band_tabs(ed,key,slot,6,selected,"侧链频段",cx))
+        .child(band_tabs(ed,owner,key,slot,6,selected,"侧链频段",cx))
         .child(div().flex().flex_wrap().items_center().gap(gpui::rems(8./16.))
             .child(toggle(ed,owner,slot,params,&format!("{prefix}_on"),"启用",cx))
             .child(choice(ed,owner,slot,params,&format!("{prefix}_shape"),&["峰值","低架","高架","低切","高切"],cx))
@@ -407,8 +453,8 @@ pub(super) fn eq_dynamic(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTar
     let solo = param(params, "solo").is_some_and(|p| p.value.round() as usize == selected + 1);
     let target = Target { track: owner.clone(), slot, key };
     let mut rows = div().flex().flex_wrap().items_center().gap(gpui::rems(8.0/16.))
-        .child(crate::ui_controls::selectable_button(format!("eq-solo-{slot}"), "独听频段", solo, th)
-            .on_click(cx.listener(move |ed, _, _, cx| write_if_current(ed, &target, vec![("solo".into(), if solo { 0. } else { selected as f64 + 1. })], cx))));
+        .child(command_button(crate::ui_controls::selectable_button(format!("eq-solo-{slot}"), "独听频段", solo, th),
+            command(ed, target, SuiteAction::ToggleSolo(selected), cx)));
     for d in extras { rows = rows.child(control(ed, editor, owner, slot, key, dsp::EQ_ID, params, d, cx)); }
     div().flex().flex_col().gap(gpui::rems(8.0/16.))
         .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
@@ -462,7 +508,7 @@ pub(super) fn multiband(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarg
     div().flex().flex_col().gap(gpui::rems(12./16.))
         .child(graph(editor.clone(), target(), params.to_vec(), "multiband-graph", "多段分频响应，拖动节点调整分频点", th, painter, handles, None, None).w_full().h(gpui::rems(280./16.)))
         .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
-            .child(band_tabs(ed, key, slot, count, selected, "频段", cx)).child(sidechain_picker(ed, owner, slot, cx)))
+            .child(band_tabs(ed, owner, key, slot, count, selected, "频段", cx)).child(sidechain_picker(ed, owner, slot, cx)))
         .child(div().flex().flex_wrap().items_center().gap(gpui::rems(14./16.))
             .child(toggle(ed, owner, slot, params, &format!("{prefix}enabled"), "启用频段", cx))
             .child(toggle(ed, owner, slot, params, &format!("{prefix}solo"), "独奏", cx))
@@ -486,7 +532,7 @@ pub(super) fn multiband_advanced(ed: &Editor, editor: &Entity<Editor>, owner: &D
     let cross_ids: Vec<_> = (1..count).map(|i| format!("xover{i}")).collect();
     let cross_refs: Vec<_> = cross_ids.iter().map(String::as_str).collect();
     div().flex().flex_col().gap(gpui::rems(12./16.))
-        .child(band_tabs(ed, key, slot, count, selected, "频段", cx))
+        .child(band_tabs(ed, owner, key, slot, count, selected, "频段", cx))
         .child(presentation::caption("频段检测与声道", "自由频段、侧链、前视与立体声处理", th)).child(controls)
         .child(presentation::caption("分频点", "数值输入与主画布拖动同步", th))
         .child(knob_row(editor, || Target { track: owner.clone(), slot, key }, params, &cross_refs, th, 44.))
@@ -534,7 +580,7 @@ pub(super) fn filters(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget
         let ids: Vec<String> = ["freq", "resonance", "drive"].map(|field| format!("{prefix}{field}")).into_iter().collect();
         let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
         main = main.child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
-                .child(band_tabs(ed, key, slot, count, selected, "滤波器", cx))
+                .child(band_tabs(ed, owner, key, slot, count, selected, "滤波器", cx))
                 .child(choice(ed, owner, slot, params, "routing", &dsp::FILTER_ROUTINGS, cx)))
             .child(div().flex().flex_wrap().items_center().gap(gpui::rems(10./16.))
                 .child(toggle(ed, owner, slot, params, &format!("{prefix}enabled"), "启用", cx))
@@ -553,7 +599,7 @@ pub(super) fn filter_advanced(ed: &Editor, editor: &Entity<Editor>, owner: &Devi
     let selected = selected_band(ed, key, count);
     let target = || Target { track: owner.clone(), slot, key };
     let mut main = div().flex().flex_col().gap(gpui::rems(12./16.))
-        .child(band_tabs(ed, key, slot, count, selected, "滤波器", cx));
+        .child(band_tabs(ed, owner, key, slot, count, selected, "滤波器", cx));
     if !micro {
         let prefix = format!("f{}.", selected + 1);
         let mut extras = div().flex().flex_wrap().gap(gpui::rems(8./16.));
@@ -618,7 +664,7 @@ pub(super) fn saturation_bands(ed: &Editor, editor: &Entity<Editor>, owner: &Dev
     }
     div().flex().flex_col().gap(gpui::rems(10./16.))
         .child(graph(editor.clone(), target(), params.to_vec(), "saturation-bands", "频段驱动：左右拖动分频点，上下拖动当前频段的驱动", th, painter, handles, None, None).w_full().h(gpui::rems(300./16.)))
-        .child(band_tabs(ed, key, slot, count, selected, "频段", cx))
+        .child(band_tabs(ed, owner, key, slot, count, selected, "频段", cx))
         .child(band_controls).into_any_element()
 }
 
@@ -626,7 +672,7 @@ pub(super) fn reverb_nodes(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceT
     params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let selected = selected_band(ed, key, 8); let th = ed.theme;
     let mut result = div().flex().flex_col().gap(gpui::rems(10./16.))
-        .child(band_tabs(ed, key, slot, 8, selected, "EQ 节点", cx));
+        .child(band_tabs(ed, owner, key, slot, 8, selected, "EQ 节点", cx));
     for (family, label, gain, shapes) in [("decay", "衰减塑形", "rate", &["峰值", "低架", "高架"][..]), ("post", "输出均衡", "gain", &["峰值", "低架", "高架", "低切", "高切"][..])] {
         let prefix = format!("{family}{}", selected + 1);
         let ids: Vec<_> = ["freq", gain, "q"].map(|s| format!("{prefix}_{s}")).into_iter().collect();
@@ -691,12 +737,9 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             also: if on { vec![] } else { vec![(on_id, 1.)] }, defaults }
     }).collect();
     let tabs = div().flex().flex_wrap().gap(gpui::rems(4./16.)).children((0..=dsp::DELAY_TAPS).map(|tap| {
-        crate::ui_controls::selectable_button(format!("delay-tap-{slot}-{tap}"), if tap == 0 { "主".to_string() } else { tap.to_string() }, selected == tap, th)
-            .role(Role::Tab).tab_index(0).aria_label(if tap == 0 { "主抽头".to_string() } else { format!("抽头 {tap}") })
-            .on_click(cx.listener(move |ed, _, _, cx| { select_band(ed, key, tap); cx.notify(); }))
-            .on_key_down(cx.listener(move |ed, event: &gpui::KeyDownEvent, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") { select_band(ed, key, tap); window.prevent_default(); cx.stop_propagation(); cx.notify(); }
-            }))
+        command_button(crate::ui_controls::selectable_button(format!("delay-tap-{slot}-{tap}"), if tap == 0 { "主".to_string() } else { tap.to_string() }, selected == tap, th)
+            .role(Role::Tab).tab_index(0).aria_label(if tap == 0 { "主抽头".to_string() } else { format!("抽头 {tap}") }),
+            command(ed, target(), SuiteAction::SelectBand(tap), cx))
     }));
     let prefix = if selected == 0 { "main".to_string() } else { format!("tap{selected}") };
     let ids: Vec<String> = ["time", "level", "pan"].map(|field| format!("{prefix}_{field}")).into_iter().collect();

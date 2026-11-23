@@ -532,6 +532,45 @@ pub(crate) fn cancel_numeric_scrub(editor: gpui::EntityId, cx: &mut App) {
     }
 }
 
+fn owns_numeric_scrub(editor: &Entity<Editor>, key: &SharedString, cx: &App) -> bool {
+    cx.try_global::<NumericScrubState>().and_then(|state| state.active.as_ref())
+        .is_some_and(|active| active.editor == editor.entity_id() && &active.key == key)
+}
+
+fn discard_numeric_scrub(editor: &Entity<Editor>, key: &SharedString, window: &mut Window, cx: &mut App) {
+    if !owns_numeric_scrub(editor, key, cx) { return; }
+    let active = cx.global_mut::<NumericScrubState>().active.take().unwrap();
+    window.release_pointer();
+    editor.update(cx, |ed, cx| {
+        if ed.numeric_preview.as_ref().is_some_and(|(id, arg, _)| *id == active.id && *arg == active.arg) {
+            ed.numeric_preview = None;
+            ed.sync_mixer();
+        }
+        cx.notify();
+    });
+}
+
+fn sample_numeric_scrub(editor: &Entity<Editor>, key: &SharedString, position: gpui::Point<Pixels>,
+    modifiers: gpui::Modifiers, cx: &mut App) {
+    if !owns_numeric_scrub(editor, key, cx) { return; }
+    let active = cx.global::<NumericScrubState>().active.as_ref().unwrap();
+    let dx = f64::from(position.x) - active.start_x;
+    let dy = active.start_y - f64::from(position.y);
+    let delta_px = if dx.abs() > dy.abs() { dx } else { dy };
+    if !active.moved && delta_px.abs() < 3.0 { return; }
+    let spec = controls::numeric(active.id);
+    let step = if modifiers.shift { spec.fine_step } else { spec.step };
+    let next = (active.initial_value + (delta_px / 4.0).round() * step).clamp(spec.min, spec.max);
+    let (id, arg) = (active.id, active.arg.clone());
+    let active = cx.global_mut::<NumericScrubState>().active.as_mut().unwrap();
+    active.moved = true;
+    active.current_value = next;
+    editor.update(cx, |ed, cx| {
+        ed.set_numeric(id, arg, next, NumericPhase::Preview, cx);
+        cx.notify();
+    });
+}
+
 #[derive(Clone)]
 struct ActiveScrub {
     editor: gpui::EntityId,
@@ -646,41 +685,18 @@ pub fn numeric_pill(
             });
 
             let (e_move, k_move) = (entity.clone(), scrub_key.clone());
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                if phase != DispatchPhase::Bubble {
+            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+                if phase != DispatchPhase::Capture || !owns_numeric_scrub(&e_move, &k_move, cx) { return; }
+                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                    discard_numeric_scrub(&e_move, &k_move, window, cx);
                     return;
                 }
-                let update = {
-                    let Some(active) = cx.try_global::<NumericScrubState>().and_then(|s| s.active.as_ref()) else { return };
-                    if active.editor != e_move.entity_id() || active.key != k_move {
-                        return;
-                    }
-                    let dx = ev.position.x.as_f32() as f64 - active.start_x;
-                    let dy = active.start_y - ev.position.y.as_f32() as f64;
-                    let delta_px = if dx.abs() > dy.abs() { dx } else { dy };
-                    if !active.moved && delta_px.abs() < 3.0 {
-                        return;
-                    }
-                    let step = if ev.modifiers.shift { spec.fine_step } else { spec.step };
-                    let steps = (delta_px / 4.0).round();
-                    let next = (active.initial_value + steps * step).clamp(spec.min, spec.max);
-                    Some((active.arg.clone(), next))
-                };
-                if let Some((arg_val, next)) = update {
-                    if let Some(active) = cx.global_mut::<NumericScrubState>().active.as_mut() {
-                        active.moved = true;
-                        active.current_value = next;
-                    }
-                    e_move.update(cx, |ed, cx| {
-                        ed.set_numeric(id, arg_val, next, NumericPhase::Preview, cx);
-                        cx.notify();
-                    });
-                }
+                sample_numeric_scrub(&e_move, &k_move, ev.position, ev.modifiers, cx);
             });
 
             let (e_up, k_up) = (entity.clone(), scrub_key.clone());
             window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left {
+                if phase != DispatchPhase::Capture || ev.button != MouseButton::Left {
                     return;
                 }
                 let matches = cx.try_global::<NumericScrubState>()
@@ -689,6 +705,11 @@ pub fn numeric_pill(
                 if !matches {
                     return;
                 }
+                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                    discard_numeric_scrub(&e_up, &k_up, window, cx);
+                    return;
+                }
+                sample_numeric_scrub(&e_up, &k_up, ev.position, ev.modifiers, cx);
                 let finished = cx.global_mut::<NumericScrubState>().active.take();
                 window.release_pointer();
                 if let Some(scrub) = finished {
@@ -1222,6 +1243,79 @@ mod tests {
         assert_eq!(route_display_name(Route::C0), "原始声库");
         assert_eq!(route_short_name(Route::VerdantVoice), "verdant-voice");
         assert_eq!(route_short_name(Route::C0), "原始声库");
+    }
+}
+
+#[cfg(test)]
+mod pointer_boundary_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, WindowHandle, point, size};
+
+    struct Harness { editor: Entity<Editor> }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let pill = self.editor.update(cx, |ed, cx| numeric_pill(ed, Num::MasterPan, Arg::None, "boundary-pan", true, cx));
+            div().size_full().child(div().w(px(220.0)).child(pill))
+                .child(canvas(|_, _, _| {}, |_, _, window, _| {
+                    window.on_mouse_event(|_: &MouseUpEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Bubble { cx.stop_propagation(); }
+                    });
+                }).size(px(0.0)))
+        }
+    }
+    fn open(cx: &mut TestAppContext) -> WindowHandle<Harness> {
+        let window = cx.open_window(size(px(320.0), px(180.0)), |window, cx| Harness {
+            editor: cx.new(|cx| Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx)),
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window
+    }
+    fn down(host: &Harness, window: &mut Window, cx: &mut App) {
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: point(px(50.0), px(14.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+        assert!(has_numeric_scrub(host.editor.entity_id(), cx));
+        assert!(window.captured_hitbox().is_some());
+    }
+    #[gpui::test]
+    fn numeric_scrub_outside_move_or_up_restores_preview_without_commit(cx: &mut TestAppContext) {
+        for terminal in [false, true] {
+            let window = open(cx);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: point(px(66.0), px(14.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 4.0);
+                let outside = point(px(70.0), px(180.0));
+                if terminal {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: outside, button: MouseButton::Left, ..Default::default() }), cx);
+                } else {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent { position: outside, pressed_button: Some(MouseButton::Left), ..Default::default() }), cx);
+                }
+                assert!(!has_numeric_scrub(host.editor.entity_id(), cx));
+                assert!(host.editor.read(cx).numeric_preview.is_none());
+                assert!(window.captured_hitbox().is_none());
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: point(px(66.0), px(14.0)), button: MouseButton::Left, ..Default::default() }), cx);
+                assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 0.0);
+                assert_eq!(host.editor.read(cx).revision().get(), 0);
+            }).unwrap();
+        }
+    }
+    #[gpui::test]
+    fn numeric_scrub_release_updates_final_sample_before_stopped_bubble(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: point(px(82.0), px(14.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 8.0);
+            assert_eq!(host.editor.read(cx).revision().get(), 1);
+            assert!(!has_numeric_scrub(host.editor.entity_id(), cx));
+            assert!(window.captured_hitbox().is_none());
+        }).unwrap();
     }
 }
 

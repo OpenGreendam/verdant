@@ -15,6 +15,7 @@ gpui.workspace = true
 gpui_platform.workspace = true
 verdant-domain = { path = "../verdant-domain" }
 verdant-session = { path = "../verdant-session" }
+verdant-ui-protocol = { path = "../verdant-ui-protocol" }
 verdant-backend = { path = "../verdant-backend" }
 verdant-service = { path = "../verdant-service" }
 verdant-audio = { path = "../verdant-audio" }
@@ -23,7 +24,8 @@ verdant-import = { path = "../verdant-import" }
 verdant-exchange = { path = "../verdant-exchange" }
 verdant-midi = { path = "../verdant-midi" }
 verdant-media = { path = "../verdant-media" }
-verdant-pitch-gesture-surface = { package = "generated-gpui-747190fccaf73db0fc7dec1a98598d3c", path = "../../proto-ui/generated/pitch-gesture-surface" }
+verdant-pitch-gesture-surface = { package = "generated-gpui-cf24f4a63e06497c7d284f96518bbd7d", path = "../../proto-ui/generated/pitch-gesture-surface" }
+verdant-normalized-knob = { package = "generated-gpui-2d2d092b9e5bdf60c04d22bd76cab71a", path = "../../proto-ui/generated/normalized-knob" }
 serde.workspace = true
 serde_json.workspace = true
 semver.workspace = true
@@ -31,3 +33,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 unicode-segmentation = "1"
 async-channel = "2"
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

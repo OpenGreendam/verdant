@@ -159,6 +159,34 @@ struct AutoPointDrag {
     interpolation: Interpolation,
 }
 
+fn owns_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, cx: &gpui::App) -> bool {
+    cx.try_global::<AutoPointDragState>().and_then(|state| state.drag.as_ref())
+        .is_some_and(|drag| drag.editor == editor.entity_id() && &drag.target == target)
+}
+
+fn cancel_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, window: &mut Window, cx: &mut gpui::App) {
+    if !owns_automation_drag(editor, target, cx) { return; }
+    cx.global_mut::<AutoPointDragState>().drag = None;
+    window.release_pointer();
+    editor.update(cx, |_, cx| cx.notify());
+}
+
+fn sample_automation_drag(editor: &Entity<Editor>, target: &AutomationTarget, position: gpui::Point<gpui::Pixels>,
+    bounds: gpui::Bounds<gpui::Pixels>, modifiers: gpui::Modifiers, cx: &mut gpui::App) {
+    if !owns_automation_drag(editor, target, cx) { return; }
+    let ed = editor.read(cx);
+    let local = position - bounds.origin;
+    let range = target_domain_range(ed, target);
+    let raw_tick = ed.arrange.x_to_tick(f64::from(local.x)).max(0.0);
+    let tick = if modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick).max(0) };
+    let value = y_to_value(f64::from(local.y), range, f64::from(bounds.size.height), target);
+    if let Some(drag) = cx.global_mut::<AutoPointDragState>().drag.as_mut() {
+        drag.tick = tick;
+        drag.value = value;
+    }
+    editor.update(cx, |_, cx| cx.notify());
+}
+
 /// Renders the left header box for an expanded track or master automation lane.
 pub fn automation_header(
     ed: &Editor,
@@ -526,36 +554,18 @@ pub fn automation_curve_canvas(editor: Entity<Editor>, target: AutomationTarget)
             });
 
             let (e_move, t_move) = (editor.clone(), target.clone());
-            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-                if phase != DispatchPhase::Bubble {
+            window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+                if phase != DispatchPhase::Capture || !owns_automation_drag(&e_move, &t_move, cx) { return; }
+                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                    cancel_automation_drag(&e_move, &t_move, window, cx);
                     return;
                 }
-                let next = {
-                    let Some(drag) = cx.try_global::<AutoPointDragState>().and_then(|s| s.drag.as_ref()) else { return };
-                    if drag.editor != e_move.entity_id() || drag.target != t_move {
-                        return;
-                    }
-                    let ed = e_move.read(cx);
-                    let local = ev.position - bounds.origin;
-                    let h = bounds.size.height.as_f32() as f64;
-                    let range = target_domain_range(ed, &t_move);
-                    let raw_tick = ed.arrange.x_to_tick(local.x.as_f32() as f64).max(0.0);
-                    let tick = if ev.modifiers.alt { raw_tick.round() as i64 } else { ed.session.snap.snap(raw_tick).max(0) };
-                    let value = y_to_value(local.y.as_f32() as f64, range, h, &t_move);
-                    Some((tick, value))
-                };
-                if let Some((tick, value)) = next {
-                    if let Some(drag) = cx.global_mut::<AutoPointDragState>().drag.as_mut() {
-                        drag.tick = tick;
-                        drag.value = value;
-                    }
-                    e_move.update(cx, |_, cx| cx.notify());
-                }
+                sample_automation_drag(&e_move, &t_move, ev.position, bounds, ev.modifiers, cx);
             });
 
             let (e_up, t_up) = (editor.clone(), target);
             window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-                if phase != DispatchPhase::Bubble || ev.button != MouseButton::Left {
+                if phase != DispatchPhase::Capture || ev.button != MouseButton::Left {
                     return;
                 }
                 let matched = cx.try_global::<AutoPointDragState>()
@@ -564,6 +574,11 @@ pub fn automation_curve_canvas(editor: Entity<Editor>, target: AutomationTarget)
                 if !matched {
                     return;
                 }
+                if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                    cancel_automation_drag(&e_up, &t_up, window, cx);
+                    return;
+                }
+                sample_automation_drag(&e_up, &t_up, ev.position, bounds, ev.modifiers, cx);
                 let Some(drag) = cx.global_mut::<AutoPointDragState>().drag.take() else { return };
                 window.release_pointer();
                 e_up.update(cx, |ed, cx| {
@@ -686,6 +701,78 @@ impl Editor {
                 }), cx);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod pointer_boundary_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, WindowHandle, size};
+
+    struct Harness { editor: Entity<Editor> }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().child(div().w(px(160.0)).h(px(80.0))
+                .child(automation_curve_canvas(self.editor.clone(), AutomationTarget::MasterGain)))
+                .child(canvas(|_, _, _| {}, |_, _, window, _| {
+                    window.on_mouse_event(|_: &MouseUpEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Bubble { cx.stop_propagation(); }
+                    });
+                }).size(px(0.0)))
+        }
+    }
+    fn open(cx: &mut TestAppContext) -> WindowHandle<Harness> {
+        let window = cx.open_window(size(px(320.0), px(200.0)), |window, cx| Harness {
+            editor: cx.new(|cx| Editor::for_native_test(crate::native_test_support::instrument_project(), window, cx)),
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window
+    }
+    fn down(host: &Harness, window: &mut Window, cx: &mut gpui::App) {
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: point(px(40.0), px(30.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+        assert!(owns_automation_drag(&host.editor, &AutomationTarget::MasterGain, cx));
+        assert!(window.captured_hitbox().is_some());
+    }
+    #[gpui::test]
+    fn automation_outside_motion_and_up_discard_the_owned_point(cx: &mut TestAppContext) {
+        for terminal in [false, true] {
+            let window = open(cx);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: point(px(70.0), px(20.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                let outside = point(px(320.0), px(60.0));
+                if terminal {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: outside, button: MouseButton::Left, ..Default::default() }), cx);
+                } else {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent { position: outside, pressed_button: Some(MouseButton::Left), ..Default::default() }), cx);
+                }
+                assert!(!owns_automation_drag(&host.editor, &AutomationTarget::MasterGain, cx));
+                assert!(window.captured_hitbox().is_none());
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: point(px(70.0), px(20.0)), button: MouseButton::Left, ..Default::default() }), cx);
+                assert_eq!(host.editor.read(cx).revision().get(), 0);
+                assert!(AutomationDocument::from_project(host.editor.read(cx).project()).unwrap().lane(&AutomationTarget::MasterGain).is_none());
+            }).unwrap();
+        }
+    }
+    #[gpui::test]
+    fn automation_in_window_release_samples_before_stopped_bubble(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: point(px(200.0), px(90.0)), button: MouseButton::Left, ..Default::default()
+            }), cx);
+            let ed = host.editor.read(cx);
+            assert_eq!(ed.revision().get(), 1);
+            let document = AutomationDocument::from_project(ed.project()).unwrap();
+            assert_eq!(document.lane(&AutomationTarget::MasterGain).unwrap().points[0].value, -48_000.0);
+            assert!(window.captured_hitbox().is_none());
+        }).unwrap();
     }
 }
 

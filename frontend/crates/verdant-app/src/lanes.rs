@@ -280,21 +280,33 @@ fn install_phoneme_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox
         }
     });
     let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-        if phase == DispatchPhase::Bubble {
-            move_phoneme_drag(&e, PointerId::Mouse, (ev.position.x - bounds.origin.x).as_f32() as f64, bounds, cx);
+    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+        if phase != DispatchPhase::Capture { return; }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            end_phoneme_drag(&e, PointerId::Mouse, true, window, cx);
+            return;
         }
+        move_phoneme_drag(&e, PointerId::Mouse, (ev.position.x - bounds.origin.x).as_f32() as f64, bounds, cx);
     });
     let e = editor.clone();
     window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-        if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left {
+        if phase == DispatchPhase::Capture && ev.button == MouseButton::Left {
+            if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                end_phoneme_drag(&e, PointerId::Mouse, true, window, cx);
+                return;
+            }
             move_phoneme_drag(&e, PointerId::Mouse, (ev.position.x - bounds.origin.x).as_f32() as f64, bounds, cx);
             end_phoneme_drag(&e, PointerId::Mouse, false, window, cx);
         }
     });
     let (e, h) = (editor.clone(), hitbox.clone());
     window.on_mouse_event(move |ev: &TouchDragEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble { return; }
+        let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
+        if phase != expected_phase { return; }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            end_phoneme_drag(&e, PointerId::Touch(0), true, window, cx);
+            return;
+        }
         let x = (ev.position.x - bounds.origin.x).as_f32() as f64;
         match ev.phase {
             TouchPhase::Started if h.is_hovered_at(ev.start_position, window) => {
@@ -586,6 +598,13 @@ fn end_tempo(ed: &mut Editor, preview: &TempoPreview, pointer: PointerId, window
     cx.notify();
 }
 
+fn cancel_tempo(preview: &TempoPreview, pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
+    if !preview.borrow().as_ref().is_some_and(|drag| drag.pointer == pointer) { return; }
+    preview.borrow_mut().take();
+    window.release_pointer();
+    cx.notify();
+}
+
 fn tempo_context(ed: &mut Editor, x: f64, y: f64, height: f64, window: &mut Window, cx: &mut Context<Editor>) {
     use crate::editor::WorkflowAction;
     use crate::menu::MenuItem;
@@ -622,15 +641,27 @@ fn install_tempo_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: 
         });
     });
     let (e, state) = (editor.clone(), preview.clone());
-    window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
-        if phase != DispatchPhase::Bubble { return; }
+    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+        if phase != DispatchPhase::Capture { return; }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(event.position.x), f64::from(event.position.y))) {
+            e.update(cx, |_, cx| cancel_tempo(&state, PointerId::Mouse, window, cx));
+            return;
+        }
         let position = event.position - bounds.origin;
         e.update(cx, |ed, cx| move_tempo(ed, &state, PointerId::Mouse, position.x.as_f32() as f64, position.y.as_f32() as f64, height, event.modifiers, cx));
     });
     let (e, state) = (editor.clone(), preview.clone());
     window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-        if phase == DispatchPhase::Bubble && event.button == MouseButton::Left {
-            e.update(cx, |ed, cx| end_tempo(ed, &state, PointerId::Mouse, window, cx));
+        if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
+            e.update(cx, |ed, cx| {
+                if !crate::host_pointer::contains_window_point(window, (f64::from(event.position.x), f64::from(event.position.y))) {
+                    cancel_tempo(&state, PointerId::Mouse, window, cx);
+                    return;
+                }
+                let position = event.position - bounds.origin;
+                move_tempo(ed, &state, PointerId::Mouse, position.x.as_f32() as f64, position.y.as_f32() as f64, height, event.modifiers, cx);
+                end_tempo(ed, &state, PointerId::Mouse, window, cx);
+            });
         }
     });
     let (e, state) = (editor.clone(), preview.clone());
@@ -641,7 +672,12 @@ fn install_tempo_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: 
     });
     let (e, h, state) = (editor.clone(), hitbox.clone(), preview.clone());
     window.on_mouse_event(move |event: &TouchDragEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble { return; }
+        let expected_phase = if event.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
+        if phase != expected_phase { return; }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(event.position.x), f64::from(event.position.y))) {
+            e.update(cx, |_, cx| cancel_tempo(&state, PointerId::Touch(0), window, cx));
+            return;
+        }
         let position = event.position - bounds.origin;
         e.update(cx, |ed, cx| match event.phase {
             TouchPhase::Started if h.is_hovered_at(event.start_position, window) => {
@@ -652,11 +688,11 @@ fn install_tempo_input(editor: &Entity<Editor>, bounds: Bounds<Pixels>, hitbox: 
                 }
             }
             TouchPhase::Moved => move_tempo(ed, &state, PointerId::Touch(0), position.x.as_f32() as f64, position.y.as_f32() as f64, height, gpui::Modifiers::default(), cx),
-            TouchPhase::Ended => end_tempo(ed, &state, PointerId::Touch(0), window, cx),
-            TouchPhase::Cancelled => {
-                let owns_touch = state.borrow().as_ref().is_some_and(|drag| drag.pointer == PointerId::Touch(0));
-                if owns_touch { state.borrow_mut().take(); window.release_pointer(); cx.notify(); }
+            TouchPhase::Ended => {
+                move_tempo(ed, &state, PointerId::Touch(0), position.x.as_f32() as f64, position.y.as_f32() as f64, height, gpui::Modifiers::default(), cx);
+                end_tempo(ed, &state, PointerId::Touch(0), window, cx);
             }
+            TouchPhase::Cancelled => cancel_tempo(&state, PointerId::Touch(0), window, cx),
             _ => {},
         });
     });
@@ -859,6 +895,14 @@ fn context(ed: &mut Editor, tick: i64, window: &mut Window, cx: &mut Context<Edi
         MenuItem::action("复制选中音符的曲线", MenuAction::CopyCurve), MenuItem::action("在光标处粘贴曲线", MenuAction::PasteCurveAt(tick)).enabled(ed.curve_clipboard.is_some())];
     ed.show_menu(window.mouse_position(), items, window, cx);
 }
+fn cancel_lane_pointer(ed: &mut Editor, param: Param, slot: usize, pointer: PointerId, window: &mut Window, cx: &mut Context<Editor>) {
+    if ed.integrations.active_panel != slot || !ed.lane_stroke.as_ref()
+        .is_some_and(|stroke| stroke.pointer == pointer && !stroke.roll && stroke.param == param) { return; }
+    ed.lane_stroke = None;
+    window.release_pointer();
+    cx.notify();
+}
+
 fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,param:Param,slot:usize,window: &mut Window, _: &mut App) {
     if hitbox.is_hovered(window) { window.set_cursor_style(CursorStyle::Crosshair, hitbox); }
     let height = bounds.size.height.as_f32() as f64;
@@ -874,14 +918,22 @@ fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,par
         });
     });
     let e = editor.clone();
-    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
-        if phase != DispatchPhase::Bubble || e.read(cx).integrations.active_panel != slot { return; }
+    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+        if phase != DispatchPhase::Capture || e.read(cx).integrations.active_panel != slot { return; }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            e.update(cx, |ed, cx| cancel_lane_pointer(ed, param, slot, PointerId::Mouse, window, cx));
+            return;
+        }
         let p = ev.position - bounds.origin;
         e.update(cx, |ed, cx| moved(ed,param,PointerId::Mouse, p.x.as_f32() as f64, p.y.as_f32() as f64, height, ev.modifiers, cx));
     });
     let e = editor.clone();
     window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
-        if phase == DispatchPhase::Bubble && ev.button == MouseButton::Left && e.read(cx).integrations.active_panel == slot { e.update(cx, |ed, cx| {
+        if phase == DispatchPhase::Capture && ev.button == MouseButton::Left && e.read(cx).integrations.active_panel == slot { e.update(cx, |ed, cx| {
+            if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+                cancel_lane_pointer(ed, param, slot, PointerId::Mouse, window, cx);
+                return;
+            }
             let p = ev.position - bounds.origin;
             moved(ed,param,PointerId::Mouse,p.x.as_f32() as f64,p.y.as_f32() as f64,height,ev.modifiers,cx);
             up(ed,param,PointerId::Mouse, window, cx);
@@ -889,7 +941,12 @@ fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,par
     });
     let (e, h) = (editor.clone(), hitbox.clone());
     window.on_mouse_event(move |ev: &TouchDragEvent, phase, window, cx| {
-        if phase != DispatchPhase::Bubble { return; }
+        let expected_phase = if ev.phase == TouchPhase::Started { DispatchPhase::Bubble } else { DispatchPhase::Capture };
+        if phase != expected_phase { return; }
+        if !crate::host_pointer::contains_window_point(window, (f64::from(ev.position.x), f64::from(ev.position.y))) {
+            e.update(cx, |ed, cx| cancel_lane_pointer(ed, param, slot, PointerId::Touch(0), window, cx));
+            return;
+        }
         let p = ev.position - bounds.origin;
         e.update(cx, |ed, cx| match ev.phase {
             TouchPhase::Started if h.is_hovered_at(ev.start_position, window) => {
@@ -906,8 +963,126 @@ fn install_input(editor:&Entity<Editor>,bounds:Bounds<Pixels>,hitbox:&Hitbox,par
                 moved(ed,param,PointerId::Touch(0),p.x.as_f32() as f64,p.y.as_f32() as f64,height,gpui::Modifiers::default(),cx);
                 up(ed,param,PointerId::Touch(0), window, cx);
             },
-            TouchPhase::Cancelled if ed.integrations.active_panel == slot && ed.lane_stroke.as_ref().is_some_and(|s| s.pointer == PointerId::Touch(0) && !s.roll) => { ed.lane_stroke = None; window.release_pointer(); cx.notify(); }
+            TouchPhase::Cancelled => cancel_lane_pointer(ed, param, slot, PointerId::Touch(0), window, cx),
             _ => {},
         });
     });
+}
+
+#[cfg(test)]
+mod pointer_boundary_tests {
+    use super::*;
+    use gpui::{AppContext, Render, TestAppContext, WindowHandle, div, point, size};
+
+    struct Harness { editor: Entity<Editor>, tempo: bool, preview: TempoPreview }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let (editor, tempo, preview) = (self.editor.clone(), self.tempo, self.preview.clone());
+            div().size_full().child(canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+                move |bounds, hitbox, window, cx| {
+                    if tempo { install_tempo_input(&editor, bounds, &hitbox, &preview, window); }
+                    else { install_input(&editor, bounds, &hitbox, Param::Dyn, 0, window, cx); }
+                }).w(px(160.0)).h(px(80.0)))
+                .child(canvas(|_, _, _| {}, |_, _, window, _| {
+                    window.on_mouse_event(|_: &MouseUpEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Bubble { cx.stop_propagation(); }
+                    });
+                }).size(px(0.0)))
+        }
+    }
+    fn open(cx: &mut TestAppContext, tempo: bool) -> WindowHandle<Harness> {
+        let mut project = verdant_domain::Project::new_empty();
+        project.tracks[0].notes = vec![verdant_domain::Note::new(0, 300, 60)];
+        project.tracks[0].refresh_index();
+        let window = cx.open_window(size(px(320.0), px(200.0)), |window, cx| {
+            let editor = cx.new(|cx| {
+                let mut editor = Editor::for_native_test(project, window, cx);
+                editor.scheduler.capabilities = Some(verdant_backend::Capabilities::default());
+                editor.needs_fit = false;
+                editor.session.viewport.start_tick = 0.0;
+                editor.session.viewport.px_per_tick = 1.0;
+                editor.session.snap.grid_ticks = 0;
+                editor.lane_tool = LaneTool::Pencil;
+                editor
+            });
+            Harness { editor, tempo, preview: TempoPreview::default() }
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window
+    }
+    fn owner(host: &Harness, cx: &App) -> Option<PointerId> {
+        if host.tempo { host.preview.borrow().as_ref().map(|drag| drag.pointer) }
+        else { host.editor.read(cx).lane_stroke.as_ref().map(|stroke| stroke.pointer) }
+    }
+    fn down(host: &Harness, window: &mut Window, cx: &mut App) {
+        window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+            position: point(px(40.0), px(40.0)), button: MouseButton::Left, ..Default::default()
+        }), cx);
+        assert_eq!(owner(host, cx), Some(PointerId::Mouse));
+        assert!(window.captured_hitbox().is_some());
+    }
+    fn touch(window: &mut Window, cx: &mut App, phase: TouchPhase, x: f32, y: f32) {
+        window.dispatch_event(gpui::PlatformInput::Touch(gpui::TouchEvent {
+            id: gpui::TouchId(11), phase, position: point(px(x), px(y)), ..Default::default()
+        }), cx);
+    }
+    #[gpui::test]
+    fn curve_and_tempo_cancel_outside_motion_or_terminal_sample(cx: &mut TestAppContext) {
+        for tempo in [false, true] { for terminal in [false, true] {
+            let window = open(cx, tempo);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: point(px(70.0), px(25.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                let outside = point(px(-20.0), px(40.0));
+                if terminal {
+                    window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: outside, button: MouseButton::Left, ..Default::default() }), cx);
+                } else {
+                    window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent { position: outside, pressed_button: Some(MouseButton::Left), ..Default::default() }), cx);
+                }
+                assert!(owner(host, cx).is_none());
+                assert!(window.captured_hitbox().is_none());
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent { position: point(px(70.0), px(25.0)), button: MouseButton::Left, ..Default::default() }), cx);
+                assert_eq!(host.editor.read(cx).revision().get(), 0);
+            }).unwrap();
+        } }
+    }
+    #[gpui::test]
+    fn curve_and_tempo_accept_final_sample_outside_control_but_inside_window(cx: &mut TestAppContext) {
+        for tempo in [false, true] {
+            let window = open(cx, tempo);
+            window.update(cx, |host, window, cx| {
+                down(host, window, cx);
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position: point(px(200.0), px(60.0)), button: MouseButton::Left, ..Default::default()
+                }), cx);
+                assert_eq!(host.editor.read(cx).revision().get(), 1);
+                if tempo { assert!(host.editor.read(cx).project().tempo_map.iter().any(|point| point.tick == 200)); }
+                assert!(owner(host, cx).is_none());
+                assert!(window.captured_hitbox().is_none());
+            }).unwrap();
+        }
+    }
+    #[gpui::test]
+    fn lane_touch_owner_ignores_rival_mouse_and_cancels_its_own_outside_sample(cx: &mut TestAppContext) {
+        for tempo in [false, true] {
+            let window = open(cx, tempo);
+            window.update(cx, |host, window, cx| {
+                touch(window, cx, TouchPhase::Started, 40.0, 40.0);
+                touch(window, cx, TouchPhase::Moved, 70.0, 25.0);
+                assert_eq!(owner(host, cx), Some(PointerId::Touch(0)));
+                window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                    position: point(px(-20.0), px(40.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+                }), cx);
+                assert_eq!(owner(host, cx), Some(PointerId::Touch(0)));
+                touch(window, cx, TouchPhase::Moved, -20.0, 40.0);
+                assert!(owner(host, cx).is_none());
+                assert!(window.captured_hitbox().is_none());
+                touch(window, cx, TouchPhase::Ended, 70.0, 25.0);
+                assert_eq!(host.editor.read(cx).revision().get(), 0);
+            }).unwrap();
+        }
+    }
 }

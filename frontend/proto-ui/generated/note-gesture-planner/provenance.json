@@ -1,0 +1,142 @@
+{
+  "source": {
+    "file": "frontend/proto-ui/src/note-gesture-planner.proto.ts",
+    "exportName": "default",
+    "sha256": "c338c05aa48559a1209eabf43f21fe2c0cc80a8016123756790073999356a48d"
+  },
+  "irVersion": 7,
+  "backend": "rust-data-v1",
+  "sourceResolution": {
+    "version": 1,
+    "imports": {},
+    "packages": []
+  },
+  "format": "proto-ui-rust-data",
+  "version": 1,
+  "profile": "rust-data-v1",
+  "dependencies": [],
+  "methods": [
+    {
+      "name": "planNoteGesture",
+      "rustName": "plan_note_gesture",
+      "parameters": [
+        {
+          "name": "machine",
+          "rustName": "argument_0",
+          "type": "string",
+          "optional": false,
+          "rustType": "String"
+        },
+        {
+          "name": "phase",
+          "rustName": "argument_1",
+          "type": "string",
+          "optional": false,
+          "rustType": "String"
+        },
+        {
+          "name": "event",
+          "rustName": "argument_2",
+          "type": "string",
+          "optional": false,
+          "rustType": "String"
+        },
+        {
+          "name": "guards",
+          "rustName": "argument_3",
+          "type": {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "hit_background",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_selected_note",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_unselected_note",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_note_body",
+                "type": "boolean"
+              },
+              {
+                "name": "hit_resize_handle",
+                "type": "boolean"
+              },
+              {
+                "name": "toggle_modifier",
+                "type": "boolean"
+              },
+              {
+                "name": "extend_modifier",
+                "type": "boolean"
+              },
+              {
+                "name": "duplicate_modifier",
+                "type": "boolean"
+              },
+              {
+                "name": "pointer_threshold_crossed",
+                "type": "boolean"
+              },
+              {
+                "name": "base_revision_matches",
+                "type": "boolean"
+              },
+              {
+                "name": "base_revision_matches_and_delta_nonzero",
+                "type": "boolean"
+              }
+            ]
+          },
+          "optional": false,
+          "rustType": "Rc<PlanNoteGestureGuards>"
+        }
+      ],
+      "returnType": {
+        "kind": "record",
+        "fields": [
+          {
+            "name": "nextPhase",
+            "type": "string"
+          },
+          {
+            "name": "consumed",
+            "type": "boolean"
+          },
+          {
+            "name": "effects",
+            "type": {
+              "kind": "array",
+              "element": "string"
+            }
+          }
+        ]
+      },
+      "rustReturnType": "Rc<PlanNoteGestureResult>"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "frontend/proto-ui/src/note-gesture-planner.proto.ts",
+      "sha256": "949e8f82cf31a7269df583049caa5ee27573006901be1605c000292795596ede"
+    }
+  ],
+  "generatedSha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2",
+  "artifacts": [
+    {
+      "path": "lib.rs",
+      "kind": "source",
+      "sha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "98be7d5b9364deebf49d00cfc00732c21a95a316644469545c115bc09578f25c"
+    }
+  ]
+}

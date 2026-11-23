@@ -1,0 +1,69 @@
+{
+  "schema": "verdant.proto-ui.receipt.v3",
+  "unit": "control-gesture-planner",
+  "source": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
+  "sourceInputs": [
+    {
+      "path": "frontend/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/control-gesture-planner.proto.ts",
+      "sha256": "13a95ceb48374943fe4c5f98e943dbda0bc6b5da40664a5e3cf3cdfb3778b613"
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    }
+  ],
+  "upstream": {
+    "repository": "https://github.com/Proto-UI/Proto-UI",
+    "revision": "5712266648fdbce2f6662636cb83f01eb849adb1"
+  },
+  "packageVersions": {
+    "protoUi": "0.3.0-alpha.2",
+    "packageManager": "pnpm@10.32.1",
+    "nodeEngine": "24.x"
+  },
+  "toolchainRequirements": {
+    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "packages": {
+      "typescript": "5.9.3",
+      "tsx": "4.21.0"
+    }
+  },
+  "target": {
+    "profile": "rust-data-v1",
+    "crateName": "verdant-control-gesture-data",
+    "methods": [
+      "planControlGesture",
+      "dragNormalized"
+    ],
+    "dependencies": []
+  },
+  "artifacts": [
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "076a18ec8b6ada1ce351ac84e758effd6e7738ef732a774e3ea73c11dec9d775"
+    },
+    {
+      "path": "lib.rs",
+      "kind": "source",
+      "sha256": "6deeb7570506d5f0fb5bac51662e444f44e71ebf446b1828e64418ea6f1fae2a"
+    },
+    {
+      "path": "provenance.json",
+      "kind": "manifest",
+      "sha256": "26209dfbdc3bb96c330bbee79a9eb2f79c4025b8514bff1c7383ed2b330f7914"
+    }
+  ]
+}

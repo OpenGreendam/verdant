@@ -1,0 +1,11 @@
+[package]
+name = "verdant-ui-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Typed boundary to compiler-owned Verdant interaction planners."
+
+[dependencies]
+verdant-note-gesture-data = { path = "../../proto-ui/generated/note-gesture-planner" }
+verdant-control-gesture-data = { path = "../../proto-ui/generated/control-gesture-planner" }

@@ -267,10 +267,14 @@ pub struct Editor {
     pub project_path: Option<PathBuf>,
     pub audition_projects: Vec<crate::auditions::AuditionProject>,
     pub session: EditorSession,
+    pub(crate) roll_capture: Option<crate::host_pointer::OwnedPointerCapture>,
+    pub(crate) roll_surface: Option<crate::host_pointer::SurfaceToken>,
+    pub(crate) proto_pointer_contact: Option<std::rc::Weak<crate::proto_knob::Contact>>,
     pub lyric: Option<LyricSession>,
     pub focus_roll: FocusHandle,
     pub focus_lyric: FocusHandle,
     pub focus_table: FocusHandle,
+    pub(crate) focus_devices: FocusHandle,
     pub focus_menu: FocusHandle,
 
     pub worker_cfg: WorkerConfig,
@@ -427,6 +431,8 @@ pub struct Editor {
     last_slow: Instant,
     /// Calendar sampling stays independent of autosave and the frame clock.
     last_pride_check: Instant,
+    #[cfg(test)]
+    _native_test_document: Option<crate::native_test_support::TestDocument>,
 }
 
 impl Editor {
@@ -439,13 +445,36 @@ impl Editor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::new_with_services(persistence, recovery, opts, worker_cfg, (engine, audio), window, cx, true)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_with_services(
+        persistence: ProjectPersistence,
+        recovery: verdant_domain::RecoveryReport,
+        opts: EditorOpts,
+        worker_cfg: WorkerConfig,
+        (engine, audio): (OutputEngine, Control),
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        start_services: bool,
+    ) -> Self {
         let focus_roll = cx.focus_handle();
         let focus_lyric = cx.focus_handle();
         let focus_table = cx.focus_handle();
+        let focus_devices = cx.focus_handle();
         cx.on_blur(&focus_lyric, window, |this: &mut Self, window, cx| {
             this.end_lyric(true, None, window, cx);
         })
         .detach();
+        cx.on_blur(&focus_roll, window, |this: &mut Self, window, cx| {
+            if this.session.pointer_owner().is_some() || this.note_creation.is_some()
+                || this.lane_stroke.as_ref().is_some_and(|stroke| stroke.roll)
+                || crate::roll::has_note_mod_drag(cx.entity_id(), cx) {
+                this.cancel_edits(verdant_session::CancelReason::FocusLost, window, cx);
+            }
+        }).detach();
+        cx.on_blur(&focus_devices, window, |this: &mut Self, window, cx| this.cancel_device_drag_in(window.window_handle(), cx)).detach();
         cx.observe_window_activation(window, |this: &mut Self, window, cx| {
             if !window.is_window_active() {
                 this.close_menu(window, cx);
@@ -480,7 +509,7 @@ impl Editor {
         }).detach();
         // Platform quit is already irrevocable here and GPUI forbids spawning
         // tasks. Normal window/Quit requests must pass shutdown() first.
-        cx.on_app_quit(|ed, _| {
+        if start_services { cx.on_app_quit(|ed, _| {
             if !ed.shut_down {
                 eprintln!("verdant: platform quit bypassed final state capture; flushing only committed state");
                 if let Err(e) = ed.persistence.autosave() { eprintln!("verdant: final autosave: {e}"); }
@@ -488,24 +517,30 @@ impl Editor {
                 ed.audio.stop();
             }
             async {}
-        }).detach();
-        let weak = cx.weak_entity();
-        window.on_window_should_close(cx, move |window, cx| {
-            weak.update(cx, |ed, cx| {
-                crate::files::capture_bounds(&mut ed.prefs, window);
-                ed.shutdown(cx)
-            }).unwrap_or(false)
-        });
+        }).detach(); }
+        if start_services {
+            let weak = cx.weak_entity();
+            window.on_window_should_close(cx, move |window, cx| {
+                weak.update(cx, |ed, cx| {
+                    crate::files::capture_bounds(&mut ed.prefs, window);
+                    ed.shutdown(cx)
+                }).unwrap_or(false)
+            });
+        }
         let layout = crate::ui_controls::LayoutPrefs::from_prefs(&opts.prefs);
         let mut ed = Editor {
             persistence,
             project_path,
             audition_projects: opts.audition_projects,
             session,
+            roll_capture: None,
+            roll_surface: None,
+            proto_pointer_contact: None,
             lyric: None,
             focus_roll,
             focus_lyric,
             focus_table,
+            focus_devices,
             focus_menu: cx.focus_handle(),
             worker_cfg,
             worker: None,
@@ -620,18 +655,37 @@ impl Editor {
             recovered,
             last_slow: Instant::now(),
             last_pride_check: Instant::now(),
+            #[cfg(test)]
+            _native_test_document: None,
         };
         if let Some(value)=ed.prefs.extra.get("audio_export_options"){if let Ok(options)=serde_json::from_value(value.clone()){ed.export_options=options;}}
         ed.restore_media_authorizations();
         ed.sync_index();
         ed.sync_arrange_cache(false);
         ed.sync_mixer();
-        ed.start_plugins(opts.plughost_path.as_deref(), cx);
-        ed.restore_inserts(cx);
-        ed.start_worker(cx);
-        ed.spawn_slow_pump(cx);
-        crate::files::prompt_recovery(&mut ed, window, cx);
+        if start_services {
+            ed.start_plugins(opts.plughost_path.as_deref(), cx);
+            ed.restore_inserts(cx);
+            ed.start_worker(cx);
+            ed.spawn_slow_pump(cx);
+            crate::files::prompt_recovery(&mut ed, window, cx);
+        }
         ed
+    }
+
+    /// The real editor/store/input wiring without worker/plugin startup,
+    /// timers that persist preferences, recovery dialogs or user-state writes.
+    #[cfg(test)]
+    pub(crate) fn for_native_test(project: Project, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let (document, persistence) = crate::native_test_support::TestDocument::create(project);
+        let worker = WorkerConfig::native_worker(document.path.join("unused-worker"), document.path.join("worker"), &[]);
+        let opts = EditorOpts { project_path: None, audition_projects: Vec::new(), prefs: Default::default(), plughost_path: None };
+        let audio = OutputEngine::open(verdant_audio::DeviceSelection::Silent);
+        let mut editor = Self::new_with_services(persistence, Default::default(), opts, worker, audio, window, cx, false);
+        editor.auto_render = false;
+        editor.render_armed = false;
+        editor._native_test_document = Some(document);
+        editor
     }
 
     /// Frame all notes: pitch range with margin, first notes to the right edge.
@@ -776,9 +830,18 @@ impl Editor {
     }
 
     pub(crate) fn cancel_control_drags(&mut self, cx: &mut Context<Self>) {
+        self.cancel_legacy_control_drags(cx);
+        self.cancel_device_drag(cx);
+    }
+
+    pub(crate) fn cancel_control_drags_in(&mut self, window: gpui::AnyWindowHandle, cx: &mut Context<Self>) {
+        self.cancel_legacy_control_drags(cx);
+        self.cancel_device_drag_in(window, cx);
+    }
+
+    fn cancel_legacy_control_drags(&mut self, cx: &mut Context<Self>) {
         self.master_drag = None;
         self.numeric_preview = None;
-        self.cancel_device_drag(cx);
         let editor = cx.entity().entity_id();
         crate::ui_controls::cancel_numeric_scrub(editor, cx);
         crate::roll::cancel_extra_drag(editor, cx);
@@ -810,10 +873,16 @@ impl Editor {
         self.lane_stroke = None;
         self.mixer_drag = None;
         for f in fx {
-            if let Effect::Notice(n) = f {
-                self.notice(n);
+            match f {
+                Effect::Notice(n) => self.notice(n),
+                Effect::ReleasePointer => self.release_roll_capture_deferred(cx),
+                _ => unreachable!("project-change cancellation may only release ownership and report a notice"),
             }
         }
+        // Pencil/touch-pitch previews have the same native capture executor,
+        // even though their domain geometry is intentionally not a planner.
+        self.release_roll_capture_deferred(cx);
+        self.compiled_pitch_move.cancel_deferred(cx);
         self.prepare_insert_topology(cx);
         self.sync_mixer();
         self.restore_inserts(cx);
@@ -822,6 +891,27 @@ impl Editor {
     }
 
     pub fn apply_effects(&mut self, fx: Vec<Effect>, window: &mut Window, cx: &mut Context<Self>) {
+        self.apply_effects_at(fx, None, window, cx);
+    }
+
+    pub(crate) fn apply_pointer_effects(&mut self, fx: Vec<Effect>, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        self.apply_effects_at(fx, Some(hitbox), window, cx);
+    }
+
+    pub(crate) fn capture_roll_pointer(&mut self, hitbox: gpui::HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        self.release_roll_capture(window, cx);
+        self.roll_capture = Some(crate::host_pointer::OwnedPointerCapture::acquire(hitbox, window, cx));
+    }
+
+    pub(crate) fn release_roll_capture(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(capture) = self.roll_capture.take() { capture.release(window, cx); }
+    }
+
+    pub(crate) fn release_roll_capture_deferred(&mut self, cx: &mut Context<Self>) {
+        if let Some(capture) = self.roll_capture.take() { capture.release_deferred(cx); }
+    }
+
+    fn apply_effects_at(&mut self, fx: Vec<Effect>, capture_target: Option<gpui::HitboxId>, window: &mut Window, cx: &mut Context<Self>) {
         for f in fx {
             match f {
                 Effect::Commit { base, batch, select_after } => {
@@ -833,7 +923,16 @@ impl Editor {
                 }
                 Effect::BeginLyricEdit(id) => self.begin_lyric(id, window, cx),
                 Effect::Notice(n) => self.notice(n),
-                Effect::CapturePointer | Effect::ReleasePointer => {}
+                Effect::CapturePointer => {
+                    // Touch has already claimed GPUI's touch arena at the
+                    // originating handler. Mouse capture is a separate native
+                    // resource and GPUI clears it on every mouse-up, including
+                    // a rival mouse release during that touch contact.
+                    if self.session.pointer_owner() == Some(verdant_session::PointerId::Mouse) {
+                        self.capture_roll_pointer(capture_target.expect("mouse capture requires its originating hitbox"), window, cx);
+                    }
+                }
+                Effect::ReleasePointer => self.release_roll_capture(window, cx),
             }
         }
         self.sync_table_cursor();
@@ -1707,7 +1806,10 @@ impl Editor {
         if !self.commit_pending_lyric(cx) {
             return false;
         }
-        self.cancel_device_drag(cx);
+        self.cancel_control_drags(cx);
+        self.release_roll_capture_deferred(cx);
+        self.compiled_pitch_move.cancel_deferred(cx);
+        self.note_creation = None;
         self.change_active_track(id);
         self.sync_index();
         self.sync_mixer();

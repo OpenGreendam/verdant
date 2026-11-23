@@ -381,14 +381,22 @@ impl Editor {
                 .child(format!("{state} · {voice}")))
             .on_click(cx.listener(|ed, _, _, cx| ed.open_right_dock(RightDockTab::RenderInserts, cx)));
         // View switcher: a linked toggle group, like AdwToggleGroup.
+        // GPUI's default accessible Click synthesizes mouse down/up. During
+        // a captured parameter drag that up would commit its toolbar-position
+        // sample before the view switch could cancel it. Semantic activation
+        // must call the same command directly, without inventing pointer input.
         let view_switcher = div().id("view-switcher").flex().flex_none().items_center().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
             .child(toggle("editor-toggle", "piano", self.bottom == Bottom::Editor, btn - 4.0, th).aria_label("钢琴卷帘 (E)")
+                .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Editor, w, cx))))
             .child(toggle("mixer-toggle", "sliders-vertical", self.bottom == Bottom::Mixer, btn - 4.0, th).aria_label("混音器 (X)")
+                .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Mixer, w, cx))))
             .child(toggle("table-toggle", "keyboard", self.bottom == Bottom::Table, btn - 4.0, th).aria_label("音符表 (T)")
+                .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Table, w, cx))))
             .child(toggle("devices-toggle", "sliders-horizontal", self.bottom == Bottom::Devices, btn - 4.0, th).aria_label("效果器链")
+                .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
         let _ = top_menu_btn;
 
