@@ -417,3 +417,26 @@ runtimeTest('knob press hover cancellation does not cancel the independent move 
   assert.equal(f.call('finish', 54, true, false), false);
   assert.equal(f.commits().length, 1);
 });
+
+
+runtimeTest('knob exact entry and reset keys belong to the compiled source and retire previews', async (t) => {
+  const f = await fixture(t);
+  f.call('begin', false, false);
+  f.call('sample', 54, true, false);
+  assert.equal(f.key('Enter').defaultPrevented, true);
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.x.value.get(), 0.5);
+  assert.deepEqual(f.events.filter(e => e.name === 'exactValueRequested'), [{ name:'exactValueRequested', payload:{revision:'document:1'} }]);
+  assert.equal(f.key('Backspace').defaultPrevented, true);
+  assert.deepEqual(f.commits(), [{value:0.25,revision:'document:1'}]);
+  f.update({disabled:true});
+  assert.equal(f.call('requestExactValue'), false);
+  assert.equal(f.events.filter(e => e.name === 'exactValueRequested').length, 1);
+});
+runtimeTest('knob stale exact entry cannot escape a reentrant cancellation', async (t) => {
+  const f = await fixture(t);
+  f.call('begin', false, false);
+  f.onEvent(name => { if(name === 'interactionCancel') f.update({revision:'document:2'}); });
+  assert.equal(f.call('requestExactValue'), false);
+  assert.deepEqual(f.events.filter(e => e.name === 'exactValueRequested'), []);
+});

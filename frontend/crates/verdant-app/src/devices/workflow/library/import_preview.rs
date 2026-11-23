@@ -44,10 +44,10 @@ pub(super) fn open(library: WeakEntity<Library>, items: Vec<Imported>, th: Theme
 }
 
 struct Preview { library: WeakEntity<Library>, items: Vec<Imported>, th: Theme }
-impl Render for Preview {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl Preview {
+    fn report_rows(&self) -> gpui::AnyElement {
         let th = self.th;
-        let mut rows = div().id("preset-import-report").flex_1().min_h_0().overflow_y_scroll()
+        let mut rows = div().id("preset-import-report")
             .flex().flex_col().gap(px(12.));
         for (index, item) in self.items.iter().enumerate() {
             let mut card = div().id(SharedString::from(format!("import-report-{index}"))).p(px(12.)).rounded(px(10.)).bg(th.card).flex().flex_col().gap(px(8.))
@@ -75,25 +75,47 @@ impl Render for Preview {
             }
             rows = rows.child(card);
         }
+        rows.into_any_element()
+    }
+    fn body(&mut self, handle:&verdant_overlay_control::OverlayControlHandle, cx:&mut Context<Self>) -> gpui::AnyElement {
+        let th = self.th;
         let count = self.items.iter().filter(|item| item.preset.is_some()).count();
+        let cancel=handle.clone(); let accept=handle.clone();
         let mut actions = div().flex().flex_wrap().justify_end().gap(px(8.))
             .child(crate::ui_controls::selectable_button("import-preview-cancel", "取消", false, th)
-                .on_click(|_, window, _| window.remove_window()));
+                .on_click(move|_, window, cx|crate::proto_overlay::choose(&cancel,0,"preview",window,cx)));
         if count > 0 {
             actions = actions.child(crate::ui_controls::selectable_button("import-preview-accept",
                 format!("导入转换预设（{count} 个）"), true, th)
-                .on_click(cx.listener(|view, _, window, cx| {
-                    let presets = view.items.iter().filter_map(|item| item.preset.clone()).collect();
-                    let _ = view.library.update(cx, |library, cx| library.import_presets(presets, cx));
-                    window.remove_window();
-                })));
+                .on_click(move|_,window,cx|crate::proto_overlay::choose(&accept,1,"preview",window,cx)));
         }
+        let entity=cx.entity();
         div().size_full().p(px(18.)).bg(th.surface).text_color(th.text)
             .font_family(crate::theme::system_ui_font(&cx.text_system().all_font_names()))
             .flex().flex_col().gap(px(12.))
             .child(div().text_lg().font_weight(FontWeight::BOLD).child("检查预设参数映射"))
             .child(div().text_sm().text_color(th.text_secondary)
                 .child("仅转换已验证的字段。未映射参数在载入时使用 Verdant 默认值，声音可能不同。导入后保存在预设库，选择“载入”才会修改当前插件。"))
-            .child(rows).child(actions)
+            .child(div().flex_1().min_h_0().child(crate::proto_scroll::content("compiled-preset-import-scroll","预设参数映射",move|_,cx|entity.read(cx).report_rows())))
+            .child(actions).into_any_element()
+    }
+}
+impl Render for Preview {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let entity=cx.entity();
+        let draw:crate::proto_overlay::Draw=std::rc::Rc::new(move|handle,_,_,cx|entity.update(cx,|view,cx|view.body(handle,cx)));
+        let entity=cx.entity().downgrade();
+        let response:crate::proto_overlay::Response=std::rc::Rc::new(move|index,window,cx| {
+            let _=entity.update(cx,|view,cx| {
+                if index==1 {
+                    let presets=view.items.iter().filter_map(|item|item.preset.clone()).collect();
+                    let _=view.library.update(cx,|library,cx|library.import_presets(presets,cx));
+                }
+                window.remove_window();
+            });
+        });
+        let can_import=self.items.iter().any(|item|item.preset.is_some());
+        crate::proto_overlay::overlay("compiled-preset-import-preview",serde_json::json!({"label":"预设参数映射","role":"dialog",
+            "open":true,"revision":"preview","choices":if can_import{2}else{1},"defaultChoice":if can_import{1}else{-1},"cancelChoice":0}),draw,response)
     }
 }

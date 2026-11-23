@@ -124,13 +124,8 @@ pub(super) fn command(ed: &Editor, target: Target, action: SuiteAction, cx: &Con
     })
 }
 
-pub(super) fn command_button(button: gpui::Stateful<gpui::Div>, command: SemanticCommand) -> gpui::Stateful<gpui::Div> {
-    let key_command = command.clone();
-    semantic_click(button, command).on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
-        if !matches!(event.keystroke.key.as_str(), "enter" | "space") { return; }
-        key_command(None, window, cx);
-        window.prevent_default(); cx.stop_propagation();
-    })
+pub(super) fn command_button(button: crate::proto_controls::Action, command: SemanticCommand) -> crate::proto_controls::Action {
+    semantic_click(button, command)
 }
 
 pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey, effect: &str, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
@@ -404,9 +399,11 @@ fn band_tabs(ed: &Editor, owner: &DeviceTarget, key: InsertKey, slot: usize, cou
     let th = ed.theme;
     div().flex().flex_wrap().gap(gpui::rems(4.0/16.)).children((0..count).map(|index| {
         let label = format!("{prefix} {}", index + 1);
+        let navigate: Vec<_> = (0..count).map(|index| command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx)).collect();
         command_button(crate::ui_controls::selectable_button(format!("band-tab-{slot}-{index}"), label, index == selected, th)
             .role(Role::Tab).tab_index(0).border_color(with_alpha(band_color(index), 0.8)),
             command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx))
+            .navigation(index, count, move |index, window, cx| { if let Some(command) = navigate.get(index) { command(None, window, cx); } })
     })).into_any_element()
 }
 
@@ -737,9 +734,11 @@ pub(super) fn delay(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, 
             also: if on { vec![] } else { vec![(on_id, 1.)] }, defaults }
     }).collect();
     let tabs = div().flex().flex_wrap().gap(gpui::rems(4./16.)).children((0..=dsp::DELAY_TAPS).map(|tap| {
+        let navigate: Vec<_> = (0..=dsp::DELAY_TAPS).map(|index| command(ed, target(), SuiteAction::SelectBand(index), cx)).collect();
         command_button(crate::ui_controls::selectable_button(format!("delay-tap-{slot}-{tap}"), if tap == 0 { "主".to_string() } else { tap.to_string() }, selected == tap, th)
             .role(Role::Tab).tab_index(0).aria_label(if tap == 0 { "主抽头".to_string() } else { format!("抽头 {tap}") }),
             command(ed, target(), SuiteAction::SelectBand(tap), cx))
+            .navigation(tap, dsp::DELAY_TAPS + 1, move |index, window, cx| { if let Some(command) = navigate.get(index) { command(None, window, cx); } })
     }));
     let prefix = if selected == 0 { "main".to_string() } else { format!("tap{selected}") };
     let ids: Vec<String> = ["time", "level", "pan"].map(|field| format!("{prefix}_{field}")).into_iter().collect();

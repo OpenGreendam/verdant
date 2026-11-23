@@ -1,0 +1,173 @@
+{
+  "schema": "verdant.proto-ui.receipt.v3",
+  "unit": "text-field",
+  "source": "frontend/proto-ui/src/text-field.proto.ts",
+  "sourceInputs": [
+    {
+      "path": "frontend/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/node_modules/@proto.ui/module-text-control/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/node_modules/@proto.ui/module-text-control/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/node_modules/@proto.ui/module-text-control/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/text-field.proto.ts",
+      "sha256": "92aeeccc40d48b80d8ef2c0234edd624b747408e1fe0d7c66185eb46fdcbd2e0"
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/node_modules/@proto.ui/module-text-control/package.json",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/root.proto",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/root.proto.proto.ts",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/root.proto.ts",
+      "sha256": "e80593b3872c8006104374a3fad1a47b0f163b575f67f9076cb7c45a6a589e9e"
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/root.proto/index.ts",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/types",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/types.proto.ts",
+      "sha256": null
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/types.ts",
+      "sha256": "1e4402451be080acfa6e2d2f60a8a0b3a45e1d2565d081989c35bb044c730f48"
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/types/index.ts",
+      "sha256": null
+    },
+    {
+      "path": "node_modules/@proto.ui/core/package.json",
+      "sha256": null
+    },
+    {
+      "path": "node_modules/@proto.ui/hooks/package.json",
+      "sha256": null
+    },
+    {
+      "path": "node_modules/@proto.ui/module-text-control/package.json",
+      "sha256": null
+    }
+  ],
+  "upstream": {
+    "repository": "https://github.com/Proto-UI/Proto-UI",
+    "revision": "7d3e9e6329afebc3cd6c361cb665f9304ceb05ca"
+  },
+  "packageVersions": {
+    "protoUi": "0.3.0-alpha.2",
+    "packageManager": "pnpm@10.32.1",
+    "nodeEngine": "24.x"
+  },
+  "toolchainRequirements": {
+    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "packages": {
+      "typescript": "5.9.3",
+      "tsx": "4.21.0"
+    }
+  },
+  "target": {
+    "profile": "gpui-source-v1",
+    "gpuiDependency": "workspace",
+    "componentName": "TextField",
+    "nativeSdkPath": "../pitch-gesture-surface/.proto-ui/gpui-native"
+  },
+  "gpu": {
+    "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
+    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+    "workspace": {
+      "name": "gpui",
+      "git": "https://github.com/cyjin-yl/z3rm",
+      "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "features": [],
+      "defaultFeatures": true
+    }
+  },
+  "sharedSdk": {
+    "owner": "pitch-gesture-surface",
+    "directory": ".proto-ui/gpui-native",
+    "package": "proto-ui-gpui-native",
+    "version": "0.2.0",
+    "features": [
+      "gpui-modern-element-api"
+    ],
+    "contentSha256": "fa06806ac4d3860f457786700ed6870fb8bd7761857b8128ecaac070c5f748e2"
+  },
+  "artifacts": [
+    {
+      "path": ".proto-ui/fixtures/style-tokens.json",
+      "kind": "source",
+      "sha256": "299e5ddf75488f073623c1d1665d1b1ebdc6ed5f7862103ab5fd96b387db62b2"
+    },
+    {
+      "path": "Cargo.toml",
+      "kind": "source",
+      "sha256": "bc3264a1d19970dbac19bc1c58b03d0f748406335f6c9cd09c002aeb00330c60"
+    },
+    {
+      "path": "Component.rs",
+      "kind": "source",
+      "sha256": "61f125020e18516584fdd1e86521815c351bfe27f71505528365e082e4c29e35"
+    },
+    {
+      "path": "Component.rs.map",
+      "kind": "source-map",
+      "sha256": "cd4e42180a97001184c83568ffb5afff2d6677dce9633144f3587c7255bb017c"
+    },
+    {
+      "path": "provenance.json",
+      "kind": "manifest",
+      "sha256": "a03669dde4395b9f9ce50d77edb6eeac9bb4a95228ba5f5f298cf38e9b3e9c32"
+    }
+  ]
+}

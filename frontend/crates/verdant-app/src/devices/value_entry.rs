@@ -3,8 +3,8 @@
 //! redirect an old value entry to a different insert at the same slot.
 
 use super::*;
-use gpui::{App, Bounds, ElementInputHandler, EntityInputHandler, FocusHandle, Point, Render, TextRun, UTF16Selection, WindowBounds, WindowOptions, point, size};
-use std::ops::Range;
+use gpui::{App, Bounds, Render, WindowBounds, WindowOptions, size};
+use crate::proto_text::{Field, Event as TextEvent, Options as TextOptions};
 
 pub(super) fn parse_value(text: &str, desc: &ParamDesc) -> Result<f64, String> {
     let text = text.trim().to_lowercase();
@@ -38,11 +38,19 @@ pub(super) fn open(editor: &Entity<Editor>, target: Target, desc: ParamDesc, cx:
     }, move |window, cx| {
         window.set_window_title(&format!("{} — Verdant", desc.name));
         cx.new(|cx| {
-            let focus = cx.focus_handle();
-            window.focus(&focus, cx);
-            let mut text = verdant_session::TextEditState::new(&format!("{}", desc.value));
-            text.select_all();
-            ValueEntry { editor: owner, target, desc, base, generation, text, focus, line: None, bounds: None, error: String::new() }
+            let th = owner.upgrade().map(|ed| ed.read(cx).theme).unwrap_or_else(|| Theme::for_appearance(window.appearance()));
+            let text = Field::with_options(&desc.name, &format!("{}", desc.value), th,
+                TextOptions { auto_focus: true, select_all: true, submit_on_enter: true, cancel_on_escape: true, ..Default::default() }, window, cx);
+            cx.subscribe_in(&text, window, |view: &mut ValueEntry, _, event, window, cx| {
+                match event {
+                    TextEvent::Submit { .. } => view.apply(window, cx),
+                    TextEvent::Cancel => window.remove_window(),
+                    TextEvent::Changed { .. } => { view.error.clear(); cx.notify(); },
+                    TextEvent::Failure(error) => { view.error = error.clone(); cx.notify(); },
+                    _ => {},
+                }
+            }).detach();
+            ValueEntry { editor: owner, target, desc, base, generation, text, error: String::new() }
         })
     }) {
         editor.update(cx, |ed, cx| { ed.notice(format!("无法打开数值输入：{error}")); cx.notify(); });
@@ -55,20 +63,14 @@ struct ValueEntry {
     desc: ParamDesc,
     base: verdant_domain::Revision,
     generation: u64,
-    text: verdant_session::TextEditState,
-    focus: FocusHandle,
-    line: Option<gpui::ShapedLine>,
-    bounds: Option<Bounds<Pixels>>,
+    text: Entity<Field>,
     error: String,
 }
 
 impl ValueEntry {
-    fn edit(&mut self, cx: &mut Context<Self>, apply: impl FnOnce(&mut verdant_session::TextEditState)) {
-        if !self.text.is_composing() { apply(&mut self.text); self.error.clear(); cx.notify(); }
-    }
     fn apply(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.text.is_composing() { return; }
-        let value = match parse_value(&self.text.text, &self.desc) {
+        if self.text.read(cx).is_composing() { return; }
+        let value = match parse_value(self.text.read(cx).value(), &self.desc) {
             Ok(value) => value,
             Err(error) => { self.error = error; cx.notify(); return; }
         };
@@ -94,96 +96,37 @@ impl ValueEntry {
     }
 }
 
-impl Render for ValueEntry {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl ValueEntry {
+    fn render_body(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let th = self.editor.upgrade().map(|ed| ed.read(cx).theme).unwrap_or_else(|| Theme::for_appearance(gpui::WindowAppearance::Dark));
-        let entity = cx.entity();
-        div().id("device-value-entry").role(Role::Dialog).aria_label(self.desc.name.clone()).size_full().p(px(18.))
-            .bg(th.surface).text_color(th.text).flex().flex_col().gap(px(10.)).key_context("LyricEditor").track_focus(&self.focus)
-            .on_action(cx.listener(|view, _: &crate::actions::LyricCancel, window, _| { if !view.text.is_composing() { window.remove_window(); } }))
-            .on_action(cx.listener(|view, _: &crate::actions::LyricConfirm, window, cx| view.apply(window, cx)))
-            .on_action(cx.listener(|view, _: &crate::actions::Backspace, _, cx| view.edit(cx, |s| s.backspace())))
-            .on_action(cx.listener(|view, _: &crate::actions::Delete, _, cx| view.edit(cx, |s| s.delete())))
-            .on_action(cx.listener(|view, _: &crate::actions::Left, _, cx| view.edit(cx, |s| s.left())))
-            .on_action(cx.listener(|view, _: &crate::actions::Right, _, cx| view.edit(cx, |s| s.right())))
-            .on_action(cx.listener(|view, _: &crate::actions::SelectLeft, _, cx| view.edit(cx, |s| s.select_left())))
-            .on_action(cx.listener(|view, _: &crate::actions::SelectRight, _, cx| view.edit(cx, |s| s.select_right())))
-            .on_action(cx.listener(|view, _: &crate::actions::Home, _, cx| view.edit(cx, |s| s.home())))
-            .on_action(cx.listener(|view, _: &crate::actions::End, _, cx| view.edit(cx, |s| s.end())))
-            .on_action(cx.listener(|view, _: &crate::actions::SelectAllText, _, cx| view.edit(cx, |s| s.select_all())))
-            .on_action(cx.listener(|view, _: &crate::actions::PasteText, _, cx| {
-                if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) { view.edit(cx, |s| s.replace_text_in_range(None, &text)); }
-            }))
-            .on_key_down(cx.listener(|view, event: &gpui::KeyDownEvent, window, cx| {
-                if event.keystroke.key == "enter" { window.prevent_default(); view.apply(window, cx); cx.stop_propagation(); }
-            }))
+        div().id("device-value-entry").size_full().p(px(18.))
+            .bg(th.surface).text_color(th.text).flex().flex_col().gap(px(10.)).key_context("LyricEditor")
             .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(self.desc.name.clone()))
-            .child(div().id("device-value-input").role(Role::TextInput).aria_label(self.desc.name.clone()).aria_value(self.text.text.clone())
-                .h(px(38.)).flex_none().rounded(px(5.)).bg(th.control).border_1().border_color(th.accent).overflow_hidden()
-                .child(canvas(|_, _, _| (), move |bounds, _, window, cx| paint(&entity, bounds, window, cx)).size_full()))
+            .child(self.text.clone())
             .child(div().text_xs().text_color(th.text_secondary).child(format!("{} … {} {} · Enter 应用 · Esc 取消", self.desc.min, self.desc.max, self.desc.unit)))
             .child(div().flex_1().text_xs().text_color(th.error).child(self.error.clone()))
             .child(div().flex().justify_end().gap(px(8.))
-                .child(crate::ui_controls::selectable_button("value-cancel", "取消", false, th).on_click(cx.listener(|_, _, window, _| window.remove_window())))
-                .child(crate::ui_controls::selectable_button("value-apply", "应用", true, th).on_click(cx.listener(|view, _, window, cx| view.apply(window, cx)))))
+                .child(crate::ui_controls::selectable_button("value-cancel", "取消", false, th).on_click(cx.listener(|view, _, window, cx| {
+                    view.text.update(cx, |field, cx| { field.invoke("requestCancel", vec![], window, cx); });
+                })))
+                .child(crate::ui_controls::selectable_button("value-apply", "应用", true, th).on_click(cx.listener(|view, _, window, cx| {
+                    view.text.update(cx, |field, cx| { field.invoke("requestSubmit", vec![], window, cx); });
+                })))).into_any_element()
     }
 }
 
-impl EntityInputHandler for ValueEntry {
-    fn text_for_range(&mut self, range: Range<usize>, actual: &mut Option<Range<usize>>, _: &mut Window, _: &mut Context<Self>) -> Option<String> {
-        let (text, adjusted) = self.text.text_for_range_utf16(range); *actual = Some(adjusted); Some(text)
+impl Render for ValueEntry {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let entity = cx.entity(); let response = entity.clone();
+        let revision = format!("{:?}:{}:{}:{}:{}", self.target.track, self.target.key.0, self.desc.id, self.generation, self.base);
+        let props = serde_json::json!({"label":self.desc.name,"revision":revision,"open":true,"choices":2,"defaultChoice":1,"cancelChoice":0});
+        div().size_full().relative().child(crate::proto_overlay::overlay("parameter-value-modal", props,
+            std::rc::Rc::new(move |_, _, _, cx| entity.update(cx, |view, cx| view.render_body(cx))),
+            std::rc::Rc::new(move |choice, window, cx| response.update(cx, |view, cx| {
+                view.text.update(cx, |field, cx| { field.invoke(if choice == 0 {"requestCancel"} else {"requestSubmit"}, vec![], window, cx); });
+            })),
+        ))
     }
-    fn selected_text_range(&mut self, _: bool, _: &mut Window, _: &mut Context<Self>) -> Option<UTF16Selection> {
-        Some(UTF16Selection { range: self.text.range_to_utf16(&self.text.selection), reversed: self.text.reversed })
-    }
-    fn set_selected_text_range(&mut self, range: Range<usize>, window: &mut Window, cx: &mut Context<Self>) {
-        self.text.selection = self.text.range_from_utf16(&range); self.text.reversed = false;
-        window.notify_text_selection_changed(&self.focus); cx.notify();
-    }
-    fn text_length_utf16(&mut self, _: &mut Window, _: &mut Context<Self>) -> Option<usize> { Some(self.text.text.encode_utf16().count()) }
-    fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> { self.text.marked.as_ref().map(|range| self.text.range_to_utf16(range)) }
-    fn unmark_text(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.text.unmark_text(); window.notify_text_input_changed(&self.focus); cx.notify(); }
-    fn replace_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.text.replace_text_in_range(range, text); self.error.clear(); window.notify_text_input_changed(&self.focus); cx.notify();
-    }
-    fn replace_and_mark_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, selected: Option<Range<usize>>, window: &mut Window, cx: &mut Context<Self>) {
-        self.text.replace_and_mark_text_in_range(range, text, selected); window.notify_text_input_changed(&self.focus); cx.notify();
-    }
-    fn bounds_for_range(&mut self, range: Range<usize>, bounds: Bounds<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<Bounds<Pixels>> {
-        let line = self.line.as_ref()?; let range = self.text.range_from_utf16(&range);
-        Some(Bounds::from_corners(point(bounds.left() + px(6.) + line.x_for_index(range.start), bounds.top()),
-            point(bounds.left() + px(6.) + line.x_for_index(range.end), bounds.bottom())))
-    }
-    fn character_index_for_point(&mut self, point: Point<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<usize> {
-        let local = self.bounds?.localize(&point)?;
-        Some(self.text.offset_to_utf16(self.line.as_ref()?.closest_index_for_x(local.x - px(6.))))
-    }
-}
-
-fn paint(entity: &Entity<ValueEntry>, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
-    let view = entity.read(cx);
-    let (state, focus) = (view.text.clone(), view.focus.clone());
-    let th = view.editor.upgrade().map(|ed| ed.read(cx).theme).unwrap_or_else(|| Theme::for_appearance(window.appearance()));
-    window.handle_input(&focus, ElementInputHandler::new(bounds, entity.clone()), cx);
-    let shown: SharedString = state.text.clone().into();
-    let base = TextRun { len: shown.len(), font: window.text_style().font(), color: th.text.into(), background_color: None, underline: None, strikethrough: None };
-    let runs = if let Some(marked) = &state.marked {
-        vec![TextRun { len: marked.start, ..base.clone() }, TextRun { len: marked.end - marked.start,
-            underline: Some(gpui::UnderlineStyle { color: Some(th.accent.into()), thickness: px(1.), wavy: false }), ..base.clone() },
-            TextRun { len: shown.len() - marked.end, ..base }]
-    } else { vec![base] };
-    let line = window.text_system().shape_line(shown, px(15.), &runs, None);
-    let origin = point(bounds.left() + px(6.), bounds.top() + px(8.));
-    if !state.selection.is_empty() {
-        let start = line.x_for_index(state.selection.start); let end = line.x_for_index(state.selection.end);
-        window.paint_quad(fill(Bounds::new(point(origin.x + start, origin.y), size(end - start, px(20.))), with_alpha(th.accent, 0.3)));
-    }
-    let _ = line.paint(origin, px(20.), gpui::TextAlign::Left, None, window, cx);
-    if focus.is_focused(window) && state.selection.is_empty() {
-        let x = line.x_for_index(state.cursor());
-        window.paint_quad(fill(Bounds::new(point(origin.x + x, origin.y), size(px(1.), px(20.))), th.accent));
-    }
-    entity.update(cx, |view, _| { view.line = Some(line); view.bounds = Some(bounds); });
 }
 
 #[cfg(test)]

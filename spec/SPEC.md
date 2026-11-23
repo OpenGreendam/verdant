@@ -16,10 +16,11 @@ Verdant 0.1.0 的完整合同见[主规格](../SPEC.md)，源码入口为
 | `frontend/proto-ui/src/normalized-knob.proto.ts` | 每实例值/phase、props 同步、取消、键盘、焦点、辅助功能和提交事件。 |
 | `frontend/crates/verdant-ui-protocol/` | 生成 API 到 app/session 的强类型边界；只依赖两个无 GPUI 的 data crate。 |
 | `frontend/proto-ui/compiler.pin.json` | 上游提交、工具链、目标 profile 和 GPUI 版本绑定。 |
-| `frontend/proto-ui/generated/` | 两个标准库 data crate 与两个原生组件；后者共用一份 native SDK，附 source map。每个单元均含 provenance。 |
+| `frontend/proto-ui/src/` 其他原型 | 动作、集合、连续值、编辑表面、演奏键、拖放、弹层、文本、图形点与滚动区域的交互契约。 |
+| `frontend/proto-ui/generated/` | 两个标准库 data crate 与十二个原生组件；原生组件共用一份 native SDK，附 source map。每个单元均含 provenance。 |
 | `frontend/proto-ui/receipts/` | 仓库边界内完整来源/解析输入闭包与生成制品的哈希记录。 |
 
-桌面直接编译控件 Rust 源码。`frontend/proto-ui/` 下的入口调用上游 Proto UI 编译器，版本、工具链和目标见 `compiler.pin.json`。卷帘属于 Proto 编译的 gesture planner + native GPUI surface：Rust 会话通过强类型 adapter 调用编译出的状态转换逻辑，负责守卫判断、pointer/capture 与领域副作用；宿主负责绘图和音乐坐标。旋钮作为有状态原型实例承担交互和公开语义，宿主提供绘图 slot 和经目标/revision 校验的领域提交。不能将这些局部集成描述为整个 DAW 已统一采用 Proto-UI 控件契约。[具体边界](../frontend/proto-ui/README.md)
+桌面直接编译控件 Rust 源码。`frontend/proto-ui/` 下的入口调用上游 Proto UI 编译器，版本、工具链和目标见 `compiler.pin.json`。卷帘属于 Proto 编译的 gesture planner + native GPUI surface：Rust 会话通过强类型 adapter 调用编译出的状态转换逻辑，负责守卫判断、pointer/capture 与领域副作用；宿主负责绘图和音乐坐标。旋钮作为有状态原型实例承担交互和公开语义，宿主提供绘图 slot 和经目标/revision 校验的领域提交。应用编写的其余交互类别经相同 Compiler 路径实现；18 类覆盖与保留的操作系统／领域边界见[迁移清单](../frontend/proto-ui/CONTROL-MIGRATION.md)。[具体边界](../frontend/proto-ui/README.md)
 
 ## 当前版本
 
@@ -34,8 +35,8 @@ Verdant 0.1.0 的完整合同见[主规格](../SPEC.md)，源码入口为
 
 上游编译产物包含 Rust 源码与来源记录；原生组件另有 source map 和共享 SDK。投影通过 native slot 调用卷帘宿主。data target 生成的类型化函数负责状态转换，Rust 会话将输入与守卫结果直接传给这些函数，预解码全部效果后执行对应的领域操作，不创建 owner 或经 JSON 调用。模型、词典、音频设备和推理实现由各自 crate 提供。
 
-普通按钮、开关、数值与选择控件经显式 target 分派。数值控件由持有实体的 render owner 提供当前值；
-点击回调从实际目标读取新值再步进，不能使用过期 render 捕获。
+普通按钮、开关、数值与选择控件由生成组件接受输入后，经显式 target 分派。数值控件由持有实体的 render owner 提供当前权威值；
+步进、取消和提议由原型计算，宿主在写入前重新验证实际目标，不能使用过期 render 捕获。
 同一用户意图经一个 `CommandBatch` 提交；preview／cancel 不修改工程。
 
 相同输入、编译器和 profile 必须生成相同字节。生成物带输入／编译器／profile 身份与该 target 的来源记录，
@@ -60,7 +61,7 @@ node frontend/proto-ui/tools/build-proto-ui.mjs --upstream /path/to/Proto-UI
 node frontend/proto-ui/tools/build-proto-ui.mjs --upstream /path/to/Proto-UI --check
 ```
 
-第一条命令按各 target 重新编译四个单元，第二条新鲜编译并核对产物字节与来源记录；缺失上游时必须失败。显式 `--check-retained` 只证明保留制品自洽，不证明新鲜编译。workspace GPUI 的来源、rev 和 feature 在检查上游存在之前核验，完整 Cargo resolve graph 另行准入。CI 的 Rust 构建依赖强制 fresh lane 和独立的 session 无原生依赖构建 lane。窗口、IME 与辅助技术按目标平台独立验收。
+第一条命令按各 target 重新编译十四个单元，第二条新鲜编译并核对产物字节与来源记录；缺失上游时必须失败。显式 `--check-retained` 只证明保留制品自洽，不证明新鲜编译。workspace GPUI 的来源、rev 和 feature 在检查上游存在之前核验，完整 Cargo resolve graph 另行准入。CI 的 Rust 构建依赖强制 fresh lane 和独立的 session 无原生依赖构建 lane。窗口、IME 与辅助技术按目标平台独立验收。
 构建方法见[前端手册](../frontend/README.md)。
 
 ## 来源与历史材料

@@ -132,5 +132,66 @@ class CiRefusals(unittest.TestCase):
             parse(line + '\n' + line.replace('2097157', '2097158'))
 
 
+from ci import validate_control_run
+from controls import CONTROL_CASES
+from test_probe import synthetic_control_observations
+
+
+class ControlCiRefusals(unittest.TestCase):
+    setUp = CiRefusals.setUp
+    save = CiRefusals.save
+
+    def setup_controls(self):
+        self.harness['suite'] = self.report['suite'] = 'controls'
+        self.report['cases'] = [{'name': name, 'status': 'passed'} for name in CONTROL_CASES]
+        self.report.update({'steps': [], 'windowMappings': [], 'elapsedSeconds': 1.0, 'tolerances': {}})
+        observations, final = synthetic_control_observations()
+        for index, (detail, document) in enumerate(observations):
+            stem = f'steps/{index:02}-{detail["label"]}'
+            write_json(self.evidence / (stem + '.verp'), document)
+            track = document['tracks'][0]
+            saved = {'revision': document['revision'], 'trackName': track['name'],
+                     'panPermille': track.get('pan_permille', 0), 'gainDb': track['instrument']['params']['gain'],
+                     'sha256': sha256(self.evidence / (stem + '.verp'))}
+            detail.update({'savedProject': saved, 'window': 'fixture', 'windowReference': [':1.2', '/frame'], 'target': []})
+            write_json(self.evidence / (stem + '.json'), detail)
+            (self.evidence / (stem + '.png')).write_bytes(b'\x89PNG\r\n\x1a\nsynthetic-evidence')
+            self.report['steps'].append({key: detail[key] for key in
+                ('label', 'case', 'control', 'pointerHeld', 'savedProject', 'window', 'windowReference')} |
+                {'evidence': stem + '.json', 'screenshot': stem + '.png', 'observedNormalizedValues': []})
+        write_json(self.evidence / 'project.verp', final)
+        self.save()
+
+    def test_original_and_controls_cannot_substitute_for_each_other(self):
+        self.harness['suite'] = 'controls'
+        self.save()
+        with self.assertRaisesRegex(RuntimeError, 'cannot be replaced'):
+            validate_run(self.identity, 'x11', self.run)
+        with self.assertRaisesRegex(RuntimeError, 'suite mismatch'):
+            validate_control_run(self.identity, 'x11', self.run)
+
+    def test_all_three_control_cases_are_required_without_skips_or_duplicates(self):
+        self.setup_controls()
+        original = copy.deepcopy(self.report['cases'])
+        for cases in (original[:-1], original + [original[-1]],
+                      [{**case, 'status': 'skipped'} for case in original]):
+            self.report['cases'] = cases
+            self.save()
+            with self.assertRaisesRegex(RuntimeError, '3 expected cases'):
+                validate_control_run(self.identity, 'x11', self.run)
+
+    def test_actual_project_bytes_and_summary_are_both_rechecked(self):
+        self.setup_controls()
+        self.assertEqual(len(validate_control_run(self.identity, 'x11', self.run)['cases']), 3)
+        step = next(step for step in self.report['steps'] if step['label'] == 'mixer-committed')
+        step['savedProject']['panPermille'] = 0
+        detail = json.loads((self.evidence / step['evidence']).read_text())
+        detail['savedProject'] = step['savedProject']
+        write_json(self.evidence / step['evidence'], detail)
+        self.save()
+        with self.assertRaisesRegex(RuntimeError, 'retained project'):
+            validate_control_run(self.identity, 'x11', self.run)
+
+
 if __name__ == '__main__':
     unittest.main()
