@@ -59,7 +59,9 @@ Startup performs the real `capabilities` handshake using
 `verdant-cli request --json` with a versioned request on stdin, followed by EOF.
 The response must be one JSON envelope with the same protocol and request ID,
 an agreeing exit status, and diagnostics. The configured CLI version must
-match. `doctor` probes the real worker and voice catalog. Missing voices are
+match. Both JSON and JSONL responses require valid UTF-8; damaged or incomplete
+byte sequences are protocol errors, never replacement text in a successful result.
+`doctor` probes the real worker and voice catalog. Missing voices are
 reported as unavailable and leave project editing usable; they are never
 replaced by a successful fake probe.
 
@@ -235,9 +237,14 @@ From `plugins/dsh` in that container:
 ```sh
 npm install --ignore-scripts
 npm run typecheck
+npm test
 npm pack
 tar -tf verdant-dsh-0.1.0.tgz
 ```
+
+The transport regressions use real subprocess pipes with a controlled byte
+producer. They cover decoding, cancellation and process retirement; installed
+Verdant CLI, DSH host and channel acceptance remain the separate checks below.
 
 `prepack` compiles this package's `src` only. The archive must contain
 `package/package.json`, `cordis.patch.yml`, `README.md`, `LICENSE`, and every

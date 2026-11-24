@@ -129,13 +129,16 @@ export class CliTransport {
       cancel(new BridgeError('Verdant CLI deadline exceeded', 'TIMEOUT'))
     }, timeoutMs)
     const stdout: Buffer[] = []
+    // Decode complete records, not pipe chunks. Keep a leading BOM so JSON
+    // retains its existing rejection policy instead of silently removing it.
+    const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
     let terminal: ObjectJson | undefined
     let sequence = 0
     let pending: Buffer[] = []
     let pendingBytes = 0
     const line = (bytes: Buffer): void => {
       if (bytes.length === 0) return
-      const event = object(JSON.parse(bytes.toString('utf8')) as unknown, 'CLI event')
+      const event = object(JSON.parse(utf8.decode(bytes)) as unknown, 'CLI event')
       if (event.protocol !== PROTOCOL || event.request_id !== requestId || event.sequence !== sequence + 1 || terminal !== undefined) {
         throw new BridgeError('CLI event identity or sequence mismatch', 'PROTOCOL_ERROR')
       }
@@ -208,7 +211,7 @@ export class CliTransport {
         let parsed: unknown
         try {
           if (onProgress !== undefined && pendingBytes > 0) line(Buffer.concat(pending, pendingBytes))
-          parsed = onProgress === undefined ? JSON.parse(Buffer.concat(stdout, stdoutBytes).toString('utf8')) as unknown : terminal
+          parsed = onProgress === undefined ? JSON.parse(utf8.decode(Buffer.concat(stdout, stdoutBytes))) as unknown : terminal
         } catch {
           throw new BridgeError('CLI did not return one complete JSON response', 'PROTOCOL_ERROR')
         }
