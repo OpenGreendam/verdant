@@ -1,0 +1,57 @@
+{
+  "schema": "verdant.main18-failed-ci.v1",
+  "authoredHead": "5818784833fa94742c14108d909a45e9bcf9632c",
+  "testedMergeCheckout": "513b08c3a0066553d6d6fdfbf069551f3f5e78e2",
+  "mainMerge": "9239516638d23e6bf5211fe15a3419550ede4096",
+  "run": 45375683399,
+  "job": 138381850371,
+  "url": "https://github.com/OpenGreendam/verdant/actions/runs/45375683399/job/138381850371",
+  "workflowConclusion": "failure",
+  "failedStep": "Resolve the full workspace in the plain Rust image",
+  "failedCommand": "cargo fetch --locked",
+  "exitCode": 101,
+  "error": "no matching package named `generated-gpui-453d0654bb061524567e58b3f919af45` found",
+  "location": "/workspace/frontend/proto-ui/generated/action-control",
+  "requiredBy": "verdant-app v0.1.0 (/workspace/frontend/crates/verdant-app)",
+  "jobs": [
+    {
+      "id": 138381230052,
+      "name": "Proto-UI retained artifacts and regression tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 138381230721,
+      "name": "Proto-UI fresh pinned compilation",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 138381850371,
+      "name": "Session build without native UI libraries",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 138382658470,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 138382658958,
+      "name": "linux",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 138382659363,
+      "name": "Real Linux window input and accessibility (22 original + 6 control cases)",
+      "status": "completed",
+      "conclusion": "skipped"
+    }
+  ],
+  "rawLog": "/workspace/scratch/b91f3481ce6f/verdant-workflow/main18-headless-failure.log",
+  "rawLogSha256": "a2216ca0b88369459559df88fee98e13b8bb75064a8baa99dff7455bd05da5db",
+  "boundary": "Complete job log retained. Fresh and retained producer jobs passed; native and real-window jobs were skipped after the actual Cargo failure."
+}

@@ -1,0 +1,601 @@
+{
+  "base": "ac0402289e335d9a8228b4e056fb95320482458a",
+  "main": "9239516638d23e6bf5211fe15a3419550ede4096",
+  "stack": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "entries": [
+    {
+      "path": "frontend/proto-ui/CONTROL-MIGRATION.md",
+      "category": "documentation",
+      "mainOnly": false,
+      "decision": "Preserve exact frozen validation context, current full-platform workflow scope and RCIP record; main edits are tied to an older source/compiler snapshot.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "ef894c63126bf7bbc259fa4b33579909863968ca",
+      "stackBlob": "228871c3d9aeb8c2e88d281b3a98e7ec6e7054c2"
+    },
+    {
+      "path": "frontend/proto-ui/MIGRATION-2026-11-23.md",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Preserve the frozen historical report and its distinction between pending integration and completed earlier snapshots; #18 supplies no replacement executions for those edits.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "aefd660bb40e9a499e3bbdf0ccbb81919ebe62e1",
+      "stackBlob": "c576ced1089b0c06544e140d730ff816caa648a1"
+    },
+    {
+      "path": "frontend/proto-ui/README.md",
+      "category": "documentation",
+      "mainOnly": false,
+      "decision": "Preserve exact frozen validation context, current full-platform workflow scope and RCIP record; main edits are tied to an older source/compiler snapshot.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "a37103ca54b7a4959ce8e452c5b767dc02db188e",
+      "stackBlob": "ef4147a6d0d7993ed01481a9795f93c8d4f4ba27"
+    },
+    {
+      "path": "frontend/proto-ui/compiler.pin.json",
+      "category": "compiler-pin",
+      "mainOnly": false,
+      "decision": "Use e9340df: bd5800dc is an ancestor, and e9340df retains main compiler capabilities plus later native context and source fixes.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "453ec7434f66da900e34776efcef7cc39c396a41",
+      "stackBlob": "2c8d5563f43a2685cb5f267568f0e16fa768bc53"
+    },
+    {
+      "path": "frontend/proto-ui/generated/action-control/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "dac2eff7afb2dd2b6b1ddf35c31a9f9f579c58b2",
+      "stackBlob": "bed4108e4649d4e1865e4bbfb7a4bfae21bf3640"
+    },
+    {
+      "path": "frontend/proto-ui/generated/action-control/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "92dfcda293547c66eea4b3c94a3b31a9cb2f1d3f",
+      "stackBlob": "cbd3d77914087b29fc2c9bd7f0cb849afd2d0a42"
+    },
+    {
+      "path": "frontend/proto-ui/generated/action-control/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "d01ee24163d3fa5d9d59afbfe4443b33a1713257",
+      "stackBlob": "015a7e2a31e4ed952fc3e51e22ef6f4d9513cae3"
+    },
+    {
+      "path": "frontend/proto-ui/generated/action-control/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "d3b71cfd423f0d73df44151c0d1e936e3b3f5fa9",
+      "stackBlob": "ee1585c848d89e811b35b91dce2d9a0e0214b8d1"
+    },
+    {
+      "path": "frontend/proto-ui/generated/collection-control/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "fd08438503dfcd8560831e873bc9223cbf97e214",
+      "stackBlob": "2e8e40a81808cc1192db3450e5c2eecd1af34250"
+    },
+    {
+      "path": "frontend/proto-ui/generated/collection-control/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "4ab5d78e489c836ff4863e0d16bb5fae50d5415c",
+      "stackBlob": "bac41f756c47acc98d395f83d1667b3f506aa1f8"
+    },
+    {
+      "path": "frontend/proto-ui/generated/collection-control/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "8ebc4e733ce06e0b4ca83ae2015dac3b6bbd9ee5",
+      "stackBlob": "767eee2353f9a8fe4bb58b836cbddcd32d545894"
+    },
+    {
+      "path": "frontend/proto-ui/generated/collection-control/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "a527d95c66ba809f9e1c23ed2bf1dc6be57e7da2",
+      "stackBlob": "6a954139df46b6ba5b0985cbc3a7fda777e01703"
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/.proto-ui/fixtures/style-tokens.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "edaa7eaaf61b9ba3788ec4725debed69c5cb38fa",
+      "stackBlob": "54936fb07dbe13f5a66b64b9894a874102c54883"
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "b3c854facbe27141019fdd35147726e3719aa569",
+      "stackBlob": "abd80c07a64a46ab85b5844623ce691253332f97"
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "220e81ad14924ca3678f8f34229a5cf1420788b1",
+      "stackBlob": "39dac144e3fc633b63e7ece7ebf4446caa0ccbf2"
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "e4013657113aca6665c449e9e0a51367c557619f",
+      "stackBlob": "79912c7b70046af53424690044db4875d6ec97b5"
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "fb5d8316046a1631625dcec0ac40536375dfa0d9",
+      "stackBlob": "b3d7f16a4055a150ea0379430d560f837c1db7b3"
+    },
+    {
+      "path": "frontend/proto-ui/generated/editor-surface/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "8228cecdcb11d697b9f44c018c9a36c64dd5f46a",
+      "stackBlob": "f19dee28ef084d6842c2a27ec348770f706340b5"
+    },
+    {
+      "path": "frontend/proto-ui/generated/editor-surface/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "dcb2a31dd0ce7006bc272d29e201f0f1d911f9e2",
+      "stackBlob": "171ad107473013ce9dea469e52e2c9a8485c6906"
+    },
+    {
+      "path": "frontend/proto-ui/generated/editor-surface/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "ca92d2af08b3c2ba7205af1222c4e5bd26c9042d",
+      "stackBlob": "3179509d31c877a91cc812bcfe2770fe76f2ce78"
+    },
+    {
+      "path": "frontend/proto-ui/generated/editor-surface/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "1023727fcffb7f0cedf6acfaa124c2d283f000db",
+      "stackBlob": "cdd96bddbcf1a11f8bde4cd75de7475e0e6f26e5"
+    },
+    {
+      "path": "frontend/proto-ui/generated/graph-point/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "b33eacac6afcec779ff312ba55ff91b1e87e663e",
+      "stackBlob": "6b80d783954f4d8d0dd7cd50455abb631ef0e559"
+    },
+    {
+      "path": "frontend/proto-ui/generated/graph-point/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "6dbb0c096a9bc581bf2b94946dd3a788fc4fe6c4",
+      "stackBlob": "7fd6c601cbb609a36c61936b557cf575540ecd83"
+    },
+    {
+      "path": "frontend/proto-ui/generated/graph-point/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "4321a72c3727c4f230a29f6142e02dc6eb09305d",
+      "stackBlob": "cd01a91c1f8527d2b5368238cd68f0a568c84647"
+    },
+    {
+      "path": "frontend/proto-ui/generated/graph-point/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "cc92b971fc93001eb6ca50d9847bad98336caa3b",
+      "stackBlob": "4aaddff2f0310ec1147dc54a758d043b906c1550"
+    },
+    {
+      "path": "frontend/proto-ui/generated/performance-key/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "883129e5cef42c6da869b6fbb45c94dad81de8ca",
+      "stackBlob": "556fcd6dd31da4887c37f77beed6f7541638b224"
+    },
+    {
+      "path": "frontend/proto-ui/generated/performance-key/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "f8aed2f673c97fee611a5d70fa21bb342377d59f",
+      "stackBlob": "70a6de82c99d49622d7f5046406450955f4e6b41"
+    },
+    {
+      "path": "frontend/proto-ui/generated/performance-key/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "34418221c85fd8b94fe157c907b9adaea91049d5",
+      "stackBlob": "512eb2e41a99b497ede63597e7b147e6a4502e0b"
+    },
+    {
+      "path": "frontend/proto-ui/generated/performance-key/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "1cfb4549d427416d1ef1d8c188da1262a8df3c23",
+      "stackBlob": "759b6274d76b859f7b534d612f542300c38022c2"
+    },
+    {
+      "path": "frontend/proto-ui/generated/scroll-region/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "45eccc4a754d48dd5a55435517f8e8912b642df4",
+      "stackBlob": "4d8670e4fa8114fdfce2039a9302f4c6b6f7b556"
+    },
+    {
+      "path": "frontend/proto-ui/generated/scroll-region/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "b49f6f043f6d9a42360e2efc80ebfdcfd5eda7ac",
+      "stackBlob": "455f93da5f40ce8e8b62aeefe1472f11c2f00e96"
+    },
+    {
+      "path": "frontend/proto-ui/generated/scroll-region/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "d6f6232265b5256823f3c7980238f1b5d8cc1cc0",
+      "stackBlob": "d595d486e3dc60776564c43b4442d8cff2ebb9bd"
+    },
+    {
+      "path": "frontend/proto-ui/generated/scroll-region/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "4e246c84d2fa835389286dd1cd7c2a2934f13575",
+      "stackBlob": "8767a1f13c06d24c613beb3b3fa345bd24692186"
+    },
+    {
+      "path": "frontend/proto-ui/generated/text-field/Cargo.toml",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "1bc046683d9c1f599df983a59be1c76d9bd5af8f",
+      "stackBlob": "e6e846a5b30b6703f697bffc9516243a03188461"
+    },
+    {
+      "path": "frontend/proto-ui/generated/text-field/Component.rs",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "c2220952a8bf6579c5f58f619d8fb7923cc952a5",
+      "stackBlob": "6ecb3e92d35501e78f708a014dbed71126c67ace"
+    },
+    {
+      "path": "frontend/proto-ui/generated/text-field/Component.rs.map",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "04b9bd19ddc76d455620b35b3d7989f596d0b6bb",
+      "stackBlob": "a67fb9c7a30a17b35314cf81bf9ae36dd4ec57fe"
+    },
+    {
+      "path": "frontend/proto-ui/generated/text-field/provenance.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "fa88d6d5392d1426e8064fc7346a930a5aa0fd3f",
+      "stackBlob": "ca5456d5faf72e976e4fc922c5c08d0fd0269296"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/action-control.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "8506937b2b4ed4d0022e9aebe2933172b2a4060f",
+      "stackBlob": "53b8c419d82e2c9266084d26c19837c60843f3e5"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/collection-control.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "022e7350bfd4a0444bdaa3c6fc23e90c80569ba9",
+      "stackBlob": "0ccbe310da5a0834bedb6a1181f56776e0e7e207"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/continuous-control.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "0efdf82c000b6313676d22c3ef57ac1047c109c3",
+      "stackBlob": "383c890fff8db9a84451195c874d5ca8a8e3b1e7"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/control-gesture-planner.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "2e0cc3406ede20e32a26f017287f54dc89e0c3bc",
+      "stackBlob": "ae8380ab62c49b4ba763dabd636e4e9f9a2a0231"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/drag-source.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "e44598a71887bd56c70d270523a501d8d75ba833",
+      "stackBlob": "05aa81d6452754de4f52c4fdc115ed1f5fe1b614"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/editor-surface.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "6e0e3c85054b38f1815a2e5774db091875c1401e",
+      "stackBlob": "0b65ce4620e3f40433dd2dd3342d5683e3f9e0c1"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/graph-point.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "ff1dcb486830991a5fe32d6246bc57712c58f7cb",
+      "stackBlob": "f26896b524512f8779fb9d1c5e14e00b5b63db6e"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/normalized-knob.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "23383c841ca1940906ecab8a06ea4631de17d735",
+      "stackBlob": "6cbd9ffe4e9ed64256a71649d2b17bf439169aa0"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/note-gesture-planner.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "8931bc7a0f10fb2c1dc180fcf0f0e23aae16366e",
+      "stackBlob": "322da7b95c844fb0d2f7e27b6217d0b7709c76de"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/overlay-control.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "c70a6b0882a0df65202a3fd73c9ca09d1cf9b93e",
+      "stackBlob": "db1b9e1abe778379ddb31164c6edba4598baab6b"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/performance-key.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "1ad4cbce87619ef0638d5398c8dfc0e6d4dbaf76",
+      "stackBlob": "5c8fad4383753a3465de0ee9e97f8013d21488ee"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/pitch-gesture-surface.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "faabd1ff27b44c4877ffcabdc7c707df4c8654fd",
+      "stackBlob": "fbaaf0c120ab9674f29e73e10f20cf318c901faf"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/scroll-region.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "10a7d4b7638d8156db5417229da5af6c35b304cd",
+      "stackBlob": "2462c7868dfded07cc6f733511de05e52bd0d1eb"
+    },
+    {
+      "path": "frontend/proto-ui/receipts/text-field.json",
+      "category": "derived",
+      "mainOnly": false,
+      "decision": "Recreate from the selected frozen e9340df source/pin with the official producer; do not manually merge emitted Rust or receipts.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "2951ac9a2b9d57951a2c86ea5775cc834fa346dd",
+      "stackBlob": "cd526e4c46577d7bb2d288f349156a71146d1e42"
+    },
+    {
+      "path": "frontend/proto-ui/src/action-control.proto.ts",
+      "category": "overlapping-authored",
+      "mainOnly": false,
+      "decision": "Preserve current Action/Collection/scalar native consumer contracts and selected-value changes; the independently reviewed main substitutions are incompatible with unchanged Rust.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "e91668adb1c2c5627090e313519264a4304bd43f",
+      "stackBlob": "6ff7cdf59de872afa9439831e8e6fb23847be13b"
+    },
+    {
+      "path": "frontend/proto-ui/src/collection-control.proto.ts",
+      "category": "overlapping-authored",
+      "mainOnly": false,
+      "decision": "Preserve current Action/Collection/scalar native consumer contracts and selected-value changes; the independently reviewed main substitutions are incompatible with unchanged Rust.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "f547080e8d08b40cf8bba95153fa2badf860295e",
+      "stackBlob": "99209182867462b8a0ea959da172807d08dd5b3c"
+    },
+    {
+      "path": "frontend/proto-ui/src/continuous-control.proto.ts",
+      "category": "overlapping-authored",
+      "mainOnly": false,
+      "decision": "Preserve current Action/Collection/scalar native consumer contracts and selected-value changes; the independently reviewed main substitutions are incompatible with unchanged Rust.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "13b61b0dbccaa771e1e2d44e6b24b44626894014",
+      "stackBlob": "f001f3237c89e39859edc2bd8add32108311cb8c"
+    },
+    {
+      "path": "frontend/proto-ui/src/editor-surface.proto.ts",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Keep commandMode and command event used by proto_editor_surface; main audioKey/commands has no migrated native consumer.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "5142dafbfe62fb1461b6deac0b62b275e09aa9a4",
+      "stackBlob": "a9f7384a3cfea39b376bd03a8735212914803cca"
+    },
+    {
+      "path": "frontend/proto-ui/src/graph-point.proto.ts",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Main only joins declarations on one line. Retain the frozen source identity; no semantic capability is added.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "de914d22e68ea55324bc51b0027e841d82e50e26",
+      "stackBlob": "239af375ce5556a29ad65cd6de076dddd8bf15ef"
+    },
+    {
+      "path": "frontend/proto-ui/src/performance-key.proto.ts",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Keep physical momentary trigger and retirement on momentary policy changes; real roll audition depends on trigger. Existing Runtime control discriminates this loss.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "189c8d33faea113cb836f23dc9b85582ad94b852",
+      "stackBlob": "e198917f4e1831c982cc8c5af8cccb95cf53f13a"
+    },
+    {
+      "path": "frontend/proto-ui/src/scroll-region.proto.ts",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Keep keyInput/revealGeometry, accepted reveal authority, horizontal projection and host fallback; preserve focused-only raw-event admission.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "aac8f73531e9d46fff5f6eacc743e4cfeeaa5110",
+      "stackBlob": "5de0cdc51103a372e9ce49b70332089bf5b266c3"
+    },
+    {
+      "path": "frontend/proto-ui/src/text-field.proto.ts",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Keep directly named field composition via official asInputEditor. No independent native Label pair consumer exists; full asInputRoot capability remains in the vendored source.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "12d9b476034d598f8beae34e58b3dac0eac4a269",
+      "stackBlob": "facec8ec010be2cb814cdf2a0dcb18dd61ea8026"
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/PROVENANCE.md",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Retain the recorded official vendor identity instead of rewriting it to the older 26b9258 snapshot. Clarify independent compiler/vendor identities in the new integration record.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "abe66ef1720c4ab22342277d0c50c4b54fad39b9",
+      "stackBlob": "b83ff81b75addcf2ddcb9d9da2b5416a77d58dfc"
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/provenance.json",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Preserve immutable vendor file hashes bound to 4e499ae; the compiler pin is separately e9340df.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "2429ef5442a914bf1322357dff05d74fc40674ee",
+      "stackBlob": "6db98410a85ffcf37f0be37afd1f1a4f2dc86302"
+    },
+    {
+      "path": "frontend/proto-ui/src/upstream-input/root.proto.ts",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Preserve exact recorded upstream snapshot with both asInputEditor and full asInputRoot/ControlLabel target; flattening introduces no missing capability.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "fa6e4e0c264eb9724c121783210f65d10b27bce5",
+      "stackBlob": "ffe14b74a04d8b2c21ea09de92446002fa16939b"
+    },
+    {
+      "path": "frontend/proto-ui/tools/test/advanced-editors.test.mjs",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Retain five existing deleted cases, including real momentary trigger and editor command/retirement controls; do not remove their oracle.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "c8d669a01ba6253b032579a7b6f24f6cd3154c91",
+      "stackBlob": "55380a96217380ad826b2ce4e91cf97a026ecc88"
+    },
+    {
+      "path": "frontend/proto-ui/tools/test/common-controls.test.mjs",
+      "category": "oracle",
+      "mainOnly": false,
+      "decision": "Preserve existing passing contract tests and stack additions; main adds no distinct test title and deletes covered behavior.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "7e62a203ebac6938400f6ea9255e7b25c2b049d6",
+      "stackBlob": "5f4925a10c2000f2591a4da162a81b55e184ca6d"
+    },
+    {
+      "path": "frontend/proto-ui/tools/test/continuous-control.test.mjs",
+      "category": "oracle",
+      "mainOnly": false,
+      "decision": "Preserve existing passing contract tests and stack additions; main adds no distinct test title and deletes covered behavior.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "c44f010c4b9a7d157ff17ae8e4a87be7293cc1b1",
+      "stackBlob": "69255653df75515f0d0e0587401192291c389583"
+    },
+    {
+      "path": "frontend/proto-ui/tools/test/text-field.test.mjs",
+      "category": "main-only-authored",
+      "mainOnly": true,
+      "decision": "Preserve the existing assertion that directly named fields compose asInputEditor, along with exact vendored-source identity checks.",
+      "selectedSource": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "mainBlob": "6d825c71999c48beb5388e60507d4befa7b1d779",
+      "stackBlob": "7b956b9ede5c7b4ced26c108167d5547b5455822"
+    }
+  ]
+}

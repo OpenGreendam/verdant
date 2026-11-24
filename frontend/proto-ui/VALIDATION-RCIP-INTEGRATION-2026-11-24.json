@@ -1,0 +1,243 @@
+{
+  "schema": "verdant.rcip-stack-integration.v1",
+  "recordedAt": "2026-11-24T11:08:33.191969+00:00",
+  "integration": {
+    "branch": "integrate/rcip-stack-main-20261124",
+    "strategy": "ordinary git merge --no-ff --no-commit followed by reviewed per-path resolution and official producer recreation; normal merge commit",
+    "firstParent": "3efb43dda237618de0935a59b41555ca69b22c2a",
+    "secondParent": "9239516638d23e6bf5211fe15a3419550ede4096",
+    "commonAncestor": "ac0402289e335d9a8228b4e056fb95320482458a",
+    "productionSnapshotTree": "2255be0989bb3ae85289c5e72fb2745c7b908321",
+    "existingPathsDifferingFromFirstParent": [],
+    "scopeOfNewFiles": "explanatory record, machine receipt, and exact copied raw/review evidence only"
+  },
+  "compiler": {
+    "selected": "e9340df6279e063cf372080bf4cc97caea3fd901",
+    "mainSelected": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e",
+    "mainPinIsAncestorOfSelected": true,
+    "ancestorCommandExit": 0,
+    "upstreamCheckout": "/workspace/scratch/27c38b1bbc32/Proto-UI",
+    "vendorInputRevision": "4e499ae25e825e130e740f16af66d70b23a743cf",
+    "vendorAndCompilerAreSeparateIdentities": true
+  },
+  "preservedStack": [
+    {
+      "pr": 15,
+      "head": "a1971a05472cdda571d984d2e2f70f1686ab809d"
+    },
+    {
+      "pr": 16,
+      "head": "afa8de2e791c48439262b8d0ea64c97cdb9c7756"
+    },
+    {
+      "pr": 17,
+      "head": "2f70c72fe44179e221d47866da31333f22d52915"
+    },
+    {
+      "pr": 19,
+      "head": "3efb43dda237618de0935a59b41555ca69b22c2a"
+    }
+  ],
+  "mainFailure": {
+    "pr": 18,
+    "authoredHead": "5818784833fa94742c14108d909a45e9bcf9632c",
+    "testedMergeCheckout": "513b08c3a0066553d6d6fdfbf069551f3f5e78e2",
+    "run": 45375683399,
+    "job": 138381850371,
+    "url": "https://github.com/OpenGreendam/verdant/actions/runs/45375683399/job/138381850371",
+    "failure": "cargo fetch --locked exits 101 because the regenerated Action package name no longer matches the app dependency",
+    "producerJobs": "fresh and retained succeeded",
+    "nativeAndOsJobs": "skipped after headless dependency failure",
+    "rawEvidence": "frontend/docs/evidence/rcip-integration-20261124/main18-headless-failure.log"
+  },
+  "resolution": {
+    "mainChangedPaths": 66,
+    "initialConflictedPaths": 51,
+    "generatedConflicts": 33,
+    "receiptConflicts": 14,
+    "authoredPinDocTestConflicts": 4,
+    "mainOnlyPathsReviewed": 11,
+    "plan": "frontend/docs/evidence/rcip-integration-20261124/path-resolution-plan.json",
+    "independentSourceReview": "frontend/docs/evidence/rcip-integration-20261124/main18-source-contract-review.json",
+    "labelAndSpaceExpansion": "none; complete existing asInputRoot capability and semantic press path retained",
+    "generatedPolicy": "Known coherent selected artifacts initialized the publication inventory, then every unit was actually emitted anew. No generated Rust/receipt text was manually edited."
+  },
+  "executed": {
+    "runtimeComparison": {
+      "oracleHead": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "sourceCandidates": [
+        "3efb43dda237618de0935a59b41555ca69b22c2a",
+        "9239516638d23e6bf5211fe15a3419550ede4096"
+      ],
+      "compilerRuntime": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "stack": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "mainSource": {
+        "tests": 3,
+        "pass": 0,
+        "fail": 3,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "testsUnchanged": true,
+      "sourceRestored": true,
+      "boundary": "Existing stack Runtime tests remain byte-identical while the authored source directory is switched. This is not main compiler/native validation. No native execution.",
+      "rawReceipt": "frontend/docs/evidence/rcip-integration-20261124/runtime-source-discrimination.json"
+    },
+    "producer": {
+      "publish": {
+        "exitCode": 0,
+        "units": 14,
+        "artifacts": 81,
+        "freshCompilation": true
+      },
+      "freshCheck": {
+        "exitCode": 0,
+        "units": 14,
+        "artifacts": 81,
+        "freshCompilation": true
+      },
+      "retainedCheck": {
+        "exitCode": 0,
+        "units": 14,
+        "freshCompilation": false
+      },
+      "toolchain": {
+        "node": "v24.22.3",
+        "packageManager": "pnpm@10.32.1",
+        "runner": "corepack pnpm@10.32.1",
+        "packages": {
+          "typescript": "5.9.3",
+          "tsx": "4.21.0"
+        },
+        "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8"
+      },
+      "rawReceipt": "frontend/docs/evidence/rcip-integration-20261124/producer-revalidation.json",
+      "outputIdentity": "Freshly executed producer output is deterministic; its text hashes equal prior runs because the selected source and pin are identical."
+    },
+    "productionIdentity": {
+      "reference": "3efb43dda237618de0935a59b41555ca69b22c2a",
+      "tree": "2255be0989bb3ae85289c5e72fb2745c7b908321",
+      "trackedDiffAfterProducer": []
+    },
+    "whitespaceChecks": {
+      "unrestrictedStagedDiffCheck": {
+        "exitCode": 2,
+        "reason": "Original timestamped blank lines in the full CI log and original blank diagnostic lines in the TAP failure carry trailing whitespace. These immutable raw bytes are intentionally preserved.",
+        "affectedPaths": [
+          "frontend/docs/evidence/rcip-integration-20261124/main18-headless-failure.log",
+          "frontend/docs/evidence/rcip-integration-20261124/runtime-main-source-control.tap"
+        ]
+      },
+      "authoredMarkdownAndJsonDiffCheck": {
+        "exitCode": 0,
+        "scope": "all added Markdown and JSON paths"
+      },
+      "productionCodeDelta": "none"
+    }
+  },
+  "remainingAcceptance": {
+    "lockedCargoGraph": "not run for this merge candidate",
+    "nativeGuiAndSdk": "not run for this merge candidate",
+    "packagingAndRealOsWindowInput": "not run for this merge candidate",
+    "gate": "Require actual candidate CI before normal integration. Existing stack CI is not relabeled as execution of this merge commit."
+  },
+  "payloads": [
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/main18-headless-failure.log",
+      "sha256": "a2216ca0b88369459559df88fee98e13b8bb75064a8baa99dff7455bd05da5db",
+      "bytes": 19950,
+      "originalSha256": "a2216ca0b88369459559df88fee98e13b8bb75064a8baa99dff7455bd05da5db",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/main18-headless-failure-receipt.json",
+      "sha256": "143e36ec5b3c8702fcb15426e9f35b3ca16d1446bacd7ea8015ea9c8ec74f28a",
+      "bytes": 2042,
+      "originalSha256": "143e36ec5b3c8702fcb15426e9f35b3ca16d1446bacd7ea8015ea9c8ec74f28a",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/main18-source-contract-review.json",
+      "sha256": "320eb0d61bc827d8d50afaa6f24b44899cfac5c064d55427013bcb190ff8bb99",
+      "bytes": 6466,
+      "originalSha256": "320eb0d61bc827d8d50afaa6f24b44899cfac5c064d55427013bcb190ff8bb99",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/path-resolution-plan.json",
+      "sha256": "f633aa40639dfaa9f9958e7d3b55705422d77240402aa402ca695d6549d9d9d2",
+      "bytes": 32309,
+      "originalSha256": "f633aa40639dfaa9f9958e7d3b55705422d77240402aa402ca695d6549d9d9d2",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/normal-merge-attempt.log",
+      "sha256": "a28a0b85a5b4a01374394c4fcda24d3b7d6959f2cac8223039291a388820538d",
+      "bytes": 8446,
+      "originalSha256": "a28a0b85a5b4a01374394c4fcda24d3b7d6959f2cac8223039291a388820538d",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/runtime-source-discrimination.json",
+      "sha256": "651236731eb5338f5abebcf8177b1137db37c6f8af85491c7d3944fa08f084c0",
+      "bytes": 3306,
+      "originalSha256": "651236731eb5338f5abebcf8177b1137db37c6f8af85491c7d3944fa08f084c0",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/runtime-stack-source-control.tap",
+      "sha256": "18840c1c9aee896ef6c2e71af42a04ed8ea99b9bebeb83c9cb3d233e5e30fc47",
+      "bytes": 857,
+      "originalSha256": "18840c1c9aee896ef6c2e71af42a04ed8ea99b9bebeb83c9cb3d233e5e30fc47",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/runtime-main-source-control.tap",
+      "sha256": "edd6c705245b699c8a714fcf7f3396182e9e5f3a5b51e2a3f7ac96548a4666dd",
+      "bytes": 3284,
+      "originalSha256": "edd6c705245b699c8a714fcf7f3396182e9e5f3a5b51e2a3f7ac96548a4666dd",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/producer-revalidation.json",
+      "sha256": "f8fe52ef5d453b8e7a1ec9449331e6aea87cc3dda214ff9cfda6d863cb48593a",
+      "bytes": 3170,
+      "originalSha256": "f8fe52ef5d453b8e7a1ec9449331e6aea87cc3dda214ff9cfda6d863cb48593a",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/producer-publish.log",
+      "sha256": "cd10b3a81629bb726b4b398b8bfad2fdac91d2b7ec280d68ef35de90f19052f3",
+      "bytes": 8076,
+      "originalSha256": "cd10b3a81629bb726b4b398b8bfad2fdac91d2b7ec280d68ef35de90f19052f3",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/producer-freshCheck.log",
+      "sha256": "f8a1f55c60735946609ea44bb100f2046e25d927f51a557c705be03e231f2f4d",
+      "bytes": 8086,
+      "originalSha256": "f8a1f55c60735946609ea44bb100f2046e25d927f51a557c705be03e231f2f4d",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-20261124/producer-retainedCheck.log",
+      "sha256": "8f1e774b096e65816eeacd48a157d734d35d4a2a939118d3701e691f12dc43a0",
+      "bytes": 491,
+      "originalSha256": "8f1e774b096e65816eeacd48a157d734d35d4a2a939118d3701e691f12dc43a0",
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/proto-ui/RCIP-INTEGRATION-2026-11-24.md",
+      "sha256": "556246959b4a38fbead79ce5522aecc83122e29e38bcff06af639fbbca6cd36f",
+      "bytes": 7716,
+      "kind": "new explanatory record"
+    }
+  ],
+  "retention": "Original logs/reviews are copied byte-for-byte, including original absolute execution paths. Old failure controls and frozen repository evidence remain unchanged."
+}

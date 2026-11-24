@@ -1,0 +1,107 @@
+Auto-merging frontend/proto-ui/CONTROL-MIGRATION.md
+Auto-merging frontend/proto-ui/README.md
+CONFLICT (content): Merge conflict in frontend/proto-ui/README.md
+Auto-merging frontend/proto-ui/compiler.pin.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/compiler.pin.json
+Auto-merging frontend/proto-ui/generated/action-control/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/action-control/Cargo.toml
+Auto-merging frontend/proto-ui/generated/action-control/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/action-control/Component.rs
+Auto-merging frontend/proto-ui/generated/action-control/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/action-control/Component.rs.map
+Auto-merging frontend/proto-ui/generated/action-control/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/action-control/provenance.json
+Auto-merging frontend/proto-ui/generated/collection-control/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/collection-control/Cargo.toml
+Auto-merging frontend/proto-ui/generated/collection-control/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/collection-control/Component.rs
+Auto-merging frontend/proto-ui/generated/collection-control/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/collection-control/Component.rs.map
+Auto-merging frontend/proto-ui/generated/collection-control/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/collection-control/provenance.json
+Auto-merging frontend/proto-ui/generated/continuous-control/.proto-ui/fixtures/style-tokens.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/continuous-control/.proto-ui/fixtures/style-tokens.json
+Auto-merging frontend/proto-ui/generated/continuous-control/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/continuous-control/Cargo.toml
+Auto-merging frontend/proto-ui/generated/continuous-control/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/continuous-control/Component.rs
+Auto-merging frontend/proto-ui/generated/continuous-control/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/continuous-control/Component.rs.map
+Auto-merging frontend/proto-ui/generated/continuous-control/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/continuous-control/provenance.json
+Auto-merging frontend/proto-ui/generated/editor-surface/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/editor-surface/Cargo.toml
+Auto-merging frontend/proto-ui/generated/editor-surface/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/editor-surface/Component.rs
+Auto-merging frontend/proto-ui/generated/editor-surface/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/editor-surface/Component.rs.map
+Auto-merging frontend/proto-ui/generated/editor-surface/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/editor-surface/provenance.json
+Auto-merging frontend/proto-ui/generated/graph-point/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/graph-point/Cargo.toml
+Auto-merging frontend/proto-ui/generated/graph-point/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/graph-point/Component.rs
+Auto-merging frontend/proto-ui/generated/graph-point/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/graph-point/Component.rs.map
+Auto-merging frontend/proto-ui/generated/graph-point/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/graph-point/provenance.json
+Auto-merging frontend/proto-ui/generated/performance-key/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/performance-key/Cargo.toml
+Auto-merging frontend/proto-ui/generated/performance-key/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/performance-key/Component.rs
+Auto-merging frontend/proto-ui/generated/performance-key/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/performance-key/Component.rs.map
+Auto-merging frontend/proto-ui/generated/performance-key/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/performance-key/provenance.json
+Auto-merging frontend/proto-ui/generated/scroll-region/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/scroll-region/Cargo.toml
+Auto-merging frontend/proto-ui/generated/scroll-region/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/scroll-region/Component.rs
+Auto-merging frontend/proto-ui/generated/scroll-region/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/scroll-region/Component.rs.map
+Auto-merging frontend/proto-ui/generated/scroll-region/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/scroll-region/provenance.json
+Auto-merging frontend/proto-ui/generated/text-field/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/text-field/Cargo.toml
+Auto-merging frontend/proto-ui/generated/text-field/Component.rs
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/text-field/Component.rs
+Auto-merging frontend/proto-ui/generated/text-field/Component.rs.map
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/text-field/Component.rs.map
+Auto-merging frontend/proto-ui/generated/text-field/provenance.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/generated/text-field/provenance.json
+Auto-merging frontend/proto-ui/receipts/action-control.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/action-control.json
+Auto-merging frontend/proto-ui/receipts/collection-control.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/collection-control.json
+Auto-merging frontend/proto-ui/receipts/continuous-control.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/continuous-control.json
+Auto-merging frontend/proto-ui/receipts/control-gesture-planner.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/control-gesture-planner.json
+Auto-merging frontend/proto-ui/receipts/drag-source.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/drag-source.json
+Auto-merging frontend/proto-ui/receipts/editor-surface.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/editor-surface.json
+Auto-merging frontend/proto-ui/receipts/graph-point.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/graph-point.json
+Auto-merging frontend/proto-ui/receipts/normalized-knob.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/normalized-knob.json
+Auto-merging frontend/proto-ui/receipts/note-gesture-planner.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/note-gesture-planner.json
+Auto-merging frontend/proto-ui/receipts/overlay-control.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/overlay-control.json
+Auto-merging frontend/proto-ui/receipts/performance-key.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/performance-key.json
+Auto-merging frontend/proto-ui/receipts/pitch-gesture-surface.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/pitch-gesture-surface.json
+Auto-merging frontend/proto-ui/receipts/scroll-region.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/scroll-region.json
+Auto-merging frontend/proto-ui/receipts/text-field.json
+CONFLICT (content): Merge conflict in frontend/proto-ui/receipts/text-field.json
+Auto-merging frontend/proto-ui/src/action-control.proto.ts
+CONFLICT (content): Merge conflict in frontend/proto-ui/src/action-control.proto.ts
+Auto-merging frontend/proto-ui/src/collection-control.proto.ts
+Auto-merging frontend/proto-ui/src/continuous-control.proto.ts
+Auto-merging frontend/proto-ui/tools/test/common-controls.test.mjs
+Auto-merging frontend/proto-ui/tools/test/continuous-control.test.mjs
+CONFLICT (content): Merge conflict in frontend/proto-ui/tools/test/continuous-control.test.mjs
+Automatic merge failed; fix conflicts and then commit the result.

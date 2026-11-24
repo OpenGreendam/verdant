@@ -1,0 +1,85 @@
+{
+  "schema": "verdant.integration-producer.v1",
+  "recordedAt": "2026-11-24T11:05:16.158014+00:00",
+  "stack": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "main": "9239516638d23e6bf5211fe15a3419550ede4096",
+  "compiler": "e9340df6279e063cf372080bf4cc97caea3fd901",
+  "preimageTree": "2255be0989bb3ae85289c5e72fb2745c7b908321",
+  "preimageNote": "Complete selected compiler-owned snapshot restored by Git solely to provide a valid publication inventory. All final artifacts are recreated using the official pinned producer, then independently checked. No generated Rust/receipt content was hand-edited.",
+  "runs": {
+    "publish": {
+      "command": [
+        "node",
+        "frontend/proto-ui/tools/build-proto-ui.mjs",
+        "--upstream",
+        "/workspace/scratch/27c38b1bbc32/Proto-UI"
+      ],
+      "exitCode": 0,
+      "log": "/workspace/scratch/b91f3481ce6f/verdant-workflow/integration-diagnosis/producer-publish.log",
+      "sha256": "cd10b3a81629bb726b4b398b8bfad2fdac91d2b7ec280d68ef35de90f19052f3",
+      "ok": true,
+      "mode": "publish",
+      "freshCompilation": true,
+      "upstreamRevision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "units": 14,
+      "artifacts": 81,
+      "executedToolchain": {
+        "node": "v24.22.3",
+        "packageManager": "pnpm@10.32.1",
+        "runner": "corepack pnpm@10.32.1",
+        "packages": {
+          "typescript": "5.9.3",
+          "tsx": "4.21.0"
+        },
+        "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8"
+      }
+    },
+    "freshCheck": {
+      "command": [
+        "node",
+        "frontend/proto-ui/tools/build-proto-ui.mjs",
+        "--check",
+        "--upstream",
+        "/workspace/scratch/27c38b1bbc32/Proto-UI"
+      ],
+      "exitCode": 0,
+      "log": "/workspace/scratch/b91f3481ce6f/verdant-workflow/integration-diagnosis/producer-freshCheck.log",
+      "sha256": "f8a1f55c60735946609ea44bb100f2046e25d927f51a557c705be03e231f2f4d",
+      "ok": true,
+      "mode": "fresh-compilation",
+      "freshCompilation": true,
+      "upstreamRevision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "units": 14,
+      "artifacts": 81,
+      "executedToolchain": {
+        "node": "v24.22.3",
+        "packageManager": "pnpm@10.32.1",
+        "runner": "corepack pnpm@10.32.1",
+        "packages": {
+          "typescript": "5.9.3",
+          "tsx": "4.21.0"
+        },
+        "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8"
+      }
+    },
+    "retainedCheck": {
+      "command": [
+        "node",
+        "frontend/proto-ui/tools/build-proto-ui.mjs",
+        "--check-retained"
+      ],
+      "exitCode": 0,
+      "log": "/workspace/scratch/b91f3481ce6f/verdant-workflow/integration-diagnosis/producer-retainedCheck.log",
+      "sha256": "8f1e774b096e65816eeacd48a157d734d35d4a2a939118d3701e691f12dc43a0",
+      "ok": true,
+      "mode": "retained-artifacts",
+      "freshCompilation": false,
+      "upstreamRevision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "units": 14,
+      "artifacts": 0,
+      "executedToolchain": null
+    }
+  },
+  "finalTrackedDiffFromStack": [],
+  "unresolved": []
+}
