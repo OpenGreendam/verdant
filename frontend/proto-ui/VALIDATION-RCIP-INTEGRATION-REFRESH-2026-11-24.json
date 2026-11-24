@@ -1,0 +1,101 @@
+{
+  "schema": "verdant.rcip-integration-main-refresh.v1",
+  "recordedAt": "2026-11-24T11:19:07.861101+00:00",
+  "expectedMergeParents": [
+    "9ec5f41d1d5d336ac8ab323f1ced4c68697ba0a8",
+    "79c0aa67ec37e777efc95bac5018cf2f5318da65"
+  ],
+  "mainAuthoredCommit": "6a3586078aff9adff2b4ba8e5cd7c74a9daf755f",
+  "preservedMergeCommit": "9490a828d3ab03b363fc49f59bf5322b0a7c9efb",
+  "productionSnapshot": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "selectedCompiler": "e9340df6279e063cf372080bf4cc97caea3fd901",
+  "previousFrozenRecord": {
+    "path": "frontend/proto-ui/VALIDATION-RCIP-INTEGRATION-2026-11-24.json",
+    "sha256": "4b53236ffa097d24cfcaee103020cb8170adad1c80b7b049d5b4634715d19258",
+    "allPayloadHashesStillMatch": true
+  },
+  "mainDiff": {
+    "paths": [
+      "frontend/Cargo.lock",
+      "frontend/crates/verdant-app/Cargo.toml"
+    ],
+    "changedAliasCount": 8,
+    "unchangedNativeAliasCount": 4,
+    "externalDependencyFeatureOrBehaviorChange": false
+  },
+  "identityVerification": {
+    "scope": "actual generated Cargo.toml package names, app dependency aliases, exact local lock entries and app lock edges for all 12 native units",
+    "historical923Matches": 4,
+    "current79Matches": 12,
+    "selectedE934Matches": 12,
+    "lockPackageCount": 836,
+    "normalizedWholeAppAndLockEqual": true,
+    "rawEvidence": "frontend/docs/evidence/rcip-integration-refresh-20261124/package-identities.json",
+    "boundary": "Structural identity verification, not cargo metadata, cargo fetch or dependency resolution. New published candidate CI remains required."
+  },
+  "resolution": {
+    "conflictedPaths": [
+      "frontend/Cargo.lock",
+      "frontend/crates/verdant-app/Cargo.toml"
+    ],
+    "rule": "Preserve #20 matching-identity constraint using the actual selected e9340df producer package names. Both selected files already match and stay exactly equal to the production snapshot.",
+    "preExistingPathsChangedFromPreviousCandidate": [],
+    "generatedFilesHandEdited": false,
+    "historicalFailureBoundary": "The #18 missing-package failure is retained as historical evidence. Current main79 has repaired that mismatch for its own artifacts; it is not claimed to retain the old alias failure."
+  },
+  "executedThisRefresh": {
+    "retainedCheck": {
+      "command": [
+        "node",
+        "frontend/proto-ui/tools/build-proto-ui.mjs",
+        "--check-retained"
+      ],
+      "exitCode": 0,
+      "units": 14,
+      "freshCompilation": false,
+      "rawReceipt": "frontend/docs/evidence/rcip-integration-refresh-20261124/refresh-validation.json"
+    },
+    "structuralPackageIdentityChecks": "passed"
+  },
+  "notRerunThisRefresh": [
+    "fresh compilation",
+    "source Runtime tests",
+    "locked Cargo resolution",
+    "native GUI/SDK tests",
+    "packaging",
+    "real OS-window input"
+  ],
+  "remainingGate": "The new published integration candidate must pass its own CI before normal merge. Prior results remain bound to their actual input snapshots.",
+  "payloads": [
+    {
+      "path": "frontend/docs/evidence/rcip-integration-refresh-20261124/package-identities.json",
+      "sha256": "45cac1d582bb12ce8e643d0bfb2d68ce9d2d02eb8df52e0310524f19d145b17f",
+      "bytes": 20208,
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-refresh-20261124/normal-merge-attempt.log",
+      "sha256": "a420bd807c25b7e7017eda275d9903cb13f84777af6de84ad23f006e255ad355",
+      "bytes": 286,
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-refresh-20261124/retained-check.log",
+      "sha256": "8f1e774b096e65816eeacd48a157d734d35d4a2a939118d3701e691f12dc43a0",
+      "bytes": 491,
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/docs/evidence/rcip-integration-refresh-20261124/refresh-validation.json",
+      "sha256": "c64256d111eded399fff538b2e735ab84ad9f12ccf2438102cfb3f48951f8eda",
+      "bytes": 1083,
+      "normalization": "none"
+    },
+    {
+      "path": "frontend/proto-ui/RCIP-INTEGRATION-REFRESH-2026-11-24.md",
+      "sha256": "dcddf0b9f6f4684894f22a562a7ec12b5eb80f7769ad42ce46439382f2234677",
+      "bytes": 2660,
+      "kind": "new explanation"
+    }
+  ]
+}

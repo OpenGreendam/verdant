@@ -1,0 +1,457 @@
+{
+  "schema": "verdant.integration-package-identity-refresh.v1",
+  "recordedAt": "2026-11-24T11:17:25.618397+00:00",
+  "mainBeforeFix": "9239516638d23e6bf5211fe15a3419550ede4096",
+  "mainAfterFix": "79c0aa67ec37e777efc95bac5018cf2f5318da65",
+  "selectedIntegrationInput": "9ec5f41d1d5d336ac8ab323f1ced4c68697ba0a8",
+  "selectedProductionSnapshot": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "changedFiles": [
+    "frontend/Cargo.lock",
+    "frontend/crates/verdant-app/Cargo.toml"
+  ],
+  "changedAliases": [
+    "verdant-action-control",
+    "verdant-collection-control",
+    "verdant-continuous-control",
+    "verdant-editor-surface",
+    "verdant-graph-point",
+    "verdant-performance-key",
+    "verdant-scroll-region",
+    "verdant-text-field"
+  ],
+  "records": {
+    "9239516638d23e6bf5211fe15a3419550ede4096": {
+      "compilerPin": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e",
+      "rows": [
+        {
+          "unit": "action-control",
+          "alias": "verdant-action-control",
+          "path": "frontend/proto-ui/generated/action-control",
+          "declaredPackage": "generated-gpui-453d0654bb061524567e58b3f919af45",
+          "generatedPackage": "generated-gpui-ed34da374ae919546d076ccbe2751ef4",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "collection-control",
+          "alias": "verdant-collection-control",
+          "path": "frontend/proto-ui/generated/collection-control",
+          "declaredPackage": "generated-gpui-7bc3e114ab2704031ff8f0e8ef72b0b4",
+          "generatedPackage": "generated-gpui-ab387781a863759d22aa611ba9bffc55",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "continuous-control",
+          "alias": "verdant-continuous-control",
+          "path": "frontend/proto-ui/generated/continuous-control",
+          "declaredPackage": "generated-gpui-8896b9a832ba128a5e3e5aa6280c2b0d",
+          "generatedPackage": "generated-gpui-6cea3b9b5774accb2474915e2921fa83",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "drag-source",
+          "alias": "verdant-drag-source",
+          "path": "frontend/proto-ui/generated/drag-source",
+          "declaredPackage": "generated-gpui-cab661c69e21f84c6f0b8d42702bac16",
+          "generatedPackage": "generated-gpui-cab661c69e21f84c6f0b8d42702bac16",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "editor-surface",
+          "alias": "verdant-editor-surface",
+          "path": "frontend/proto-ui/generated/editor-surface",
+          "declaredPackage": "generated-gpui-56aecbc3a70b9ce072128c3ce6551e8a",
+          "generatedPackage": "generated-gpui-b482e3580273d3793849dd46be364a38",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "graph-point",
+          "alias": "verdant-graph-point",
+          "path": "frontend/proto-ui/generated/graph-point",
+          "declaredPackage": "generated-gpui-c341222aeb0ae550fc52fc631f285414",
+          "generatedPackage": "generated-gpui-016c767e39c58274728185baec2a3fa4",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "normalized-knob",
+          "alias": "verdant-normalized-knob",
+          "path": "frontend/proto-ui/generated/normalized-knob",
+          "declaredPackage": "generated-gpui-4498881630ff6ed192d401c5efa20d08",
+          "generatedPackage": "generated-gpui-4498881630ff6ed192d401c5efa20d08",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "overlay-control",
+          "alias": "verdant-overlay-control",
+          "path": "frontend/proto-ui/generated/overlay-control",
+          "declaredPackage": "generated-gpui-c95b53accf92907139eb07f9b02b4adf",
+          "generatedPackage": "generated-gpui-c95b53accf92907139eb07f9b02b4adf",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "performance-key",
+          "alias": "verdant-performance-key",
+          "path": "frontend/proto-ui/generated/performance-key",
+          "declaredPackage": "generated-gpui-06be6e15d2484bcbf34a5dcbd8147005",
+          "generatedPackage": "generated-gpui-3bc8d6cf457a74bdf278cb1b042336e6",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "pitch-gesture-surface",
+          "alias": "verdant-pitch-gesture-surface",
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface",
+          "declaredPackage": "generated-gpui-c77c3274cff416fb9f1443d0f0dbb6ef",
+          "generatedPackage": "generated-gpui-c77c3274cff416fb9f1443d0f0dbb6ef",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "scroll-region",
+          "alias": "verdant-scroll-region",
+          "path": "frontend/proto-ui/generated/scroll-region",
+          "declaredPackage": "generated-gpui-426fa7cf12293064eedce6664125b583",
+          "generatedPackage": "generated-gpui-9dea1709f3ac20d540d209c81f3d4450",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        },
+        {
+          "unit": "text-field",
+          "alias": "verdant-text-field",
+          "path": "frontend/proto-ui/generated/text-field",
+          "declaredPackage": "generated-gpui-59091ba4197b0c29e9b91c921377bf80",
+          "generatedPackage": "generated-gpui-5aa1c6a383ac379ab1bc4630ae1c59f5",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": false,
+          "exactLockPackageCount": 0,
+          "appLockEdgeMatches": false
+        }
+      ],
+      "matchCount": 4,
+      "lockPackages": 836,
+      "generatedLockPackages": 12,
+      "normalizedAppAndLockSha256": "b83dc058f6febcc7bae7973493b289e2408b86a8ad80add601f031c080e851aa",
+      "appManifestSha256": "2207778a22a07a7ce14f7d57fe8b68ca54fe1fd3d2258b9d54be0cc51b994442",
+      "cargoLockSha256": "da0b9eeae2e012cd3e06f2c3debb344e74c85b8db9959a6692b1a9c39af75fdf"
+    },
+    "79c0aa67ec37e777efc95bac5018cf2f5318da65": {
+      "compilerPin": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e",
+      "rows": [
+        {
+          "unit": "action-control",
+          "alias": "verdant-action-control",
+          "path": "frontend/proto-ui/generated/action-control",
+          "declaredPackage": "generated-gpui-ed34da374ae919546d076ccbe2751ef4",
+          "generatedPackage": "generated-gpui-ed34da374ae919546d076ccbe2751ef4",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "collection-control",
+          "alias": "verdant-collection-control",
+          "path": "frontend/proto-ui/generated/collection-control",
+          "declaredPackage": "generated-gpui-ab387781a863759d22aa611ba9bffc55",
+          "generatedPackage": "generated-gpui-ab387781a863759d22aa611ba9bffc55",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "continuous-control",
+          "alias": "verdant-continuous-control",
+          "path": "frontend/proto-ui/generated/continuous-control",
+          "declaredPackage": "generated-gpui-6cea3b9b5774accb2474915e2921fa83",
+          "generatedPackage": "generated-gpui-6cea3b9b5774accb2474915e2921fa83",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "drag-source",
+          "alias": "verdant-drag-source",
+          "path": "frontend/proto-ui/generated/drag-source",
+          "declaredPackage": "generated-gpui-cab661c69e21f84c6f0b8d42702bac16",
+          "generatedPackage": "generated-gpui-cab661c69e21f84c6f0b8d42702bac16",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "editor-surface",
+          "alias": "verdant-editor-surface",
+          "path": "frontend/proto-ui/generated/editor-surface",
+          "declaredPackage": "generated-gpui-b482e3580273d3793849dd46be364a38",
+          "generatedPackage": "generated-gpui-b482e3580273d3793849dd46be364a38",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "graph-point",
+          "alias": "verdant-graph-point",
+          "path": "frontend/proto-ui/generated/graph-point",
+          "declaredPackage": "generated-gpui-016c767e39c58274728185baec2a3fa4",
+          "generatedPackage": "generated-gpui-016c767e39c58274728185baec2a3fa4",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "normalized-knob",
+          "alias": "verdant-normalized-knob",
+          "path": "frontend/proto-ui/generated/normalized-knob",
+          "declaredPackage": "generated-gpui-4498881630ff6ed192d401c5efa20d08",
+          "generatedPackage": "generated-gpui-4498881630ff6ed192d401c5efa20d08",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "overlay-control",
+          "alias": "verdant-overlay-control",
+          "path": "frontend/proto-ui/generated/overlay-control",
+          "declaredPackage": "generated-gpui-c95b53accf92907139eb07f9b02b4adf",
+          "generatedPackage": "generated-gpui-c95b53accf92907139eb07f9b02b4adf",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "performance-key",
+          "alias": "verdant-performance-key",
+          "path": "frontend/proto-ui/generated/performance-key",
+          "declaredPackage": "generated-gpui-3bc8d6cf457a74bdf278cb1b042336e6",
+          "generatedPackage": "generated-gpui-3bc8d6cf457a74bdf278cb1b042336e6",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "pitch-gesture-surface",
+          "alias": "verdant-pitch-gesture-surface",
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface",
+          "declaredPackage": "generated-gpui-c77c3274cff416fb9f1443d0f0dbb6ef",
+          "generatedPackage": "generated-gpui-c77c3274cff416fb9f1443d0f0dbb6ef",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "scroll-region",
+          "alias": "verdant-scroll-region",
+          "path": "frontend/proto-ui/generated/scroll-region",
+          "declaredPackage": "generated-gpui-9dea1709f3ac20d540d209c81f3d4450",
+          "generatedPackage": "generated-gpui-9dea1709f3ac20d540d209c81f3d4450",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "text-field",
+          "alias": "verdant-text-field",
+          "path": "frontend/proto-ui/generated/text-field",
+          "declaredPackage": "generated-gpui-5aa1c6a383ac379ab1bc4630ae1c59f5",
+          "generatedPackage": "generated-gpui-5aa1c6a383ac379ab1bc4630ae1c59f5",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        }
+      ],
+      "matchCount": 12,
+      "lockPackages": 836,
+      "generatedLockPackages": 12,
+      "normalizedAppAndLockSha256": "b83dc058f6febcc7bae7973493b289e2408b86a8ad80add601f031c080e851aa",
+      "appManifestSha256": "6a47a5931319b845eaedd3ee8eea9d7c9cdc2bd3d794953e759a585a907fc71d",
+      "cargoLockSha256": "4b9374bf57790c1a63946a585202c1bd78ff9719feadb4671260095d5ee0d56c"
+    },
+    "9ec5f41d1d5d336ac8ab323f1ced4c68697ba0a8": {
+      "compilerPin": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "rows": [
+        {
+          "unit": "action-control",
+          "alias": "verdant-action-control",
+          "path": "frontend/proto-ui/generated/action-control",
+          "declaredPackage": "generated-gpui-b286d126da0c73bf3a1d84949b13c25a",
+          "generatedPackage": "generated-gpui-b286d126da0c73bf3a1d84949b13c25a",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "collection-control",
+          "alias": "verdant-collection-control",
+          "path": "frontend/proto-ui/generated/collection-control",
+          "declaredPackage": "generated-gpui-a5767e6167b7ae5523cc27b3938c6863",
+          "generatedPackage": "generated-gpui-a5767e6167b7ae5523cc27b3938c6863",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "continuous-control",
+          "alias": "verdant-continuous-control",
+          "path": "frontend/proto-ui/generated/continuous-control",
+          "declaredPackage": "generated-gpui-c418da798fb27a549347168982b07ae9",
+          "generatedPackage": "generated-gpui-c418da798fb27a549347168982b07ae9",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "drag-source",
+          "alias": "verdant-drag-source",
+          "path": "frontend/proto-ui/generated/drag-source",
+          "declaredPackage": "generated-gpui-29cfcd7b8359945c50f15ffd20b14ff7",
+          "generatedPackage": "generated-gpui-29cfcd7b8359945c50f15ffd20b14ff7",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "editor-surface",
+          "alias": "verdant-editor-surface",
+          "path": "frontend/proto-ui/generated/editor-surface",
+          "declaredPackage": "generated-gpui-d4689e3e1fc8f199cbb99d47cca12963",
+          "generatedPackage": "generated-gpui-d4689e3e1fc8f199cbb99d47cca12963",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "graph-point",
+          "alias": "verdant-graph-point",
+          "path": "frontend/proto-ui/generated/graph-point",
+          "declaredPackage": "generated-gpui-cde8247b3e173b0bec12326eb2e32684",
+          "generatedPackage": "generated-gpui-cde8247b3e173b0bec12326eb2e32684",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "normalized-knob",
+          "alias": "verdant-normalized-knob",
+          "path": "frontend/proto-ui/generated/normalized-knob",
+          "declaredPackage": "generated-gpui-51ee6ccecd229ec65f76891504d689af",
+          "generatedPackage": "generated-gpui-51ee6ccecd229ec65f76891504d689af",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "overlay-control",
+          "alias": "verdant-overlay-control",
+          "path": "frontend/proto-ui/generated/overlay-control",
+          "declaredPackage": "generated-gpui-3c96e5538cf4708f4efe8d5a58b185be",
+          "generatedPackage": "generated-gpui-3c96e5538cf4708f4efe8d5a58b185be",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "performance-key",
+          "alias": "verdant-performance-key",
+          "path": "frontend/proto-ui/generated/performance-key",
+          "declaredPackage": "generated-gpui-bcb9600466028d97f55418619b08f828",
+          "generatedPackage": "generated-gpui-bcb9600466028d97f55418619b08f828",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "pitch-gesture-surface",
+          "alias": "verdant-pitch-gesture-surface",
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface",
+          "declaredPackage": "generated-gpui-b52ed869ec1a5a76be7b9293837850ec",
+          "generatedPackage": "generated-gpui-b52ed869ec1a5a76be7b9293837850ec",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "scroll-region",
+          "alias": "verdant-scroll-region",
+          "path": "frontend/proto-ui/generated/scroll-region",
+          "declaredPackage": "generated-gpui-b839ef9e9422255d8661581dfde3da43",
+          "generatedPackage": "generated-gpui-b839ef9e9422255d8661581dfde3da43",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        },
+        {
+          "unit": "text-field",
+          "alias": "verdant-text-field",
+          "path": "frontend/proto-ui/generated/text-field",
+          "declaredPackage": "generated-gpui-ea1da5215512dd1041ef9decb464d3cc",
+          "generatedPackage": "generated-gpui-ea1da5215512dd1041ef9decb464d3cc",
+          "generatedVersion": "0.1.0",
+          "aliasMatches": true,
+          "exactLockPackageCount": 1,
+          "appLockEdgeMatches": true
+        }
+      ],
+      "matchCount": 12,
+      "lockPackages": 836,
+      "generatedLockPackages": 12,
+      "normalizedAppAndLockSha256": "b83dc058f6febcc7bae7973493b289e2408b86a8ad80add601f031c080e851aa",
+      "appManifestSha256": "d0f5e677e079361ba41087d2ad23f8e33004592b8aa3a2529a28db9bc4dfaa86",
+      "cargoLockSha256": "9705e787471bfe5b59c5acc73fe53b7bb84eab4f6a608589c8f28b581f129ec0"
+    }
+  },
+  "normalizedFullAppAndLockDeepEqual": true,
+  "normalization": "Only generated package identity strings are replaced by their stable consumer aliases; package/dependency ordering is canonicalized. All other TOML values, 836 lock package records, versions, sources, features and dependency edges are compared.",
+  "coverageBoundary": "Structural identity verification, not cargo metadata, cargo fetch or dependency resolution. New published candidate CI remains required.",
+  "currentMainConclusion": "#20 repairs all eight former main package-identity mismatches. Current main79 has 12/12 correct mappings for its own bd5800-derived artifacts. Selected e934-derived artifacts also have 12/12 correct mappings, with no additional Cargo semantics removed."
+}

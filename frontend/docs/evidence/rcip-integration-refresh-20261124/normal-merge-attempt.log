@@ -1,0 +1,5 @@
+Auto-merging frontend/Cargo.lock
+CONFLICT (content): Merge conflict in frontend/Cargo.lock
+Auto-merging frontend/crates/verdant-app/Cargo.toml
+CONFLICT (content): Merge conflict in frontend/crates/verdant-app/Cargo.toml
+Automatic merge failed; fix conflicts and then commit the result.
