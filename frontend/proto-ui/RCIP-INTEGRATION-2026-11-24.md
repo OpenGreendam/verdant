@@ -55,7 +55,7 @@ All 11 main-only paths were adjudicated as follows:
 | `src/text-field.proto.ts` | Keep the official `asInputEditor` composition for directly named fields. No new independent Label pair is required by current consumers. |
 | `src/upstream-input/PROVENANCE.md` | Preserve the recorded vendor-source history instead of rewriting it to an older snapshot. Compiler and vendor identities are distinguished below. |
 | `src/upstream-input/provenance.json` | Preserve the exact recorded vendor hashes. |
-| `src/upstream-input/root.proto.ts` | Keep both official hooks, including the full `asInputRoot` ControlLabel target. No Label capability is removed. |
+| `src/upstream-input/root.proto.ts` | Keep both official reusable hooks, including the full `asInputRoot` ControlLabel target. The directly named compiled TextField continues to use `asInputEditor`; main's added target binding on that component is not carried over. |
 | `tools/test/advanced-editors.test.mjs` | Keep the existing momentary, editor-command, threshold and retirement assertions removed by #18. |
 | `tools/test/text-field.test.mjs` | Keep exact vendor provenance checks and the established directly named editor composition assertion. |
 
@@ -70,8 +70,9 @@ that Label support is unavailable.
 Main's early Space default-prevention line is not added separately. The current
 native press path already consumes accepted Space activation, and the existing
 source tests protect its ordering and authority. This merge adds no new Label
-consumer or keyboard behavior. Existing runtime and native assertions remain
-unchanged.
+consumer or keyboard behavior. Early keydown prevention and prevention during
+semantic press commit are different timings; this decision does not claim they
+are interchangeable. Existing runtime and native assertions remain unchanged.
 
 ## Executed evidence
 

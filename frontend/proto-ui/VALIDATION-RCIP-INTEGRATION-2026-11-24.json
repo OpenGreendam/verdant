@@ -9,7 +9,9 @@
     "commonAncestor": "ac0402289e335d9a8228b4e056fb95320482458a",
     "productionSnapshotTree": "2255be0989bb3ae85289c5e72fb2745c7b908321",
     "existingPathsDifferingFromFirstParent": [],
-    "scopeOfNewFiles": "explanatory record, machine receipt, and exact copied raw/review evidence only"
+    "scopeOfNewFiles": "explanatory record, machine receipt, and exact copied raw/review evidence only",
+    "mergeCommit": "9490a828d3ab03b363fc49f59bf5322b0a7c9efb",
+    "documentationClarification": "A subsequent documentation-only commit clarifies reusable InputRoot versus the compiled TextField target, and distinguishes early keydown versus semantic press default-prevention timing. No source, tests, raw evidence or generated artifact changes."
   },
   "compiler": {
     "selected": "e9340df6279e063cf372080bf4cc97caea3fd901",
@@ -234,8 +236,8 @@
     },
     {
       "path": "frontend/proto-ui/RCIP-INTEGRATION-2026-11-24.md",
-      "sha256": "556246959b4a38fbead79ce5522aecc83122e29e38bcff06af639fbbca6cd36f",
-      "bytes": 7716,
+      "sha256": "af2bb482b1e7108d0253080b41b36a281876d76a84db82a0e407cdc4ef61ebb2",
+      "bytes": 7979,
       "kind": "new explanatory record"
     }
   ],
