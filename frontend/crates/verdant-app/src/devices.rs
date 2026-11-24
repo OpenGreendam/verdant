@@ -526,11 +526,35 @@ fn toggle(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
     let th = ed.theme;
     let on = param(params, id).is_some_and(|d| d.value >= 0.5);
     let (target, id_owned) = (target_for(ed, track, slot), id.to_string());
-    let command = parameter_command(target, vec![(id_owned, if on { 0.0 } else { 1.0 })], cx);
+    let command = boolean_parameter_command(ed, target, id_owned, on, cx);
     semantic_click(crate::proto_controls::action(SharedString::from(format!("toggle-{slot}-{id}")), label.to_string()).authority(format!("{}:{track:?}:{slot}:{id}", crate::proto_controls::editor_authority(ed))).role(Role::Switch).aria_label(label.to_string()).aria_selected(on).tab_index(0)
         .flex().items_center().gap(gpui::rems(8.0/16.)).cursor_pointer().text_sm()
         .child(label.to_string()).child(crate::view::switch(on, th)), command)
         .into_any_element()
+}
+
+fn boolean_parameter_command(ed: &Editor, target: Option<Target>, id: String, accepted: bool, cx: &Context<Editor>) -> SemanticCommand {
+    let editor = cx.weak_entity();
+    let basis = target.as_ref().and_then(|target| target.basis(ed));
+    let guard_target = target.clone();
+    let guard_id = id.clone();
+    let allowed = Rc::new(move |ed: &Editor, window: &Window| {
+        let (Some(target), Some(basis)) = (&guard_target, &basis) else { return false; };
+        device_input_available(ed) && DeviceScope::for_window(window).allows(&target.track, ed)
+            && param(&basis.params, &guard_id).is_some_and(|desc| desc.value.is_finite() && (desc.value >= 0.5) == accepted)
+            && target.basis(ed).as_ref() == Some(basis)
+    });
+    let before_cancel = allowed.clone();
+    let activate = semantic_command(editor.clone(), editor.clone(), move |ed, event, window, cx| {
+        let (Some(target), Some(event)) = (&target, event) else { return; };
+        if !allowed(ed, window) || !may_begin_device_input(ed) || event.selected() == accepted { return; }
+        write_if_current(ed, target, vec![(id.clone(), if event.selected() { 1.0 } else { 0.0 })], cx);
+    });
+    Rc::new(move |event, window, cx| {
+        if event.is_none_or(|event| event.selected() == accepted) { return; }
+        let current = editor.upgrade().is_some_and(|editor| before_cancel(editor.read(cx), window));
+        if current { activate(event, window, cx); }
+    })
 }
 
 fn parameter_command(target: Option<Target>, values: Vec<(String, f64)>, cx: &Context<Editor>) -> SemanticCommand {
@@ -1245,8 +1269,14 @@ fn chain_command(ed: &Editor, track: TrackId, action: ChainAction, cx: &Context<
     let activate = semantic_command(editor.clone(), editor.clone(), move |ed, event, window, cx| {
         if !allowed(ed, window) || !may_begin_device_input(ed) { return; }
         match action {
-            ChainAction::Bypass { slot, .. } => {
-                controls::dispatch(ed, CommandId::PluginBypass, CommandArg::TrackSlot(track.clone(), slot as u32), window, cx);
+            ChainAction::Bypass { slot, expected_key } => {
+                if let Some(event) = event {
+                    let Some(expected) = ed.insert_specs(&track).get(slot).cloned() else { return; };
+                    // This source represents enabled, while the domain stores bypass.
+                    ed.accept_track_insert_bypass(&track, slot, &expected, expected_key, !event.selected(), cx);
+                } else {
+                    controls::dispatch(ed, CommandId::PluginBypass, CommandArg::TrackSlot(track.clone(), slot as u32), window, cx);
+                }
             }
             ChainAction::Menu { slot, expected_key } => {
                 use crate::editor::MenuAction as M;
