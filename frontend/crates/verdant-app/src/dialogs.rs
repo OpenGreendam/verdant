@@ -466,6 +466,7 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
     let (t_gain, id_gain) = (track_id.clone(), clip_id.clone());
     let (t_pan, id_pan) = (track_id.clone(), clip_id.clone());
     let (t_mute, id_mute, was_muted) = (track_id.clone(), clip_id.clone(), clip.muted);
+    let mute_basis = crate::proto_controls::editor_authority(ed);
 
     Some(
         div()
@@ -558,12 +559,14 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
                     .gap(px(5.0))
                     .child(
                         selectable_button("clip-mute-btn", if was_muted { "已静音" } else { "静音片段" }, was_muted, th)
-                            .flex_1()
-                            .on_click(cx.listener(move |ed, _, _, cx| {
+                            .role(Role::Switch).authority(mute_basis.clone()).flex_1()
+                            .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+                                if crate::proto_controls::editor_authority(ed) != mute_basis { return; }
                                 if let Some(tr) = ed.project().track(&t_mute) {
                                     if let Ok(mut list) = verdant_media::read_clips(tr) {
                                         if let Some(c) = list.iter_mut().find(|c| c.id.to_string() == id_mute) {
-                                            c.muted = !was_muted;
+                                            if c.muted != was_muted || event.selected() == c.muted { return; }
+                                            c.muted = event.selected();
                                             if let Ok(val) = verdant_media::clips_value(t_mute.clone(), &list) {
                                                 ed.commit(ed.revision(), CommandBatch::single("音频片段静音", Command::SetTrackData {
                                                     track: t_mute.clone(), key: verdant_media::AUDIO_CLIPS_KEY.into(), value: val,
@@ -772,20 +775,20 @@ fn render_scale_body(ed: &Editor, root: u8, intervals: &[u8], cx: &mut Context<E
             div().flex().flex_wrap().gap(px(4.0)).children((0u8..12).map(|deg| {
                 let on = intervals.contains(&deg);
                 let pitch_name = NOTE_ROOT_NAMES[((root + deg) % 12) as usize];
+                let basis = modal_revision(ed);
                 selectable_button(
                     SharedString::from(format!("scale-deg-{deg}")),
                     format!("{} ({pitch_name})", DEGREE_LABELS[deg as usize]),
                     on,
                     th,
                 )
-                .on_click(cx.listener(move |ed, _, _, cx| {
+                .role(Role::CheckBox).authority(basis.clone())
+                .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+                    if modal_revision(ed) != basis { return; }
                     if let Some(ModalDialog::Scale { intervals: iv, .. }) = &mut ed.modal_dialog {
-                        if let Some(pos) = iv.iter().position(|&x| x == deg) {
-                            iv.remove(pos);
-                        } else {
-                            iv.push(deg);
-                            iv.sort_unstable();
-                        }
+                        if event.selected() {
+                            if !iv.contains(&deg) { iv.push(deg); iv.sort_unstable(); }
+                        } else { iv.retain(|value| *value != deg); }
                         cx.notify();
                     }
                 }))
@@ -1268,14 +1271,18 @@ fn render_clip_body(
                 cx.notify();
             }
         }))
-        .child(selectable_button("clip-modal-mute", if muted { "状态：已静音" } else { "状态：正常发声" }, muted, th).on_click(
-            cx.listener(|ed, _, _, cx| {
-                if let Some(ModalDialog::AudioClipEdit { muted: m, .. }) = &mut ed.modal_dialog {
-                    *m = !*m;
-                    cx.notify();
-                }
-            }),
-        ))
+        .child({
+            let basis = modal_revision(ed);
+            selectable_button("clip-modal-mute", if muted { "状态：已静音" } else { "状态：正常发声" }, muted, th)
+                .role(Role::Switch).authority(basis.clone())
+                .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+                    if modal_revision(ed) != basis { return; }
+                    if let Some(ModalDialog::AudioClipEdit { muted: current, .. }) = &mut ed.modal_dialog {
+                        *current = event.selected();
+                        cx.notify();
+                    }
+                }))
+        })
 }
 
 fn clip_dialog_gain(gain_db: f64) -> f32 {

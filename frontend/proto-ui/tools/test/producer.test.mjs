@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { promisify } from 'node:util';
 import { EXIT, ProducerError, loadPin, runProducer } from '../build-proto-ui.mjs';
+import { parseCargoManifest } from '../lib/workspace-gpui.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const json = (filename) => JSON.parse(readFileSync(filename, 'utf8'));
@@ -187,6 +188,9 @@ test('each data unit pins selected pure methods, a stable package and an empty d
     assert.deepEqual(receipt.target, unit.target);
     assert.deepEqual(provenance.methods.map((method) => method.name), unit.target.methods);
     assert.deepEqual(provenance.dependencies, []);
+    assert.equal(unit.target.sourceLicense, 'AGPL-3.0-or-later');
+    assert.equal(provenance.sourceLicense, unit.target.sourceLicense);
+    assert.equal(parseCargoManifest(readFileSync(path.join(root, unit.output.directory, 'Cargo.toml'), 'utf8')).package.license, unit.target.sourceLicense);
     assert.equal(receipt.sharedSdk, undefined);
     assert.equal(receipt.gpu, undefined);
     assert.equal(existsSync(path.join(root, unit.output.directory, 'Component.rs')), false);
@@ -199,6 +203,8 @@ for (const [label, mutate] of [
   ['missing selectors', (unit) => { unit.target.methods = []; }],
   ['duplicate selectors', (unit) => { unit.target.methods = ['planNoteGesture', 'planNoteGesture']; }],
   ['language dependency', (unit) => { unit.target.dependencies = ['serde_json']; }],
+  ['empty source license', (unit) => { unit.target.sourceLicense = ''; }],
+  ['multiline source license', (unit) => { unit.target.sourceLicense = 'AGPL-3.0-or-later\nMIT'; }],
   ['implicit target', (unit) => { delete unit.target; }],
 ]) {
   test(`data targets reject ${label} instead of falling back to a GPUI component`, (t) => {

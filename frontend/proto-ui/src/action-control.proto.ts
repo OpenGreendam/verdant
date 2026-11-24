@@ -74,7 +74,12 @@ export default definePrototype<Props>({
       const ticket = generation;
       const revision = run.props.get().revision ?? '';
       if (name === 'context' && !run.props.get().contextMenu) return false;
-      const next = name === 'context' ? run.props.get().selected ?? false : !(run.props.get().selected ?? false);
+      const props = run.props.get();
+      const accepted = props.selected ?? false;
+      const exclusive = props.role === 'radio' || props.role === 'menuitemradio' || props.role === 'tab';
+      // Radio items and tabs select their member idempotently; toggle controls
+      // propose the inverse. Context requests preserve the accepted selection.
+      const next = name === 'context' ? accepted : exclusive ? true : !accepted;
       retirePress();
       if (!run || !attached || disposed || disabled.get() || ticket !== generation) return false;
       // Selection remains authoritative until the owner accepts the proposal.

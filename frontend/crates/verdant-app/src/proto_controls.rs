@@ -12,6 +12,7 @@ use verdant_action_control::{ActionControl, native::gpui_native_owner::{NativeFa
 /// keyboard activation, which GPUI's synthetic `ClickEvent` cannot represent.
 /// Physical click metadata is retained only after that same source accepted it.
 pub(crate) struct Activation {
+    selected: bool,
     native: Option<ClickEvent>,
     native_context: Option<gpui::MouseDownEvent>,
     position: gpui::Point<gpui::Pixels>,
@@ -19,17 +20,21 @@ pub(crate) struct Activation {
     assistive: bool,
 }
 impl Activation {
+    /// The source's controlled selection proposal, accepted only after the
+    /// consumer has checked its document/target authority.
+    pub(crate) fn selected(&self) -> bool { self.selected }
     pub(crate) fn modifiers(&self) -> gpui::Modifiers { self.modifiers }
     pub(crate) fn is_mouse(&self) -> bool { self.native_context.is_some() || matches!(self.native, Some(ClickEvent::Mouse(_))) }
     pub(crate) fn is_assistive(&self) -> bool { self.assistive }
     pub(crate) fn native_event(&self) -> Option<&ClickEvent> { self.native.as_ref() }
     pub(crate) fn position(&self) -> gpui::Point<gpui::Pixels> { self.position }
     fn decode(payload: &Value, native: Option<&ClickEvent>, context: Option<&gpui::MouseDownEvent>, owner: &OwnerRef) -> Option<Self> {
-        payload.get("selected")?.as_bool()?;
+        let selected = payload.get("selected")?.as_bool()?;
         payload.get("key")?.as_str()?;
         let origin = payload.get("origin")?.as_str()?;
         if !matches!(origin, "press" | "keyboard" | "assistive" | "programmatic") { return None; }
         Some(Self {
+            selected,
             native: if origin == "press" { native.cloned() } else { None },
             native_context: if origin == "press" { context.cloned() } else { None },
             position: if origin == "press" {
@@ -308,7 +313,7 @@ mod tests {
             div().size_full().flex().flex_col().items_start()
                 .child(action("native-action", "Native compiled action").role(Role::Switch)
                     .aria_selected(self.selected).disabled(self.disabled).w(px(160.)).h(px(36.)).child("Action")
-                    .on_click(cx.listener(|host, _, _, cx| { host.activations += 1; host.selected = !host.selected; cx.notify(); })))
+                    .on_click(cx.listener(|host, event: &Activation, _, cx| { host.activations += 1; host.selected = event.selected(); cx.notify(); })))
                 .child(div().flex().children((0..3).map(|index| {
                     let entity = cx.entity();
                     action(("native-tab", index), format!("Native tab {index}")).role(Role::Tab)
@@ -508,7 +513,7 @@ mod integrated_route_tests {
                         host.contexts.push((event.is_mouse(), event.modifiers().shift, event.position())); cx.notify();
                     }))
                     .on_click(cx.listener(|host, event: &Activation, _, cx| {
-                        host.activations += 1; host.selected = !host.selected;
+                        host.activations += 1; host.selected = event.selected();
                         host.samples.push((event.modifiers().shift, event.is_mouse(), event.is_assistive()));
                         cx.notify();
                     })))

@@ -498,6 +498,9 @@ fn resolve_score_options(format:verdant_exchange::Format,mut options:verdant_exc
 enum ScoreOptionControl{Utf8,Cp932,Ppq,Preserve,Track(Option<usize>),Cancel,Export}
 
 struct ScoreExportDialog {
+    overlay: Option<(verdant_overlay_control::native::gpui_native_owner::OwnerWeak, String)>,
+    options_generation: u64,
+    completed: bool,
     format: verdant_exchange::Format,
     options: verdant_exchange::ExportOptions,
     tracks: Vec<String>,
@@ -528,27 +531,68 @@ impl ScoreExportDialog {
                 numeric: Some(Numeric { min:1., max:32767., step:1., default:480. }), ..Default::default() }, window, cx);
         cx.subscribe_in(&ppq, window, |view, _, event, window, cx| {
             match event {
-                Event::Submit { .. } => view.activate(Export, window, cx),
-                Event::Cancel => view.activate(Cancel, window, cx),
+                Event::Submit { .. } => view.request_response("Enter", window, cx),
+                Event::Cancel => view.request_response("Escape", window, cx),
                 Event::Changed { .. } | Event::CompositionEnd { .. } | Event::Replaced { .. } => { view.error = None; cx.notify(); },
                 Event::Failure(error) => { view.error = Some(error.clone()); cx.notify(); },
                 _ => {},
             }
         }).detach();
-        Self { format, options, tracks, ppq, controls, send, error:None }
+        Self { overlay: None, options_generation: 0, completed: false, format, options, tracks, ppq, controls, send, error:None }
+    }
+
+    fn authority(&self, cx: &Context<Self>) -> String {
+        format!("score-export:{}:{}", cx.entity_id(), self.options_generation)
+    }
+
+    fn complete(&mut self, window: &mut Window) {
+        // GPUI marks a window removed before it detaches its native owners.
+        // Retire this form synchronously so the rest of a response batch cannot
+        // export after cancellation or send a second successful export.
+        self.completed = true;
+        self.options_generation += 1;
+        window.remove_window();
+    }
+
+    fn accept_selection(&mut self, index: usize, selected: bool, basis: &str, cx: &mut Context<Self>) {
+        if self.completed || self.authority(cx) != basis || self.ppq.read(cx).is_composing() { return; }
+        if self.controls.get(index) != Some(&ScoreOptionControl::Preserve) || self.options.preserve_extensions == selected { return; }
+        self.options.preserve_extensions = selected;
+        self.options_generation += 1;
+        cx.notify();
+    }
+
+    fn request_response(&self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.completed { return; }
+        if let Some((owner, revision)) = &self.overlay {
+            if let Some(owner) = owner.upgrade() {
+                let handle = verdant_overlay_control::OverlayControlHandle { owner };
+                crate::proto_overlay::request_response(&handle, name, revision, window, cx);
+            }
+        }
     }
 
     fn activate(&mut self, control:ScoreOptionControl, window:&mut Window, cx:&mut Context<Self>) {
         use ScoreOptionControl::*;
+        if self.completed { return; }
         match control {
-            Utf8 => self.options.ust_encoding = verdant_exchange::UstEncoding::Utf8,
-            Cp932 => self.options.ust_encoding = verdant_exchange::UstEncoding::Cp932,
+            Utf8 => {
+                if matches!(self.options.ust_encoding, verdant_exchange::UstEncoding::Utf8) { return; }
+                self.options.ust_encoding = verdant_exchange::UstEncoding::Utf8; self.options_generation += 1;
+            },
+            Cp932 => {
+                if matches!(self.options.ust_encoding, verdant_exchange::UstEncoding::Cp932) { return; }
+                self.options.ust_encoding = verdant_exchange::UstEncoding::Cp932; self.options_generation += 1;
+            },
             Ppq => { self.ppq.update(cx, |field, cx| { field.invoke("focusSelf", vec![], window, cx); }); },
-            Preserve => self.options.preserve_extensions = !self.options.preserve_extensions,
-            Track(track) => self.options.track = track,
-            Cancel => { window.remove_window(); return; },
+            Preserve => return, // Controlled selection arrives with its source value.
+            Track(track) => {
+                if self.options.track == track { return; }
+                self.options.track = track; self.options_generation += 1;
+            },
+            Cancel => { self.complete(window); return; },
             Export => match resolve_score_options(self.format, self.options.clone(), self.ppq.read(cx).value()) {
-                Ok(options) => { if self.send.try_send(options).is_ok() { window.remove_window(); return; } self.error = Some("原工程窗口已关闭，请重新导出".into()); },
+                Ok(options) => { if self.send.try_send(options).is_ok() { self.complete(window); return; } self.error = Some("原工程窗口已关闭，请重新导出".into()); },
                 Err(error) => self.error = Some(error),
             },
         }
@@ -558,7 +602,6 @@ impl ScoreExportDialog {
     fn control(&self, kind:ScoreOptionControl, label:String, selected:bool, handle:&verdant_overlay_control::OverlayControlHandle,
         revision:&str, window:&Window) -> crate::proto_controls::Action {
         let index = self.controls.iter().position(|control|*control == kind).expect("dialog control");
-        let export = self.controls.iter().position(|control|*control == ScoreOptionControl::Export).expect("export control");
         let th = crate::theme::Theme::for_appearance(window.appearance());
         let role = match kind { ScoreOptionControl::Preserve => gpui::Role::CheckBox,
             ScoreOptionControl::Utf8 | ScoreOptionControl::Cp932 | ScoreOptionControl::Track(_) => gpui::Role::RadioButton, _ => gpui::Role::Button };
@@ -569,7 +612,10 @@ impl ScoreExportDialog {
             .p(px(8.)).rounded(px(4.)).border_1().border_color(th.control)
             .focus(move |style| style.border_color(th.accent))
             .bg(if selected { th.selection } else { th.control }).text_sm().text_color(th.text).child(label)
-            .on_click(move |_, window, cx| crate::proto_overlay::choose(&source, index, &basis, window, cx));
+            .on_click(move |event, window, cx| {
+                if kind == ScoreOptionControl::Preserve { crate::proto_overlay::choose_selection(&source, index, event.selected(), &basis, window, cx); }
+                else { crate::proto_overlay::choose(&source, index, &basis, window, cx); }
+            });
         let group = self.controls.iter().enumerate().filter_map(|(index, candidate)| match (kind, candidate) {
             (ScoreOptionControl::Utf8 | ScoreOptionControl::Cp932, ScoreOptionControl::Utf8 | ScoreOptionControl::Cp932)
                 | (ScoreOptionControl::Track(_), ScoreOptionControl::Track(_)) => Some(index), _ => None,
@@ -582,7 +628,7 @@ impl ScoreExportDialog {
         }
         if kind != ScoreOptionControl::Cancel {
             let source = handle.clone(); let basis = revision.to_string();
-            control = control.on_enter(move |window, cx| crate::proto_overlay::choose(&source, export, &basis, window, cx));
+            control = control.on_enter(move |window, cx| crate::proto_overlay::request_response(&source, "Enter", &basis, window, cx));
         }
         control
     }
@@ -617,26 +663,33 @@ impl ScoreExportDialog {
 
 impl Render for ScoreExportDialog {
     fn render(&mut self, _window:&mut Window, cx:&mut Context<Self>) -> impl IntoElement {
-        let revision = format!("score-export:{}", cx.entity_id());
-        let props = serde_json::json!({"label":"乐谱导出选项", "role":"dialog", "open":true, "revision":revision,
+        let revision = self.authority(cx);
+        let props = serde_json::json!({"label":"乐谱导出选项", "role":"dialog", "open":!self.completed, "revision":revision,
             "choices":self.controls.len(), "defaultChoice":self.controls.iter().position(|c|*c==ScoreOptionControl::Export).unwrap(),
             "cancelChoice":self.controls.iter().position(|c|*c==ScoreOptionControl::Cancel).unwrap()});
         let entity = cx.entity(); let basis = revision.clone();
         let draw = std::rc::Rc::new(move |handle:&verdant_overlay_control::OverlayControlHandle, _focus:&gpui::FocusHandle, _window:&mut Window, _cx:&mut gpui::App| {
             let handle = handle.clone(); let revision = basis.clone(); let entity = entity.clone();
             let content = std::rc::Rc::new(move |_scroll:&verdant_scroll_region::ScrollRegionHandle, _focus:&gpui::FocusHandle, _engine: Option<crate::proto_scroll::EngineBinding>, window:&mut Window, cx:&mut gpui::App| {
-                entity.update(cx, |view,cx| view.native_content(&handle,&revision,window,cx))
+                entity.update(cx, |view,cx| {
+                    view.overlay = Some((std::rc::Rc::downgrade(&handle.owner), revision.clone()));
+                    view.native_content(&handle,&revision,window,cx)
+                })
             });
             crate::proto_scroll::region("score-export-scroll", serde_json::json!({"label":"导出设置", "role":"group", "trapFocus":false,"tabStop":false}), content).into_any_element()
         });
-        let entity = cx.entity().downgrade();
+        let entity = cx.entity().downgrade(); let basis = revision;
         let response = std::rc::Rc::new(move |index:usize, window:&mut Window, cx:&mut gpui::App| {
             let _ = entity.update(cx, |view,cx| {
-                if view.ppq.read(cx).is_composing() { return; }
+                if view.completed || view.authority(cx) != basis || view.ppq.read(cx).is_composing() { return; }
                 if let Some(control) = view.controls.get(index).copied() { view.activate(control,window,cx); }
             });
         });
-        crate::proto_overlay::overlay("score-export-options", props, draw, response)
+        let entity = cx.entity().downgrade();
+        let selection = std::rc::Rc::new(move |index:usize, selected:bool, basis:&str, _window:&mut Window, cx:&mut gpui::App| {
+            let _ = entity.update(cx, |view,cx| view.accept_selection(index,selected,basis,cx));
+        });
+        crate::proto_overlay::overlay("score-export-options", props, draw, response).on_selection(selection)
     }
 }
 

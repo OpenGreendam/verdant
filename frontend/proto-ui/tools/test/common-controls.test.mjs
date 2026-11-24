@@ -610,3 +610,122 @@ runtimeTest('search list routes text shortcuts through source without consuming 
   assert.deepEqual(form.events, [{ name: 'response', payload: { index: 0, revision: 'filtered' } }]);
   assert.equal(f.events.length, before);
 });
+
+runtimeTest('alert response facts let the source choose suggested and cancel actions', async t => {
+  const f = await fixture(t, 'overlay-control', {
+    role: 'alertdialog', choices: 4, responseKinds: [2, 0, 1, 3],
+    // Explicit indices are ignored once the host supplies response facts.
+    defaultChoice: 0, cancelChoice: 3,
+  });
+  assert.equal(f.x.defaultChoice.get(), 3); assert.equal(f.x.cancelChoice.get(), 0);
+  assert.equal(f.call('choose', 1, 'document:1'), false, 'unavailable choices reject pointer/assistive requests too');
+  assert.equal(f.call('requestResponse', 'Enter', 'document:1'), true);
+  assert.equal(f.events.at(-1).payload.index, 3);
+  assert.equal(f.call('requestResponse', 'Escape', 'document:1'), true);
+  assert.equal(f.events.at(-1).payload.index, 0);
+  f.update({ responseKinds: [2, 0, 1, 1] });
+  assert.equal(f.x.defaultChoice.get(), 2, 'without an explicit suggestion the first ordinary response is suggested');
+  f.update({ responseKinds: [2, 0, 0, 2] });
+  assert.equal(f.x.defaultChoice.get(), -1);
+  assert.equal(f.call('requestResponse', 'Enter', 'document:1'), false);
+});
+
+runtimeTest('overlay rejects malformed response facts and stale semantic child requests', async t => {
+  const f = await fixture(t, 'overlay-control', { choices: 2, responseKinds: [2, 1] });
+  for (const responseKinds of [[1], [2, 4], [2, 1.5], [2, NaN], '21', { 0: 2, 1: 1, length: 2 }]) {
+    f.update({ responseKinds });
+    assert.equal(f.call('choose', 1, 'document:1'), false);
+    assert.equal(f.call('requestResponse', 'Enter', 'document:1'), false);
+    assert.equal(f.x.defaultChoice.get(), -1);
+  }
+  assert.deepEqual(f.events, []);
+  f.update({ responseKinds: [2, 1], revision: 'document:2' });
+  assert.equal(f.call('requestResponse', 'Enter', 'document:1'), false);
+  assert.equal(f.call('requestResponse', 'Escape', 'document:1'), false);
+  assert.equal(f.call('requestResponse', 'Enter', 'document:2'), true);
+  assert.deepEqual(f.events, [{ name: 'response', payload: { index: 1, revision: 'document:2' } }]);
+  f.update({ disabled: true });
+  assert.equal(f.call('requestResponse', 'Escape', 'document:2'), false);
+  await f.session.unmount();
+  assert.equal(f.call('requestResponse', 'Enter', 'document:2'), false);
+});
+
+runtimeTest('reentrant response policy updates cannot restore a retired alert choice', async t => {
+  const f = await fixture(t, 'overlay-control', { choices: 3, responseKinds: [2, 1, 0] });
+  const stop = f.x.defaultChoice.subscribe(event => {
+    if (event.type === 'next' && event.next === 2) f.update({ responseKinds: [2, 0, 0], open: false, revision: 'document:3' });
+  });
+  f.update({ responseKinds: [2, 0, 3], revision: 'document:2' }); stop();
+  assert.equal(f.x.defaultChoice.get(), -1); assert.equal(f.x.open.get(), false);
+  assert.equal(f.x.scopeActive.get(), false);
+  assert.equal(f.call('requestResponse', 'Enter', 'document:2'), false);
+  assert.deepEqual(f.events, []);
+});
+
+runtimeTest('radio and tab activation proposes selection idempotently without accepting it for the owner', async t => {
+  for (const role of ['radio', 'menuitemradio', 'tab']) {
+    const f = await fixture(t, 'action-control', { role, selected: false, selectable: true });
+    for (let index = 0; index < 2; index++) f.call('requestActivate');
+    assert.deepEqual(f.events.map(event => event.payload.selected), [true, true], role);
+    assert.equal(f.x.selected.get(), false, 'the owner may reject a selection proposal');
+    f.update({ selected: true });
+    f.event('host:verdant-action-activate');
+    f.event('press.start'); f.event('press.end'); f.event('press.commit');
+    assert.deepEqual(f.events.map(event => event.payload.selected), [true, true, true, true], `${role} must not unselect its active member`);
+    f.update({ disabled: true });
+    assert.equal(f.call('requestActivate'), false);
+    f.event('host:verdant-action-activate');
+    assert.equal(f.events.length, 4, 'disabled exclusive controls cannot propose changes');
+  }
+});
+
+runtimeTest('ordinary toggle roles keep controlled inversion while context preserves acceptance', async t => {
+  for (const role of ['button', 'switch', 'checkbox', 'menuitemcheckbox']) {
+    const f = await fixture(t, 'action-control', { role, selected: true, selectable: true, contextMenu: true });
+    f.call('requestActivate'); f.call('requestActivate');
+    assert.deepEqual(f.events.map(event => event.payload.selected), [false, false], `${role} proposals use accepted state until the owner changes it`);
+    assert.equal(f.x.selected.get(), true);
+    f.update({ selected: false }); f.call('requestActivate');
+    assert.equal(f.events.at(-1).payload.selected, true);
+    f.call('requestContext', 1, 1, false, 'document:1');
+    assert.equal(f.events.at(-1).name, 'context');
+    assert.equal(f.events.at(-1).payload.selected, false, 'opening a context menu never inverts selection');
+  }
+});
+
+runtimeTest('overlay preserves child controlled selection proposals and legacy response indices', async t => {
+  const form = await fixture(t, 'overlay-control', { choices: 3, defaultChoice: 2, cancelChoice: 0 });
+  const checkbox = await fixture(t, 'action-control', { role: 'checkbox', selected: true, selectable: true });
+  checkbox.onEvent((name, payload) => {
+    if (name === 'activate') assert.equal(form.call('chooseSelection', 1, payload.selected, payload.revision), true);
+  });
+  checkbox.event('host:verdant-action-activate'); checkbox.event('host:verdant-action-activate');
+  assert.deepEqual(form.events, [
+    { name: 'selection', payload: { index: 1, selected: false, revision: 'document:1' } },
+    { name: 'selection', payload: { index: 1, selected: false, revision: 'document:1' } },
+  ], 'repeated proposals preserve the child source value rather than reconstructing a modal toggle');
+  assert.equal(checkbox.x.selected.get(), true, 'the host still decides whether to accept the proposal');
+  assert.equal(form.call('choose', 0, 'document:1'), true);
+  assert.deepEqual(form.events.at(-1), { name: 'response', payload: { index: 0, revision: 'document:1' } });
+  assert.equal(form.call('requestResponse', 'Enter', 'document:1'), true);
+  assert.deepEqual(form.events.at(-1), { name: 'response', payload: { index: 2, revision: 'document:1' } });
+});
+
+runtimeTest('overlay selection shares choice validation and rejects stale or inactive authority', async t => {
+  const f = await fixture(t, 'overlay-control', { choices: 3, responseKinds: [2, 1, 0] });
+  for (const index of [-1, 2, 3, 0.5, NaN, Infinity]) assert.equal(f.call('chooseSelection', index, true, 'document:1'), false);
+  for (const selected of [null, undefined, 'true', 0, {}]) assert.equal(f.call('chooseSelection', 1, selected, 'document:1'), false);
+  f.update({ responseKinds: [2] });
+  assert.equal(f.call('chooseSelection', 1, true, 'document:1'), false);
+  f.update({ responseKinds: [2, 1, 0], revision: 'document:2' });
+  assert.equal(f.call('chooseSelection', 1, true, 'document:1'), false);
+  assert.equal(f.call('chooseSelection', 1, false, 'document:2'), true);
+  assert.deepEqual(f.events, [{ name: 'selection', payload: { index: 1, selected: false, revision: 'document:2' } }]);
+  f.update({ disabled: true });
+  assert.equal(f.call('chooseSelection', 1, true, 'document:2'), false);
+  f.update({ disabled: false, open: false });
+  assert.equal(f.call('chooseSelection', 1, true, 'document:2'), false);
+  f.update({ open: true }); await f.session.unmount();
+  assert.equal(f.call('chooseSelection', 1, true, 'document:2'), false);
+  assert.equal(f.events.length, 1);
+});

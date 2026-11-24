@@ -70,6 +70,18 @@ impl PlanControlGestureResult {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum Data2 {
+    Alternative0(f64),
+    Alternative1,
+}
+
+#[derive(Clone, Debug)]
+pub enum Data3 {
+    Alternative0,
+    Alternative1,
+}
+
 fn pui_function_0(v_7068617365: String, v_6576656e74: String, v_677561726473: Rc<PlanControlGestureGuards>) -> Result<Rc<PlanControlGestureResult>, DataError> {
     if { let pui_local_7 = { let pui_local_0 = { let pui_local_2 = v_7068617365.clone(); let pui_local_3 = "idle".to_owned(); (pui_local_2 == pui_local_3) }; if ({ let pui_local_4 = pui_local_0.clone(); pui_local_4 }) { { let pui_local_5 = v_6576656e74.clone(); let pui_local_6 = "PointerDown".to_owned(); (pui_local_5 == pui_local_6) } } else { pui_local_0 } }; pui_local_7 } {
         if { let pui_local_9 = !({ let pui_local_8 = (v_677561726473.clone()).hit_control.clone(); pui_local_8 }); pui_local_9 } {
@@ -102,13 +114,13 @@ fn pui_function_0(v_7068617365: String, v_6576656e74: String, v_677561726473: Rc
 }
 
 fn pui_function_1(v_7374617274: f64, v_64656c7461: f64, v_74726176656c: f64, v_66696e65: bool) -> Result<f64, DataError> {
-    let v_7370616e: f64 = if { let pui_local_93 = { let pui_local_91 = v_74726176656c.clone(); let pui_local_92 = 1.0f64; (pui_local_91) > (pui_local_92) }; pui_local_93 } { v_74726176656c.clone() } else { 1.0f64 };
-    let v_72617465: f64 = if { let pui_local_94 = v_66696e65.clone(); pui_local_94 } { 0.1f64 } else { 1.0f64 };
-    let v_6e657874: f64 = { let pui_local_95 = v_7374617274.clone(); let pui_local_96 = { let pui_local_97 = { let pui_local_99 = v_64656c7461.clone(); let pui_local_100 = v_7370616e.clone(); (pui_local_99) / (pui_local_100) }; let pui_local_98 = v_72617465.clone(); (pui_local_97) * (pui_local_98) }; (pui_local_95) + (pui_local_96) };
-    if { let pui_local_103 = { let pui_local_101 = v_6e657874.clone(); let pui_local_102 = 0.0f64; (pui_local_101) < (pui_local_102) }; pui_local_103 } {
+    let v_7370616e: Data2 = if { let pui_local_93 = { let pui_local_91 = v_74726176656c.clone(); let pui_local_92 = 1.0f64; (pui_local_91) > (pui_local_92) }; pui_local_93 } { Data2::Alternative0(v_74726176656c.clone()) } else { Data2::Alternative0(1.0f64) };
+    let v_72617465: Data3 = if { let pui_local_94 = v_66696e65.clone(); pui_local_94 } { { let _ = 0.1f64; Data3::Alternative0 } } else { { let _ = 1.0f64; Data3::Alternative1 } };
+    let v_6e657874: f64 = { let pui_local_95 = v_7374617274.clone(); let pui_local_96 = { let pui_local_97 = { let pui_local_101 = v_64656c7461.clone(); let pui_local_102 = v_7370616e.clone(); (pui_local_101) / (match pui_local_102 { Data2::Alternative0(pui_local_103) => { pui_local_103 }, Data2::Alternative1 => { 1.0f64 } }) }; let pui_local_98 = v_72617465.clone(); (pui_local_97) * (match pui_local_98 { Data3::Alternative0 => { 0.1f64 }, Data3::Alternative1 => { 1.0f64 } }) }; (pui_local_95) + (pui_local_96) };
+    if { let pui_local_107 = { let pui_local_105 = v_6e657874.clone(); let pui_local_106 = 0.0f64; (pui_local_105) < (pui_local_106) }; pui_local_107 } {
         return Ok(0.0f64);
     }
-    if { let pui_local_106 = { let pui_local_104 = v_6e657874.clone(); let pui_local_105 = 1.0f64; (pui_local_104) > (pui_local_105) }; pui_local_106 } {
+    if { let pui_local_110 = { let pui_local_108 = v_6e657874.clone(); let pui_local_109 = 1.0f64; (pui_local_108) > (pui_local_109) }; pui_local_110 } {
         return Ok(1.0f64);
     }
     return Ok(v_6e657874.clone());
@@ -126,11 +138,11 @@ pub fn plan_control_gesture(argument_0: String, argument_1: String, argument_2: 
 
 /// Calls selected pure source function "dragNormalized"; component setup is not executed.
 pub fn drag_normalized(argument_0: f64, argument_1: f64, argument_2: f64, argument_3: bool) -> Result<f64, DataError> {
-    { let pui_local_119 = (argument_0).clone(); if !pui_local_119.is_finite() { return Err(DataError::NonFiniteNumber); } }
-    { let pui_local_120 = (argument_1).clone(); if !pui_local_120.is_finite() { return Err(DataError::NonFiniteNumber); } }
-    { let pui_local_121 = (argument_2).clone(); if !pui_local_121.is_finite() { return Err(DataError::NonFiniteNumber); } }
+    { let pui_local_123 = (argument_0).clone(); if !pui_local_123.is_finite() { return Err(DataError::NonFiniteNumber); } }
+    { let pui_local_124 = (argument_1).clone(); if !pui_local_124.is_finite() { return Err(DataError::NonFiniteNumber); } }
+    { let pui_local_125 = (argument_2).clone(); if !pui_local_125.is_finite() { return Err(DataError::NonFiniteNumber); } }
     
     let result = pui_function_1(argument_0, argument_1, argument_2, argument_3)?;
-    { let pui_local_123 = (result).clone(); if !pui_local_123.is_finite() { return Err(DataError::NonFiniteNumber); } }
+    { let pui_local_127 = (result).clone(); if !pui_local_127.is_finite() { return Err(DataError::NonFiniteNumber); } }
     Ok(result)
 }

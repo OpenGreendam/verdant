@@ -2,9 +2,15 @@
 
 Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生成原生组件，`rust-data-v1` 生成只依赖 Rust 标准库的类型化决策函数。保留的 Rust 源码全部由上游 compiler 发射；不要手改 `generated/`。版本、完整 GPUI 来源、工具链要求、共享 SDK 内容和各编译单元的目标由 [compiler.pin.json](compiler.pin.json) 绑定。
 
-## 已合入主线的整合状态
+## 2026-11-24 RCIP 推进
 
-Verdant [PR #12](https://github.com/OpenGreendam/verdant/pull/12) 已于 2026-11-23 合入 `main`，合并提交为 `afd3eda361874f275422263473334daba7575b59`。本轮保留 18 类交互对应的 14 个编译入口、Adwaita 绘图和音乐领域层，并将编辑操作选择、连续值精度和输入生命周期放进作者源码。
+当前分支把 compiler 从 `4e499ae25e825e130e740f16af66d70b23a743cf` 升到公开提交 [`e9340df6279e063cf372080bf4cc97caea3fd901`](https://github.com/Proto-UI/Proto-UI/commit/e9340df6279e063cf372080bf4cc97caea3fd901)，基于上游主线 `88fc0883bec70abbc0d7505d88370657c279639e`，通用兼容修复见 [Proto-UI PR #1791](https://github.com/Proto-UI/Proto-UI/pull/1791)。共享 SDK 内容摘要为 `832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b`；SDK 版本仍为 `0.2.0`，14 个单元和 receipt 全部通过固定干净编译器重新生成。
+
+本轮补齐连续输入的阈值／步进、受控 `selected` 的真实宿主消费，以及弹窗和乐谱导出表单的默认响应、子输入提交与关闭退役。逐控件对应和仍需继续迁移的项目见 [RCIP 清单](RCIP-2026-11-24.md)，准确执行范围见 [本轮验证记录](VALIDATION-RCIP-2026-11-24.json)。这些工作分支结果不表示上游修复或 Verdant 改动已经合入主线。
+
+## 2026-11-23 已合入主线的整合记录
+
+Verdant [PR #12](https://github.com/OpenGreendam/verdant/pull/12) 已于 2026-11-23 合入 `main`，合并提交为 `afd3eda361874f275422263473334daba7575b59`。该轮保留 18 类交互对应的 14 个编译入口、Adwaita 绘图和音乐领域层，并将编辑操作选择、连续值精度和输入生命周期放进作者源码。
 
 **最终候选 `5e19b7de231894c921a6dd69f16e8820b35b8ec3` 已完成 fresh producer、完整 Node、三平台 GUI/SDK、打包以及全部 28 项 Linux 真实窗口输入验收。** [Frontend #122](https://github.com/OpenGreendam/verdant/actions/runs/45212699291) 实际测试 PR merge checkout `96691e1abdf722d573465ee2d32a4a1588a9191b`；结果固定到该来源，后续提交仍需各自验证。
 
@@ -22,7 +28,7 @@ Verdant [PR #12](https://github.com/OpenGreendam/verdant/pull/12) 已于 2026-11
 
 ## 当前边界
 
-本轮将其余应用交互扩展到 **12 个原生编译组件 + 2 个标准库决策单元**；完整的 18 类映射、宿主边界与验证范围见 [CONTROL-MIGRATION.md](CONTROL-MIGRATION.md)。下表保留原有四个基础单元的职责，新增的十个单元与它们共用生成、pin、receipt 和 CI 门禁。
+目前共有 **12 个原生编译组件 + 2 个标准库决策单元**；完整的 18 类映射、宿主边界与验证范围见 [CONTROL-MIGRATION.md](CONTROL-MIGRATION.md)。这些入口在本轮基线已经存在；本轮继续补齐实际消费路径，没有用新建同名包装组件增加计数。下表各单元共用生成、pin、receipt 和 CI 门禁。
 
 | 单元 | 原型拥有的职责 | Rust 宿主拥有的职责 |
 |---|---|---|

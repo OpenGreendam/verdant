@@ -26,7 +26,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "4e499ae25e825e130e740f16af66d70b23a743cf"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -34,7 +34,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -47,23 +47,24 @@
       "planControlGesture",
       "dragNormalized"
     ],
-    "dependencies": []
+    "dependencies": [],
+    "sourceLicense": "AGPL-3.0-or-later"
   },
   "artifacts": [
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "076a18ec8b6ada1ce351ac84e758effd6e7738ef732a774e3ea73c11dec9d775"
+      "sha256": "0b417703d86fc2792818a0489ad862423cf64d166119c14cd7fe27321d97132a"
     },
     {
       "path": "lib.rs",
       "kind": "source",
-      "sha256": "6deeb7570506d5f0fb5bac51662e444f44e71ebf446b1828e64418ea6f1fae2a"
+      "sha256": "74ea4ce4cbdc2cc456b3ab27c42daf21c15f0a45f66a42199a727612f82b3802"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "26209dfbdc3bb96c330bbee79a9eb2f79c4025b8514bff1c7383ed2b330f7914"
+      "sha256": "3b64c50661a70234ffca1e443b35615c6ce3b71af716f51af91e10435cfdfcab"
     }
   ]
 }

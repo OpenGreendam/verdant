@@ -160,8 +160,15 @@ pub struct ClockDriver {
 }
 
 pub(crate) fn toggle_follow(editor: &mut Editor, cx: &mut Context<Editor>) {
-    editor.session.follow_playhead = !editor.session.follow_playhead;
-    let enabled = editor.session.follow_playhead;
+    let enabled = !editor.session.follow_playhead;
+    set_follow(editor, enabled, cx);
+}
+
+/// Commands may request a toggle; a compiled control supplies its accepted
+/// selected proposal directly. Repeating that proposal is a no-op.
+fn set_follow(editor: &mut Editor, enabled: bool, cx: &mut Context<Editor>) {
+    if editor.session.follow_playhead == enabled { return; }
+    editor.session.follow_playhead = enabled;
     editor.playback.driver.update(cx, |driver, cx| {
         driver.follow_frame = enabled.then(Instant::now);
         cx.notify();
@@ -358,6 +365,7 @@ impl Render for LcdView {
         let frame = (seconds.max(0.0) * ed.audio_info.sample_rate as f64).round() as u64;
         let position = lcd_position(frame, ed.audio_info.sample_rate, &ed.tempo(), &ed.meter());
         let follow = ed.session.follow_playhead;
+        let follow_authority = crate::proto_controls::editor_authority(ed);
         let ui_font = ed.ui_font.clone();
         let compact = ed.width_class == crate::ui_controls::WidthClass::Phone;
         // Every readout uses a fixed-pitch face with tabular figures and a
@@ -379,11 +387,16 @@ impl Render for LcdView {
                 .child(div().text_size(px(13.0)).line_height(px(16.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(format!("{:.1}", position.bpm)))
                 .child(div().text_size(px(11.0)).line_height(px(14.0)).text_color(th.text_secondary).child(format!("BPM · {}", position.signature)))))
             .when(!compact, |d| d.child(crate::proto_controls::action("transport-follow", "跟随播放头").aria_selected(follow)
+                .authority(follow_authority.clone())
                 .flex_none().h(px(28.0)).px(px(8.0)).flex().items_center().rounded(px(6.0)).text_size(px(12.0))
                 .when(follow, |d| d.bg(th.checked))
                 .text_color(if follow { th.text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.checked } else { th.hover }))
                 .child("跟随")
-                .on_click(move |_, _, cx| editor.update(cx, toggle_follow)))).into_any_element()
+                .on_click(move |event, _, cx| editor.update(cx, |ed, cx| {
+                    if crate::proto_controls::editor_authority(ed) != follow_authority
+                        || ed.session.follow_playhead != follow { return; }
+                    set_follow(ed, event.selected(), cx);
+                })))).into_any_element()
     }
 }
 

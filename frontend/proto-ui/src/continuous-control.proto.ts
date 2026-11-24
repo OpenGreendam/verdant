@@ -157,27 +157,33 @@ export default definePrototype<Props>({
       if (run) run.update();
       return current(ticket);
     });
-    const sample = (candidate: number, fineCandidate: number, crossed: boolean, fine: boolean, ticket: number): boolean => {
+    const sample = (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean, ticket: number): boolean => {
       if (!current(ticket) || !enabled() || phase.get() === 'idle') return false;
-      if (!Number.isFinite(candidate) || !Number.isFinite(fineCandidate)) { cancel(); return false; }
-      if (phase.get() === 'armed' && !crossed) return true;
+      if (!Number.isFinite(candidate) || !Number.isFinite(fineCandidate)
+        || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) { cancel(); return false; }
+      // Native input supplies displacement facts, never an already-decided
+      // drag phase. All scalar surfaces share this authored three-pixel slop.
+      if (phase.get() === 'armed' && deltaX * deltaX + deltaY * deltaY < 9) return true;
       phase.set('dragging', 'reason: continuous control dragging');
       if (!current(ticket)) return false;
       let next = fine ? fineCandidate : candidate;
       const handle = run;
       if (handle && handle.props.get().dragMode === 'steps') {
         const amount = fine ? (handle.props.get().fineStep ?? 0.001) : (handle.props.get().step ?? 0.01);
-        next = initialValue.get() + Math.round(candidate) * amount;
+        // Scrub direction, the dominant axis and four-pixel stepping are
+        // interaction policy. The host still owns musical unit formatting.
+        const movement = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : -deltaY;
+        next = initialValue.get() + Math.round(movement / 4) * amount;
       }
       return preview(next, ticket);
     };
-    def.expose.method('sample', (candidate: number, fineCandidate: number, crossed: boolean, fine: boolean) => {
+    def.expose.method('sample', (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean) => {
       const ticket = ++epoch;
-      return sample(candidate, fineCandidate, crossed, fine, ticket);
+      return sample(candidate, fineCandidate, deltaX, deltaY, fine, ticket);
     });
-    def.expose.method('finish', (candidate: number, fineCandidate: number, crossed: boolean, fine: boolean) => {
+    def.expose.method('finish', (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean) => {
       const ticket = ++epoch;
-      if (!sample(candidate, fineCandidate, crossed, fine, ticket) || !current(ticket)) return false;
+      if (!sample(candidate, fineCandidate, deltaX, deltaY, fine, ticket) || !current(ticket)) return false;
       if (phase.get() === 'dragging') return propose(value.get(), ticket);
       const action = run?.props.get().tapAction ?? 'none';
       phase.set('idle', 'reason: continuous control released');

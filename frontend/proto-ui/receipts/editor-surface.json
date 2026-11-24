@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "4e499ae25e825e130e740f16af66d70b23a743cf"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -50,7 +50,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -81,33 +81,33 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "artifacts": [
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+      "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "2406bac9b1d2e51fb6e58de04843a1ab4eaad57ec814dbee848da8c258d0ab0d"
+      "sha256": "e508e588f2be2ce115a482fed5a77dc146cb7d1f32dae13ea88db073b3c3673a"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "0cb9db7765f9da1f48fbf5ba6950b0c4993b3e3053f6ea666204e41524073fdb"
+      "sha256": "bf78ab9cb9dd5fc04c14d3e89fbd6ae698ad104800ff46955ebcb5cfdc780887"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "12d89edb9d1cfab4f4144588af8ebc8abc6576a33a3d88b3036212e94f598ced"
+      "sha256": "4d3ed5e82f3f5d512ae11df7b81272eec4ce7e4722d8e7488265caa02abe7d6d"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "cf3912ba841610678ec93fc3d0037037b3e42ac273787b2edfafa1f1aea4d6bc"
+      "sha256": "6c32e3dce71777092b693b5674025bce3a1feb8eb9ba24db80ad2fe133c111b9"
     }
   ]
 }

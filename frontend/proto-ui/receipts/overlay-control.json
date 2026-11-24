@@ -29,7 +29,7 @@
     },
     {
       "path": "frontend/proto-ui/src/overlay-control.proto.ts",
-      "sha256": "cd2ab5f31d25e5301e3563727fd899acece373f9d2aa6e93d5df24bcce8b729c"
+      "sha256": "8f85abe52d82e1c09fbc93e5591c2d6ec76c706e28fdade221dfbe16b3bcd959"
     },
     {
       "path": "node_modules/@proto.ui/core/package.json",
@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "4e499ae25e825e130e740f16af66d70b23a743cf"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -50,7 +50,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -81,33 +81,33 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "artifacts": [
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+      "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "5c8dffb1da3e8e44216cab0c7deea2573b869d03c8a1a364b4ad437e0b70c5d5"
+      "sha256": "e1cc51335c1b8559e8e21406812b74cd1a010d1dd17ed0008d4580563fa21a30"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "e8c98b06a36f8516aae2aa733a486343728185a5322ac01c965ec82a444a5284"
+      "sha256": "463eac811c34008e8f5d4154d764b1464be761f9f2f03c89fefc44dd7cb58678"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "0f941ea5eee6b7c6dbb7681d7c76c775b08a6786d20f9001849673577682442c"
+      "sha256": "382a61fab7bed9a8fae4917a93a7f3b8f003967b63157efd01da056878c297e8"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "4c8c46f94adff3ca5f320ac4ea4b42e68bb6adeaf3059064e96ba121020d1fe3"
+      "sha256": "6424ac19bcb279c5ac5a39157d62ccc2926130a5f83ecc746971ded4a083ff3f"
     }
   ]
 }

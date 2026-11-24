@@ -102,7 +102,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "4e499ae25e825e130e740f16af66d70b23a743cf"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -110,7 +110,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -141,33 +141,33 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "artifacts": [
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "299e5ddf75488f073623c1d1665d1b1ebdc6ed5f7862103ab5fd96b387db62b2"
+      "sha256": "c1c1e4d1e86f68947f7cc88157327d2dfa3f7744ddb0338cc46f46fd3d0ebe63"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "5de9ad24d0a5f617711d175f1fc4cb65ba8062b618c02dc23df0aa1ba0bd92c4"
+      "sha256": "159aca23f7451b814bdc103e2f46bcfb4a3f64b380c9f86f3a8635eec2265e98"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "8998ae91ed7f1097030586c81362fe8455bd3183698c2821043137af60b076d0"
+      "sha256": "c7d7205b6add67b7f27a8f07698e0c93d6d32fac43ef04e7b6ed828c9a705f98"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "01afd5804fa398c064f7d212e5b70d3aecb07d8cc69bfb76a03da93c1f798c2d"
+      "sha256": "b735cf5f404d6a859ccb80df3736ed1d1bc17ddcedf84a869e58dc939f57066e"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "b127e8cec889077b13b765bd640454956be3f595ad84163a170ab150384158c7"
+      "sha256": "0e42922ae12fe6c787960beda36e1346500189b43db07265f047a3d48ba8a244"
     }
   ]
 }

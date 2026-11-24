@@ -555,12 +555,9 @@ pub fn numeric_pill(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>
     config.tap_action = if matches!(id, Num::SnapGridTicks | Num::DefaultNoteTicks) { "activate" } else { "none" };
     config.preview_echo = true;
     let scalar = scalar(entity, key.clone(), config,
-        |sample, _, _| {
-            let dx = sample.total_delta.x;
-            let dy = -sample.total_delta.y;
-            let steps = if dx.abs() > dy.abs() { dx } else { dy } / 4.0;
-            Sample { value: steps, fine: steps, jump: false }
-        },
+        // Step-mode scrubbing consumes raw displacement inside the prototype;
+        // no host axis choice or pixel-to-step policy precedes its decision.
+        |_, _, initial| Sample { value: initial, fine: initial, jump: false },
         move |display, actions, _, cx| {
             let formatted = format_numeric_value(display_editor.read(cx), id, display.value);
             let text = if compact { format!("{label} {formatted}") } else { formatted };
@@ -1079,6 +1076,32 @@ mod pointer_boundary_tests {
                 position: point(px(82.0), px(14.0)), button: MouseButton::Left, ..Default::default()
             }), cx);
             assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 8.0);
+            assert_eq!(host.editor.read(cx).revision().get(), 1);
+            assert!(!has_numeric_scrub(host.editor.entity_id(), cx));
+            assert!(window.captured_hitbox().is_none());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn numeric_scrub_native_motion_is_classified_by_the_compiled_source(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                position: point(px(52.0), px(16.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+            }), cx);
+            assert!(host.editor.read(cx).numeric_preview.is_none(), "diagonal motion below three pixels stays armed");
+            window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                position: point(px(54.0), px(22.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), -2.0,
+                "the prototype chooses the dominant downward axis");
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: point(px(50.0), px(2.0)), button: MouseButton::Left,
+                modifiers: gpui::Modifiers { shift: true, ..Default::default() }, ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 1.5,
+                "the terminal raw motion is sampled using the source's fine step");
             assert_eq!(host.editor.read(cx).revision().get(), 1);
             assert!(!has_numeric_scrub(host.editor.entity_id(), cx));
             assert!(window.captured_hitbox().is_none());
