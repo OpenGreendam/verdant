@@ -12,8 +12,8 @@ rust-version = "1.98"
 [workspace.dependencies]
 # One workspace native identity, checked against compiler.pin.json and Cargo's
 # full resolve graph. Platform behavior is accepted separately; see P0-DECISIONS.
-gpui = { git = "https://github.com/cyjin-yl/z3rm", rev = "e5f2f9db75e97613232b5c1946333e61fa3828ab" }
-gpui_platform = { git = "https://github.com/cyjin-yl/z3rm", rev = "e5f2f9db75e97613232b5c1946333e61fa3828ab", features = ["font-kit", "x11", "wayland"] }
+gpui = { git = "https://github.com/cyjin-yl/z3rm", rev = "28f0728802599ad9ac902b86e322f783081c7df3" }
+gpui_platform = { git = "https://github.com/cyjin-yl/z3rm", rev = "28f0728802599ad9ac902b86e322f783081c7df3", features = ["font-kit", "x11", "wayland"] }
 serde = { version = "1", features = ["derive", "rc"] }
 semver = "1"
 # Preserve binary64 values when reading scores, model metadata and numerical receipts.

@@ -124,11 +124,11 @@
   },
   "gpu": {
     "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
-    "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+    "workspaceGpuiRevision": "28f0728802599ad9ac902b86e322f783081c7df3",
     "workspace": {
       "name": "gpui",
       "git": "https://github.com/cyjin-yl/z3rm",
-      "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "rev": "28f0728802599ad9ac902b86e322f783081c7df3",
       "features": [],
       "defaultFeatures": true
     }
