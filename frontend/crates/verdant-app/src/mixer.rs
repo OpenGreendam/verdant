@@ -108,6 +108,25 @@ fn toggle_button(ed: &Editor, target: ToggleTarget, label: impl Into<SharedStrin
         }))
 }
 
+/// Both master-insert surfaces consume the same source selection proposal.
+/// The editor owns slot identity, pending host work and the persisted write.
+pub(crate) fn master_insert_bypass_button(ed: &Editor, slot: usize, spec: &InsertSpec, key: &'static str, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
+    let basis = mixer_revision(ed);
+    let runtime = ed.live_master_insert(slot).map(|handle| handle.key());
+    let busy = ed.inserts_loading || runtime.is_some_and(|key| ed.plugin_busy.contains(&key));
+    let expected = spec.clone();
+    route_button(key, if spec.bypass { "启用" } else { "旁通" }, spec.bypass, ed.theme)
+        .role(Role::Switch)
+        .aria_label(format!("主总线插入 {} 旁通", slot + 1))
+        .authority(format!("{basis}:master:{slot}:{}:{runtime:?}", spec.instance_id))
+        .disabled(busy)
+        .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+            cx.stop_propagation();
+            if mixer_revision(ed) != basis { return; }
+            ed.accept_master_insert_bypass(slot, &expected, runtime, event.selected(), cx);
+        }))
+}
+
 #[derive(IntoElement)]
 struct MixerTracks { editor: Entity<Editor> }
 impl gpui::RenderOnce for MixerTracks {
@@ -226,12 +245,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                         .flex()
                         .gap(px(3.0))
                         .child(
-                            route_button("master-insert-bypass", if spec.bypass { "启用" } else { "旁通" }, spec.bypass, th).authority(mixer_revision(ed))
-                                .disabled(busy)
-                                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
-                                    if !busy { ed.toggle_master_insert_bypass(slot, cx); }
-                                    cx.stop_propagation();
-                                })),
+                            master_insert_bypass_button(ed, slot, spec, "master-insert-bypass", cx),
                         )
                         .child(
                             route_button("master-insert-remove", "移除", false, th).authority(mixer_revision(ed))
@@ -662,12 +676,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 .flex()
                 .gap(px(5.0))
                 .child(
-                    route_button("master-param-bypass", if spec.bypass { "启用" } else { "旁通" }, spec.bypass, th).authority(mixer_revision(ed))
-                        .disabled(busy)
-                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
-                            if !busy { ed.toggle_master_insert_bypass(slot, cx); }
-                            cx.stop_propagation();
-                        })),
+                    master_insert_bypass_button(ed, slot, spec, "master-param-bypass", cx),
                 )
                 .child(
                     route_button("master-param-remove", "移除", false, th).authority(mixer_revision(ed))

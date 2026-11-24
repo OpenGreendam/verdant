@@ -1021,8 +1021,25 @@ impl Editor {
         self.toggle_owned_insert_bypass(InsertOwner::Track(track.clone()), slot, cx);
     }
 
-    pub fn toggle_master_insert_bypass(&mut self, slot: usize, cx: &mut Context<Self>) {
-        self.toggle_owned_insert_bypass(InsertOwner::Master, slot, cx);
+    pub(crate) fn accept_master_insert_bypass(&mut self, slot: usize, expected: &InsertSpec,
+        runtime: Option<verdant_plugins::InsertKey>, selected: bool, cx: &mut Context<Self>) -> bool
+    {
+        if expected.bypass == selected || self.inserts_loading
+            || self.master_insert_specs().get(slot) != Some(expected)
+            || self.live_master_insert(slot).map(|handle| handle.key()) != runtime
+            || runtime.is_some_and(|key| self.plugin_busy.contains(&key)) { return false; }
+        if !self.flush_insert_states(cx) { return false; }
+        let mut specs = self.master_insert_specs();
+        let Some(spec) = specs.get_mut(slot) else { return false; };
+        // A legitimate flush may refresh opaque state. It cannot transfer an
+        // already-issued selection to another instance or accepted bypass value.
+        let mut captured = spec.clone();
+        captured.state_b64 = expected.state_b64.clone();
+        if captured != *expected || self.live_master_insert(slot).map(|handle| handle.key()) != runtime {
+            return false;
+        }
+        spec.bypass = selected;
+        self.commit_owned_inserts(&InsertOwner::Master, specs, "插件旁通", cx)
     }
 
     fn toggle_owned_insert_bypass(&mut self, owner: InsertOwner, slot: usize, cx: &mut Context<Self>) {
@@ -1452,6 +1469,10 @@ impl Editor {
         committed
     }
 }
+
+#[cfg(test)]
+#[path = "plugin_ui_bypass_tests.rs"]
+mod source_bypass_tests;
 
 #[cfg(test)]
 mod topology_tests {
