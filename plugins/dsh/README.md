@@ -134,8 +134,12 @@ Long renders use the actual `request --events` transport. Bounded JSONL parsing
 checks protocol, request ID, sequence, one terminal response and exit status.
 The first native progress job ID establishes the host/native mapping; the
 initial host return truthfully has only the bridge `run_id` and host `job_id`
-until the native ID exists. Progress reports real lifecycle events, not
-synthetic completion percentages. Native cancellation is requested when the
+until the native ID exists. A terminal result must retain that native job ID;
+any non-null ID on its event envelope must also agree with the result. An
+identity mismatch fails the run before registering artifacts or packing the
+desktop handoff. A result without progress can establish the native ID.
+Progress reports real lifecycle events, not synthetic completion percentages.
+Native cancellation is requested when the
 native job is known, then subprocess supervision signals its process tree.
 Plugin disposal aborts owned work, awaits child close and POSIX process-group
 retirement (Windows uses native `taskkill.exe /T /F`), awaits persistence, then
@@ -242,8 +246,10 @@ npm pack
 tar -tf verdant-dsh-0.1.0.tgz
 ```
 
-The transport regressions use real subprocess pipes with a controlled byte
-producer. They cover decoding, cancellation and process retirement; installed
+The transport and render-bridge regressions use real subprocess pipes with
+controlled protocol producers. They cover decoding, cancellation, process
+retirement, native job identity, and persisted run outcomes. The render fixture
+does not synthesize audio or establish portable-project validity; installed
 Verdant CLI, DSH host and channel acceptance remain the separate checks below.
 
 `prepack` compiles this package's `src` only. The archive must contain
