@@ -616,7 +616,9 @@ fn eq_menu(track: DeviceTarget, slot: usize, key: InsertKey, band: usize, eq: &E
         items.push(I::separator());
         for (i, slope) in dsp::SLOPES.iter().enumerate() { items.push(I::action(format!("{slope} dB/oct"), set("slope", i as f64)).checked(b.slope == i)); }
     }
-    items.push(I::action("连续陡度（FIR）", set("slope_continuous", if eq.slope_continuous[band] { 0. } else { 1. })).checked(eq.slope_continuous[band]));
+    items.push(I::boolean("连续陡度（FIR）", crate::menu::MenuBoolean::DeviceParameter {
+        target: track.clone(), slot, key, parameter: dsp::eq_param_id(band, "slope_continuous"),
+    }, eq.slope_continuous[band]));
     items.push(I::separator());
     let places = Placement::ALL.iter().map(|&pl| I::action(pl.label(), set("place", pl.index() as f64)).checked(b.place == pl)).collect();
     items.push(I::submenu("立体声位置", places));

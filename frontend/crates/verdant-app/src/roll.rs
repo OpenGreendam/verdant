@@ -1382,7 +1382,7 @@ fn native_ruler(editor:Entity<Editor>,arrange:bool,input:crate::proto_editor_sur
                         let looping=ed.playback_settings().looping;
                         let mut items=vec![
                             I::action("播放头移到此处",M::SeekTick(tick)),I::action("跳转到小节…",M::Workflow(A::GoToBar)),I::separator(),
-                            I::action("循环起点设在此处",M::Workflow(A::LoopStart(tick))),I::action("循环终点设在此处",M::Workflow(A::LoopEnd(tick))),I::action("循环播放",M::Workflow(A::ToggleLoop)).checked(looping),I::separator(),
+                            I::action("循环起点设在此处",M::Workflow(A::LoopStart(tick))),I::action("循环终点设在此处",M::Workflow(A::LoopEnd(tick))),I::boolean_command("循环播放",crate::generated::controls::CommandId::ToggleLoop,crate::generated::controls::CommandArg::None,looping),I::separator(),
                             I::header("速度与拍号"),I::action("在此处编辑 / 新增速度…",M::Workflow(A::EditTempo(tick))),I::action("删除前一速度事件",M::Workflow(A::DeleteTempo(tempo))).enabled(tempo>0),
                             I::action("在此处编辑 / 新增拍号…",M::Workflow(A::EditMeter(tick))),I::action("删除前一拍号事件",M::Workflow(A::DeleteMeter(meter))).enabled(meter>0)];
                         if !arrange {

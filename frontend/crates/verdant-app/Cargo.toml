@@ -29,7 +29,7 @@ verdant-media = { path = "../verdant-media" }
 verdant-pitch-gesture-surface = { package = "generated-gpui-b52ed869ec1a5a76be7b9293837850ec", path = "../../proto-ui/generated/pitch-gesture-surface" }
 verdant-normalized-knob = { package = "generated-gpui-51ee6ccecd229ec65f76891504d689af", path = "../../proto-ui/generated/normalized-knob" }
 verdant-action-control = { package = "generated-gpui-b286d126da0c73bf3a1d84949b13c25a", path = "../../proto-ui/generated/action-control" }
-verdant-collection-control = { package = "generated-gpui-10d72bff841f6ff2cf401f8e38efaada", path = "../../proto-ui/generated/collection-control" }
+verdant-collection-control = { package = "generated-gpui-a5767e6167b7ae5523cc27b3938c6863", path = "../../proto-ui/generated/collection-control" }
 verdant-continuous-control = { package = "generated-gpui-c418da798fb27a549347168982b07ae9", path = "../../proto-ui/generated/continuous-control" }
 verdant-editor-surface = { package = "generated-gpui-d4689e3e1fc8f199cbb99d47cca12963", path = "../../proto-ui/generated/editor-surface" }
 verdant-performance-key = { package = "generated-gpui-bcb9600466028d97f55418619b08f828", path = "../../proto-ui/generated/performance-key" }

@@ -346,10 +346,11 @@ pub(crate) fn bar_target_tick(meter: &verdant_domain::MeterMap, text: &str) -> R
 
 fn position_menu(ed:&mut Editor,position:gpui::Point<gpui::Pixels>,window:&mut Window,cx:&mut Context<Editor>) {
     use crate::editor::{MenuAction as M,WorkflowAction as A};use crate::menu::MenuItem as I;
+    use crate::generated::controls::{CommandId as C, CommandArg};
     let playback=ed.playback_settings();
     let items=vec![I::action("跳转到小节…",M::Workflow(A::GoToBar)),I::action("回到开头",M::SeekTick(0)),I::separator(),
-        I::action("跟随播放头",M::ToggleFollow).checked(ed.session.follow_playhead),I::action("循环播放",M::Workflow(A::ToggleLoop)).checked(playback.looping),
-        I::action("节拍器",M::Workflow(A::ToggleMetronome)).checked(playback.metronome),I::separator(),
+        I::boolean("跟随播放头",crate::menu::MenuBoolean::FollowPlayhead,ed.session.follow_playhead),I::boolean_command("循环播放",C::ToggleLoop,CommandArg::None,playback.looping),
+        I::boolean_command("节拍器",C::ToggleMetronome,CommandArg::None,playback.metronome),I::separator(),
         I::action("在播放头编辑 / 新增速度…",M::Workflow(A::EditTempo(ed.tempo().tick_at(ed.frame_playhead).max(0.) as i64))),
         I::action("在播放头编辑 / 新增拍号…",M::Workflow(A::EditMeter(ed.tempo().tick_at(ed.frame_playhead).max(0.) as i64)))];
     ed.show_menu(position,items,window,cx);

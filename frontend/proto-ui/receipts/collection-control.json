@@ -21,7 +21,7 @@
     },
     {
       "path": "frontend/proto-ui/src/collection-control.proto.ts",
-      "sha256": "bf53d458da29b3237ea7a78d6629e95c41cf536436fdc03070acd3ae6f81219d"
+      "sha256": "34bfb7f03e04f3d34676d3475badd676f864c5bb4960086d84b43b5459927a89"
     },
     {
       "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
@@ -92,22 +92,22 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "97c4570dfcbf0f751a2eccb972a456894816104c17d87c3c0aee1981216d2d07"
+      "sha256": "b35bbc55eb79ef8bcf1ec5910f85139a70adcefbd1ed6d5d760c71520c754587"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "1429143d288c6535e4a4c15ac4c2ddd12d1812e3f70546bca8e3a1a5325dfc59"
+      "sha256": "2d71cf4056027952382c0e2af98145212f9d94d80cdb8eb8e0884821ec27a4ee"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "da7784be710bbfea6ef2d1b186a84daedcd88f3702737cf8f3fae63ee6d89008"
+      "sha256": "a87dd3db617421afa108af2162ff3d6e080f8385f931de4d074b02d6b4ac3436"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "82f1262615e19e6f18c51fc352b99f65fe6377c11a0a94b7661fc0603a7b6185"
+      "sha256": "a91de0a07b1c229be18649a0e9ae00d28d5b1dc0c2c4aea9c12187f2b8a93946"
     }
   ]
 }

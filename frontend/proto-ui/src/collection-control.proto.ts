@@ -6,8 +6,9 @@ type Props = {
   expanded?: number; revision?: string; disabled?: boolean; autoFocus?: boolean; columns?: number;
 };
 
-// Item kinds: 0 unavailable/header, 1 action, 2 submenu. Host supplies content
-// facts; this instance owns traversal, expansion, activation and dismissal.
+// Item kinds: 0 unavailable/header, 1 action, 2 submenu, 3/4 unchecked/checked
+// Boolean, 5/6 unselected/selected choice. Host supplies accepted content facts;
+// this instance owns traversal, expansion, selection proposals and dismissal.
 export default definePrototype<Props>({
   name: 'verdant-collection-control',
   setup(def) {
@@ -39,6 +40,7 @@ export default definePrototype<Props>({
     def.expose.state('focused', focus.focused); def.expose.state('focusVisible', focus.focusVisible);
     def.expose.event('select', { payload: 'json' });
     def.expose.event('activate', { payload: 'json' });
+    def.expose.event('selection', { payload: 'json' });
     def.expose.event('expand', { payload: 'json' });
     def.expose.event('close', { payload: 'json' });
     def.expose.event('command', { payload: 'json' });
@@ -70,7 +72,8 @@ export default definePrototype<Props>({
     };
     const validItems = (values: number[], start: number, end: number): boolean => {
       if (end <= start) return true;
-      if (end - start === 1) return values[start] === 0 || values[start] === 1 || values[start] === 2;
+      if (end - start === 1) return values[start] === 0 || values[start] === 1 || values[start] === 2
+        || values[start] === 3 || values[start] === 4 || values[start] === 5 || values[start] === 6;
       const sum = start + end;
       const middle = (sum - sum % 2) / 2;
       return validItems(values, start, middle) && validItems(values, middle, end);
@@ -112,8 +115,20 @@ export default definePrototype<Props>({
       if (current && ticket === epoch) current.update();
       return true;
     };
+    const chooseSelection = (index: number, selected: boolean, extend: boolean): boolean => {
+      const owner = current;
+      const item = kind(index);
+      if (!owner || !ready() || typeof selected !== 'boolean' || item < 3 || item > 6
+        || (item >= 5 && !selected)) return false;
+      const ticket = ++epoch;
+      cursor.set(index, 'reason: collection selection proposal cursor');
+      if (!ready() || epoch !== ticket) return false;
+      owner.expose.emit('selection', { index, selected, extend, revision: owner.props.get().revision ?? '' });
+      return true;
+    };
     const choose = (index: number, extend: boolean): boolean => {
       if (!ready() || kind(index) === 0) return false;
+      if (kind(index) >= 3) return chooseSelection(index, kind(index) === 3 || kind(index) >= 5, extend);
       const ticket = ++epoch;
       cursor.set(index, 'reason: collection activation cursor');
       if (!ready() || epoch !== ticket) return false;
@@ -218,6 +233,12 @@ export default definePrototype<Props>({
     def.expose.method('choose', (index: number, extend: boolean, basis: string) => {
       if (basis !== (current?.props.get().revision ?? '')) return false;
       return choose(index, extend);
+    });
+    // A child ActionControl proposal retains its value. Keyboard activation
+    // reaches the same admission path using the accepted item facts above.
+    def.expose.method('chooseSelection', (index: number, selected: boolean, basis: string) => {
+      if (basis !== (current?.props.get().revision ?? '')) return false;
+      return chooseSelection(index, selected, false);
     });
     def.expose.method('selectIndex', (index: number, extend: boolean, basis: string) => {
       if (basis !== (current?.props.get().revision ?? '')) return false;

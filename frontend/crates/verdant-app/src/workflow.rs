@@ -205,7 +205,7 @@ impl Editor {
         })();if let Err(error)=result{self.notice(error);cx.notify();}
     }
     fn replace_selected_notes(&mut self,label:&str,notes:Vec<Note>,cx:&mut Context<Self>){if notes.is_empty(){self.notice("先选择音符");cx.notify();return;}self.commit(self.revision(),CommandBatch::single(label,Command::ReplaceNotes{track:self.session.track.clone(),notes}),cx);}
-    fn edit_part(&mut self,id:&str,label:&str,cx:&mut Context<Self>,f:impl FnOnce(&mut verdant_domain::parts::PartInstance)->Result<(),String>)->Result<(),String>{let mut parts=Parts::load(self.project())?;f(parts.instances.iter_mut().find(|p|p.id==id).ok_or("片段已不存在")?)?;parts.validate(self.project())?;if self.commit(self.revision(),CommandBatch::single(label,parts.command()),cx){Ok(())}else{Err("片段修改未提交".into())}}
+    pub(crate) fn edit_part(&mut self,id:&str,label:&str,cx:&mut Context<Self>,f:impl FnOnce(&mut verdant_domain::parts::PartInstance)->Result<(),String>)->Result<(),String>{let mut parts=Parts::load(self.project())?;f(parts.instances.iter_mut().find(|p|p.id==id).ok_or("片段已不存在")?)?;parts.validate(self.project())?;if self.commit(self.revision(),CommandBatch::single(label,parts.command()),cx){Ok(())}else{Err("片段修改未提交".into())}}
     fn duplicate_track(&mut self,id:&TrackId,cx:&mut Context<Self>)->Result<(),String>{
         if self.project().tracks.len()>=verdant_audio::MAX_TRACKS{return Err("已达到轨道数上限".into());}let index=self.track_index(id).ok_or("轨道已不存在")?;
         let mut track=self.project().track(id).cloned().ok_or("轨道已不存在")?;let new_id=TrackId::generate();track.id=new_id.clone();track.name=format!("{} 副本",track.name);track.solo=false;
@@ -309,8 +309,8 @@ impl Editor {
             I::submenu("片段 (Part)",parts),
             I::submenu("速度与拍号",vec![w("当前位置速度…",A::EditTempo(tick)),w("当前位置拍号…",A::EditMeter(tick))]),
             I::submenu("循环与节拍器",vec![
-                w("循环播放",A::ToggleLoop).checked(pb.looping),w("以选中音符设为循环",A::RepeatSelection),w("在播放头设循环起点",A::LoopStart(tick)),w("在播放头设循环终点",A::LoopEnd(tick)),
-                I::separator(),w("节拍器",A::ToggleMetronome).checked(pb.metronome),w("离线导出包含节拍器",A::ToggleExportClick).checked(pb.export_click),
+                I::boolean_command("循环播放",crate::generated::controls::CommandId::ToggleLoop,crate::generated::controls::CommandArg::None,pb.looping),w("以选中音符设为循环",A::RepeatSelection),w("在播放头设循环起点",A::LoopStart(tick)),w("在播放头设循环终点",A::LoopEnd(tick)),
+                I::separator(),I::boolean_command("节拍器",crate::generated::controls::CommandId::ToggleMetronome,crate::generated::controls::CommandArg::None,pb.metronome),I::boolean("离线导出包含节拍器",crate::menu::MenuBoolean::ExportClick,pb.export_click),
                 I::separator(),I::header("预备拍"),
                 w("无",A::CountIn(0)).checked(pb.count_in_bars==0),w("1 小节",A::CountIn(1)).checked(pb.count_in_bars==1),w("2 小节",A::CountIn(2)).checked(pb.count_in_bars==2),
                 w("4 小节",A::CountIn(4)).checked(pb.count_in_bars==4),w("8 小节",A::CountIn(8)).checked(pb.count_in_bars==8)]),

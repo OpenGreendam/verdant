@@ -2085,16 +2085,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-10d72bff841f6ff2cf401f8e38efaada"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "proto-ui-gpui-native",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "generated-gpui-29cfcd7b8359945c50f15ffd20b14ff7"
 version = "0.1.0"
 dependencies = [
@@ -2116,6 +2106,16 @@ dependencies = [
 
 [[package]]
 name = "generated-gpui-51ee6ccecd229ec65f76891504d689af"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "proto-ui-gpui-native",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "generated-gpui-a5767e6167b7ae5523cc27b3938c6863"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -6738,10 +6738,10 @@ dependencies = [
  "async-channel",
  "chrono",
  "env_logger",
- "generated-gpui-10d72bff841f6ff2cf401f8e38efaada",
  "generated-gpui-29cfcd7b8359945c50f15ffd20b14ff7",
  "generated-gpui-3c96e5538cf4708f4efe8d5a58b185be",
  "generated-gpui-51ee6ccecd229ec65f76891504d689af",
+ "generated-gpui-a5767e6167b7ae5523cc27b3938c6863",
  "generated-gpui-b286d126da0c73bf3a1d84949b13c25a",
  "generated-gpui-b52ed869ec1a5a76be7b9293837850ec",
  "generated-gpui-b839ef9e9422255d8661581dfde3da43",

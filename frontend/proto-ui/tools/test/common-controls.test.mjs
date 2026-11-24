@@ -126,6 +126,44 @@ runtimeTest('menu traversal skips unavailable rows, opens submenus and rejects s
   f.call('choose', 3, false, 'document:2'); assert.equal(f.events.at(-1).name, 'activate');
   f.event('key.down', { key: 'Escape' }); assert.equal(f.events.at(-1).name, 'close');
 });
+runtimeTest('collection carries child Boolean proposals and derives keyboard selection from accepted item facts', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'menu', cursor: 0 });
+  assert.equal(f.call('setItems', [3, 4, 5, 6, 1, 2, 0]), true);
+  assert.equal(f.call('chooseSelection', 0, false, 'document:1'), true);
+  assert.deepEqual(f.events.at(-1), { name: 'selection', payload: { index: 0, selected: false, extend: false, revision: 'document:1' } },
+    'a child source false is preserved even when the collection accepted false');
+  f.call('key', 'Enter', false, false); f.call('key', ' ', false, false);
+  assert.deepEqual(f.events.slice(-2).map(event => event.payload.selected), [true, true], 'proposals never optimistically change accepted facts');
+  f.call('choose', 1, false, 'document:1'); assert.equal(f.events.at(-1).payload.selected, false);
+  for (const index of [2, 3]) {
+    f.call('choose', index, false, 'document:1'); assert.equal(f.events.at(-1).payload.selected, true);
+    assert.equal(f.call('chooseSelection', index, false, 'document:1'), false, 'a choice cannot be deselected');
+  }
+  const n = f.events.length;
+  for (const index of [-1, 0.5, 4, 5, 6, 7]) assert.equal(f.call('chooseSelection', index, true, 'document:1'), false);
+  assert.equal(f.call('chooseSelection', 0, 1, 'document:1'), false);
+  assert.equal(f.call('chooseSelection', 0, true, 'document:0'), false);
+  assert.equal(f.events.length, n);
+  f.update({ cursor: 0, revision: 'document:2' }); f.call('setItems', [4]);
+  f.call('key', 'Enter', false, false); assert.equal(f.events.at(-1).payload.selected, false);
+  f.update({ disabled: true });
+  assert.equal(f.call('chooseSelection', 0, false, 'document:2'), false);
+  f.update({ disabled: false }); await f.session.unmount();
+  assert.equal(f.call('chooseSelection', 0, false, 'document:2'), false);
+});
+runtimeTest('collection reentrant replacement retires a suspended selection proposal', async t => {
+  const f = await fixture(t, 'collection-control', { mode: 'menu', cursor: 0 });
+  f.call('setItems', [3, 3]);
+  const stop = f.x.cursor.subscribe(event => {
+    if (event.type === 'next' && event.next === 1) {
+      f.update({ revision: 'document:2', cursor: 0 });
+      f.call('setItems', [1]);
+    }
+  });
+  assert.equal(f.call('chooseSelection', 1, true, 'document:1'), false); stop();
+  assert.equal(f.events.filter(event => event.name === 'selection').length, 0);
+  assert.equal(f.call('chooseSelection', 0, true, 'document:2'), false, 'a replacement ordinary action cannot receive an old Boolean proposal');
+});
 runtimeTest('collection validates typed manifests and large unavailable spans without recursion overflow', async t => {
   const f = await fixture(t, 'collection-control', { mode: 'table', cursor: 0 });
   assert.equal(f.call('setItems', [1, 9]), false);
