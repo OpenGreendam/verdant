@@ -21,7 +21,7 @@
     },
     {
       "path": "frontend/proto-ui/src/graph-point.proto.ts",
-      "sha256": "332bc9effe73d8b8af3d9ef7fc384c4d702a8dc7038508047d90e574275855ec"
+      "sha256": "a73365d04db2c44ec025a0a0a32aabb58d732e83a35a3f85f1e78e10471d8c5b"
     },
     {
       "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -50,7 +50,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -81,33 +81,33 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "artifacts": [
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+      "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "ccd58560bccdaf5692e27f4d78b9a3c32b5ff467c773767ed897e5f763bc272b"
+      "sha256": "ccb584c82b0e0f651be63e5cd24490f250d155ba0db6e81a19c35cf2316e35c7"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "cade7a02444eb2f5f301482bfb4e373976c217f20a93d9fa13ccf37d7c6db5cb"
+      "sha256": "a420d1ef8fe97f2cc442ce2fb8ca1d60bdaa1d6eb39e83e0592ba06968329524"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "117bdf7b56abcd7b6041cf3ed1faf776e7e64272f3ac7fa5eb5b797e55decf8a"
+      "sha256": "5c03ab8d4857906b202798b181893f6d93ab65a278ee288469549e0333ce22fc"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "a2e24810cda67376fc722e299cb3e4b3c80392108f812d7ed27d20c2eb3de77c"
+      "sha256": "c7c726c4a46664e0307857d9c3fff584a26ba3e5f1be8ea45046f563e991f879"
     }
   ]
 }

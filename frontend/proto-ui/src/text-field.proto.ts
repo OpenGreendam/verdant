@@ -1,6 +1,6 @@
 import { definePrototype, tw, type RunHandle } from '@proto.ui/core';
 import { asFocusable } from '@proto.ui/hooks';
-import { asInputRoot, type InputRootProps } from './upstream-input/root.proto';
+import { asInputEditor, type InputRootProps } from './upstream-input/root.proto';
 
 type Props = InputRootProps & {
   autoFocus?: boolean;
@@ -21,9 +21,9 @@ type Props = InputRootProps & {
 // This prototype adds application-boundary requests, not a second text engine.
 export default definePrototype<Props>({
   name: 'verdant-text-field',
-  modules: asInputRoot.modules,
+  modules: asInputEditor.modules,
   setup(def) {
-    const inherited = asInputRoot();
+    const inherited = asInputEditor();
     const state = inherited.stateHandles;
     if (!state) throw new Error('Input root state projection is required');
     const focus = asFocusable();

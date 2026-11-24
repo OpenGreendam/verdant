@@ -1,0 +1,1182 @@
+{
+  "schema": "verdant.proto-ui.rcip-validation.v1",
+  "recordedForDate": "2026-11-24",
+  "timezone": "Etc/UTC",
+  "recordedAt": "2026-11-24T17:39:31.304979+08:00",
+  "recordKind": "current-candidate-validation-with-preserved-attempts",
+  "status": "local-validation-complete-with-known-upstream-failure-and-platform-ci-outstanding",
+  "scope": "This RCIP implementation completed its local source, producer, generated native consumer and dependency-graph validation. The known upstream compiler failure, earlier attempts, historical mainline evidence and outstanding current-PR platform acceptance remain separate.",
+  "source": {
+    "repository": "https://github.com/OpenGreendam/verdant",
+    "baseRevision": "ac0402289e335d9a8228b4e056fb95320482458a",
+    "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+    "candidateTree": "cd39b8b8ca02c6d209bf3f9f5c4a8b5ef3611de4",
+    "binding": "This candidate identifies the implementation before the validation documentation update. The canonical changed-implementation manifest below remains comparable across documentation-only commits; this file does not claim its own future commit was executed.",
+    "implementationUnchangedSinceCandidateAtRecordTime": true,
+    "implementationManifest": {
+      "comparison": "baseRevision..candidateRevision with git diff --name-status --no-renames",
+      "fileContentHash": "SHA-256 of the exact working-tree file bytes, verified to have no implementation diff from candidateRevision; deleted files use null.",
+      "exclusionRule": "Exclude any basename README.md, CONTROL-MIGRATION.md, RCIP-*.md, or VALIDATION-*; include changed implementation, tests, manifests, lockfile, compiler pin, generated code and receipts.",
+      "excludedPaths": [
+        "frontend/proto-ui/CONTROL-MIGRATION.md",
+        "frontend/proto-ui/RCIP-2026-11-24.md",
+        "frontend/proto-ui/README.md"
+      ],
+      "canonicalization": "UTF-8 JSON of the files array with files sorted by path, object keys sorted lexicographically, ensure_ascii=false, and separators comma/colon with no whitespace or trailing newline.",
+      "sha256": "3def813ee5da39a408ff41456d0f09b70ef9e5705923b6deff3b142016efe3fc",
+      "fileCount": 104,
+      "files": [
+        {
+          "path": "frontend/Cargo.lock",
+          "change": "M",
+          "sha256": "eefc962126c9fc80e0f00bbb352687a828a882aa1b92ce67541c1402d68de960"
+        },
+        {
+          "path": "frontend/crates/verdant-app/Cargo.toml",
+          "change": "M",
+          "sha256": "0b81f9f1cb0ed1e8a167e45c3dcee0b2f00cb72fb0ef97df145421a4fa3f9ce5"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/alert.rs",
+          "change": "M",
+          "sha256": "5d3556db53cda1120ccac354bd8a9f05358cfe1d3773e35a11ded50ea322656f"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/clock.rs",
+          "change": "M",
+          "sha256": "998ae4e73a579bb721bfaa95152c108daa419c1c1446efdda890a979f10b6dc6"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/dialogs.rs",
+          "change": "M",
+          "sha256": "56a8e62ed32a79dad73f6c2937f33a0aea59b9d599aa5877b9616e2534250faf"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/files.rs",
+          "change": "M",
+          "sha256": "beac7465cdb97a1e60b1efe0688a725e5a386d6489ce7ce5e3ea31ecb3611461"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/files_export_options_tests.rs",
+          "change": "M",
+          "sha256": "38fcc6c4d0e87b7b43645740883cc6598d238e2e1c402d932d7e2f4660d9274a"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/mixer.rs",
+          "change": "M",
+          "sha256": "befe72ec7fd8145a766091fd73afab317de2967ba53ba243ada1ea67278462b4"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/proto_controls.rs",
+          "change": "M",
+          "sha256": "8d9338a5978c49e56cb3ea6f3a6736bd2fe2b871c05e71f5e67c2946254c98f6"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/proto_overlay.rs",
+          "change": "M",
+          "sha256": "4d3b3361db502427a3a2a4ee642cf4ad880a1046462c0a505b32f7a8515b786e"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/proto_scalar.rs",
+          "change": "M",
+          "sha256": "c8a06f5bb541c27197c713069e5236a6b3bd71405ab13a4884bfbc5a24700dc3"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/ui_controls.rs",
+          "change": "M",
+          "sha256": "e820490b5376bac6650ca3bd9d3a873281a4a67587f9dfd2294975170cd5f6a5"
+        },
+        {
+          "path": "frontend/crates/verdant-app/src/voice_ui.rs",
+          "change": "M",
+          "sha256": "a5050b6dd1c09be11979051a244f2d9be1f22d5ed6686d93f7493ec2a5b049e1"
+        },
+        {
+          "path": "frontend/proto-ui/compiler.pin.json",
+          "change": "M",
+          "sha256": "046fd9674c7201487ccf0a12619cb7aa19e73ed051ae7072fd8f9ad14fe983fa"
+        },
+        {
+          "path": "frontend/proto-ui/generated/action-control/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/action-control/Cargo.toml",
+          "change": "M",
+          "sha256": "8ba7fb16bea915df9827bd56690847b7b82a3b25651ce99d4db76833165fa441"
+        },
+        {
+          "path": "frontend/proto-ui/generated/action-control/Component.rs",
+          "change": "M",
+          "sha256": "7234015e07103c6903da6430c38df1b172477f0a815bec19cb355b89b9971ce6"
+        },
+        {
+          "path": "frontend/proto-ui/generated/action-control/Component.rs.map",
+          "change": "M",
+          "sha256": "fc90c44f191104ee54f9d0715e9141be4c724b7e1abac49c00fe3b789fd8ff9b"
+        },
+        {
+          "path": "frontend/proto-ui/generated/action-control/provenance.json",
+          "change": "M",
+          "sha256": "55c36d29ad383aabb234590d54bda3aff1da43bb3a8d44c8ca5bf3099c74a875"
+        },
+        {
+          "path": "frontend/proto-ui/generated/collection-control/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/collection-control/Cargo.toml",
+          "change": "M",
+          "sha256": "97c4570dfcbf0f751a2eccb972a456894816104c17d87c3c0aee1981216d2d07"
+        },
+        {
+          "path": "frontend/proto-ui/generated/collection-control/Component.rs",
+          "change": "M",
+          "sha256": "1429143d288c6535e4a4c15ac4c2ddd12d1812e3f70546bca8e3a1a5325dfc59"
+        },
+        {
+          "path": "frontend/proto-ui/generated/collection-control/Component.rs.map",
+          "change": "M",
+          "sha256": "da7784be710bbfea6ef2d1b186a84daedcd88f3702737cf8f3fae63ee6d89008"
+        },
+        {
+          "path": "frontend/proto-ui/generated/collection-control/provenance.json",
+          "change": "M",
+          "sha256": "82f1262615e19e6f18c51fc352b99f65fe6377c11a0a94b7661fc0603a7b6185"
+        },
+        {
+          "path": "frontend/proto-ui/generated/continuous-control/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "4365d7500110f67e404b59e80dd6d8d9736240ccbd16695f5a90feb2e7fd46c2"
+        },
+        {
+          "path": "frontend/proto-ui/generated/continuous-control/Cargo.toml",
+          "change": "M",
+          "sha256": "8e4faa1f0c3034a053c0b292aa87cc4499bd7df7ad16b7ef922bf3a3ad5cc03f"
+        },
+        {
+          "path": "frontend/proto-ui/generated/continuous-control/Component.rs",
+          "change": "M",
+          "sha256": "639517877df65f044800deff03cfa380b3669d3a0891e17033105d40e9073b47"
+        },
+        {
+          "path": "frontend/proto-ui/generated/continuous-control/Component.rs.map",
+          "change": "M",
+          "sha256": "19ab83783d05d2691468d43a1c09a97d924c33103c6fc6d87fb086d78894e90f"
+        },
+        {
+          "path": "frontend/proto-ui/generated/continuous-control/provenance.json",
+          "change": "M",
+          "sha256": "aaf77d4a06dcfb25afcd622db3d803f3f9fddfb77c51ec3bbc88b462f9e77224"
+        },
+        {
+          "path": "frontend/proto-ui/generated/control-gesture-planner/Cargo.toml",
+          "change": "M",
+          "sha256": "0b417703d86fc2792818a0489ad862423cf64d166119c14cd7fe27321d97132a"
+        },
+        {
+          "path": "frontend/proto-ui/generated/control-gesture-planner/lib.rs",
+          "change": "M",
+          "sha256": "74ea4ce4cbdc2cc456b3ab27c42daf21c15f0a45f66a42199a727612f82b3802"
+        },
+        {
+          "path": "frontend/proto-ui/generated/control-gesture-planner/provenance.json",
+          "change": "M",
+          "sha256": "3b64c50661a70234ffca1e443b35615c6ce3b71af716f51af91e10435cfdfcab"
+        },
+        {
+          "path": "frontend/proto-ui/generated/drag-source/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/drag-source/Cargo.toml",
+          "change": "M",
+          "sha256": "b4874e85b005297b719f12a814fc9758c2bc780a13fdff39dc14001a39004a2f"
+        },
+        {
+          "path": "frontend/proto-ui/generated/drag-source/Component.rs",
+          "change": "M",
+          "sha256": "378c285c03427eeb433da9880b45c50720607f934762b36153aad1b9f4ae2b16"
+        },
+        {
+          "path": "frontend/proto-ui/generated/drag-source/Component.rs.map",
+          "change": "M",
+          "sha256": "f0ea00ebf17205ee7ebf60b739cb33b511b3b6a99ed3729523348949c9aaf66d"
+        },
+        {
+          "path": "frontend/proto-ui/generated/drag-source/provenance.json",
+          "change": "M",
+          "sha256": "4486b5531e4e6a9c950793bd590ac3e49c8648576959d088fe12c7345f1c19db"
+        },
+        {
+          "path": "frontend/proto-ui/generated/editor-surface/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/editor-surface/Cargo.toml",
+          "change": "M",
+          "sha256": "e508e588f2be2ce115a482fed5a77dc146cb7d1f32dae13ea88db073b3c3673a"
+        },
+        {
+          "path": "frontend/proto-ui/generated/editor-surface/Component.rs",
+          "change": "M",
+          "sha256": "bf78ab9cb9dd5fc04c14d3e89fbd6ae698ad104800ff46955ebcb5cfdc780887"
+        },
+        {
+          "path": "frontend/proto-ui/generated/editor-surface/Component.rs.map",
+          "change": "M",
+          "sha256": "4d3ed5e82f3f5d512ae11df7b81272eec4ce7e4722d8e7488265caa02abe7d6d"
+        },
+        {
+          "path": "frontend/proto-ui/generated/editor-surface/provenance.json",
+          "change": "M",
+          "sha256": "6c32e3dce71777092b693b5674025bce3a1feb8eb9ba24db80ad2fe133c111b9"
+        },
+        {
+          "path": "frontend/proto-ui/generated/graph-point/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/graph-point/Cargo.toml",
+          "change": "M",
+          "sha256": "ccb584c82b0e0f651be63e5cd24490f250d155ba0db6e81a19c35cf2316e35c7"
+        },
+        {
+          "path": "frontend/proto-ui/generated/graph-point/Component.rs",
+          "change": "M",
+          "sha256": "a420d1ef8fe97f2cc442ce2fb8ca1d60bdaa1d6eb39e83e0592ba06968329524"
+        },
+        {
+          "path": "frontend/proto-ui/generated/graph-point/Component.rs.map",
+          "change": "M",
+          "sha256": "5c03ab8d4857906b202798b181893f6d93ab65a278ee288469549e0333ce22fc"
+        },
+        {
+          "path": "frontend/proto-ui/generated/graph-point/provenance.json",
+          "change": "M",
+          "sha256": "c7c726c4a46664e0307857d9c3fff584a26ba3e5f1be8ea45046f563e991f879"
+        },
+        {
+          "path": "frontend/proto-ui/generated/normalized-knob/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/normalized-knob/Cargo.toml",
+          "change": "M",
+          "sha256": "a709783acffc8709dbfdcf31d48d111659b53e4172b7841de31572244d9cefa7"
+        },
+        {
+          "path": "frontend/proto-ui/generated/normalized-knob/Component.rs",
+          "change": "M",
+          "sha256": "880ea489acd5eda8681e5872d486291c3b9baadc97866e50f404d9d17b95b77a"
+        },
+        {
+          "path": "frontend/proto-ui/generated/normalized-knob/Component.rs.map",
+          "change": "M",
+          "sha256": "064ccb92fd15ee4c9eb7a64f426f3bf48d8138b34a8e3b8ef6f690dd965397f1"
+        },
+        {
+          "path": "frontend/proto-ui/generated/normalized-knob/provenance.json",
+          "change": "M",
+          "sha256": "3497f8cdaa40addb920722ba5ce2a07ff377c52a71f36a82d7289800fa7a1ca1"
+        },
+        {
+          "path": "frontend/proto-ui/generated/note-gesture-planner/Cargo.toml",
+          "change": "M",
+          "sha256": "5854b20d4b0d3817486996b74162ecf0ef22cd1b649a71ed07ee77bdbbb0f9f8"
+        },
+        {
+          "path": "frontend/proto-ui/generated/note-gesture-planner/lib.rs",
+          "change": "M",
+          "sha256": "f5b3f2bbf0ed8e53cc45d2f65ee7c6d0730609932d4aa413e7fd39cefcbde73b"
+        },
+        {
+          "path": "frontend/proto-ui/generated/note-gesture-planner/provenance.json",
+          "change": "M",
+          "sha256": "85a39f279407fc9c514189d56e204fe84853af765c7174c691820800db64ba6c"
+        },
+        {
+          "path": "frontend/proto-ui/generated/overlay-control/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/overlay-control/Cargo.toml",
+          "change": "M",
+          "sha256": "e1cc51335c1b8559e8e21406812b74cd1a010d1dd17ed0008d4580563fa21a30"
+        },
+        {
+          "path": "frontend/proto-ui/generated/overlay-control/Component.rs",
+          "change": "M",
+          "sha256": "463eac811c34008e8f5d4154d764b1464be761f9f2f03c89fefc44dd7cb58678"
+        },
+        {
+          "path": "frontend/proto-ui/generated/overlay-control/Component.rs.map",
+          "change": "M",
+          "sha256": "382a61fab7bed9a8fae4917a93a7f3b8f003967b63157efd01da056878c297e8"
+        },
+        {
+          "path": "frontend/proto-ui/generated/overlay-control/provenance.json",
+          "change": "M",
+          "sha256": "6424ac19bcb279c5ac5a39157d62ccc2926130a5f83ecc746971ded4a083ff3f"
+        },
+        {
+          "path": "frontend/proto-ui/generated/performance-key/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/performance-key/Cargo.toml",
+          "change": "M",
+          "sha256": "8d8e376db71c9ebcce33b5d8494bebce67293e89cb710ef6f9e7c03559e9bff1"
+        },
+        {
+          "path": "frontend/proto-ui/generated/performance-key/Component.rs",
+          "change": "M",
+          "sha256": "2f63b2f5837c42c029a75da1ac7935f24fbc0d06dd70c56a272c01a4dfdccbe2"
+        },
+        {
+          "path": "frontend/proto-ui/generated/performance-key/Component.rs.map",
+          "change": "M",
+          "sha256": "6d2d9f46854f1da80f384c11c69f587cfed4043399541dc973a41bc51028b2bf"
+        },
+        {
+          "path": "frontend/proto-ui/generated/performance-key/provenance.json",
+          "change": "M",
+          "sha256": "d41c140dd87c6f7d04637d503b9c96f272af4303fe765b0e6f40d3646fa753e7"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/.proto-ui/gpui-native/src/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/.proto-ui/gpui-native/src/gpui-native-a11y.rs",
+          "change": "M",
+          "sha256": "ef80e70f5885f84f6857f325485eb3ee8a2752fd5efa28579b231da42829e445"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/.proto-ui/gpui-native/src/gpui-native-owner.rs",
+          "change": "M",
+          "sha256": "a4134b05841af995ecd17840941cd45aa54cc42fa5de1dc160ec56a6acc929cd"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/Cargo.toml",
+          "change": "M",
+          "sha256": "1e64ca9750d6c26f10d3a317b2e58aaa42d2afd64b4617f5fca39db6d7435e5d"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/Component.rs",
+          "change": "M",
+          "sha256": "dabc02a936b625aa948a55a17dfb09fedbaff9dac51c3409ab5841ab8027d3b2"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/Component.rs.map",
+          "change": "M",
+          "sha256": "7bada98deaaeca2a7784dc64dd0f467e2169250eaeb92ac16c929b2b6b024ea4"
+        },
+        {
+          "path": "frontend/proto-ui/generated/pitch-gesture-surface/provenance.json",
+          "change": "M",
+          "sha256": "fee4cadc8babfda9c7749d5114fa75f2373e3f55f48b2886f358fa94d3a9e3a5"
+        },
+        {
+          "path": "frontend/proto-ui/generated/scroll-region/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "c8bd6e61f4210c14b3f33c714c215e014122b6a484525d8df9b772bc885aae9e"
+        },
+        {
+          "path": "frontend/proto-ui/generated/scroll-region/Cargo.toml",
+          "change": "M",
+          "sha256": "fb0470c5fdd0cc750d256409719d6ef9bb8b5c9829b1c164b6c7bece46f2b573"
+        },
+        {
+          "path": "frontend/proto-ui/generated/scroll-region/Component.rs",
+          "change": "M",
+          "sha256": "fa119d5a7b41c7bcd0d405cac1d18509b1611bde02697e68da04391807a5b5be"
+        },
+        {
+          "path": "frontend/proto-ui/generated/scroll-region/Component.rs.map",
+          "change": "M",
+          "sha256": "91b2ddc89ca9454428483ee8f4f5a2e2097fe15cd796178ce32440d1cf51504c"
+        },
+        {
+          "path": "frontend/proto-ui/generated/scroll-region/provenance.json",
+          "change": "M",
+          "sha256": "cb92fb668a30bc3b05b1836fc97cb78df86cd94a885d53ef5ba738ab004354da"
+        },
+        {
+          "path": "frontend/proto-ui/generated/text-field/.proto-ui/fixtures/style-tokens.json",
+          "change": "M",
+          "sha256": "c1c1e4d1e86f68947f7cc88157327d2dfa3f7744ddb0338cc46f46fd3d0ebe63"
+        },
+        {
+          "path": "frontend/proto-ui/generated/text-field/Cargo.toml",
+          "change": "M",
+          "sha256": "159aca23f7451b814bdc103e2f46bcfb4a3f64b380c9f86f3a8635eec2265e98"
+        },
+        {
+          "path": "frontend/proto-ui/generated/text-field/Component.rs",
+          "change": "M",
+          "sha256": "c7d7205b6add67b7f27a8f07698e0c93d6d32fac43ef04e7b6ed828c9a705f98"
+        },
+        {
+          "path": "frontend/proto-ui/generated/text-field/Component.rs.map",
+          "change": "M",
+          "sha256": "b735cf5f404d6a859ccb80df3736ed1d1bc17ddcedf84a869e58dc939f57066e"
+        },
+        {
+          "path": "frontend/proto-ui/generated/text-field/provenance.json",
+          "change": "M",
+          "sha256": "0e42922ae12fe6c787960beda36e1346500189b43db07265f047a3d48ba8a244"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/action-control.json",
+          "change": "M",
+          "sha256": "5796e5d8e64b06ece6f019a0adf2db674d6eec3c92abf758f0e3e9a6a5bc319e"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/collection-control.json",
+          "change": "M",
+          "sha256": "aa599b8e8221b95eeefa4f4645192ce103986f39ed675826e06ff81aaed6b710"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/continuous-control.json",
+          "change": "M",
+          "sha256": "22edb62354fd4bbccca8a814ef64cdae7cc27adfa651e0e302c86875b53cd342"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/control-gesture-planner.json",
+          "change": "M",
+          "sha256": "399643599ab9a552546a34e5be7189247f462fde963e7b45c31c3cdc771ded51"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/drag-source.json",
+          "change": "M",
+          "sha256": "bbbda1c9b007b7ab9f3cf126d475880796f4aeeaea68ed0ad6de8ae05258aa90"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/editor-surface.json",
+          "change": "M",
+          "sha256": "3358184c12871dc5d96c0f80c441d1445fbbe5e710df0deaf5078b0f8b998839"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/graph-point.json",
+          "change": "M",
+          "sha256": "ed62ecb9da35e70a2e8039ac4e75333619d7447168ce455ee7cd4838847f30dc"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/normalized-knob.json",
+          "change": "M",
+          "sha256": "fcf26c5ed627e7120e77d7b3febbfd08d4c2e228b01e5ca656d8096af608b4c1"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/note-gesture-planner.json",
+          "change": "M",
+          "sha256": "0d0a749d85a94ee2b4520ba076eca60898315e1825bc386efb8da96292c1191a"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/overlay-control.json",
+          "change": "M",
+          "sha256": "bc591764915739ef3010f7249fd0129029d1aea6839e8690d19e1c5b8db47ca8"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/performance-key.json",
+          "change": "M",
+          "sha256": "ebac2271c44ca647436e976eaf1be6051f913e5347a080e6ff7700527eff6cb3"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/pitch-gesture-surface.json",
+          "change": "M",
+          "sha256": "0d9f288c83c031a9324badcb11ceea7c965d58404b14ca4a9922ad14fb00142b"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/scroll-region.json",
+          "change": "M",
+          "sha256": "010fb558e02a56d63869920000ea95a3ecd7029b3aa2437db3472bbb8e08f719"
+        },
+        {
+          "path": "frontend/proto-ui/receipts/text-field.json",
+          "change": "M",
+          "sha256": "9d16a8c7d22f9d3b5cf4d02cb2a20308b53cbe8a38dd3ca100760e8d1e5265b4"
+        },
+        {
+          "path": "frontend/proto-ui/src/action-control.proto.ts",
+          "change": "M",
+          "sha256": "2dd055bea75a40f342235b839e4d2b7537fd9502ff3c04d55b0f8dc93572af6f"
+        },
+        {
+          "path": "frontend/proto-ui/src/continuous-control.proto.ts",
+          "change": "M",
+          "sha256": "0a006661a6f55696b997dcbd761c9f0eb124280d98214a66f0709865f8bf1266"
+        },
+        {
+          "path": "frontend/proto-ui/src/overlay-control.proto.ts",
+          "change": "M",
+          "sha256": "8f85abe52d82e1c09fbc93e5591c2d6ec76c706e28fdade221dfbe16b3bcd959"
+        },
+        {
+          "path": "frontend/proto-ui/tools/build-proto-ui.mjs",
+          "change": "M",
+          "sha256": "755706ea385c47b407e89a21231f0ff30a539674a4fc92d3b74ee355a8cac4ce"
+        },
+        {
+          "path": "frontend/proto-ui/tools/test/common-controls.test.mjs",
+          "change": "M",
+          "sha256": "b5582e441cdbe75742a10214da7ba54f361afc3846ad641d3ab16fc50c657802"
+        },
+        {
+          "path": "frontend/proto-ui/tools/test/continuous-control.test.mjs",
+          "change": "M",
+          "sha256": "b9895b3f7f1bb5c472d6caace1d7eea13fa4616cf412154f0476fc4f345cf31b"
+        },
+        {
+          "path": "frontend/proto-ui/tools/test/producer.test.mjs",
+          "change": "M",
+          "sha256": "acb0597c033c490b49d5360eaa5c5a4fdd4ca0d81166c65515925b6740cf012e"
+        }
+      ]
+    },
+    "nativeExecution": {
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "cleanWorkingTree": true,
+      "compilerRevision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "sharedSdkContentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b",
+      "cargoLock": {
+        "bytes": 212616,
+        "sha256": "eefc962126c9fc80e0f00bbb352687a828a882aa1b92ce67541c1402d68de960"
+      },
+      "finalGateExitCodes": {
+        "metadata": 0,
+        "gui": 0,
+        "sdk_default": 0,
+        "sdk_modern_text_selection": 0,
+        "headless": 0,
+        "all_features_metadata": 0
+      },
+      "receipt": "nativeFinalReceipt",
+      "sourceTimestampByteProof": "nativeFinalSourceProof",
+      "buildEnvironment": {
+        "os": "Linux",
+        "architecture": "x86_64",
+        "cargoBuildJobs": 2,
+        "incremental": false,
+        "testDebugInfo": 0,
+        "devDebugInfo": 0,
+        "profile": "test",
+        "network": "offline"
+      },
+      "boundary": "Timestamp-only cache invalidation preserved generated source bytes. Current commands, logs and byte proofs are retained separately; no generated source was hand-edited."
+    }
+  },
+  "coverage": {
+    "baselineCompilerRevision": "4e499ae25e825e130e740f16af66d70b23a743cf",
+    "baselineNativeCompilationUnits": 12,
+    "baselineStdOnlyCompilationUnits": 2,
+    "nativeCompilationUnits": 12,
+    "stdOnlyCompilationUnits": 2,
+    "compilationUnits": 14,
+    "compilerOwnedArtifacts": 81,
+    "units": [
+      "pitch-gesture-surface",
+      "note-gesture-planner",
+      "control-gesture-planner",
+      "normalized-knob",
+      "action-control",
+      "collection-control",
+      "continuous-control",
+      "editor-surface",
+      "performance-key",
+      "drag-source",
+      "overlay-control",
+      "text-field",
+      "graph-point",
+      "scroll-region"
+    ],
+    "interpretation": "Both base and candidate have 12 GPUI plus 2 data units. Unit counts are inventory, not an adoption percentage or proof that every host consumes source decisions."
+  },
+  "compiler": {
+    "repository": "https://github.com/Proto-UI/Proto-UI",
+    "baseRevision": "88fc0883bec70abbc0d7505d88370657c279639e",
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+    "pullRequest": "https://github.com/Proto-UI/Proto-UI/pull/1791",
+    "packageVersions": {
+      "protoUi": "0.3.0-alpha.2",
+      "packageManager": "pnpm@10.32.1",
+      "nodeEngine": "24.x"
+    },
+    "executedProducerToolchain": {
+      "node": "v24.22.3",
+      "packageManager": "pnpm@10.32.1",
+      "runner": "corepack pnpm@10.32.1",
+      "packages": {
+        "typescript": "5.9.3",
+        "tsx": "4.21.0"
+      },
+      "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8"
+    },
+    "sharedSdk": {
+      "owner": "pitch-gesture-surface",
+      "directory": ".proto-ui/gpui-native",
+      "package": "proto-ui-gpui-native",
+      "version": "0.2.0",
+      "features": [
+        "gpui-modern-element-api"
+      ],
+      "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
+    },
+    "gpui": {
+      "upstreamGpuiRevision": "62e5991dd0f0c8a3af8d5e7e9c4652490d468db8",
+      "workspaceGpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "workspace": {
+        "name": "gpui",
+        "git": "https://github.com/cyjin-yl/z3rm",
+        "rev": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+        "features": [],
+        "defaultFeatures": true
+      }
+    }
+  },
+  "currentEvidence": {
+    "producerPublish": {
+      "status": "passed",
+      "freshCompilation": true,
+      "units": 14,
+      "artifacts": 81,
+      "log": "producerPublish"
+    },
+    "producerFreshCheck": {
+      "status": "passed",
+      "freshCompilation": true,
+      "units": 14,
+      "artifacts": 81,
+      "log": "producerFreshCheck"
+    },
+    "producerRetainedCheck": {
+      "status": "passed",
+      "freshCompilation": false,
+      "units": 14,
+      "log": "producerRetainedCheck",
+      "scope": "Checks retained artifacts and their receipts; fresh compilation is recorded separately."
+    },
+    "sourceRuntimeAndProducerTests": {
+      "status": "passed",
+      "passed": 236,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 56195.570691,
+      "log": "sourceRuntimeAndProducerTests",
+      "scope": "Application authored Runtime and producer/source-graph regression tests with the pinned upstream available; no native or OS input execution is implied."
+    },
+    "gpuiRuleFixtures": {
+      "status": "passed",
+      "passed": 82,
+      "log": "gpuiRuleFixtures",
+      "scope": "Declaration and graph-rule fixtures only. The final real all-features Cargo graph is a separate gate."
+    },
+    "nativeContextRegression": {
+      "status": "passed",
+      "compilerRevision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "sharedSdkContentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exitCode": 0,
+      "compilationSeconds": 13.93,
+      "durationSeconds": 0.02,
+      "binarySha256": "816c36bb83da04fd0a759588566352a1b89752074b008469695e267041585e0b",
+      "actualSdkAndConsumerCompilation": true,
+      "byteIdentityProof": {
+        "filesUnchanged": 56,
+        "rustFileMtimesRefreshed": 21,
+        "log": "contextFreshByteProof"
+      },
+      "sourceBinding": {
+        "committedCompilerFilesEqualExecutedSnapshot": true,
+        "authoredFixtureIdenticalBetweenRedAndGreen": true,
+        "consumerIdenticalBetweenRedAndGreen": true,
+        "generatedFilesManuallyEdited": false
+      },
+      "log": "contextActualFreshGreen",
+      "review": "contextReview",
+      "scope": "Independent generated press-modifiers consumer with actual native left and right mouse input. Six modifier masks are checked; this is separate from the final Verdant native application suite and does not claim OS input acceptance."
+    },
+    "applicationNativeFull": {
+      "status": "passed",
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "passed": 298,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exitCode": 0,
+      "durationSeconds": 278.28,
+      "log": "nativeFinal",
+      "workingDirectory": "frontend",
+      "command": "cargo test --locked --offline -p verdant-app --bin verdant-gui -- --test-threads=1",
+      "scope": "Complete verdant-gui native GPUI test-context suite. It executes the generated components and actual app consumers; it is not packaged OS input acceptance."
+    },
+    "sdkDefaultTestSupport": {
+      "status": "passed",
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "passed": 63,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exitCode": 0,
+      "durationSeconds": 0.16,
+      "log": "nativeFinal",
+      "workingDirectory": "frontend",
+      "command": "cargo test --locked --offline -p proto-ui-gpui-native --features test-support,gpui/test-support --lib -- --test-threads=1",
+      "features": [
+        "test-support",
+        "gpui/test-support"
+      ],
+      "manifestDefaultFeaturesEnabled": true
+    },
+    "sdkModernElementAndTextSelectionNotification": {
+      "status": "passed",
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "passed": 62,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exitCode": 0,
+      "durationSeconds": 0.16,
+      "log": "nativeFinal",
+      "workingDirectory": "frontend",
+      "command": "cargo test --locked --offline -p proto-ui-gpui-native --features test-support,gpui/test-support,gpui-modern-element-api,gpui-text-selection-notification --lib -- --test-threads=1",
+      "features": [
+        "test-support",
+        "gpui/test-support",
+        "gpui-modern-element-api",
+        "gpui-text-selection-notification"
+      ]
+    },
+    "headlessSession": {
+      "status": "passed",
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exitCode": 0,
+      "groups": {
+        "sessionLib": 4,
+        "contractTraces": 12,
+        "generatedGestures": 11,
+        "uiProtocolLib": 6
+      },
+      "doctestsCollected": 0,
+      "durationSeconds": 0.03,
+      "log": "nativeFinal",
+      "workingDirectory": "frontend",
+      "command": "cargo test --locked --offline -p verdant-session -p verdant-ui-protocol",
+      "scope": "Final session/protocol consumer tests on the native Linux build container. The actual dependency graph independently proves no native dependencies are reachable from session; CI separately uses the clean headless base image."
+    },
+    "dataSourceMutation": {
+      "status": "not-run-local",
+      "executionResponsibility": "current-PR-CI",
+      "log": null,
+      "scope": "The existing frontend CI runs the native baseline/variant data consumer. This is delegated to current-PR CI and is not an added local blocking rerun. Source/producer mutations are included separately in the 236-test result."
+    },
+    "cargoGraphAllFeatures": {
+      "status": "passed",
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "metadataExitCode": 0,
+      "graphCheckExitCode": 0,
+      "metadataCommand": "cargo metadata --locked --all-features --offline --format-version 1",
+      "graphCheckCommand": "node frontend/proto-ui/tools/check-cargo-gpui.mjs --metadata <final-all-features-metadata.json>",
+      "metadataLog": "finalAllFeaturesMetadata",
+      "log": "finalGraphCheck",
+      "remoteObservation": "finalGraphRemoteObservation",
+      "packageCount": 836,
+      "resolveNodes": 836,
+      "gpuiPackageCount": 1,
+      "gpuiRevision": "e5f2f9db75e97613232b5c1946333e61fa3828ab",
+      "sharedSdkPackageCount": 1,
+      "headlessReachablePackages": 68,
+      "headlessNativeDependencies": 0,
+      "stdOnlyDataPackages": [
+        {
+          "name": "verdant-note-gesture-data",
+          "dependencies": 0
+        },
+        {
+          "name": "verdant-control-gesture-data",
+          "dependencies": 0
+        }
+      ],
+      "scope": "Fresh actual --locked --all-features metadata with no platform filter, checked against the final compiler pin. This is complete dependency-graph evidence, not an all-features compilation claim. Identical raw metadata bytes from an earlier capture were reused only after verifying the fresh run exit, current clean candidate, complete size and SHA-256.",
+      "independentReview": "finalGraphIndependentReview"
+    },
+    "crossPlatformCiAndPackages": {
+      "status": "not-run",
+      "workflows": [],
+      "scope": "No current-candidate Windows/macOS/Linux package CI conclusion is imported from historical mainline."
+    },
+    "packagedOsInput": {
+      "status": "not-run",
+      "passedCases": null,
+      "log": null,
+      "scope": "No current-candidate X11/Wayland packaged-window or active OS accessibility acceptance is claimed."
+    },
+    "applicationContextRepair": {
+      "status": "passed",
+      "candidateRevision": "7273a2f21d40d713d920893a280456e51890a527",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 297,
+      "durationSeconds": 0.06,
+      "log": "nativeFinalContextSingle",
+      "scope": "The previously failing actual-app context test includes right-click Shift, Shift+F10, Menu, pointer/keyboard anchors and no accidental activation. SDK, all generated components and the app were actually recompiled before this run; the subsequent full suite used the same implementation."
+    }
+  },
+  "compilerVerification": {
+    "focusedSuite": {
+      "status": "failed-with-observed-baseline-case",
+      "executedRevision": "3bba971d260056645a275151dbf9f84d71a67cbf",
+      "suiteFiles": 21,
+      "passedSuiteFiles": 20,
+      "failedSuiteFiles": 1,
+      "passed": 471,
+      "failed": 1,
+      "durationSeconds": 46.77,
+      "log": "compilerFocused",
+      "failure": {
+        "file": "packages/compiler/test/json-boundary-provenance.test.ts",
+        "test": "outward JSON retains actual ordinary-value provenance > preserves known nullish spread has no enumerable fields",
+        "diagnostic": "PUI1006: Outward payload does not match its declared data boundary.",
+        "status": "unresolved"
+      },
+      "baselineObservation": {
+        "revision": "b939afe35d30a1a436766d80beea7093a46e4fb2",
+        "log": "compilerNullishBaseline",
+        "scope": "Same named test failed with the baseline compiler implementation plus added regression cases, before the callable-effects implementation repair. This is not a full-suite baseline execution at 88fc0883."
+      },
+      "applicability": "Final e9340df adds only the native context-menu modifier bridge and its regression fixture to 3bba971. The 21-suite run was not re-executed at e9340df and is not reported as all green."
+    },
+    "finalContextDelta": {
+      "status": "passed",
+      "suiteFiles": 2,
+      "passed": 33,
+      "failed": 0,
+      "durationSeconds": 4.62,
+      "log": "compilerContextDelta",
+      "scope": "gpui-native-owner-items and gpui-authored-inputs source/owner tests for the final native context-menu delta.",
+      "coveredRevision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+      "binding": "The tested final source/owner delta was committed at e9340df; reviewed committed bytes match the retained execution snapshot. The source test log itself does not encode a Git head."
+    }
+  },
+  "earlierAttempts": {
+    "nativeGuiInitial": {
+      "status": "failed",
+      "source": {
+        "baseCandidateRevision": "45679ecc068f32529d2a55246d26dae9ec7658df",
+        "workingTreeOverrides": [
+          {
+            "path": "frontend/crates/verdant-app/src/proto_controls.rs",
+            "sha256": "8d9338a5978c49e56cb3ea6f3a6736bd2fe2b871c05e71f5e67c2946254c98f6",
+            "reason": "Explicit &Activation type annotation in the added native test callback."
+          },
+          {
+            "path": "frontend/Cargo.lock",
+            "sha256": "eefc962126c9fc80e0f00bbb352687a828a882aa1b92ce67541c1402d68de960",
+            "reason": "Actual locked native execution graph."
+          }
+        ],
+        "compilerRevision": "3bba971d260056645a275151dbf9f84d71a67cbf",
+        "sharedSdkContentSha256": "6308b46ea0baaff271dea338c18686ae614530e17af5d583a91e09bcbb8adcef",
+        "identitySource": "Native runner supplied the candidate and override digests; recorded raw logs were read locally and their digests verified."
+      },
+      "exitCode": 101,
+      "tests": 298,
+      "passed": 296,
+      "failed": 2,
+      "ignored": 0,
+      "filtered": 0,
+      "durationSeconds": 167.71,
+      "log": "nativeGuiInitial",
+      "failures": [
+        {
+          "test": "alert::tests::alert_enter_uses_source_default_while_space_and_escape_keep_their_response",
+          "observed": "After Enter then Space, actual responses [1], expected [1, 0].",
+          "cause": "The fixture omitted physical KeyUp, leaving the Enter source lease active. The repair adds Enter and Space KeyUp without changing production code or the original assertions.",
+          "followUp": "nativeAlertAfterPhysicalKeySequenceFix"
+        },
+        {
+          "test": "proto_controls::integrated_route_tests::native_context_menu_uses_compiled_mouse_and_named_keyboard_routes",
+          "observed": "Shift-right-click context response carried shift=false; expected shift=true.",
+          "cause": "Generated native context.menu dispatch omitted event.modifiers.",
+          "followUp": "Final compiler e9340df and currentEvidence.nativeContextRegression; application full rerun remains separately recorded."
+        }
+      ]
+    },
+    "nativeAlertAfterPhysicalKeySequenceFix": {
+      "status": "passed",
+      "source": {
+        "baseCandidateRevision": "45679ecc068f32529d2a55246d26dae9ec7658df",
+        "compilerRevision": "3bba971d260056645a275151dbf9f84d71a67cbf",
+        "sharedSdkContentSha256": "6308b46ea0baaff271dea338c18686ae614530e17af5d583a91e09bcbb8adcef",
+        "inheritsWorkingTreeOverridesFrom": "nativeGuiInitial.source",
+        "additionalOverride": {
+          "path": "frontend/crates/verdant-app/src/alert.rs",
+          "sha256": "5d3556db53cda1120ccac354bd8a9f05358cfe1d3773e35a11ded50ea322656f"
+        }
+      },
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 297,
+      "durationSeconds": 0.08,
+      "log": "nativeAlertAndHeadless",
+      "scope": "Single native Alert regression after the fixture correction; not a full 298-test pass."
+    },
+    "headlessSessionBeforeFinalCompilerPin": {
+      "status": "passed",
+      "inheritsSourceFrom": "nativeAlertAfterPhysicalKeySequenceFix.source",
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "groups": {
+        "sessionLib": 4,
+        "contractTraces": 12,
+        "generatedGestures": 11,
+        "uiProtocolLib": 6
+      },
+      "log": "nativeAlertAndHeadless",
+      "scope": "Earlier session/protocol execution; not substituted for the final-candidate pending headless gate."
+    },
+    "upstreamNativeBeforeContextFix": {
+      "status": "passed",
+      "sharedSdkContentSha256": "6308b46ea0baaff271dea338c18686ae614530e17af5d583a91e09bcbb8adcef",
+      "leftClickModifierConsumer": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "sdkLib": {
+        "passed": 63,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log": "nativeCompilerFixtureBeforeContextFix",
+      "scope": "Earlier generated native SDK text/a11y and left-click modifier fixture. It predates the context-menu bridge and is not either final SDK feature-suite result."
+    },
+    "contextRedAndCachedGreen": {
+      "baselineCompilerRevision": "3bba971d260056645a275151dbf9f84d71a67cbf",
+      "redSdkContentSha256": "6308b46ea0baaff271dea338c18686ae614530e17af5d583a91e09bcbb8adcef",
+      "trueRed": {
+        "exit": 101,
+        "passed": 0,
+        "failed": 1,
+        "filteredOut": 1,
+        "actualFailure": "mask1 expected shift:true, actual false",
+        "status": "failed-as-expected",
+        "log": "contextBaselineAndCachedGreen"
+      },
+      "initialGreen": {
+        "exit": 101,
+        "passed": 1,
+        "failed": 1,
+        "compilationSeconds": 0.45,
+        "disposition": "cached red binary reused; not valid green candidate execution",
+        "status": "invalid-candidate-execution",
+        "binarySha256": "561081764d53f837ae7e9e1b66146aa65711ed0fac7aaaf0e895a85d09ceac44",
+        "log": "contextBaselineAndCachedGreen"
+      },
+      "firstFreshAttempt": {
+        "exit": 101,
+        "disposition": "explicit utime PermissionError before byteproof; wrapper continued cached binary; infrastructure failure retained",
+        "status": "infrastructure-error",
+        "log": "contextFirstFreshAttempt"
+      },
+      "resolvedBy": "currentEvidence.nativeContextRegression",
+      "scope": "Red reproduction is retained. Neither the cached red binary under the green workspace nor the permission-error retry is counted as a valid green candidate result."
+    }
+  },
+  "historicalEvidence": [
+    {
+      "record": "VALIDATION-MAINLINE-2026-11-23.json",
+      "sha256": "b377daa85dc8ffd9c9304dadf192f7f678b833ccea49947995e026fdd1afdf31",
+      "status": "historical-only-preserved-unchanged",
+      "sourceRevision": "5e19b7de231894c921a6dd69f16e8820b35b8ec3",
+      "executedMergeRevision": "96691e1abdf722d573465ee2d32a4a1588a9191b",
+      "compilerRevision": "4e499ae25e825e130e740f16af66d70b23a743cf",
+      "historicalNativePlatforms": [
+        "linux-x86_64",
+        "windows-x86_64",
+        "macos-aarch64"
+      ],
+      "historicalPackagedOsPassedCases": 28,
+      "applicability": "Prior mainline CI and packaged input evidence; none of its platform successes or 28 OS cases count as execution of this RCIP candidate."
+    }
+  ],
+  "evidence": {
+    "pathInterpretation": "Paths are relative evidence names within the task workspace, not repository files. Digests cover full raw files. No uploaded CI artifact or permanent remote URL is claimed.",
+    "logs": {
+      "producerPublish": {
+        "path": "verdant-final-generate.log",
+        "sha256": "3ff116757b52633f64b63632eb04f4cbce0a59ecbc4e42e6bacaec918181de57",
+        "bytes": 8076
+      },
+      "producerFreshCheck": {
+        "path": "verdant-final-fresh-check.log",
+        "sha256": "fde7d28719b80f243f176f6844acdb5dfa06bd6e2e218cf7bc138c7e7070135d",
+        "bytes": 8086
+      },
+      "producerRetainedCheck": {
+        "path": "verdant-final-retained-check.log",
+        "sha256": "8f1e774b096e65816eeacd48a157d734d35d4a2a939118d3701e691f12dc43a0",
+        "bytes": 491
+      },
+      "sourceRuntimeAndProducerTests": {
+        "path": "verdant-final-source-producer-tests.log",
+        "sha256": "a11eeed0b6c2639a263932dd6b9056d2b881d654ada0c8b198f7b31194c9281d",
+        "bytes": 22357
+      },
+      "gpuiRuleFixtures": {
+        "path": "verdant-final-gpui-rules.log",
+        "sha256": "8aa2e99ab741c05b49ab2d1ed8ae37175f14dd0abbc0273833f7bb89c96f4470",
+        "bytes": 5325
+      },
+      "compilerFocused": {
+        "path": "compiler-final-focused.log",
+        "sha256": "d78a6e474ea6448e330486952dd7bd16d9ae5bd1a32fa3c3c1cf3bf8e9ecd975",
+        "bytes": 387827
+      },
+      "compilerContextDelta": {
+        "path": "context-modifiers-source-tests.log",
+        "sha256": "b90d4ee181052dda298fdcfe2ac3e58865128bc53d52baed954665ced2b9a390",
+        "bytes": 77546
+      },
+      "compilerNullishBaseline": {
+        "path": "closure-workflow/baseline-json-tests.log",
+        "sha256": "f560db0763583b4140d3069932cc356d9206049eab925fe28e94ccfa02a381b0",
+        "bytes": 98991
+      },
+      "nativeGuiInitial": {
+        "path": "closure-workflow/verdant-native/app-native-v3.log",
+        "sha256": "abd8ae2172bd125a1f45e6f7c638ace67d2746d04dc858ea456cd7d11c67a9b3",
+        "bytes": 1987638
+      },
+      "nativeAlertAndHeadless": {
+        "path": "closure-workflow/verdant-native/app-native-alert-headless.log",
+        "sha256": "f1b4783bd3ba5e02dc375b33b399b00549e6ec2e15f6074d944ce295c1c27be0",
+        "bytes": 2074742
+      },
+      "nativeCompilerFixtureBeforeContextFix": {
+        "path": "native-v4-cargo.log",
+        "sha256": "24fb66fb7f7396dcd354ae770243f6f0694038409c71481706c73030a030c1fa",
+        "bytes": 65152
+      },
+      "contextReview": {
+        "path": "compiler-audit-work/context-review/validation-report.json",
+        "sha256": "99a1ec2e519294597c31bf6da2a19a7f23689fbd92d544258f40fa064570d66b",
+        "bytes": 7544
+      },
+      "contextBaselineAndCachedGreen": {
+        "path": "compiler-audit-work/context-review/remote-evidence/context-native.log",
+        "sha256": "bbe2d33862f5b7685c6e48228324ad4f646d51e53845002d17e52d2920a97bcf",
+        "bytes": 108322
+      },
+      "contextFirstFreshAttempt": {
+        "path": "compiler-audit-work/context-review/remote-evidence/context-native-fresh.log",
+        "sha256": "3a029a95b52a8199f26877409427d394060ced836f792df801b9ead71a4d0da9",
+        "bytes": 53711
+      },
+      "contextActualFreshGreen": {
+        "path": "compiler-audit-work/context-review/remote-evidence/context-native-fresh2.log",
+        "sha256": "87ccb567be88c2d17533060c69dda8761266fdc6b29a4ff41e5c168e719fd2ed",
+        "bytes": 54104
+      },
+      "contextFreshByteProof": {
+        "path": "compiler-audit-work/context-review/remote-evidence/context-green-fresh2-byte-proof.json",
+        "sha256": "c21c65dbae2415cab3dc4405b5d12db356277f78615007d9784c7a90d16b9a2d",
+        "bytes": 15311
+      },
+      "nativeFinal": {
+        "path": "closure-workflow/verdant-native/app-native-final.log",
+        "bytes": 2129749,
+        "sha256": "a657bd2f3920ad8fe00909a00d9c17f33f07b479ca67c6ae71c05d50370fc901"
+      },
+      "nativeFinalReceipt": {
+        "path": "closure-workflow/verdant-native/app-native-final-receipt.json",
+        "bytes": 7007,
+        "sha256": "80f1b295de48de8ef320fa157448ddd38d2d4c915711e8c29f975309aa8963b2"
+      },
+      "nativeFinalGateExits": {
+        "path": "closure-workflow/verdant-native/app-native-final-gates.json",
+        "bytes": 108,
+        "sha256": "85e1d6a57bce74cb1a0ebe2a4f31e235893e848bcd74fb7216c6d2ae5a47c2a6"
+      },
+      "nativeFinalContextSingle": {
+        "path": "closure-workflow/verdant-native/app-native-context-check.log",
+        "bytes": 1958023,
+        "sha256": "2bee74dd7564e7083071dff907fedc448923c2943cd1ed2063b9a76323427b3d"
+      },
+      "nativeFinalSourceProof": {
+        "path": "closure-workflow/verdant-native/app-native-context-source-proof.json",
+        "bytes": 311,
+        "sha256": "22e463d7b5f0cddab780dfb2f254e13f579320eddef132f60da953bb0b568b79"
+      },
+      "finalAllFeaturesMetadata": {
+        "path": "compiler-audit-work/graph/app-native-final-all-features-metadata.json",
+        "bytes": 4107806,
+        "sha256": "08b27ca3d3db5f522a64bd5194d4db90f2b1c9aaa1640b00b277c78b747aaab9"
+      },
+      "finalGraphCheck": {
+        "path": "compiler-audit-work/graph/final-graph-check.json",
+        "bytes": 23923,
+        "sha256": "4cbe22b1493708e41510f18c62478b054c4b1b361c91eea7868d989f4fc5a19a"
+      },
+      "finalGraphRemoteObservation": {
+        "path": "compiler-audit-work/graph/final-remote-meta.json",
+        "bytes": 1536,
+        "sha256": "9002168fccc073be0ea8dc73b6d158c19952bb72e6229421007b6662a5e65701"
+      },
+      "nativeFinalRunner": {
+        "path": "closure-workflow/verdant-native/run-app-native-final.sh",
+        "bytes": 1119,
+        "sha256": "ec36beccd6310da1687d6bf91847d05a25f01155003dc9b044b77f6719ee686e"
+      },
+      "nativeFinalContainerRunner": {
+        "path": "closure-workflow/verdant-native/run-app-native-final-container.sh",
+        "bytes": 1783,
+        "sha256": "1580eeda16e198aeec9b78eccc9bcd8ee5999c5a506be2416a44fd4d5c932a77"
+      },
+      "finalGraphIndependentReview": {
+        "path": "compiler-audit-work/graph/final-validation-report.json",
+        "bytes": 6487,
+        "sha256": "b091ba7a41e98ba50a6863ea3c277ef3ee1585996d7c68ff7088e20e4798f3c3"
+      }
+    },
+    "storageCategory": "local-task-workspace"
+  },
+  "remainingScope": [
+    "Current-PR CI still needs its clean headless base-image and native data-source mutation lanes, cross-platform packages and packaged X11/Wayland input acceptance; consult the live PR checks.",
+    "Upstream PR #1791 remains subject to its independent GitHub review and repository integration rules. Local agent review is not a GitHub approval.",
+    "Compiler known-nullish-spread failure is retained as unresolved; the broad focused compiler run is not all green.",
+    "Remaining host adoption gaps are enumerated in RCIP-2026-11-24.md, including master insert bypass, selectable command adapters, and checked-menu selection propagation."
+  ],
+  "limitations": [
+    "Runtime, producer, native framework tests, SDK tests, graph rules and OS input runs prove different layers; their counts are not summed into a single acceptance total.",
+    "The canonical implementation digest binds changed implementation bytes only; documentation changes do not imply a new runtime execution.",
+    "Earlier failures, stale-binary executions and infrastructure errors are retained rather than recast as passes.",
+    "No current candidate visual, physical touch, system IME, screen-reader, Windows/macOS native-window or packaged X11/Wayland success is asserted here."
+  ]
+}

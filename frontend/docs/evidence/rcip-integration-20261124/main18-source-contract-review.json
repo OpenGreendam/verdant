@@ -1,0 +1,84 @@
+{
+  "schema": "verdant.main-source-compatibility-review.v1",
+  "reviewer": "root/verdant_rcip",
+  "base": "ac0402289e335d9a8228b4e056fb95320482458a",
+  "main": "9239516638d23e6bf5211fe15a3419550ede4096",
+  "main_authored_commit": "5818784833fa94742c14108d909a45e9bcf9632c",
+  "stack": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "scope": "Read-only authored source and actual Rust consumer contract comparison; no source edits, native reruns, GitHub reviews, or merge mutation.",
+  "conclusion": "The main compiler-bump commit changes application contracts as well as the compiler pin. Directly adopting its authored source would break existing consumers. Preserve the stack's current contracts and adjudicate additive intent separately; never hand-merge generated Rust or receipts.",
+  "findings": [
+    {
+      "id": "collection-contract",
+      "severity": "blocking if main source is copied",
+      "main_change": "filterlist/filterKey/focus-filter replaced by searchlist/keyFrom/Find; contextAt, reconcile, revealGeometry and scroll projection removed.",
+      "consumers": [
+        "frontend/crates/verdant-app/src/proto_collection.rs:144,163,191",
+        "frontend/crates/verdant-app/src/plugin_ui.rs:148,257,270",
+        "frontend/crates/verdant-app/src/devices/workflow/library.rs:78,338,360",
+        "frontend/crates/verdant-app/src/mixer.rs:169,455",
+        "frontend/crates/verdant-app/src/arrange.rs:145,191"
+      ],
+      "impact": "Current search/preset dispatch uses seven-argument filterKey with composition and modifier facts, and current menu/track bridges depend on reveal/context/reconcile. Main contains no matching Rust migration. The new checked-menu selection/chooseSelection contract must also survive."
+    },
+    {
+      "id": "scalar-contract",
+      "severity": "blocking if main source is copied",
+      "main_change": "keyMode/table-point renamed to keyboardMode/vertical-step and exposed key method removed.",
+      "consumers": [
+        "frontend/crates/verdant-app/src/proto_scalar.rs:143,307"
+      ],
+      "impact": "Current native scalar dispatch still calls key and publishes keyMode. Adopting main disconnects delegated key admission and can restore traversal keys to scalar writes."
+    },
+    {
+      "id": "editor-command-contract",
+      "severity": "blocking if main source is copied",
+      "main_change": "commandMode and command event replaced by commands and audioKey return-value method; Escape result changed from clear-range to escape.",
+      "consumers": [
+        "frontend/crates/verdant-app/src/proto_editor_surface.rs:375,437"
+      ],
+      "impact": "Current editor surface uses source command event delivery and commandMode authority; it does not call the added audioKey API."
+    },
+    {
+      "id": "scroll-contract",
+      "severity": "blocking if main source is copied",
+      "main_change": "keyInput and revealGeometry methods, reveal authority props, and horizontal projection removed; focus guard moved into public key method.",
+      "consumers": [
+        "frontend/crates/verdant-app/src/proto_scroll.rs:172,234"
+      ],
+      "impact": "The host's explicit fallback and deferred geometry transports still call these methods. Stack's event path already leaves descendant editing keys alone while explicit calls serve the documented fallback."
+    },
+    {
+      "id": "action-contract",
+      "severity": "blocking if main source is copied",
+      "main_change": "submitOnEnter, submit event and requestContext method removed, together with press-generation and live-text separation guards.",
+      "consumers": [
+        "frontend/crates/verdant-app/src/proto_controls.rs:170,238",
+        "frontend/proto-ui/src/action-control.proto.ts"
+      ],
+      "impact": "Existing form/default-response consumers still publish submitOnEnter and drain submit. The held-source authority guard and stack's exclusive radio/tab true proposals must remain."
+    },
+    {
+      "id": "momentary-key",
+      "severity": "blocking if main source is copied",
+      "main_change": "Physical keyDown and pointer press.start no longer emit trigger for momentary controls; momentary policy change no longer retires press.",
+      "consumers": [
+        "frontend/crates/verdant-app/src/proto_performance_key.rs:36-39",
+        "frontend/crates/verdant-app/src/roll.rs:1512"
+      ],
+      "impact": "The real piano-roll audition key is momentary. Its delivery intentionally skips pressedChange and relies on trigger, so main source would silence physical momentary activation while assistive activation could still work."
+    }
+  ],
+  "input_hook_finding": {
+    "main_change": "Flattens asInputEditor plus asInputRoot into one asInputRoot, then makes direct text-field use the latter.",
+    "verified": "The stack already retains the full asInputRoot ControlLabel target at upstream-input/root.proto.ts:246-255, including disabled, request.isCurrent, and pointer/programmatic focus reason. Main moves that same behavior into the single hook; it does not introduce a capability absent from the stack.",
+    "profile": "Pinned e934 targets.ts:512-516 explicitly admits ControlLabel operations. No unsupported-profile claim is made.",
+    "consumer": "Search across app Rust and authored sources found no independent Label association consumer; text-field composes directly named editing through asInputEditor and has an explicit provenance/test boundary for that choice. Rust does not refer to either hook's name.",
+    "recommendation": "Preserve the exact recorded official vendor snapshot and its two hooks. This retains real asInputRoot Label capability without forcing a separate Label association onto directly named fields."
+  },
+  "additive_intent": {
+    "space_prevention": "Main adds an early key.down Space default-prevention line. Stack already requests default prevention from press.commit in the same native keydown; SDK global_key_down at gpui-native-owner.rs:1144-1153 preserves semantic press when a key default is prevented. This small source-level intent can be considered independently with existing authority guards; it does not justify wholesale main Action replacement.",
+    "graph_point": "Main graph-point source change only joins the previousRevision declaration onto one line.",
+    "tests": "No source/native tests were run in this review. Existing frozen-head CI remains attached to those heads; the reconciled candidate needs its own producer and runtime evidence."
+  }
+}

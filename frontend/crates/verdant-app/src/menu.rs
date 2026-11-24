@@ -6,6 +6,7 @@
 //! moves and capacity-limited actions remain visible but cannot be activated.
 use gpui::{Context, FocusHandle, IntoElement, KeyDownEvent, Pixels, Point, SharedString, Window, div, prelude::*, px};
 use crate::editor::{Editor, MenuAction};
+use crate::generated::controls::{CommandArg, CommandId};
 use std::path::{Path, PathBuf};
 use verdant_exchange::Format;
 
@@ -23,6 +24,50 @@ pub enum MenuCommand {
     Editor(MenuAction),
     File(FileAction),
     Submenu(Vec<MenuItem>),
+    Boolean(MenuBoolean),
+}
+
+/// Accepted Boolean facts and their existing domain or UI write boundaries.
+/// Targets carry stable identities; a checked row never rebuilds a toggle.
+#[derive(Clone, Debug)]
+pub enum MenuBoolean {
+    Command(crate::generated::controls::CommandId, crate::generated::controls::CommandArg),
+    FollowPlayhead,
+    ExportClick,
+    PartMuted(String),
+    DeviceParameter { target: crate::devices::DeviceTarget, slot: usize, key: verdant_plugins::InsertKey, parameter: String },
+}
+
+impl MenuBoolean {
+    fn current(&self, ed: &Editor) -> Option<bool> {
+        match self {
+            Self::Command(command, arg) => ed.source_command_selection(*command, arg),
+            Self::FollowPlayhead => Some(ed.session.follow_playhead),
+            Self::ExportClick => Some(ed.playback_settings().export_click),
+            Self::PartMuted(id) => verdant_domain::parts::Parts::load(ed.project()).ok()?.instance(id).map(|part| part.muted),
+            Self::DeviceParameter { target, slot, key, parameter } => {
+                if ed.inserts_loading || ed.plugin_busy.contains(key) { return None; }
+                ed.current_device_parameters(target, *slot, *key)?.iter().find(|desc| &desc.id == parameter)
+                    .filter(|desc| desc.value.is_finite()).map(|desc| desc.value >= 0.5)
+            },
+        }
+    }
+
+    fn accept(&self, ed: &mut Editor, selected: bool, cx: &mut Context<Editor>) {
+        if self.current(ed).is_none_or(|current| current == selected) { return; }
+        match self {
+            Self::Command(command, arg) => ed.accept_source_command_selection(*command, arg, selected, cx),
+            Self::FollowPlayhead => crate::clock::set_follow(ed, selected, cx),
+            Self::ExportClick => ed.edit_playback("导出节拍器", cx, |settings| settings.export_click = selected),
+            Self::PartMuted(id) => {
+                if let Err(error) = ed.edit_part(id, "片段静音", cx, |part| { part.muted = selected; Ok(()) }) { ed.notice(error); }
+            },
+            Self::DeviceParameter { target, slot, parameter, .. } => {
+                ed.set_device_params(target.clone(), *slot, vec![(parameter.clone(), if selected { 1.0 } else { 0.0 })], cx);
+            },
+        }
+        cx.notify();
+    }
 }
 
 pub const SCORE_FORMATS: [(Format, &str); 7] = [
@@ -161,7 +206,8 @@ pub struct MenuItem {
     pub hint: SharedString,
     pub command: Option<MenuCommand>,
     pub enabled: bool,
-    /// A toggle: shows a check mark column; the label stays the same.
+    /// Accepted selection shown in the check column. Ordinary checked actions
+    /// are choices; Boolean commands expose a checkbox and a live accepted value.
     pub checked: Option<bool>,
     /// A non-interactive section title.
     pub header: bool,
@@ -172,6 +218,13 @@ impl MenuItem {
         Self { label: label.into(), hint: "".into(), command, enabled, checked: None, header: false }
     }
     pub fn action(label: impl Into<SharedString>, command: MenuAction) -> Self { Self::new(label, Some(MenuCommand::Editor(command))) }
+    pub fn boolean(label: impl Into<SharedString>, target: MenuBoolean, checked: bool) -> Self {
+        Self::new(label, Some(MenuCommand::Boolean(target))).checked(checked)
+    }
+    pub fn boolean_command(label: impl Into<SharedString>, command: crate::generated::controls::CommandId,
+        arg: crate::generated::controls::CommandArg, checked: bool) -> Self {
+        Self::boolean(label, MenuBoolean::Command(command, arg), checked)
+    }
     pub fn file(label: impl Into<SharedString>, command: FileAction) -> Self { Self::new(label, Some(MenuCommand::File(command))) }
     pub fn submenu(label: impl Into<SharedString>, items: Vec<MenuItem>) -> Self {
         // Stay openable even when every child is disabled, so users can see what exists.
@@ -186,6 +239,12 @@ impl MenuItem {
     pub fn separator() -> Self { Self::disabled("") }
     pub fn is_separator(&self) -> bool { self.label.is_empty() }
     fn row_height(&self) -> f32 { if self.is_separator() { 9.0 } else if self.header { 22.0 } else { 26.0 } }
+    fn state(&self, ed: &Editor) -> (bool, Option<bool>) {
+        if let Some(MenuCommand::Boolean(target)) = &self.command {
+            let current = target.current(ed);
+            (self.enabled && current.is_some(), current.or(self.checked))
+        } else { (self.enabled, self.checked) }
+    }
 }
 #[derive(Clone, Debug)]
 pub struct OpenMenu {
@@ -227,22 +286,27 @@ impl Editor {
         }
     }
 
-    fn activate_menu_item(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(menu) = self.menu.as_mut().filter(|menu| menu.window == window.window_handle()) else { return; };
-        let Some((index, _, item)) = menu.rows().nth(row).filter(|(_, _, item)| item.enabled) else { return; };
-        match &item.command {
-            Some(MenuCommand::Submenu(_)) => {},
-            Some(MenuCommand::Editor(command)) => {
-                let command = command.clone();
+    fn activate_menu_item(&mut self, row: usize, selected: Option<bool>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(menu) = self.menu.as_ref().filter(|menu| menu.window == window.window_handle()) else { return; };
+        let Some((_, _, item)) = menu.rows().nth(row) else { return; };
+        let (enabled, checked) = item.state(self);
+        if !enabled { return; }
+        let command = item.command.clone();
+        match command {
+            Some(MenuCommand::Boolean(target)) => {
+                let Some(selected) = selected else { return; };
+                self.close_menu(window, cx);
+                target.accept(self, selected, cx);
+            },
+            Some(MenuCommand::Editor(command)) if checked.is_none() && selected.is_none() || checked.is_some() && selected == Some(true) => {
                 self.close_menu(window, cx);
                 self.run_menu_action(command, window, cx);
             }
-            Some(MenuCommand::File(command)) => {
-                let command = command.clone();
+            Some(MenuCommand::File(command)) if checked.is_none() && selected.is_none() || checked.is_some() && selected == Some(true) => {
                 self.close_menu(window, cx);
                 self.run_file_action(command, window, cx);
             }
-            None => {}
+            _ => {}
         }
     }
 
@@ -382,8 +446,8 @@ impl Editor {
         items.extend([
             MenuItem::separator(),
             MenuItem::header("自动化"),
-            MenuItem::action("当前轨道自动化泳道", MenuAction::ToggleTrackAutomation(track)).with_hint("A").checked(auto_on),
-            MenuItem::action("主总线自动化泳道", MenuAction::ToggleMasterAutomation).checked(self.automation_ui.show_master),
+            MenuItem::boolean_command("当前轨道自动化泳道", CommandId::ToggleTrackAutomation, CommandArg::Track(track), auto_on).with_hint("A"),
+            MenuItem::boolean_command("主总线自动化泳道", CommandId::ToggleMasterAutomation, CommandArg::None, self.automation_ui.show_master),
             MenuItem::separator(),
             MenuItem::submenu("片段 (Part)", vec![
                 MenuItem::action("从选中音符创建片段", MenuAction::Workflow(A::CreatePart)).enabled(!self.session.selection.is_empty()),
@@ -463,17 +527,17 @@ impl Editor {
         let recording = self.integrations.recording.is_some();
         vec![
             MenuItem::header("显示"),
-            MenuItem::action("音素时序泳道", MenuAction::TogglePhonemeLane).checked(self.layout.show_phoneme_lane),
-            MenuItem::action("BPM 速度泳道", MenuAction::ToggleTempoLane).checked(self.layout.show_tempo_lane),
+            MenuItem::boolean_command("音素时序泳道", CommandId::TogglePhonemeLane, CommandArg::None, self.layout.show_phoneme_lane),
+            MenuItem::boolean_command("BPM 速度泳道", CommandId::ToggleTempoLane, CommandArg::None, self.layout.show_tempo_lane),
             MenuItem::action("添加参数泳道", MenuAction::Workflow(A::Integration(I::ThreeLanes))),
-            MenuItem::action("叠加其他轨道重影音符", MenuAction::Workflow(A::Integration(I::OtherTracks))).checked(self.integrations.other_tracks),
+            MenuItem::boolean_command("叠加其他轨道重影音符", CommandId::ToggleOtherTracks, CommandArg::None, self.integrations.other_tracks),
             MenuItem::action("音阶与调式高亮…", MenuAction::Workflow(A::Integration(I::Scale))),
             MenuItem::separator(),
             MenuItem::header("走带"),
-            MenuItem::action("循环播放", MenuAction::Workflow(A::ToggleLoop)).checked(pb.looping),
+            MenuItem::boolean_command("循环播放", CommandId::ToggleLoop, CommandArg::None, pb.looping),
             MenuItem::action("以选中音符设为循环范围", MenuAction::Workflow(A::RepeatSelection)).enabled(!self.session.selection.is_empty()),
-            MenuItem::action("节拍器", MenuAction::Workflow(A::ToggleMetronome)).checked(pb.metronome),
-            MenuItem::action("离线导出包含节拍器", MenuAction::Workflow(A::ToggleExportClick)).checked(pb.export_click),
+            MenuItem::boolean_command("节拍器", CommandId::ToggleMetronome, CommandArg::None, pb.metronome),
+            MenuItem::boolean("离线导出包含节拍器", MenuBoolean::ExportClick, pb.export_click),
             MenuItem::action("当前位置速度 (BPM)…", MenuAction::Workflow(A::EditTempo(tick))),
             MenuItem::action("当前位置拍号…", MenuAction::Workflow(A::EditMeter(tick))),
             MenuItem::separator(),
@@ -519,8 +583,8 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
         MenuItem::action("轨道下移", MenuAction::Workflow(A::MoveTrack(track.clone(), 1))).enabled(index.is_some_and(|i| i + 1 < project.tracks.len())),
         MenuItem::action("复制轨道", MenuAction::Workflow(A::DuplicateTrack(track.clone()))).enabled(exists && can_add),
         MenuItem::separator(),
-        MenuItem::action("静音", MenuAction::MuteTrack(track.clone())).enabled(exists).checked(state.is_some_and(|t| t.muted)),
-        MenuItem::action("独奏", MenuAction::SoloTrack(track.clone())).enabled(exists).checked(state.is_some_and(|t| t.solo)),
+        MenuItem::boolean_command("静音", CommandId::ToggleMute, CommandArg::Track(track.clone()), state.is_some_and(|t| t.muted)).enabled(exists),
+        MenuItem::boolean_command("独奏", CommandId::ToggleSolo, CommandArg::Track(track.clone()), state.is_some_and(|t| t.solo)).enabled(exists),
         MenuItem::action("切换轨道颜色", MenuAction::CycleColor(track.clone())).enabled(exists),
         MenuItem::action(if state.is_some_and(|t| t.is_instrument()) { "转为人声轨" } else { "转为乐器轨" },
             MenuAction::MakeInstrumentTrack { track: track.clone(), instrument: !state.is_some_and(|t| t.is_instrument()) }).enabled(exists),
@@ -532,14 +596,21 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
 }
 
 fn collection_revision(ed: &Editor, menu: &OpenMenu) -> String {
-    format!("{}:{}:{}:{:?}:{:?}:{:?}:{:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.expanded, menu.items)
+    let states = menu.rows().map(|(_, _, item)| item.state(ed)).collect::<Vec<_>>();
+    format!("{}:{}:{}:{:?}:{:?}:{:?}:{:?}:{states:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.window, menu.anchor, menu.expanded, menu.items)
 }
 
 pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx: &mut Context<Editor>) -> impl IntoElement {
     let revision = collection_revision(ed, menu);
     let viewport = window.use_keyed_state("context-menu-viewport", cx, |_,_| gpui::ScrollHandle::new());
-    let items = menu.rows().map(|(_, _, item)| if !item.enabled || item.command.is_none() { 0 }
-        else if matches!(&item.command, Some(MenuCommand::Submenu(_))) { 2 } else { 1 }).collect();
+    let items = menu.rows().map(|(_, _, item)| {
+        let (enabled, checked) = item.state(ed);
+        if !enabled || item.command.is_none() { 0 }
+        else if matches!(&item.command, Some(MenuCommand::Submenu(_))) { 2 }
+        else if let Some(checked) = checked {
+            (if matches!(&item.command, Some(MenuCommand::Boolean(_))) { 3 } else { 5 }) + u8::from(checked)
+        } else { 1 }
+    }).collect();
     let expanded = menu.rows().enumerate().find_map(|(row, (index, child, _))|
         (!child && menu.expanded == Some(index)).then_some(row as i64)).unwrap_or(-1);
     let props = serde_json::json!({"mode":"menu", "label":"上下文菜单", "cursor":menu.selected,
@@ -566,7 +637,12 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
             let index = crate::proto_controls::source_integer(payload.get("index")).unwrap_or(-1);
             match name {
                 "close" => ed.close_menu(window, cx),
-                "activate" if index >= 0 => ed.activate_menu_item(index as usize, window, cx),
+                "activate" if index >= 0 => ed.activate_menu_item(index as usize, None, window, cx),
+                "selection" if index >= 0 => {
+                    if let Some(selected) = payload.get("selected").and_then(serde_json::Value::as_bool) {
+                        ed.activate_menu_item(index as usize, Some(selected), window, cx);
+                    }
+                },
                 "select" if index >= 0 => {
                     if let Some(menu) = ed.menu.as_mut() { menu.selected = index as usize; }
                     if let Some((handle, engine)) = source.borrow().clone() {
@@ -622,29 +698,32 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, handle: verdant_colle
                     .flex().items_end().pb(px(3.0)).text_xs().font_weight(gpui::FontWeight::SEMIBOLD).text_color(th.text_secondary)
                     .child(item.label.clone()).into_any_element();
             }
-            let enabled = item.enabled;
+            let (enabled, checked) = item.state(ed);
             let submenu = matches!(&item.command, Some(MenuCommand::Submenu(_)));
             let expanded = submenu && menu.expanded == Some(index);
             let choose = handle.clone(); let choose_revision = revision.clone();
             let hover = handle.clone(); let hover_revision = revision.clone();
-            crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone()).role(if item.checked.is_some() { gpui::Role::MenuItemCheckBox } else { gpui::Role::MenuItem })
+            let role = if matches!(&item.command, Some(MenuCommand::Boolean(_))) { gpui::Role::MenuItemCheckBox }
+                else if checked.is_some() { gpui::Role::MenuItemRadio } else { gpui::Role::MenuItem };
+            crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone()).role(role)
                 .authority(format!("{revision}:{i}"))
                 .tab_index(-1)
                 .disabled(!enabled)
                 .aria_label(item.label.clone())
-                .when_some(item.checked, |d, on| d.aria_selected(on))
+                .when_some(checked, |d, on| d.aria_selected(on))
                 .when(submenu, |action| action.aria_expanded(expanded))
                 .when(i == selected && enabled, |d| d.aria_active_descendant().bg(th.hover))
                 .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0))
                 .text_color(if enabled { th.text } else { th.text_tertiary })
-                .when(checks, |d| d.child(div().w(px(18.0)).flex_none().text_color(th.accent).child(if item.checked == Some(true) { "✓" } else { "" })))
+                .when(checks, |d| d.child(div().w(px(18.0)).flex_none().text_color(th.accent).child(if checked == Some(true) { "✓" } else { "" })))
                 .child(div().when(child, |d| d.pl(px(16.0))).flex_1().truncate().child(item.label.clone()))
                 .when(!item.hint.is_empty(), |d| d.child(div().ml(px(12.0)).flex_none().text_xs().text_color(th.text_secondary).child(if expanded { "⌄".into() } else { item.hint.clone() })))
                 .on_mouse_move(move |_, window, cx| {
                     crate::proto_collection::call(&hover, "selectIndex", vec![i.into(), false.into(), hover_revision.clone().into()], window, cx);
                 })
-                .on_click(move |_, window, cx| {
-                    crate::proto_collection::call(&choose, "choose", vec![i.into(), false.into(), choose_revision.clone().into()], window, cx);
+                .on_click(move |event, window, cx| {
+                    let (method, value) = if checked.is_some() { ("chooseSelection", event.selected()) } else { ("choose", false) };
+                    crate::proto_collection::call(&choose, method, vec![i.into(), value.into(), choose_revision.clone().into()], window, cx);
                     cx.stop_propagation();
                 }).into_any_element()
         }))
@@ -696,6 +775,10 @@ pub(crate) fn popover_placement(anchor: Point<Pixels>, (w, h): (f32, f32), (win_
 #[cfg(test)]
 #[path = "menu_file_tests.rs"]
 mod file_tests;
+
+#[cfg(test)]
+#[path = "menu_selection_tests.rs"]
+mod selection_tests;
 
 #[cfg(test)]
 mod native_menu_tests {

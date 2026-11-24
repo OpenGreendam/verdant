@@ -1,0 +1,61 @@
+{
+  "schema": "verdant.integration-contract-discrimination.v1",
+  "recordedAt": "2026-11-24T11:00:12.581201+00:00",
+  "stack": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "main": "9239516638d23e6bf5211fe15a3419550ede4096",
+  "compiler": "e9340df6279e063cf372080bf4cc97caea3fd901",
+  "upstream": "/workspace/scratch/27c38b1bbc32/Proto-UI",
+  "command": [
+    "node",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "--test-name-pattern=filtered\\ collection\\ owns\\ result\\ reconciliation,\\ search\\ routing\\ and\\ focus\\ commands|reference\\ piano\\ keys\\ trigger\\ exactly\\ once\\ even\\ when\\ a\\ full\\ press\\ ends\\ before\\ delivery|continuous\\ point\\-row\\ keyboard\\ aliases\\ share\\ scalar\\ admission\\ and\\ delegate\\ collection\\ traversal",
+    "frontend/proto-ui/tools/test/common-controls.test.mjs",
+    "frontend/proto-ui/tools/test/advanced-editors.test.mjs",
+    "frontend/proto-ui/tools/test/continuous-control.test.mjs"
+  ],
+  "testNames": [
+    "filtered collection owns result reconciliation, search routing and focus commands",
+    "reference piano keys trigger exactly once even when a full press ends before delivery",
+    "continuous point-row keyboard aliases share scalar admission and delegate collection traversal"
+  ],
+  "boundary": "Existing stack Runtime tests remain byte-identical while the authored source directory is switched. This is not main compiler/native validation. No native execution.",
+  "initialPreflight": "A temporary dependency symlink was reported as untracked by Git and rejected by the clean-tree guard before any test ran. The task-owned symlink was removed; no test or dependency was changed.",
+  "testHashes": {
+    "frontend/proto-ui/tools/test/common-controls.test.mjs": "dd61829c21bed9f0964a6e83242d9ab54c4e0ab3e6b12a16794be6669cf7341a",
+    "frontend/proto-ui/tools/test/advanced-editors.test.mjs": "48a97204a54281bb8a49bd463c11c230a408abf6d3fac9451e9eed9802f3206c",
+    "frontend/proto-ui/tools/test/continuous-control.test.mjs": "b9895b3f7f1bb5c472d6caace1d7eea13fa4616cf412154f0476fc4f345cf31b"
+  },
+  "stackRun": {
+    "exitCode": 0,
+    "log": "/workspace/scratch/b91f3481ce6f/verdant-workflow/integration-diagnosis/runtime-stack-source-control.tap",
+    "sha256": "18840c1c9aee896ef6c2e71af42a04ed8ea99b9bebeb83c9cb3d233e5e30fc47",
+    "summary": {
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  },
+  "mainSourceRun": {
+    "exitCode": 1,
+    "log": "/workspace/scratch/b91f3481ce6f/verdant-workflow/integration-diagnosis/runtime-main-source-control.tap",
+    "sha256": "edd6c705245b699c8a714fcf7f3396182e9e5f3a5b51e2a3f7ac96548a4666dd",
+    "summary": {
+      "tests": 3,
+      "pass": 0,
+      "fail": 3,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  },
+  "restoredExactStackSource": true,
+  "workingTreeStatusAfter": "",
+  "testHashesAfter": {
+    "frontend/proto-ui/tools/test/common-controls.test.mjs": "dd61829c21bed9f0964a6e83242d9ab54c4e0ab3e6b12a16794be6669cf7341a",
+    "frontend/proto-ui/tools/test/advanced-editors.test.mjs": "48a97204a54281bb8a49bd463c11c230a408abf6d3fac9451e9eed9802f3206c",
+    "frontend/proto-ui/tools/test/continuous-control.test.mjs": "b9895b3f7f1bb5c472d6caace1d7eea13fa4616cf412154f0476fc4f345cf31b"
+  }
+}

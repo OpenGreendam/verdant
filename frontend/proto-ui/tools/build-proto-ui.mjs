@@ -89,7 +89,8 @@ export function loadPin(filename, root = defaultRoot) {
       dataPackages.add(target.crateName);
       if (!Array.isArray(target.methods) || !target.methods.length || target.methods.some((name) => !/^[A-Za-z][A-Za-z0-9]*$/.test(name)) || new Set(target.methods).size !== target.methods.length) fail(EXIT.pin, `${unit.name} must select distinct pure source methods.`);
       if (!same(target.dependencies, [])) fail(EXIT.pin, `${unit.name} must require a standard-library-only data artifact.`);
-      if (Object.keys(target).some((key) => !['profile', 'crateName', 'methods', 'dependencies'].includes(key))) fail(EXIT.pin, `${unit.name} has unknown data target options.`);
+      if (target.sourceLicense !== undefined && (typeof target.sourceLicense !== 'string' || !target.sourceLicense.trim() || /[\u0000-\u001f\u007f-\u009f\uD800-\uDFFF]/u.test(target.sourceLicense))) fail(EXIT.pin, `${unit.name} has invalid source license metadata.`);
+      if (Object.keys(target).some((key) => !['profile', 'crateName', 'methods', 'dependencies', 'sourceLicense'].includes(key))) fail(EXIT.pin, `${unit.name} has unknown data target options.`);
     } else fail(EXIT.pin, `${unit.name} has an unsupported compilation target.`);
     checked(EXIT.pin, () => {
       // Include the repository and inventory roots, even when a generated
@@ -324,7 +325,7 @@ async function compileUnit(root, pin, unit, { compiler, dataCompiler, FileSource
     if (!inputs.some((input) => input.path === filename && input.sha256 === sha256(source))) fail(EXIT.compile, `Source changed while capturing compilation inputs: ${filename}`);
   }
   const result = isDataUnit(unit)
-    ? await dataCompiler.compileRustDataFile(unit.source, { root, sourceSnapshot: snapshot, methods: unit.target.methods, crateName: unit.target.crateName })
+    ? await dataCompiler.compileRustDataFile(unit.source, { root, sourceSnapshot: snapshot, methods: unit.target.methods, crateName: unit.target.crateName, sourceLicense: unit.target.sourceLicense })
     : await compiler.compileFile(unit.source, { root, sourceSnapshot: snapshot, ...unit.target });
   if (!result.ok) fail(EXIT.compile, `Compiler rejected ${unit.source}:\n${JSON.stringify(result.diagnostics, null, 2)}`);
   const artifacts = isDataUnit(unit) ? dataCompiler.rustDataCompilationArtifacts(result.value) : compiler.compilationArtifacts(result.value);

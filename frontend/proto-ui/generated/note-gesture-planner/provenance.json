@@ -4,8 +4,9 @@
     "exportName": "default",
     "sha256": "c338c05aa48559a1209eabf43f21fe2c0cc80a8016123756790073999356a48d"
   },
-  "irVersion": 7,
+  "irVersion": 8,
   "backend": "rust-data-v1",
+  "sourceLicense": "AGPL-3.0-or-later",
   "sourceResolution": {
     "version": 1,
     "imports": {},
@@ -126,17 +127,17 @@
       "sha256": "949e8f82cf31a7269df583049caa5ee27573006901be1605c000292795596ede"
     }
   ],
-  "generatedSha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2",
+  "generatedSha256": "f5b3f2bbf0ed8e53cc45d2f65ee7c6d0730609932d4aa413e7fd39cefcbde73b",
   "artifacts": [
     {
       "path": "lib.rs",
       "kind": "source",
-      "sha256": "c738b2c64d2a32711615a72c08b150b54f6502cf7b72d308d6d546b3b8ace8a2"
+      "sha256": "f5b3f2bbf0ed8e53cc45d2f65ee7c6d0730609932d4aa413e7fd39cefcbde73b"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "98be7d5b9364deebf49d00cfc00732c21a95a316644469545c115bc09578f25c"
+      "sha256": "5854b20d4b0d3817486996b74162ecf0ef22cd1b649a71ed07ee77bdbbb0f9f8"
     }
   ]
 }

@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "mode": "retained-artifacts",
+  "freshCompilation": false,
+  "units": [
+    "pitch-gesture-surface",
+    "note-gesture-planner",
+    "control-gesture-planner",
+    "normalized-knob",
+    "action-control",
+    "collection-control",
+    "continuous-control",
+    "editor-surface",
+    "performance-key",
+    "drag-source",
+    "overlay-control",
+    "text-field",
+    "graph-point",
+    "scroll-region"
+  ],
+  "upstreamRevision": "e9340df6279e063cf372080bf4cc97caea3fd901"
+}

@@ -8,15 +8,29 @@ use verdant_overlay_control::native::gpui_native_owner::NativeSnapshot;
 
 pub(crate) type Draw = Rc<dyn Fn(&OverlayControlHandle, &FocusHandle, &mut Window, &mut App) -> gpui::AnyElement>;
 pub(crate) type Response = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+pub(crate) type Selection = Rc<dyn Fn(usize, bool, &str, &mut Window, &mut App)>;
 
 #[derive(IntoElement)]
-pub(crate) struct Overlay { id: ElementId, props: Value, draw: Draw, response: Response }
+pub(crate) struct Overlay { id: ElementId, props: Value, draw: Draw, response: Response, selection: Option<Selection> }
 pub(crate) fn overlay(id: impl Into<ElementId>, props: Value, draw: Draw, response: Response) -> Overlay {
-    Overlay { id: id.into(), props, draw, response }
+    Overlay { id: id.into(), props, draw, response, selection: None }
+}
+impl Overlay {
+    pub(crate) fn on_selection(mut self, selection: Selection) -> Self { self.selection = Some(selection); self }
 }
 pub(crate) fn choose(handle: &OverlayControlHandle, index: usize, revision: &str, window: &mut Window, cx: &mut App) {
     if let Err(error) = handle.call("choose", vec![index.into(), revision.into()], window, cx) {
         eprintln!("compiled overlay choice: {error:?}");
+    }
+}
+pub(crate) fn choose_selection(handle: &OverlayControlHandle, index: usize, selected: bool, revision: &str, window: &mut Window, cx: &mut App) {
+    if let Err(error) = handle.call("chooseSelection", vec![index.into(), selected.into(), revision.into()], window, cx) {
+        eprintln!("compiled overlay selection: {error:?}");
+    }
+}
+pub(crate) fn request_response(handle: &OverlayControlHandle, name: &str, revision: &str, window: &mut Window, cx: &mut App) {
+    if let Err(error) = handle.call("requestResponse", vec![name.into(), revision.into()], window, cx) {
+        eprintln!("compiled overlay response request: {error:?}");
     }
 }
 pub(crate) fn key(handle: &OverlayControlHandle, event: &gpui::KeyDownEvent, window: &mut Window, cx: &mut App) {
@@ -33,12 +47,12 @@ impl Render for Drawing {
 }
 struct Mount {
     root: Entity<OverlayControl>, drawing: Entity<Drawing>, props: Value,
-    response: Response, _changes: Subscription,
+    response: Response, selection: Option<Selection>, _changes: Subscription,
 }
 impl RenderOnce for Overlay {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let parent = crate::proto_parent::current(); let initial_parent = parent.clone();
-        let props = self.props.clone(); let response = self.response.clone(); let draw = self.draw.clone();
+        let props = self.props.clone(); let response = self.response.clone(); let selection = self.selection.clone(); let draw = self.draw.clone();
         let mount = window.use_keyed_state(self.id, cx, move |window, cx| {
             let root = OverlayControl::create(props.clone(), initial_parent, window, cx)
                 .unwrap_or_else(|error| panic!("compiled overlay setup: {error:?}"));
@@ -49,7 +63,8 @@ impl RenderOnce for Overlay {
             let weak = cx.entity().downgrade(); let host = window.window_handle();
             let changes = cx.observe(&root, move |mount: &mut Mount, _, cx| {
                 let handle = mount.root.read(cx).handle(); let events = handle.take_events(); let failures = handle.take_failures();
-                let revision = mount.props.get("revision").and_then(Value::as_str).unwrap_or_default().to_owned(); let response = mount.response.clone();
+                let revision = mount.props.get("revision").and_then(Value::as_str).unwrap_or_default().to_owned();
+                let response = mount.response.clone(); let selection = mount.selection.clone();
                 let epoch = handle.owner.borrow().epoch; let owner = handle.owner;
                 let weak = weak.clone();
                 cx.defer(move |cx| {
@@ -69,20 +84,28 @@ impl RenderOnce for Overlay {
                                     && owner.props.get("disabled").and_then(Value::as_bool) != Some(true)
                             };
                             if !current || !live { return; }
-                            if name != "response" || payload.get("revision").and_then(Value::as_str) != Some(revision.as_str()) { continue; }
-                            if let Some(index) = crate::proto_controls::source_index(payload.get("index")) { response(index, window, cx); }
+                            if payload.get("revision").and_then(Value::as_str) != Some(revision.as_str()) { continue; }
+                            if let Some(index) = crate::proto_controls::source_index(payload.get("index")) {
+                                if name == "response" { response(index, window, cx); }
+                                else if name == "selection" {
+                                    if let (Some(selected), Some(selection)) = (payload.get("selected").and_then(Value::as_bool), selection.as_ref()) {
+                                        selection(index, selected, &revision, window, cx);
+                                    }
+                                }
+                            }
                         }
                     });
                 });
                 mount.drawing.update(cx, |_, cx| cx.notify()); cx.notify();
             });
-            Mount { root, drawing, props, response, _changes: changes }
+            Mount { root, drawing, props, response, selection, _changes: changes }
         });
         let root = mount.update(cx, |mount, cx| {
             if crate::proto_parent::changed(&mount.root.read(cx).handle().owner, &parent) {
                 mount.root.update(cx, |root, cx| root.set_parent(parent, cx)).unwrap_or_else(|error| panic!("compiled container parent: {error:?}"));
             }
             mount.response = self.response;
+            mount.selection = self.selection;
             if mount.props != self.props {
                 mount.root.update(cx, |root, cx| root.set_props(self.props.clone(), window, cx))
                     .unwrap_or_else(|error| panic!("compiled overlay props: {error:?}"));

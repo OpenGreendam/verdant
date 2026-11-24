@@ -2,16 +2,16 @@
   "source": {
     "file": "frontend/proto-ui/src/action-control.proto.ts",
     "exportName": "default",
-    "sha256": "9f962089745ce414f781e9a653694d45a32a328edfbce9fad85c2ec6ca95e139"
+    "sha256": "baf4e1b329b15d9092e21c6c358466e855d1548355828f207b1ab6dc668c639e"
   },
-  "irVersion": 7,
+  "irVersion": 8,
   "backend": "gpui-source-v1",
   "nativeSdk": {
     "schemaVersion": 1,
     "name": "proto-ui-gpui-native",
     "version": "0.2.0",
     "dependencyMode": "workspace",
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35",
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b",
     "path": "../pitch-gesture-surface/.proto-ui/gpui-native",
     "bundled": false
   },
@@ -88,30 +88,30 @@
   "sourceFiles": [
     {
       "file": "frontend/proto-ui/src/action-control.proto.ts",
-      "sha256": "7bb3f19a3351ab0b8b5933c4b4281ac88e013cc071f157b2cfc6a26aaac8bca4"
+      "sha256": "2dd055bea75a40f342235b839e4d2b7537fd9502ff3c04d55b0f8dc93572af6f"
     }
   ],
-  "generatedSha256": "61f36cb1561a455869d2d3aadfedb444dab8405d840feb3d59990e699ffc1650",
+  "generatedSha256": "7234015e07103c6903da6430c38df1b172477f0a815bec19cb355b89b9971ce6",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "61f36cb1561a455869d2d3aadfedb444dab8405d840feb3d59990e699ffc1650"
+      "sha256": "7234015e07103c6903da6430c38df1b172477f0a815bec19cb355b89b9971ce6"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "7151039e8b5fd0f4e4b905e2c8753fff8948b42bdd57c0f4d6a23e3f897bc9e7"
+      "sha256": "8ba7fb16bea915df9827bd56690847b7b82a3b25651ce99d4db76833165fa441"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+      "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "78bd04668d89c0dc5981939d2b06bcd66935c340f4b3dc41ef6d0f3173d35a75"
+      "sha256": "fc90c44f191104ee54f9d0715e9141be4c724b7e1abac49c00fe3b789fd8ff9b"
     }
   ]
 }

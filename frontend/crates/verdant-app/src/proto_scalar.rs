@@ -227,7 +227,7 @@ impl MoveGestureBinding for Binding {
         }
         let Some(mapped) = self.sample(sample, window) else { self.cancel(window, cx); return; };
         self.invoke("sample", vec![mapped.value.into(), mapped.fine.into(),
-            (sample.total_delta.x.hypot(sample.total_delta.y) >= 3.0).into(), sample.modifiers.shift.into()], window, cx);
+            sample.total_delta.x.into(), sample.total_delta.y.into(), sample.modifiers.shift.into()], window, cx);
     }
     fn on_end(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) {
         if self.contact.input.get() != Some(sample.input) { return; }
@@ -238,7 +238,7 @@ impl MoveGestureBinding for Binding {
         if let Some(capture) = self.capture.borrow_mut().take() { capture.release(window, cx); }
         let Some(mapped) = self.sample(sample, window) else { self.cancel(window, cx); return; };
         self.invoke("finish", vec![mapped.value.into(), mapped.fine.into(),
-            (sample.total_delta.x.hypot(sample.total_delta.y) >= 3.0).into(), sample.modifiers.shift.into()], window, cx);
+            sample.total_delta.x.into(), sample.total_delta.y.into(), sample.modifiers.shift.into()], window, cx);
     }
     fn on_cancel(&self, _: MoveGestureCancelReason, context: Option<MoveGestureCancelContext<'_>>) {
         let active = self.contact.input.replace(None).is_some();

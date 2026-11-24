@@ -2,7 +2,7 @@
   "schema": "verdant.proto-ui.compiler-pin.v3",
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -21,7 +21,7 @@
     }
   },
   "toolchain": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -35,7 +35,7 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "units": [
     {
@@ -64,7 +64,8 @@
         "methods": [
           "planNoteGesture"
         ],
-        "dependencies": []
+        "dependencies": [],
+        "sourceLicense": "AGPL-3.0-or-later"
       }
     },
     {
@@ -81,7 +82,8 @@
           "planControlGesture",
           "dragNormalized"
         ],
-        "dependencies": []
+        "dependencies": [],
+        "sourceLicense": "AGPL-3.0-or-later"
       }
     },
     {

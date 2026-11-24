@@ -81,8 +81,11 @@ export default definePrototype<Props>({
     };
     def.expose.method('keyDown', (key: string) => {
       if (!run || syncing || !attached || disposed || disabled.get() || keyNote(key) !== note) return false;
+      const repeated = typing;
       typing = true;
-      publish(++epoch);
+      const ticket = ++epoch;
+      publish(ticket);
+      if (momentary && !repeated && current(ticket) && run) run.expose.emit('trigger', { revision });
       return true;
     });
     def.expose.method('keyUp', (key: string) => {
@@ -95,7 +98,9 @@ export default definePrototype<Props>({
     def.event.on('press.start', () => {
       if (!run || syncing || !attached || disposed || disabled.get()) return;
       direct = true;
-      publish(++epoch);
+      const ticket = ++epoch;
+      publish(ticket);
+      if (momentary && current(ticket) && run) run.expose.emit('trigger', { revision });
     });
     const releaseDirect = () => { direct = false; publish(++epoch); };
     def.event.on('press.end', releaseDirect);
@@ -124,7 +129,7 @@ export default definePrototype<Props>({
       const props = handle.props.get();
       const nextRevision = props.revision ?? '';
       const nextNote = props.note ?? 60;
-      const release = nextRevision !== revision || nextNote !== note || props.disabled === true;
+      const release = nextRevision !== revision || nextNote !== note || props.disabled === true || (props.momentary ?? false) !== momentary;
       const wasPressed = pressed.get();
       const basis = revision;
       revision = nextRevision;

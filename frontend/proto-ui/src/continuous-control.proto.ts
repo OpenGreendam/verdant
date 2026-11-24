@@ -5,7 +5,7 @@ type Props = {
   value?: number; min?: number; max?: number; step?: number; fineStep?: number;
   defaultValue?: number; label?: string; disabled?: boolean; revision?: string;
   role?: string; dragMode?: string; doubleAction?: string; tapAction?: string;
-  previewEcho?: boolean; keyboardMode?: string;
+  previewEcho?: boolean; keyMode?: string;
 };
 
 // Geometry and musical/plugin unit conversion stay at the native boundary.
@@ -23,7 +23,7 @@ export default definePrototype<Props>({
       revision: { type: 'string', default: '' }, role: { type: 'string', default: 'slider' },
       dragMode: { type: 'string', default: 'absolute' }, doubleAction: { type: 'string', default: 'reset' },
       tapAction: { type: 'string', default: 'none' }, previewEcho: { type: 'boolean', default: false },
-      keyboardMode: { type: 'string', default: 'full' },
+      keyMode: { type: 'string', default: 'scalar' },
     });
     const phase = def.state.string('phase', 'idle');
     const value = def.state.numberRange('value', 0, { min: -1e15, max: 1e15 });
@@ -47,7 +47,7 @@ export default definePrototype<Props>({
     accessible.action('setValue', { event: 'host:verdant-scalar-set-value' });
     // Native visual slots have no intrinsic size. The authored root is the
     // interactive surface and occupies the allocation provided by its host.
-    def.feedback.style.use(tw('w-full h-full'));
+    def.feedback.style.use(tw('w-full h-full min-w-0 min-h-0'));
     def.expose.state('value', value);
     def.expose.state('initialValue', initialValue);
     def.expose.state('phase', phase);
@@ -70,7 +70,7 @@ export default definePrototype<Props>({
     let accepted = 0;
     let revision = '';
     let stepPolicy = 0.01; let finePolicy = 0.001;
-    let dragPolicy = 'absolute'; let doublePolicy = 'reset'; let tapPolicy = 'none'; let keyboardPolicy = 'full';
+    let dragPolicy = 'absolute'; let doublePolicy = 'reset'; let tapPolicy = 'none'; let keyboardPolicy = 'scalar';
     const current = (ticket: number): boolean => !disposed && run !== null && epoch === ticket;
     const authorityCurrent = (ticket: number): boolean => !disposed && run !== null && authorityEpoch === ticket;
     const enabled = (): boolean => run !== null && attached && !disposed && !syncing && !disabled.get();
@@ -111,7 +111,7 @@ export default definePrototype<Props>({
         && props.disabled !== true && (props.step ?? 0.01) === stepPolicy
         && (props.fineStep ?? 0.001) === finePolicy && (props.dragMode ?? 'absolute') === dragPolicy
         && (props.doubleAction ?? 'reset') === doublePolicy && (props.tapAction ?? 'none') === tapPolicy
-        && (props.keyboardMode ?? 'full') === keyboardPolicy;
+        && (props.keyMode ?? 'scalar') === keyboardPolicy;
       phase.set('idle', 'reason: continuous control proposal');
       if (!current(ticket)) return false;
       if (echoed) accepted = proposal;
@@ -157,27 +157,33 @@ export default definePrototype<Props>({
       if (run) run.update();
       return current(ticket);
     });
-    const sample = (candidate: number, fineCandidate: number, crossed: boolean, fine: boolean, ticket: number): boolean => {
+    const sample = (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean, ticket: number): boolean => {
       if (!current(ticket) || !enabled() || phase.get() === 'idle') return false;
-      if (!Number.isFinite(candidate) || !Number.isFinite(fineCandidate)) { cancel(); return false; }
-      if (phase.get() === 'armed' && !crossed) return true;
+      if (!Number.isFinite(candidate) || !Number.isFinite(fineCandidate)
+        || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) { cancel(); return false; }
+      // Native input supplies displacement facts, never an already-decided
+      // drag phase. All scalar surfaces share this authored three-pixel slop.
+      if (phase.get() === 'armed' && deltaX * deltaX + deltaY * deltaY < 9) return true;
       phase.set('dragging', 'reason: continuous control dragging');
       if (!current(ticket)) return false;
       let next = fine ? fineCandidate : candidate;
       const handle = run;
       if (handle && handle.props.get().dragMode === 'steps') {
         const amount = fine ? (handle.props.get().fineStep ?? 0.001) : (handle.props.get().step ?? 0.01);
-        next = initialValue.get() + Math.round(candidate) * amount;
+        // Scrub direction, the dominant axis and four-pixel stepping are
+        // interaction policy. The host still owns musical unit formatting.
+        const movement = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : -deltaY;
+        next = initialValue.get() + Math.round(movement / 4) * amount;
       }
       return preview(next, ticket);
     };
-    def.expose.method('sample', (candidate: number, fineCandidate: number, crossed: boolean, fine: boolean) => {
+    def.expose.method('sample', (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean) => {
       const ticket = ++epoch;
-      return sample(candidate, fineCandidate, crossed, fine, ticket);
+      return sample(candidate, fineCandidate, deltaX, deltaY, fine, ticket);
     });
-    def.expose.method('finish', (candidate: number, fineCandidate: number, crossed: boolean, fine: boolean) => {
+    def.expose.method('finish', (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean) => {
       const ticket = ++epoch;
-      if (!sample(candidate, fineCandidate, crossed, fine, ticket) || !current(ticket)) return false;
+      if (!sample(candidate, fineCandidate, deltaX, deltaY, fine, ticket) || !current(ticket)) return false;
       if (phase.get() === 'dragging') return propose(value.get(), ticket);
       const action = run?.props.get().tapAction ?? 'none';
       phase.set('idle', 'reason: continuous control released');
@@ -211,32 +217,34 @@ export default definePrototype<Props>({
       if (!current(ticket) || !enabled()) return;
       propose(next, ticket);
     });
-    def.event.on('key.down', (_current, event) => {
-      if (event.key === 'Escape') {
-        if (phase.get() !== 'idle') event.control.requestDefaultActionPrevention();
-        cancel(); return;
+    const key = (name: string, shift: boolean, command: boolean, alt: boolean): boolean => {
+      if (name === 'Escape') {
+        const active = phase.get() !== 'idle';
+        cancel(); return active;
       }
-      if (!enabled() || event.altKey || event.ctrlKey || event.metaKey) return;
-      const key = event.key ?? '';
-      // A scalar inside a traversable point collection owns value steps while
-      // the collection owns row navigation and returning to its parent. Keep
-      // that division in the source, before consuming the physical key.
-      if (run?.props.get().keyboardMode === 'vertical-step'
-        && key !== 'ArrowUp' && key !== 'ArrowDown' && key !== '+' && key !== '=' && key !== '-') return;
-      if (key !== 'ArrowLeft' && key !== 'ArrowDown' && key !== 'ArrowRight' && key !== 'ArrowUp'
-        && key !== 'PageUp' && key !== 'PageDown' && key !== 'Home' && key !== 'End'
-        && key !== 'Enter' && key !== 'Backspace' && key !== '+' && key !== '=' && key !== '-') return;
-      event.control.requestDefaultActionPrevention();
-      if (key === 'Enter') { edit(); return; }
-      if (key === 'Backspace') { reset(); return; }
-      if (key === 'Home' || key === 'End') {
+      if (!enabled() || alt || command) return false;
+      // Embedded point rows delegate traversal/default response to Collection;
+      // value keys and their aliases still have one authored scalar admission.
+      if (run?.props.get().keyMode === 'table-point' && name !== 'ArrowUp' && name !== 'ArrowDown'
+        && name !== '+' && name !== '=' && name !== '-') return false;
+      if (name !== 'ArrowLeft' && name !== 'ArrowDown' && name !== 'ArrowRight' && name !== 'ArrowUp'
+        && name !== 'PageUp' && name !== 'PageDown' && name !== 'Home' && name !== 'End'
+        && name !== 'Enter' && name !== 'Backspace' && name !== '+' && name !== '=' && name !== '-') return false;
+      if (name === 'Enter') { edit(); return true; }
+      if (name === 'Backspace') { reset(); return true; }
+      if (name === 'Home' || name === 'End') {
         const ticket = epoch + 1; cancel();
-        if (current(ticket) && enabled()) propose(key === 'Home' ? minimum.get() : maximum.get(), ticket);
-        return;
+        if (current(ticket) && enabled()) propose(name === 'Home' ? minimum.get() : maximum.get(), ticket);
+        return true;
       }
-      const direction = key === 'PageUp' ? 10 : key === 'PageDown' ? -10
-        : (key === 'ArrowRight' || key === 'ArrowUp' || key === '+' || key === '=') ? 1 : -1;
-      adjust(direction, event.shiftKey === true);
+      const direction = name === 'PageUp' ? 10 : name === 'PageDown' ? -10
+        : (name === 'ArrowRight' || name === 'ArrowUp' || name === '+' || name === '=') ? 1 : -1;
+      adjust(direction, shift);
+      return true;
+    };
+    def.expose.method('key', key);
+    def.event.on('key.down', (_current, event) => {
+      if (key(event.key ?? '', event.shiftKey === true, event.ctrlKey === true || event.metaKey === true, event.altKey === true)) event.control.requestDefaultActionPrevention();
     });
     const sync = (handle: RunHandle<Props>) => {
       if (disposed) return;
@@ -246,7 +254,7 @@ export default definePrototype<Props>({
       const policyChanged = stepPolicy !== (props.step ?? 0.01) || finePolicy !== (props.fineStep ?? 0.001)
         || dragPolicy !== (props.dragMode ?? 'absolute')
         || doublePolicy !== (props.doubleAction ?? 'reset') || tapPolicy !== (props.tapAction ?? 'none')
-        || keyboardPolicy !== (props.keyboardMode ?? 'full');
+        || keyboardPolicy !== (props.keyMode ?? 'scalar');
       const echoed = props.previewEcho === true && phase.get() !== 'idle'
         && (props.revision ?? '') === revision && props.value === value.get()
         && (props.min ?? 0) === minimum.get() && (props.max ?? 1) === maximum.get()
@@ -260,7 +268,7 @@ export default definePrototype<Props>({
       run = handle;
       stepPolicy = props.step ?? 0.01; finePolicy = props.fineStep ?? 0.001;
       dragPolicy = props.dragMode ?? 'absolute'; doublePolicy = props.doubleAction ?? 'reset'; tapPolicy = props.tapAction ?? 'none';
-      keyboardPolicy = props.keyboardMode ?? 'full';
+      keyboardPolicy = props.keyMode ?? 'scalar';
       const low = props.min ?? 0;
       const high = props.max ?? 1;
       const valid = Number.isFinite(low) && Number.isFinite(high) && low < high
@@ -316,7 +324,7 @@ export default definePrototype<Props>({
     def.lifecycle.onCreated(sync);
     def.lifecycle.onMounted((handle) => { if (!disposed) { attached = true; sync(handle); } });
     def.props.watch(['value', 'min', 'max', 'step', 'fineStep', 'defaultValue', 'label', 'disabled',
-      'revision', 'role', 'dragMode', 'doubleAction', 'tapAction', 'previewEcho', 'keyboardMode'], sync);
+      'revision', 'role', 'dragMode', 'doubleAction', 'tapAction', 'previewEcho', 'keyMode'], sync);
     def.event.on('host:blur', cancel);
     def.lifecycle.onUnmounted(() => retire(false));
     def.lifecycle.onBeforeDispose(() => retire(true));

@@ -100,67 +100,12 @@ async function fixture(t, initial = {}, mount = true) {
 runtimeTest('continuous final sample commits once and controlled rejection restores accepted value', async (t) => {
   const f = await fixture(t);
   assert.equal(f.call('begin', 0.5, false, false, false), true);
-  assert.equal(f.call('sample', 0.6, 0.51, true, false), true);
+  assert.equal(f.call('sample', 0.6, 0.51, 4, 0, false), true);
   assert.equal(f.x.value.get(), 0.6);
-  assert.equal(f.call('finish', 0.8, 0.53, true, false), true);
+  assert.equal(f.call('finish', 0.8, 0.53, 4, 0, false), true);
   assert.deepEqual(f.commits(), [{ value: 0.8, revision: 'document:1' }]);
   assert.equal(f.x.value.get(), 0.5);
   assert.equal(f.x.phase.get(), 'idle');
-});
-
-runtimeTest('continuous cancellation carries the retired accepted value and original revision', async t => {
-  const f = await fixture(t);
-  f.call('begin', 0.5, false, false, false);
-  f.call('sample', 0.7, 0.52, true, false);
-  f.update({ value: 0.2, revision: 'document:2' });
-  assert.deepEqual(f.cancels(), [{ value: 0.5, revision: 'document:1' }]);
-  assert.equal(f.x.value.get(), 0.2);
-  assert.equal(f.call('finish', 0.9, 0.53, true, false), false);
-  assert.deepEqual(f.commits(), []);
-});
-
-runtimeTest('continuous preview echo cannot mask a synchronous policy change during finish', async t => {
-  for (const policy of [{ max: 2 }, { disabled: true }, { step: 0.2 }, { dragMode: 'relative' }, { keyboardMode: 'vertical-step' }]) {
-    const f = await fixture(t, { previewEcho: true });
-    f.call('begin', 0.5, false, false, false);
-    f.onEvent((name, payload) => { if (name === 'valuePreview') f.update({ value: payload.value, ...policy }); });
-    assert.equal(f.call('finish', 0.8, 0.53, true, false), false);
-    assert.deepEqual(f.commits(), []);
-    assert.equal(f.x.phase.get(), 'idle');
-    assert.deepEqual(f.cancels(), [{ value: 0.5, revision: 'document:1' }]);
-  }
-});
-
-runtimeTest('continuous plus minus and fine keys use the same authored numeric proposal', async t => {
-  const f = await fixture(t);
-  assert.equal(f.key('=').defaultPrevented, true);
-  assert.equal(f.key('+', { shiftKey: true }).defaultPrevented, true);
-  assert.equal(f.key('-').defaultPrevented, true);
-  assert.deepEqual(f.commits().map(proposal => proposal.value), [0.51, 0.501, 0.49]);
-  assert.equal(f.key('+', { ctrlKey: true }).defaultPrevented, false);
-});
-
-runtimeTest('point scalar key policy owns value steps and releases collection navigation', async t => {
-  const f = await fixture(t, { keyboardMode: 'vertical-step', step: 0.1, fineStep: 0.01 });
-  for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', 'Escape', 'Tab', 'Backspace']) {
-    assert.equal(f.key(key).defaultPrevented, false, `${key} belongs to the surrounding collection`);
-  }
-  assert.deepEqual(f.events, []);
-  assert.equal(f.key('ArrowUp').defaultPrevented, true);
-  assert.equal(f.key('ArrowDown', { shiftKey: true }).defaultPrevented, true);
-  assert.equal(f.key('+').defaultPrevented, true);
-  assert.equal(f.key('-').defaultPrevented, true);
-  assert.deepEqual(f.commits().map(proposal => proposal.value), [0.6, 0.49, 0.6, 0.4]);
-  f.call('begin', 0.5, false, false, false);
-  f.call('sample', 0.8, 0.53, true, false);
-  assert.equal(f.key('Escape').defaultPrevented, true, 'active scalar cancels before collection dismissal');
-  assert.equal(f.x.phase.get(), 'idle');
-  assert.equal(f.key('Escape').defaultPrevented, false, 'idle scalar leaves dismissal to the collection');
-  f.action('increment');
-  assert.equal(f.commits().at(-1).value, 0.6, 'assistive adjustment stays independent of keyboard layout');
-  f.update({ keyboardMode: 'full' });
-  assert.equal(f.key('End').defaultPrevented, true);
-  assert.equal(f.commits().at(-1).value, 1);
 });
 
 runtimeTest('continuous synchronous draft echoes cannot swallow the final release commit', async (t) => {
@@ -170,95 +115,72 @@ runtimeTest('continuous synchronous draft echoes cannot swallow the final releas
     if (name === 'valueCommit') f.update({ value: payload.value, revision: 'document:2' });
   });
   f.call('begin', 0.5, false, false, false);
-  assert.equal(f.call('sample', 0.6, 0.51, true, false), true);
-  assert.equal(f.call('finish', 0.7, 0.52, true, false), true);
+  assert.equal(f.call('sample', 0.6, 0.51, 4, 0, false), true);
+  assert.equal(f.call('finish', 0.7, 0.52, 4, 0, false), true);
   assert.deepEqual(f.commits(), [{ value: 0.7, revision: 'document:1' }]);
   assert.equal(f.x.value.get(), 0.7);
-});
-
-runtimeTest('continuous commit retains an exact preview echo for the next keyboard step and drag', async (t) => {
-  for (const nextInput of ['keyboard', 'drag']) {
-    const f = await fixture(t, { value: 35, min: 0, max: 240, step: 5, fineStep: 1, previewEcho: true });
-    f.onEvent((name, payload) => {
-      if (name === 'valuePreview' || name === 'valueCommit') f.update({ value: payload.value });
-    });
-    f.call('begin', 35, false, false, false);
-    f.call('sample', 154, 36, true, false);
-    assert.equal(f.call('finish', 154, 36, true, false), true);
-    assert.deepEqual(f.commits(), [{ value: 154, revision: 'document:1' }]);
-    assert.equal(f.x.phase.get(), 'idle');
-    assert.equal(f.x.value.get(), 154, 'an unchanged final host echo remains the idle authority');
-    assert.deepEqual(f.cancels(), []);
-    if (nextInput === 'keyboard') {
-      assert.equal(f.key('ArrowRight', { shiftKey: true }).defaultPrevented, true);
-      assert.equal(f.commits().at(-1).value, 155);
-      assert.equal(f.x.value.get(), 155);
-    } else {
-      assert.equal(f.call('begin', 154, false, false, false), true);
-      assert.equal(f.x.initialValue.get(), 154, 'the next drag starts at the committed echo');
-      f.call('sample', 170, 155, true, false);
-      f.call('cancel');
-      assert.equal(f.x.value.get(), 154);
-      assert.deepEqual(f.cancels(), [{ value: 154, revision: 'document:1' }]);
-    }
-  }
-});
-
-runtimeTest('continuous preview echo remains provisional until that exact value is committed', async (t) => {
-  const cancelled = await fixture(t, { previewEcho: true });
-  cancelled.onEvent((name, payload) => {
-    if (name === 'valuePreview') cancelled.update({ value: payload.value });
-  });
-  cancelled.call('begin', 0.5, false, false, false);
-  cancelled.call('sample', 0.7, 0.52, true, false);
-  cancelled.call('cancel');
-  assert.equal(cancelled.x.value.get(), 0.5);
-  assert.deepEqual(cancelled.cancels(), [{ value: 0.5, revision: 'document:1' }]);
-
-  for (const previewEcho of [false, true]) {
-    const rejected = await fixture(t, { previewEcho });
-    rejected.onEvent((name, payload) => {
-      if (previewEcho && name === 'valuePreview' && payload.value === 0.6) rejected.update({ value: 0.6 });
-    });
-    rejected.call('begin', 0.5, false, false, false);
-    rejected.call('sample', 0.6, 0.51, true, false);
-    assert.equal(rejected.call('finish', 0.8, 0.53, true, false), true);
-    assert.equal(rejected.x.value.get(), 0.5, 'an earlier echo cannot accept a different final proposal');
-    rejected.call('adjust', 1, false);
-    assert.deepEqual(rejected.commits().map(payload => payload.value), [0.8, 0.51]);
-  }
-});
-
-runtimeTest('continuous commit echo cannot overwrite a reentrant host replacement', async (t) => {
-  const f = await fixture(t, { previewEcho: true });
-  f.onEvent((name, payload) => {
-    if (name === 'valuePreview') f.update({ value: payload.value });
-    if (name === 'valueCommit') f.update({ value: 0.2, revision: 'document:2' });
-  });
-  f.call('begin', 0.5, false, false, false);
-  f.call('sample', 0.6, 0.51, true, false);
-  assert.equal(f.call('finish', 0.7, 0.52, true, false), true);
-  assert.equal(f.x.value.get(), 0.2);
-  assert.equal(f.call('begin', 0.2, false, false, false), true);
-  assert.equal(f.x.initialValue.get(), 0.2);
-  f.call('cancel');
-  assert.deepEqual(f.cancels(), [{ value: 0.2, revision: 'document:2' }]);
 });
 
 runtimeTest('continuous numeric scrubbing owns rounding, physical steps and fine steps', async (t) => {
   const f = await fixture(t, { value: 120, min: 40, max: 300, step: 1, fineStep: 0.1, dragMode: 'steps', role: 'spinbutton' });
   f.call('begin', 0, false, false, false);
-  f.call('sample', 2.5, 2.5, true, false);
+  f.call('sample', 120, 120, 10, 2, false);
   assert.equal(f.x.value.get(), 123);
-  f.call('finish', -2.5, -2.5, true, true);
+  f.call('finish', 120, 120, -10, 2, true);
   assert.deepEqual(f.commits(), [{ value: 119.8, revision: 'document:1' }]);
   assert.equal(f.semantics().role, 'spinbutton');
+});
+
+runtimeTest('continuous pointer facts keep tap slop, boundary crossing and the final release in the source', async (t) => {
+  const tap = await fixture(t, { tapAction: 'activate' });
+  tap.call('begin', 0.5, false, false, false);
+  assert.equal(tap.call('sample', 0.9, 0.54, 2, 2, false), true);
+  assert.equal(tap.x.phase.get(), 'armed');
+  assert.equal(tap.x.value.get(), 0.5, 'a subthreshold candidate cannot become a preview');
+  tap.call('finish', 0.9, 0.54, 2, 2, false);
+  assert.equal(tap.events.at(-1).name, 'activate');
+  assert.deepEqual(tap.commits(), []);
+
+  const drag = await fixture(t);
+  drag.call('begin', 0.5, false, false, false);
+  assert.equal(drag.call('sample', 0.7, 0.52, 3, 0, false), true);
+  assert.equal(drag.x.phase.get(), 'dragging', 'the exact three-pixel boundary starts a drag');
+  // Returning inside the slop after a real drag does not turn release into a tap.
+  assert.equal(drag.call('finish', 0.6, 0.51, 1, 0, true), true);
+  assert.deepEqual(drag.commits(), [{ value: 0.51, revision: 'document:1' }]);
+});
+
+runtimeTest('numeric scrub direction and dominant-axis ties use raw motion and ignore host candidates', async (t) => {
+  for (const [dx, dy, fine, expected] of [
+    [12, 4, false, 123], [-12, 4, false, 117],
+    [4, -12, false, 123], [4, 12, false, 117],
+    [12, 12, false, 117], [12, -12, true, 120.3],
+  ]) {
+    const f = await fixture(t, { value: 120, min: 40, max: 300, step: 1, fineStep: 0.1, dragMode: 'steps' });
+    f.call('begin', 120, false, false, false);
+    f.call('finish', 299, 40, dx, dy, fine);
+    assert.deepEqual(f.commits(), [{ value: expected, revision: 'document:1' }],
+      `raw motion (${dx}, ${dy}), fine=${fine}`);
+  }
+});
+
+runtimeTest('nonfinite pointer facts cancel an active scalar before any terminal write', async (t) => {
+  for (const [dx, dy] of [[NaN, 0], [0, Infinity], [-Infinity, 0]]) {
+    const f = await fixture(t);
+    f.call('begin', 0.5, false, false, false);
+    f.call('sample', 0.7, 0.52, 4, 0, false);
+    assert.equal(f.call('finish', 0.9, 0.54, dx, dy, false), false);
+    assert.equal(f.x.phase.get(), 'idle');
+    assert.equal(f.x.value.get(), 0.5);
+    assert.deepEqual(f.cancels(), [{ value: 0.5, revision: 'document:1' }]);
+    assert.deepEqual(f.commits(), []);
+  }
 });
 
 runtimeTest('continuous keyboard and assistive takeovers cancel preview and use accepted physical units', async (t) => {
   const f = await fixture(t, { value: -8, min: -96, max: 6, step: 0.5, fineStep: 0.1 });
   f.call('begin', -8, false, false, false);
-  f.call('sample', 2, -7, true, false);
+  f.call('sample', 2, -7, 4, 0, false);
   f.key('ArrowUp');
   assert.deepEqual(f.commits(), [{ value: -7.5, revision: 'document:1' }]);
   assert.equal(f.cancels().length, 1);
@@ -269,22 +191,37 @@ runtimeTest('continuous keyboard and assistive takeovers cancel preview and use 
   f.setValue(Infinity);
   assert.equal(f.commits().length, 3);
 });
+runtimeTest('continuous point-row keyboard aliases share scalar admission and delegate collection traversal', async (t) => {
+  const f=await fixture(t,{value:60,min:0,max:127,step:1,fineStep:0.1,role:'spinbutton',keyMode:'table-point'});
+  assert.equal(f.call('key','+',false,false,false),true);
+  assert.equal(f.key('=',{shiftKey:true}).defaultPrevented,true);
+  assert.equal(f.call('key','-',false,false,false),true);
+  assert.equal(f.key('ArrowUp').defaultPrevented,true);
+  assert.deepEqual(f.commits().map(p=>p.value),[61,60.1,59,61]);
+  for(const key of ['ArrowLeft','ArrowRight','Home','End','PageUp','PageDown','Enter','Tab']) {
+    assert.equal(f.call('key',key,false,false,false),false,`collection owns ${key}`);
+  }
+  assert.equal(f.call('key','+',false,true,false),false);
+  assert.equal(f.call('key','-',false,false,true),false);
+  f.update({disabled:true,revision:'document:2'});
+  assert.equal(f.call('key','+',false,false,false),false);assert.equal(f.commits().length,4);
+});
 
 runtimeTest('continuous authority change, invalid input and detach cannot commit stale preview', async (t) => {
   const f = await fixture(t);
   f.call('begin', 0.5, false, false, false);
-  f.call('sample', 0.9, 0.54, true, false);
+  f.call('sample', 0.9, 0.54, 4, 0, false);
   f.update({ value: 0.4, revision: 'document:2' });
   assert.equal(f.x.phase.get(), 'idle');
-  assert.equal(f.call('finish', 1, 0.6, true, false), false);
+  assert.equal(f.call('finish', 1, 0.6, 4, 0, false), false);
   assert.equal(f.x.value.get(), 0.4);
   f.call('begin', 0.4, false, false, false);
-  assert.equal(f.call('sample', NaN, 0.4, true, false), false);
+  assert.equal(f.call('sample', NaN, 0.4, 4, 0, false), false);
   assert.equal(f.x.phase.get(), 'idle');
   f.call('begin', 0.4, false, false, false);
   await f.session.unmount();
   assert.equal(f.x.phase.get(), 'idle');
-  assert.equal(f.call('finish', 0.8, 0.44, true, false), false);
+  assert.equal(f.call('finish', 0.8, 0.44, 4, 0, false), false);
   assert.deepEqual(f.commits(), []);
 });
 
@@ -296,7 +233,7 @@ runtimeTest('continuous resize boundaries, reset and stepper share one source pr
   f.call('reset');
   assert.deepEqual(f.commits().map((p) => p.value), [308, 440, 260, 300]);
   f.call('begin', 300, false, false, false);
-  f.call('sample', 400, 310, true, false);
+  f.call('sample', 400, 310, 4, 0, false);
   f.update({ max: 350 });
   assert.equal(f.x.phase.get(), 'idle');
   assert.equal(f.x.value.get(), 300);
@@ -307,7 +244,7 @@ runtimeTest('continuous double edit and tap activation preserve value without a 
   f.call('begin', 0.5, false, false, true);
   assert.equal(f.events.at(-1).name, 'editRequest');
   f.call('begin', 0.5, false, false, false);
-  f.call('finish', 0.5, 0.5, false, false);
+  f.call('finish', 0.5, 0.5, 0, 0, false);
   assert.equal(f.events.at(-1).name, 'activate');
   assert.deepEqual(f.commits(), []);
 });
@@ -318,4 +255,134 @@ runtimeTest('continuous disabled instance never starts or requests a host write'
   assert.equal(f.call('adjust', 1, false), false);
   f.key('ArrowUp'); f.action('increment'); f.setValue(0.7);
   assert.deepEqual(f.events, []);
+});
+
+runtimeTest('continuous cancellation carries the retired accepted value and original revision', async t => {
+  const f = await fixture(t);
+  f.call('begin', 0.5, false, false, false);
+  f.call('sample', 0.7, 0.52, 4, 0, false);
+  f.update({ value: 0.2, revision: 'document:2' });
+  assert.deepEqual(f.cancels(), [{ value: 0.5, revision: 'document:1' }]);
+  assert.equal(f.x.value.get(), 0.2);
+  assert.equal(f.call('finish', 0.9, 0.53, 4, 0, false), false);
+  assert.deepEqual(f.commits(), []);
+});
+
+
+runtimeTest('continuous preview echo cannot mask a synchronous policy change during finish', async t => {
+  for (const policy of [{ max: 2 }, { disabled: true }, { step: 0.2 }, { dragMode: 'relative' }, { keyMode: 'table-point' }]) {
+    const f = await fixture(t, { previewEcho: true });
+    f.call('begin', 0.5, false, false, false);
+    f.onEvent((name, payload) => { if (name === 'valuePreview') f.update({ value: payload.value, ...policy }); });
+    assert.equal(f.call('finish', 0.8, 0.53, 4, 0, false), false);
+    assert.deepEqual(f.commits(), []);
+    assert.equal(f.x.phase.get(), 'idle');
+    assert.deepEqual(f.cancels(), [{ value: 0.5, revision: 'document:1' }]);
+  }
+});
+
+
+runtimeTest('continuous plus minus and fine keys use the same authored numeric proposal', async t => {
+  const f = await fixture(t);
+  assert.equal(f.key('=').defaultPrevented, true);
+  assert.equal(f.key('+', { shiftKey: true }).defaultPrevented, true);
+  assert.equal(f.key('-').defaultPrevented, true);
+  assert.deepEqual(f.commits().map(proposal => proposal.value), [0.51, 0.501, 0.49]);
+  assert.equal(f.key('+', { ctrlKey: true }).defaultPrevented, false);
+});
+
+
+runtimeTest('point scalar key policy owns value steps and releases collection navigation', async t => {
+  const f = await fixture(t, { keyMode: 'table-point', step: 0.1, fineStep: 0.01 });
+  for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', 'Escape', 'Tab', 'Backspace']) {
+    assert.equal(f.key(key).defaultPrevented, false, `${key} belongs to the surrounding collection`);
+  }
+  assert.deepEqual(f.events, []);
+  assert.equal(f.key('ArrowUp').defaultPrevented, true);
+  assert.equal(f.key('ArrowDown', { shiftKey: true }).defaultPrevented, true);
+  assert.equal(f.key('+').defaultPrevented, true);
+  assert.equal(f.key('-').defaultPrevented, true);
+  assert.deepEqual(f.commits().map(proposal => proposal.value), [0.6, 0.49, 0.6, 0.4]);
+  f.call('begin', 0.5, false, false, false);
+  f.call('sample', 0.8, 0.53, 4, 0, false);
+  assert.equal(f.key('Escape').defaultPrevented, true, 'active scalar cancels before collection dismissal');
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.key('Escape').defaultPrevented, false, 'idle scalar leaves dismissal to the collection');
+  f.action('increment');
+  assert.equal(f.commits().at(-1).value, 0.6, 'assistive adjustment stays independent of keyboard layout');
+  f.update({ keyMode: 'scalar' });
+  assert.equal(f.key('End').defaultPrevented, true);
+  assert.equal(f.commits().at(-1).value, 1);
+});
+
+
+runtimeTest('continuous commit retains an exact preview echo for the next keyboard step and drag', async (t) => {
+  for (const nextInput of ['keyboard', 'drag']) {
+    const f = await fixture(t, { value: 35, min: 0, max: 240, step: 5, fineStep: 1, previewEcho: true });
+    f.onEvent((name, payload) => {
+      if (name === 'valuePreview' || name === 'valueCommit') f.update({ value: payload.value });
+    });
+    f.call('begin', 35, false, false, false);
+    f.call('sample', 154, 36, 4, 0, false);
+    assert.equal(f.call('finish', 154, 36, 4, 0, false), true);
+    assert.deepEqual(f.commits(), [{ value: 154, revision: 'document:1' }]);
+    assert.equal(f.x.phase.get(), 'idle');
+    assert.equal(f.x.value.get(), 154, 'an unchanged final host echo remains the idle authority');
+    assert.deepEqual(f.cancels(), []);
+    if (nextInput === 'keyboard') {
+      assert.equal(f.key('ArrowRight', { shiftKey: true }).defaultPrevented, true);
+      assert.equal(f.commits().at(-1).value, 155);
+      assert.equal(f.x.value.get(), 155);
+    } else {
+      assert.equal(f.call('begin', 154, false, false, false), true);
+      assert.equal(f.x.initialValue.get(), 154, 'the next drag starts at the committed echo');
+      f.call('sample', 170, 155, 4, 0, false);
+      f.call('cancel');
+      assert.equal(f.x.value.get(), 154);
+      assert.deepEqual(f.cancels(), [{ value: 154, revision: 'document:1' }]);
+    }
+  }
+});
+
+
+runtimeTest('continuous preview echo remains provisional until that exact value is committed', async (t) => {
+  const cancelled = await fixture(t, { previewEcho: true });
+  cancelled.onEvent((name, payload) => {
+    if (name === 'valuePreview') cancelled.update({ value: payload.value });
+  });
+  cancelled.call('begin', 0.5, false, false, false);
+  cancelled.call('sample', 0.7, 0.52, 4, 0, false);
+  cancelled.call('cancel');
+  assert.equal(cancelled.x.value.get(), 0.5);
+  assert.deepEqual(cancelled.cancels(), [{ value: 0.5, revision: 'document:1' }]);
+
+  for (const previewEcho of [false, true]) {
+    const rejected = await fixture(t, { previewEcho });
+    rejected.onEvent((name, payload) => {
+      if (previewEcho && name === 'valuePreview' && payload.value === 0.6) rejected.update({ value: 0.6 });
+    });
+    rejected.call('begin', 0.5, false, false, false);
+    rejected.call('sample', 0.6, 0.51, 4, 0, false);
+    assert.equal(rejected.call('finish', 0.8, 0.53, 4, 0, false), true);
+    assert.equal(rejected.x.value.get(), 0.5, 'an earlier echo cannot accept a different final proposal');
+    rejected.call('adjust', 1, false);
+    assert.deepEqual(rejected.commits().map(payload => payload.value), [0.8, 0.51]);
+  }
+});
+
+
+runtimeTest('continuous commit echo cannot overwrite a reentrant host replacement', async (t) => {
+  const f = await fixture(t, { previewEcho: true });
+  f.onEvent((name, payload) => {
+    if (name === 'valuePreview') f.update({ value: payload.value });
+    if (name === 'valueCommit') f.update({ value: 0.2, revision: 'document:2' });
+  });
+  f.call('begin', 0.5, false, false, false);
+  f.call('sample', 0.6, 0.51, 4, 0, false);
+  assert.equal(f.call('finish', 0.7, 0.52, 4, 0, false), true);
+  assert.equal(f.x.value.get(), 0.2);
+  assert.equal(f.call('begin', 0.2, false, false, false), true);
+  assert.equal(f.x.initialValue.get(), 0.2);
+  f.call('cancel');
+  assert.deepEqual(f.cancels(), [{ value: 0.2, revision: 'document:2' }]);
 });

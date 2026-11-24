@@ -2,7 +2,7 @@
 //! File classification is only a UI preflight; the worker verifies the bytes,
 //! complete bank, ONNX ABI and atomic registry installation.
 use super::*;
-use gpui::{AccessibleAction, Div, Role, div, prelude::*, px};
+use gpui::{Div, Role, div, prelude::*, px};
 use verdant_backend::voices::{SourceEvidence, VoiceAssets};
 
 #[derive(Clone, Debug)]
@@ -100,16 +100,14 @@ impl Editor {
     }
 
     pub fn voice_import_details(&self, cx: &mut Context<Self>) -> Option<Div> {
+        let prompt = self.text_prompt.as_ref()?;
         let PromptPurpose::Integration(integrations::IntegrationPrompt::InstallVoice(draft)) =
-            &self.text_prompt.as_ref()?.purpose else { return None; };
+            &prompt.purpose else { return None; };
         let th = self.theme;
         let accepted = draft.evidence.rights_attested;
-        let toggle = |ed: &mut Editor, cx: &mut Context<Editor>| {
-            if let Some(TextPrompt { purpose: PromptPurpose::Integration(integrations::IntegrationPrompt::InstallVoice(draft)), .. }) = &mut ed.text_prompt {
-                draft.evidence.rights_attested = !draft.evidence.rights_attested;
-                cx.notify();
-            }
-        };
+        let instance = prompt.instance.clone();
+        let basis = crate::proto_controls::editor_authority(self);
+        let authority = format!("{basis}:{instance}:{:?}:{:?}:{:?}", draft.assets.voice_package, draft.evidence.token, draft.evidence.model);
         let label = "我有权使用这些原始数据及其迁移声库";
         Some(div().flex().flex_col().gap(px(6.)).text_xs()
             .child(format!("声库：{}", draft.assets.voice_package.as_ref()?.display()))
@@ -117,11 +115,19 @@ impl Editor {
             .child(format!("原始 BIN：{}", draft.evidence.model.display()))
             .child(div().text_color(th.text_secondary).child("安装会核对文件内容并保存来源记录。原始文件匹配与您的使用权声明分别记录。"))
             .child(crate::proto_controls::action("voice-rights-attestation", label).role(Role::CheckBox)
-                .authority(format!("{}:{:?}:{:?}:{:?}",crate::proto_controls::editor_authority(self),draft.assets.voice_package,draft.evidence.token,draft.evidence.model))
+                .authority(authority)
                 .aria_selected(accepted).tab_index(0).p(px(8.)).rounded(px(5.)).bg(th.control)
                 .child(format!("{} {label}", if accepted { "☑" } else { "☐" }))
-                .on_click(cx.listener(move |ed, _, _, cx| toggle(ed, cx)))
-                .on_a11y_action(AccessibleAction::Click, crate::view::a11y_listener(cx, move |ed, _, _, cx| toggle(ed, cx)))))
+                .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+                    if crate::proto_controls::editor_authority(ed) != basis { return; }
+                    let Some(prompt) = &mut ed.text_prompt else { return; };
+                    if prompt.instance != instance { return; }
+                    if let PromptPurpose::Integration(integrations::IntegrationPrompt::InstallVoice(draft)) = &mut prompt.purpose {
+                        if draft.evidence.rights_attested != accepted { return; }
+                        draft.evidence.rights_attested = event.selected();
+                        cx.notify();
+                    }
+                }))))
     }
 }
 

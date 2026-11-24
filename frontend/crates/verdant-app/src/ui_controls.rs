@@ -250,6 +250,34 @@ pub fn select_button(
         .child(svg().path(icon("chevron-down")).size(px(13.0)).flex_none().text_color(th.text_secondary))
 }
 
+/// Attach exactly one command consumer to a surface that has no listener yet.
+/// Only classified Boolean commands accept the source's selected proposal.
+pub(crate) fn bind_command_action(
+    ed: &Editor,
+    cmd: Cmd,
+    arg: Arg,
+    action: crate::proto_controls::Action,
+    active: bool,
+    cx: &mut Context<Editor>,
+) -> crate::proto_controls::Action {
+    let basis = crate::proto_controls::editor_authority(ed);
+    let authority = format!("{basis}:{cmd:?}:{arg:?}");
+    let selection = ed.source_command_selection(cmd, &arg);
+    let button = if let Some(accepted) = selection {
+        action.on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+            if crate::proto_controls::editor_authority(ed) != basis
+                || ed.source_command_selection(cmd, &arg) != Some(accepted) { return; }
+            ed.accept_source_command_selection(cmd, &arg, event.selected(), cx);
+        }))
+    } else {
+        action.on_click(cx.listener(move |ed, _, window, cx| controls::dispatch(ed, cmd, arg.clone(), window, cx)))
+    };
+    button
+        .authority(authority)
+        .role(if selection.is_some() { Role::Switch } else { Role::Button })
+        .aria_selected(selection.unwrap_or(active))
+}
+
 /// Command button with explicit visual active state and uniform `BAR_BTN_H` height.
 pub fn selectable_command_button(
     ed: &Editor,
@@ -262,21 +290,12 @@ pub fn selectable_command_button(
 ) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
-    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
-    controls::command_button(
-        cmd,
-        arg,
-        label.clone(),
-        key,
-        th.text.into(),
+    let active = ed.source_command_selection(cmd, &arg).unwrap_or(active);
+    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(),
         if active { th.checked.into() } else { th.control.into() },
-        if active { th.checked.into() } else { th.control_pressed.into() },
-        cx,
-    )
-    .authority(authority)
-    .role(Role::Button)
+        if active { th.checked.into() } else { th.control_pressed.into() });
+    bind_command_action(ed, cmd, arg, action, active, cx)
     .aria_label(label)
-    .aria_selected(active)
     .h(px(BAR_BTN_H))
     .py(px(0.0))
     .px(px(11.0))
@@ -301,21 +320,12 @@ pub fn flat_command_button(
     let label = label.into();
     let th = ed.theme;
     let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
-    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
-    controls::command_button(
-        cmd,
-        arg,
-        label.clone(),
-        key,
-        th.text.into(),
+    let active = ed.source_command_selection(cmd, &arg).unwrap_or(active);
+    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(),
         if active { th.checked.into() } else { clear.into() },
-        if active { th.checked.into() } else { th.hover.into() },
-        cx,
-    )
-    .authority(authority)
-    .role(Role::Button)
+        if active { th.checked.into() } else { th.hover.into() });
+    bind_command_action(ed, cmd, arg, action, active, cx)
     .aria_label(label)
-    .aria_selected(active)
     .py(px(0.0))
     .rounded(px(6.0))
 }
@@ -555,12 +565,9 @@ pub fn numeric_pill(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>
     config.tap_action = if matches!(id, Num::SnapGridTicks | Num::DefaultNoteTicks) { "activate" } else { "none" };
     config.preview_echo = true;
     let scalar = scalar(entity, key.clone(), config,
-        |sample, _, _| {
-            let dx = sample.total_delta.x;
-            let dy = -sample.total_delta.y;
-            let steps = if dx.abs() > dy.abs() { dx } else { dy } / 4.0;
-            Sample { value: steps, fine: steps, jump: false }
-        },
+        // Step-mode scrubbing consumes raw displacement inside the prototype;
+        // no host axis choice or pixel-to-step policy precedes its decision.
+        |_, _, initial| Sample { value: initial, fine: initial, jump: false },
         move |display, actions, _, cx| {
             let formatted = format_numeric_value(display_editor.read(cx), id, display.value);
             let text = if compact { format!("{label} {formatted}") } else { formatted };
@@ -949,6 +956,10 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
 }
 
 #[cfg(test)]
+#[path = "ui_controls_selection_tests.rs"]
+mod source_selection_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1079,6 +1090,32 @@ mod pointer_boundary_tests {
                 position: point(px(82.0), px(14.0)), button: MouseButton::Left, ..Default::default()
             }), cx);
             assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 8.0);
+            assert_eq!(host.editor.read(cx).revision().get(), 1);
+            assert!(!has_numeric_scrub(host.editor.entity_id(), cx));
+            assert!(window.captured_hitbox().is_none());
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn numeric_scrub_native_motion_is_classified_by_the_compiled_source(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            down(host, window, cx);
+            window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                position: point(px(52.0), px(16.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+            }), cx);
+            assert!(host.editor.read(cx).numeric_preview.is_none(), "diagonal motion below three pixels stays armed");
+            window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
+                position: point(px(54.0), px(22.0)), pressed_button: Some(MouseButton::Left), ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), -2.0,
+                "the prototype chooses the dominant downward axis");
+            window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                position: point(px(50.0), px(2.0)), button: MouseButton::Left,
+                modifiers: gpui::Modifiers { shift: true, ..Default::default() }, ..Default::default()
+            }), cx);
+            assert_eq!(host.editor.read(cx).numeric_value(Num::MasterPan, Arg::None), 1.5,
+                "the terminal raw motion is sampled using the source's fine step");
             assert_eq!(host.editor.read(cx).revision().get(), 1);
             assert!(!has_numeric_scrub(host.editor.entity_id(), cx));
             assert!(window.captured_hitbox().is_none());

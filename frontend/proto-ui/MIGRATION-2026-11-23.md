@@ -2,7 +2,9 @@
 
 本记录描述本分支对原审计 **18 类交互**的实际源码迁移。应用使用 **12 个 `gpui-source-v1` 原生编译单元和 2 个 `rust-data-v1` 决策单元，共 14 个编译单元**。这两个数字分别统计交互类别和编译入口；不能换算成界面面积、代码量或功能完成百分比。
 
-采用率不是缺陷率；一个共享控件接入多个界面，也不等于其所有平台和输入设备已经验收。本轮的源码、编译产物、依赖图和原生框架行为验证已完成；最终 [compiler.pin.json](compiler.pin.json) 与 [receipts](receipts/) 一致绑定 14 个单元、81 个编译产物和完整来源闭包。执行范围、不可变来源及历史失败的处理见文末和 [最终机器记录](VALIDATION-2026-11-23.json)。
+采用率不是缺陷率；一个共享控件接入多个界面，也不等于其所有平台和输入设备已经验收。当前候选选择性整合 PR #7（基线 `2621c0a9760768d67e23e2fe7e85a893d6e1b170`）与 PR #8（比较来源 `832cfb49171fe5982c86f667cfe60f92e906c2fb`），保留原来的完整验收和宿主边界。**远端恢复后的最终 fresh/Node/GUI/SDK/跨平台运行仍待完成。** 当前执行状态见 [整合机器记录](VALIDATION-INTEGRATION-2026-11-23.json)；[上一轮机器记录](VALIDATION-2026-11-23.json) 保持原字节，历史成功不自动适用于当前源码。
+
+生成目标仍为 14 个入口、唯一 SDK 和来源 receipts；81 个生成制品是既有 inventory 的预期范围，须由最终 producer 对当前源码重新确认。实验性 `gpui-source-v1`、Draft 状态和各平台尚未执行的验收不会在本文中被改写为稳定能力。
 
 ## 编译入口
 
@@ -35,28 +37,25 @@
 
 `frontend/crates/verdant-app/src/generated/controls.rs` 仍是应用检入的命令/控制定义。其目录名不是 Proto 编译来源证明。真正生成的组件只来自本目录的 producer。
 
-## 滚动接入的明确统计口径
+## 滚动接入的明确边界
 
-应用共有 **21 处 `proto_scroll::viewport` 源码调用点**。这里统计的是创建视口的位置，不是当前窗口中的实例数；同一模板可渲染多个设备或轨道。
+一般内容使用 `proto_scroll::viewport`；预设结果、混音轨道条、菜单、插件结果、模态正文以及虚拟表格/历史列表将编译源绑定到实际绘制内容的同一引擎。调用点数量只衡量源码构造位置，会随窗口接入变化，不代表运行时实例、界面面积或功能完成率。上一轮 21 个 viewport、5 个显式原生容器的统计保留在历史 JSON 中，此处不复用为本轮总数。
 
-| 应用区域 | 调用点 | 实际内容 |
-|---|---:|---|
-| 主视图 | 7 | 左侧检查器、右侧属性、卷帘工具栏、泳道标签、曲线工具栏、编曲区、参数泳道 |
-| 混音器 | 4 | Track/Master 插入槽、Track/Master 参数面板 |
-| 设备与编辑器辅助区域 | 6 | 参考频谱、调制来源、音素时长、快捷键说明、原生插件内容、设备链 |
-| 预设工作流 | 4 | 实例列表、预设类别、保存表单、导入报告 |
+音符、控制点、历史和参数泳道保持 source-owned reveal：原生布局提供可见行及未实例化行的真实几何，源核对目标、revision 和当前游标，决定最近边缘的滚动请求。宿主不重新引入 `ScrollStrategy::Nearest` 或两个独立 ScrollHandle 的位置复制。回归继续核对实际像素 offset、整行真实 bounds，以及公开 `position` 的归一化比例。
 
-此外，应用保留 **5 处原生物理滚动容器**。它们都绑定编译组件声明的同一 ScrollSurface 引擎，不是独立的原生滚动策略：
+## PR #7 与 #8 的选择性整合
 
-| 原生容器 | 实际路径 | 编译拥有者 |
+| 区域 | 移入的有效改进 | 必须保留的原边界与回归 |
 |---|---|---|
-| `preset-list` | `devices/workflow/library.rs` | CollectionControl |
-| `mixer-strips` | `mixer.rs` | CollectionControl |
-| `context-menu` | `menu.rs` | CollectionControl |
-| `plugin-browser-rows` | `plugin_ui.rs` | CollectionControl |
-| 模态正文 | `dialogs.rs` | ScrollRegion |
+| Action / Collection | 接受动作的来源/位置/修饰键；Enter 提交和激活互斥；一次消费、重开与拓扑变更退役 | 实时标签与命令 authority 分离；同引擎滚动/reveal、搜索 `filterKey`、完整旧测试 |
+| 连续值与图形 | 源精度、量化、控制值接受、旧 revision 的取消、物理 capture 身份检查 | 临时预览与接受值分离；帧 authority/live surface；实际双参数事务、键盘和辅助功能 |
+| EditorSurface | 区域/音符/曲线/音素/标尺操作选择，吸附、Shift 轴约束、边缘滚动和统一导航 | 三像素编曲阈值、source commandMode/音频快捷键、Escape/失焦/晚到取消、slot 父树与卷帘键盘滚轮 |
+| PerformanceKey | 重复/重叠接触、隐藏、窗口停用和延迟回调的退役 | 短促触发、最高 C 键、持续音符和 Playing owner 防止旧 note-off 停止新音符 |
+| TextField | 规范化接受值镜像、draft generation/view epoch、逐事件存活检查、搜索导航先于默认动作 | 上游 asInputEditor、IME 本地编辑、歌词快捷键保护与 Redo、programmatic reset/select-all、同引擎搜索揭示 |
+| Overlay / 工作流 | 子字段 defaultPrevented；每次响应核对实际 owner/epoch/revision；提示实例 UUID；导入预览弹层 | 原有 authority、焦点树、真实滚动正文、旧响应不得操作同名重开的新窗口 |
+| Producer / CI | 完整来源、编译身份和共享 SDK 的重新生成；强化来源与受控协议验收 | Linux 完整 workspace 与原生输入、macOS/Windows 完整 GUI release 测试、独立 headless 基础镜像门禁 |
 
-上述 5 处计数排除 `proto_*.rs` 桥接实现和测试。整个 `verdant-app/src` **没有生产代码直接调用 `scroll_to_item`**。音符表、控制点表和历史列表从 UniformList 的真实测量提供可见及未实例化行的几何；参数泳道从真实 ScrollHandle 提供子项几何。最近边缘揭示由源组件检查目标/revision 并发出滚动请求，宿主不再选择 `ScrollStrategy::Nearest`。原生测试分别核对实际像素 offset、可见行的真实 bounds 和源组件的归一化 `position`，不混淆这两种单位。
+Windows release 历史列表回归保留真实 Up/Home/Enter、源选择和领域 undo-depth 断言。测试按生产 `insert_transport_ready` 条件有界等待真实音频链/时序确认，超时报告 revision、callback budget、retired-chain/timeline 和 notices；不会清空 TransportHold 或用盲目的固定多帧代替该守卫。
 
 ## 需要保持的边界
 
@@ -84,13 +83,19 @@ Adwaita 颜色、排版、图标、曲线和音符绘图继续由应用提供。
 - 真实原生滚动引擎 lease、Web Component 空渲染和相关跨目标编译回归。
 - 文本选区通知分别适配现代 GPUI 的通知 API 与默认固定 GPUI 的字符坐标失效/下一帧查询机制；默认宿主真实读取选区、焦点隔离和过期编辑 lease 的行为有独立回归。
 
-事件发出后抛异常、render 阶段通知、终止 owner、双帧首次 hover、卸载与旧 lease 等回归均已在下文的原生 SDK 运行中执行；当前结果不依靠旧 SDK 小集的成功推断。
+下文的历史 SDK 运行包含事件发出后抛异常、render 阶段通知、终止 owner、双帧首次 hover、卸载与旧 lease 回归。本轮还整合 PR #1731 的适用修复，并对 lifecycle emit 后抛异常的通知边界继续验证；新的源码候选必须重新运行全部相关消费者和 SDK 测试，不能沿用旧小集结果。
 
 `src/upstream-input/` 保留上游版权、许可证和精确来源。生成文件必须由锁定的上游编译器重新生成，不能通过修改 Rust 输出、降低 SDK 身份要求或绕过 source receipt 来修复集成。
 
 ## 验证与证据层次
 
-最终完成记录绑定以下身份；执行范围、工具链、来源身份、日志摘要与历史检查点见 [VALIDATION-2026-11-23.json](VALIDATION-2026-11-23.json)。后续文档提交不改变这里被验证的源码快照。
+本轮状态保存在 [VALIDATION-INTEGRATION-2026-11-23.json](VALIDATION-INTEGRATION-2026-11-23.json)。恢复后的编辑源码已核对：EditorSurface 与恢复前的冻结 SHA 一致，32 个 Runtime 用例及所有既有 Rust 测试均保留，13 个修改的 Rust 文件已通过 AST 解析；这不能代替类型检查、生成和 native 执行。当前完整 producer、应用 Node、GUI/SDK 和跨平台结果保持 pending，等待统一运行和最终不可变来源。
+
+恢复前，在已发布上游 `19e472face9b64d0f3b90583bd3cd2a7367b1d9d` 上执行过严格 producer（14/81，freshCompilation=true）、完整 Node 203/203 与独立 fresh 检查；随后本地 Cargo 被 SIGKILL，执行环境丢失。它们作为旧工作目录的检查点保留，不是远端重建或后续上游修复的通过证据。
+
+### 上一轮已完成的固定快照
+
+以下身份和表格属于上一轮的 [VALIDATION-2026-11-23.json](VALIDATION-2026-11-23.json)。后续文档提交不改变这里被验证的旧源码快照，也不会将历史结果合并到本轮成功计数。
 
 | 身份 | 固定值 |
 |---|---|
@@ -99,7 +104,7 @@ Adwaita 颜色、排版、图标、曲线和音符绘图继续由应用提供。
 | 共享 SDK 内容 SHA-256 | `27af6e2995e3c6d9a35ccbc4859a6273ed58b0c613ef4d3247284da1030b4691` |
 | Node / package manager | Node `24.22.3` / `corepack pnpm@10.32.1` |
 
-| 已完成的最终检查 | 实际结果与范围 |
+| 上一轮已完成的检查 | 该快照的实际结果与范围 |
 |---|---|
 | 作者源码 Runtime 与应用工具 | 完整 8 个 Node 测试文件 **173/173**，0 fail、0 skip；其中作者 Runtime **88** 项，publication/headless/producer 工具回归 **85** 项。设置了 `PROTO_UI_UPSTREAM`，fresh producer 用例实际执行；另有 **82** 项 GPUI 规则检查通过 |
 | 上游源码与类型 | 聚焦源码回归 **206/206**；聚焦 TypeScript 检查退出码 **0**。涵盖准入、独立 IR 再验证、Web 源码消费者与发射行为，不是整仓或 OS 输入认证 |
@@ -128,4 +133,4 @@ Runtime 88 项由 advanced editors 23、common controls 28、continuous control 
 
 ### 平台范围
 
-上述检查完成了本轮的源码、编译产物、依赖边界和原生框架行为验证。它们不是逐屏视觉或全平台无障碍认证；GPUI 测试、上游默认宿主 CI 与打包后的真实 OS 输入是不同层次。当前候选未执行的打包后 X11/Wayland、物理触摸、系统 IME、读屏和其他平台场景，继续按 [平台验收范围](../docs/PLATFORM-ACCEPTANCE.md) 单独记录。[历史 #79 的 OS 记录](NATIVE-INPUT-2026-11-22.json) 只属于当时的 app/worker 字节与提交，不转移为本候选的成功状态。
+上述历史检查完成了当时源码、编译产物、依赖边界和原生框架行为的验证；当前整合仍需重新执行。它们不是逐屏视觉或全平台无障碍认证；GPUI 测试、上游默认宿主 CI 与打包后的真实 OS 输入是不同层次。当前候选未执行的打包后 X11/Wayland、物理触摸、系统 IME、读屏和其他平台场景，继续按 [平台验收范围](../docs/PLATFORM-ACCEPTANCE.md) 单独记录。[历史 #79 的 OS 记录](NATIVE-INPUT-2026-11-22.json) 只属于当时的 app/worker 字节与提交，不转移为本候选的成功状态。

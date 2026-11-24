@@ -207,3 +207,184 @@ fn native_export_dialog_uses_compiled_text_selection_radio_and_submit(cx: &mut g
     assert_eq!(options.track, Some(1));
     assert!(receive.try_recv().is_err());
 }
+
+#[gpui::test]
+fn native_export_text_submit_cannot_bypass_a_disabled_overlay_owner(cx: &mut gpui::TestAppContext) {
+    use verdant_overlay_control::native::gpui_native_owner::{replace_props, drive_owners};
+    let (send, receive) = async_channel::bounded(1);
+    let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+        ScoreExportDialog::new(Format::Midi, ExportOptions::default(), vec!["Track".into()], send, window, cx)
+    });
+    window.update(cx, |_, window, _| window.activate_window()).unwrap();
+    crate::native_test_support::frames(window, cx);
+    cx.simulate_input(window.into(), "1920");
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |dialog, window, cx| {
+        let (overlay, _) = dialog.overlay.as_ref().expect("mounted source response owner");
+        let owner = overlay.upgrade().expect("live response owner");
+        let mut props = owner.borrow().props.clone();
+        props["disabled"] = json!(true);
+        replace_props(&owner, props); drive_owners(window, cx);
+        let focus = dialog.ppq.read(cx).focus.clone(); window.focus(&focus, cx);
+    }).unwrap();
+    cx.simulate_keystrokes(window.into(), "enter escape");
+    crate::native_test_support::frames(window, cx);
+    assert!(receive.try_recv().is_err(), "text submit must consult OverlayControl before invoking the export domain action");
+    window.update(cx, |dialog, _, cx| {
+        assert_eq!(dialog.ppq.read(cx).value(), "1920");
+        assert!(dialog.error.is_none(), "the rejected UI intent never enters export validation");
+    }).expect("disabled source rejects cancellation as well as submission");
+}
+
+#[gpui::test]
+fn native_export_invalid_text_keeps_form_open_and_source_cancel_sends_nothing(cx: &mut gpui::TestAppContext) {
+    let (send, receive) = async_channel::bounded(1);
+    let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+        ScoreExportDialog::new(Format::Midi, ExportOptions::default(), vec!["Track".into()], send, window, cx)
+    });
+    window.update(cx, |_, window, _| window.activate_window()).unwrap();
+    crate::native_test_support::frames(window, cx);
+    cx.simulate_input(window.into(), "32768");
+    crate::native_test_support::frames(window, cx);
+    cx.simulate_keystrokes(window.into(), "enter");
+    crate::native_test_support::frames(window, cx);
+    assert!(receive.try_recv().is_err());
+    window.update(cx, |dialog, _, cx| {
+        assert_eq!(dialog.ppq.read(cx).value(), "32768");
+        assert!(dialog.error.is_some(), "the business validator rejects the unrepresentable MIDI division");
+    }).expect("failed validation retains the form and draft");
+    cx.simulate_keystrokes(window.into(), "escape"); cx.run_until_parked();
+    assert!(receive.try_recv().is_err(), "source cancellation never exports the rejected draft");
+    assert!(window.update(cx, |_, _, _| ()).is_err(), "source cancel closes the options window");
+}
+
+fn preserve_source(window: &Window) -> verdant_action_control::ActionControlHandle {
+    use verdant_action_control::native::gpui_native_owner::{all_owners, resolved};
+    let owner = all_owners().into_iter().find(|owner| {
+        let owner = owner.borrow();
+        owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+            && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text().contains("保留来源扩展"))
+    }).expect("production Preserve checkbox is a compiled action");
+    verdant_action_control::ActionControlHandle { owner }
+}
+
+fn export_overlay(dialog: &ScoreExportDialog) -> verdant_overlay_control::OverlayControlHandle {
+    let (owner, _) = dialog.overlay.as_ref().expect("mounted export overlay");
+    verdant_overlay_control::OverlayControlHandle { owner: owner.upgrade().expect("live export overlay") }
+}
+
+#[gpui::test]
+fn native_export_preserve_accepts_source_selection_once_and_rejects_stale_form_callbacks(cx: &mut gpui::TestAppContext) {
+    use verdant_action_control::native::gpui_native_owner::{replace_props, dispatch_accessibility_action, drive_owners};
+    let (send, receive) = async_channel::bounded(1);
+    let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+        ScoreExportDialog::new(Format::Midi, ExportOptions { preserve_extensions: false, ..Default::default() }, vec!["Track".into()], send, window, cx)
+    });
+    window.update(cx, |_, window, _| window.activate_window()).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |_, window, cx| {
+        let source = preserve_source(window);
+        // Deliberately diverge only the source acceptance. Its real assistive
+        // activation proposes false while the form already holds false.
+        let mut props = source.owner.borrow().props.clone(); props["selected"] = json!(true);
+        replace_props(&source.owner, props); drive_owners(window, cx);
+        for _ in 0..2 { dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx); }
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |dialog, window, cx| {
+        assert!(!dialog.options.preserve_extensions, "source false must not become a host inversion to true");
+        assert_eq!(dialog.options_generation, 0, "same-value proposals leave accepted form authority unchanged");
+        let source = preserve_source(window);
+        let mut props = source.owner.borrow().props.clone(); props["selected"] = json!(false);
+        replace_props(&source.owner, props); drive_owners(window, cx);
+        for _ in 0..2 { dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx); }
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |dialog, window, cx| {
+        assert!(dialog.options.preserve_extensions, "the source true proposal reaches the actual export options");
+        assert_eq!(dialog.options_generation, 1, "duplicate captured proposals cannot create a second acceptance");
+        let source = preserve_source(window);
+        // Accept another option before this still-mounted child's old callback
+        // can be delivered; no paint has yet refreshed its captured authority.
+        dialog.activate(ScoreOptionControl::Track(Some(0)), window, cx);
+        dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |dialog, window, cx| {
+        assert_eq!(dialog.options.track, Some(0)); assert!(dialog.options.preserve_extensions);
+        assert_eq!(dialog.options_generation, 2, "a callback from the prior form authority cannot overwrite current acceptance");
+        let handle = export_overlay(dialog); let basis = dialog.authority(cx);
+        let index = dialog.controls.iter().position(|control| *control == ScoreOptionControl::Preserve).unwrap();
+        assert_eq!(handle.call("choose", vec![index.into(), basis.clone().into()], window, cx).unwrap(), json!(true));
+        for _ in 0..2 {
+            assert_eq!(handle.call("chooseSelection", vec![index.into(), true.into(), basis.clone().into()], window, cx).unwrap(), json!(true));
+        }
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |dialog, window, _| {
+        assert!(dialog.options.preserve_extensions, "legacy index-only responses never reconstruct a checkbox toggle");
+        assert_eq!(dialog.options_generation, 2); assert!(receive.try_recv().is_err());
+        window.remove_window();
+    }).unwrap(); cx.run_until_parked();
+}
+
+#[gpui::test]
+fn native_export_preserve_cannot_bypass_inactive_or_retired_overlay_authority(cx: &mut gpui::TestAppContext) {
+    use verdant_action_control::native::gpui_native_owner::{dispatch_accessibility_action, drive_owners};
+    use verdant_overlay_control::native::gpui_native_owner::{replace_props, detach_native_view};
+    for retirement in ["disabled", "closed", "revision", "detached"] {
+        let (send, receive) = async_channel::bounded(1);
+        let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+            ScoreExportDialog::new(Format::Midi, ExportOptions { preserve_extensions: false, ..Default::default() }, vec!["Track".into()], send, window, cx)
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |dialog, window, cx| {
+            let source = preserve_source(window); let overlay = export_overlay(dialog);
+            let mut props = overlay.owner.borrow().props.clone();
+            match retirement {
+                "disabled" => props["disabled"] = json!(true),
+                "closed" => props["open"] = json!(false),
+                "revision" => props["revision"] = json!("retired export authority"),
+                _ => {},
+            }
+            if retirement == "detached" { detach_native_view(&overlay.owner); }
+            else { replace_props(&overlay.owner, props); }
+            verdant_overlay_control::native::gpui_native_owner::drive_owners(window, cx);
+            dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
+        }).unwrap();
+        cx.run_until_parked();
+        window.update(cx, |dialog, window, _| {
+            assert!(!dialog.options.preserve_extensions, "{retirement} must reject the child's source proposal");
+            assert_eq!(dialog.options_generation, 0); assert!(receive.try_recv().is_err());
+            window.remove_window();
+        }).unwrap(); cx.run_until_parked();
+    }
+}
+
+#[gpui::test]
+fn native_export_terminal_response_retires_same_batch_export_callbacks(cx: &mut gpui::TestAppContext) {
+    for cancel_first in [true, false] {
+        // Capacity greater than one exposes duplicate exports instead of letting
+        // channel backpressure hide a second callback after remove_window.
+        let (send, receive) = async_channel::bounded(4);
+        let window = cx.open_window(gpui::size(px(580.), px(620.)), move |window, cx| {
+            ScoreExportDialog::new(Format::Ust, ExportOptions::default(), vec!["Track".into()], send, window, cx)
+        });
+        window.update(cx, |_, window, _| window.activate_window()).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |dialog, window, cx| {
+            let handle = export_overlay(dialog); let basis = dialog.authority(cx);
+            let export = dialog.controls.iter().position(|control| *control == ScoreOptionControl::Export).unwrap();
+            let first = if cancel_first { dialog.controls.iter().position(|control| *control == ScoreOptionControl::Cancel).unwrap() } else { export };
+            for index in [first, export] {
+                assert_eq!(handle.call("choose", vec![index.into(), basis.clone().into()], window, cx).unwrap(), json!(true));
+            }
+        }).unwrap();
+        cx.run_until_parked();
+        if cancel_first { assert!(receive.try_recv().is_err(), "a queued export cannot execute after the preceding cancellation"); }
+        else { assert!(receive.try_recv().is_ok(), "the first successful export is delivered once"); }
+        assert!(receive.try_recv().is_err(), "closing the form rejects the rest of its source response batch");
+        assert!(window.update(cx, |_, _, _| ()).is_err());
+    }
+}

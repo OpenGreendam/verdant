@@ -17,7 +17,7 @@ use crate::generated::controls::{CommandArg, CommandId, NumericId};
 use crate::menu::MenuItem;
 use crate::paint::{Texts, b, flush_texts};
 use crate::theme::{Theme, mix};
-use crate::ui_controls::{numeric_pill, selectable_command_button};
+use crate::ui_controls::{numeric_pill, selectable_button};
 use crate::view::command_button;
 
 pub const STRIP_W: f32 = 196.0;
@@ -62,6 +62,69 @@ pub fn mixer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) -> 
 
 fn mixer_revision(ed: &Editor) -> String {
     format!("{}:{}:{}", ed.project().project_id, ed.document_generation, ed.revision())
+}
+
+#[derive(Clone, Debug)]
+enum ToggleTarget {
+    TrackMute(TrackId), TrackSolo(TrackId), TrackAutomation(TrackId), MasterMute, MasterAutomation,
+}
+impl ToggleTarget {
+    fn current(&self, ed: &Editor) -> Option<bool> {
+        match self {
+            Self::TrackMute(track) => ed.project().track(track).map(|track| track.muted),
+            Self::TrackSolo(track) => ed.project().track(track).map(|track| track.solo),
+            Self::TrackAutomation(track) => ed.project().track(track).map(|_| ed.automation_ui.expanded_tracks.contains(track)),
+            Self::MasterMute => Some(crate::mix::MasterBusSettings::from_project(ed.project()).muted),
+            Self::MasterAutomation => Some(ed.automation_ui.show_master),
+        }
+    }
+    fn accept(&self, ed: &mut Editor, selected: bool, cx: &mut Context<Editor>) {
+        match self {
+            Self::TrackMute(track) => ed.edit_header(track, if selected { "静音" } else { "取消静音" }, cx, |header| header.muted = selected),
+            Self::TrackSolo(track) => ed.edit_header(track, if selected { "独奏" } else { "取消独奏" }, cx, |header| header.solo = selected),
+            Self::TrackAutomation(track) => {
+                if selected { ed.automation_ui.expanded_tracks.insert(track.clone()); }
+                else { ed.automation_ui.expanded_tracks.remove(track); }
+            },
+            Self::MasterMute => ed.edit_master_bus("主总线静音", cx, |settings| settings.muted = selected),
+            Self::MasterAutomation => ed.automation_ui.show_master = selected,
+        }
+        cx.notify();
+    }
+}
+
+/// Source-owned switch proposal with the same persisted or UI-only domain
+/// transaction as the previous command. The domain never recomputes `!value`.
+fn toggle_button(ed: &Editor, target: ToggleTarget, label: impl Into<SharedString>, key: impl Into<SharedString>, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
+    let selected = target.current(ed).unwrap_or(false);
+    let basis = mixer_revision(ed);
+    selectable_button(key, label, selected, ed.theme).role(Role::Switch)
+        .authority(format!("{basis}:{target:?}"))
+        .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+            // Retained/queued actions can outlive a project switch or a newer
+            // accepted value even when the native element key is unchanged.
+            if mixer_revision(ed) != basis || target.current(ed) != Some(selected) { return; }
+            if event.selected() != selected { target.accept(ed, event.selected(), cx); }
+        }))
+}
+
+/// Both master-insert surfaces consume the same source selection proposal.
+/// The editor owns slot identity, pending host work and the persisted write.
+pub(crate) fn master_insert_bypass_button(ed: &Editor, slot: usize, spec: &InsertSpec, key: &'static str, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
+    let basis = mixer_revision(ed);
+    let runtime = ed.live_master_insert(slot).map(|handle| handle.key());
+    let busy = ed.inserts_loading || runtime.is_some_and(|key| ed.plugin_busy.contains(&key));
+    let expected = spec.clone();
+    route_button(key, if spec.bypass { "启用" } else { "旁通" }, spec.bypass, ed.theme)
+        .role(Role::Switch)
+        .aria_label(format!("主总线插入 {} 旁通", slot + 1))
+        .authority(format!("{basis}:master:{slot}:{}:{runtime:?}", spec.instance_id))
+        .disabled(busy)
+        .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+            cx.stop_propagation();
+            if mixer_revision(ed) != basis { return; }
+            ed.accept_master_insert_bypass(slot, &expected, runtime, event.selected(), cx);
+        }))
 }
 
 #[derive(IntoElement)]
@@ -182,12 +245,7 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                         .flex()
                         .gap(px(3.0))
                         .child(
-                            route_button("master-insert-bypass", if spec.bypass { "启用" } else { "旁通" }, spec.bypass, th).authority(mixer_revision(ed))
-                                .disabled(busy)
-                                .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
-                                    if !busy { ed.toggle_master_insert_bypass(slot, cx); }
-                                    cx.stop_propagation();
-                                })),
+                            master_insert_bypass_button(ed, slot, spec, "master-insert-bypass", cx),
                         )
                         .child(
                             route_button("master-insert-remove", "移除", false, th).authority(mixer_revision(ed))
@@ -263,27 +321,12 @@ fn master_strip(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) 
                 .rounded(px(8.0))
                 .bg(th.control)
                 .child(
-                    selectable_command_button(
-                        ed,
-                        CommandId::ToggleMasterMute,
-                        CommandArg::None,
-                        if master.muted { "M 已静音" } else { "M 静音" },
-                        "master-mute",
-                        master.muted,
-                        cx,
-                    )
+                    toggle_button(ed, ToggleTarget::MasterMute,
+                        if master.muted { "M 已静音" } else { "M 静音" }, "master-mute", cx)
                     .flex_1(),
                 )
                 .child(
-                    selectable_command_button(
-                        ed,
-                        CommandId::ToggleMasterAutomation,
-                        CommandArg::None,
-                        "A 自动化",
-                        "master-auto",
-                        ed.automation_ui.show_master,
-                        cx,
-                    )
+                    toggle_button(ed, ToggleTarget::MasterAutomation, "A 自动化", "master-auto", cx)
                     .flex_1(),
                 ),
         )
@@ -329,7 +372,6 @@ fn strip(
     let th = ed.theme;
     let color = th.track(header.color.as_deref());
     let selected = ed.session.track == id;
-    let auto_on = ed.automation_ui.expanded_tracks.contains(&id);
     let track_peaks = ed.meters.get(index).copied().unwrap_or((0.0, 0.0));
     let (peak_str, clipped) = peak_db_label(track_peaks);
     let header_menu = id.clone();
@@ -470,26 +512,17 @@ fn strip(
                 .gap(px(2.0))
                 .rounded(px(8.0))
                 .bg(th.control)
-                .child(selectable_command_button(ed, CommandId::ToggleMute, CommandArg::Track(id.clone()), "M", SharedString::from(format!("mix-mute-{id}")), header.muted, cx).flex_1())
+                .child(toggle_button(ed, ToggleTarget::TrackMute(id.clone()), "M", format!("mix-mute-{id}"), cx).flex_1())
                 .child(
-                    command_button(ed, CommandId::ToggleSolo, CommandArg::Track(id.clone()), "S", SharedString::from(format!("mix-solo-{id}")), cx)
+                    toggle_button(ed, ToggleTarget::TrackSolo(id.clone()), "S", format!("mix-solo-{id}"), cx)
                         .flex_1()
-                        .aria_selected(header.solo)
                         .border_1()
                         .rounded(px(6.0))
                         .border_color(if header.solo { th.warning } else { th.control })
                         .when(header.solo, |d| d.bg(th.warning).text_color(th.on_track()).font_weight(FontWeight::SEMIBOLD)),
                 )
                 .child(
-                    selectable_command_button(
-                        ed,
-                        CommandId::ToggleTrackAutomation,
-                        CommandArg::Track(id.clone()),
-                        "A",
-                        SharedString::from(format!("mix-auto-{id}")),
-                        auto_on,
-                        cx,
-                    )
+                    toggle_button(ed, ToggleTarget::TrackAutomation(id.clone()), "A", format!("mix-auto-{id}"), cx)
                     .flex_1(),
                 ),
         )
@@ -643,12 +676,7 @@ fn master_parameter_panel(ed: &Editor, slot: usize, cx: &mut Context<Editor>) ->
                 .flex()
                 .gap(px(5.0))
                 .child(
-                    route_button("master-param-bypass", if spec.bypass { "启用" } else { "旁通" }, spec.bypass, th).authority(mixer_revision(ed))
-                        .disabled(busy)
-                        .on_click(cx.listener(move |ed, _: &crate::proto_controls::Activation, _, cx| {
-                            if !busy { ed.toggle_master_insert_bypass(slot, cx); }
-                            cx.stop_propagation();
-                        })),
+                    master_insert_bypass_button(ed, slot, spec, "master-param-bypass", cx),
                 )
                 .child(
                     route_button("master-param-remove", "移除", false, th).authority(mixer_revision(ed))
@@ -1153,6 +1181,84 @@ mod escape_route_tests {
                 assert!(editor.session.selection.is_empty(), "an inactive contact falls through to the existing Escape action");
             }).unwrap();
             previous_window = Some(window);
+        }
+    }
+}
+
+#[cfg(test)]
+mod source_toggle_tests {
+    use super::*;
+    use gpui::{AppContext, Render, Subscription, TestAppContext, Window, size};
+    use verdant_action_control::{ActionControlHandle, native::gpui_native_owner::{all_owners, resolved, replace_props, dispatch_accessibility_action, drive_owners}};
+
+    struct Harness { editor: Entity<Editor>, target: ToggleTarget, _changed: Subscription }
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let target = self.target.clone();
+            self.editor.update(cx, |ed, cx| {
+                toggle_button(ed, target, "Source mixer switch", "source-mixer-switch", cx)
+                    .w(px(220.)).h(px(40.)).into_any_element()
+            })
+        }
+    }
+    fn source(window: &Window) -> ActionControlHandle {
+        let owner = all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text() == "Source mixer switch")
+        }).expect("production mixer switch uses ActionControl");
+        ActionControlHandle { owner }
+    }
+    #[gpui::test]
+    fn mixer_switches_accept_the_source_proposal_and_reject_retired_document_callbacks(cx: &mut TestAppContext) {
+        for family in 0..5 {
+            let window = cx.open_window(size(px(300.), px(160.)), |window, cx| {
+                let editor = cx.new(|cx| Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx));
+                let track = editor.read(cx).session.track.clone();
+                let target = match family { 0 => ToggleTarget::TrackMute(track), 1 => ToggleTarget::TrackSolo(track),
+                    2 => ToggleTarget::TrackAutomation(track), 3 => ToggleTarget::MasterMute, _ => ToggleTarget::MasterAutomation };
+                let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+                Harness { editor, target, _changed: changed }
+            });
+            window.update(cx, |_, window, _| window.activate_window()).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                assert_eq!(host.target.current(host.editor.read(cx)), Some(false));
+                let source = source(window);
+                // Change the compiled source's accepted value, keeping the
+                // domain false: its next real assistive activation now proposes
+                // false. Re-inverting the host value would incorrectly write true.
+                let mut props = source.owner.borrow().props.clone(); props["selected"] = serde_json::json!(true);
+                replace_props(&source.owner, props); drive_owners(window, cx);
+                dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, window, cx| {
+                assert_eq!(host.target.current(host.editor.read(cx)), Some(false), "family {family} must accept source false instead of inverting the host");
+                assert_eq!(host.editor.read(cx).revision().get(), 0, "same-value source proposal creates no project transaction");
+                let source = source(window);
+                let mut props = source.owner.borrow().props.clone(); props["selected"] = serde_json::json!(false);
+                replace_props(&source.owner, props); drive_owners(window, cx);
+                dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            let revision = window.update(cx, |host, window, cx| {
+                assert_eq!(host.target.current(host.editor.read(cx)), Some(true), "source true reaches family {family}");
+                let revision = host.editor.read(cx).revision().get();
+                assert_eq!(revision, if family == 2 || family == 4 { 0 } else { 1 });
+                let source = source(window);
+                // Keep the old mounted callback while its document authority
+                // changes before the deferred source response can be delivered.
+                host.editor.update(cx, |ed, _| ed.document_generation += 1);
+                dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
+                revision
+            }).unwrap();
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, _, cx| {
+                assert_eq!(host.target.current(host.editor.read(cx)), Some(true), "old document response cannot write family {family}");
+                assert_eq!(host.editor.read(cx).revision().get(), revision);
+            }).unwrap();
+            window.update(cx, |_, window, _| window.remove_window()).unwrap(); cx.run_until_parked();
         }
     }
 }

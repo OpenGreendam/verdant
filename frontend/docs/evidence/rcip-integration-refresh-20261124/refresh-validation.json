@@ -1,0 +1,23 @@
+{
+  "schema": "verdant.integration-refresh-validation.v1",
+  "startedAt": "2026-11-24T11:17:57.484733+00:00",
+  "finishedAt": "2026-11-24T11:17:57.700459+00:00",
+  "integrationInput": "9ec5f41d1d5d336ac8ab323f1ced4c68697ba0a8",
+  "mainMerged": "79c0aa67ec37e777efc95bac5018cf2f5318da65",
+  "compilerPin": "e9340df6279e063cf372080bf4cc97caea3fd901",
+  "productionSnapshot": "3efb43dda237618de0935a59b41555ca69b22c2a",
+  "command": [
+    "node",
+    "frontend/proto-ui/tools/build-proto-ui.mjs",
+    "--check-retained"
+  ],
+  "exitCode": 0,
+  "rawLog": "/workspace/scratch/b91f3481ce6f/verdant-workflow/integration-refresh/retained-check.log",
+  "sha256": "8f1e774b096e65816eeacd48a157d734d35d4a2a939118d3701e691f12dc43a0",
+  "freshCompilation": false,
+  "boundary": "Only retained verification was rerun for this alias-only refresh. Previous fresh/source executions remain bound to their original inputs; no new Cargo, native or OS execution is claimed.",
+  "ok": true,
+  "mode": "retained-artifacts",
+  "units": 14,
+  "upstreamRevision": "e9340df6279e063cf372080bf4cc97caea3fd901"
+}

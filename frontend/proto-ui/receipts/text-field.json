@@ -41,7 +41,7 @@
     },
     {
       "path": "frontend/proto-ui/src/text-field.proto.ts",
-      "sha256": "92aeeccc40d48b80d8ef2c0234edd624b747408e1fe0d7c66185eb46fdcbd2e0"
+      "sha256": "45b79cf0cb2ee1c0e6767ab857d7b3dbb1b409cb56b02151a4789bcced7218c7"
     },
     {
       "path": "frontend/proto-ui/src/upstream-input/node_modules/@proto.ui/core/package.json",
@@ -65,7 +65,7 @@
     },
     {
       "path": "frontend/proto-ui/src/upstream-input/root.proto.ts",
-      "sha256": "e80593b3872c8006104374a3fad1a47b0f163b575f67f9076cb7c45a6a589e9e"
+      "sha256": "851fabc3b1b9b859e5ee4a8888a27a03f415e3352180b86253163cc8ee4719fc"
     },
     {
       "path": "frontend/proto-ui/src/upstream-input/root.proto/index.ts",
@@ -102,7 +102,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -110,7 +110,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -141,33 +141,33 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "artifacts": [
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "299e5ddf75488f073623c1d1665d1b1ebdc6ed5f7862103ab5fd96b387db62b2"
+      "sha256": "c1c1e4d1e86f68947f7cc88157327d2dfa3f7744ddb0338cc46f46fd3d0ebe63"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "3095b9b303b36463db3e7190808ad0d4870a872c05b964a8ac7dc9179e4222d0"
+      "sha256": "159aca23f7451b814bdc103e2f46bcfb4a3f64b380c9f86f3a8635eec2265e98"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "3a32acfa1f9954a6bd690a46c40983cee7026d0c00f6d80bdc16232a7c463131"
+      "sha256": "c7d7205b6add67b7f27a8f07698e0c93d6d32fac43ef04e7b6ed828c9a705f98"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "c34ed531c898c6e5aa187bd2d5f3a9fbceb602a1190f6450b3851e12a10d176f"
+      "sha256": "b735cf5f404d6a859ccb80df3736ed1d1bc17ddcedf84a869e58dc939f57066e"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "4c705b1ec697d34f2f2817579e55b4323146995fd1e72db675d38030ca5721d4"
+      "sha256": "0e42922ae12fe6c787960beda36e1346500189b43db07265f047a3d48ba8a244"
     }
   ]
 }

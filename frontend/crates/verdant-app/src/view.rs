@@ -294,16 +294,16 @@ pub(crate) fn switch(on: bool, th: Theme) -> Div {
 }
 
 /// AdwSwitchRow: title (and optional subtitle) with a switch; the whole row toggles.
-fn switch_row(ed: &Editor, cmd: Cmd, key: &'static str, title: &str, subtitle: Option<String>, on: bool, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
+pub(crate) fn switch_row(ed: &Editor, cmd: Cmd, key: &'static str, title: &str, subtitle: Option<String>, on: bool, cx: &mut Context<Editor>) -> crate::proto_controls::Action {
     let th = ed.theme;
-    crate::proto_controls::action(key, title.to_string()).authority(format!("{}:{cmd:?}",crate::proto_controls::editor_authority(ed)))
-        .role(Role::Switch).aria_selected(on)
+    let on = ed.source_command_selection(cmd, &Arg::None).unwrap_or(on);
+    let action = crate::proto_controls::action(key, title.to_string())
         .flex().items_center().gap(px(12.0)).cursor_pointer()
         .child(div().flex_1().min_w_0().flex().flex_col()
             .child(div().text_sm().text_color(th.text).child(title.to_string()))
             .children(subtitle.map(|s| div().text_xs().text_color(th.text_secondary).child(s))))
-        .child(switch(on, th))
-        .on_click(cx.listener(move |ed, _, w, cx| controls::dispatch(ed, cmd, Arg::None, w, cx)))
+        .child(switch(on, th));
+    crate::ui_controls::bind_command_action(ed, cmd, Arg::None, action, on, cx)
 }
 
 fn support_text(support: Support) -> String {

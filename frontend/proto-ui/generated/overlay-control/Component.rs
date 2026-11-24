@@ -1,6 +1,7 @@
 // Direct checked-source GPUI component. Supporting files are ordinary editable Rust.
   
   pub use proto_ui_gpui_native as native;
+  pub use native::gpui_native_owner::{ControlLabelRef, InstanceAssociations};
   use gpui::{prelude::*, App, Context, FocusHandle, Subscription, Window};
   use std::rc::Rc;
   use serde_json::Value as Json;
@@ -17,7 +18,7 @@
           _ => false,
       }
   }
-  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("description").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("role").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("revision").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("open").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("defaultChoice").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("cancelChoice").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("choices").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) }
+  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("description").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("role").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("revision").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("open").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("defaultChoice").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("cancelChoice").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("choices").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("responseKinds").map_or(true, |prop| prop.is_null() || (prop.as_array().is_some_and(|items| items.iter().all(|item| item.as_f64().is_some_and(f64::is_finite))) || prop.is_null() || prop.is_null())) }
   fn prop_valid(key: &str, value: &Json) -> bool { match key { "label" => value.is_string(),
         "description" => value.is_string(),
         "role" => value.is_string(),
@@ -26,15 +27,25 @@
         "disabled" => value.is_boolean(),
         "defaultChoice" => value.as_f64().is_some_and(f64::is_finite),
         "cancelChoice" => value.as_f64().is_some_and(f64::is_finite),
-        "choices" => value.as_f64().is_some_and(f64::is_finite), _ => false } }
+        "choices" => value.as_f64().is_some_and(f64::is_finite),
+        "responseKinds" => (value.as_array().is_some_and(|items| items.iter().all(|item| item.as_f64().is_some_and(f64::is_finite))) || value.is_null() || value.is_null()), _ => false } }
   fn check_method(name: &str, arguments: &[Value]) { match name {
           "choose" => if !(arguments.len() <= 2 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "key" => if !(arguments.len() <= 1 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
+        "chooseSelection" => if !(arguments.len() <= 3 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
+        "requestResponse" => if !(arguments.len() <= 2 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string()))) { value_type_error("invalid exposed method arguments") },
         "focusSelf" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
           _ => value_error("unknown exposed method"),
   } }
   
   #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum GeneratedData1 {
+    Alternative0(Vec<f64>),
+    Alternative1(()),
+    Alternative2(()),
+}
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GeneratedData0 {
     #[serde(rename = "label", default, skip_serializing_if = "Option::is_none")]
     pub field_0: Option<String>,
@@ -54,6 +65,8 @@ pub struct GeneratedData0 {
     pub field_7: Option<f64>,
     #[serde(rename = "choices", default, skip_serializing_if = "Option::is_none")]
     pub field_8: Option<f64>,
+    #[serde(rename = "responseKinds", default, skip_serializing_if = "Option::is_none")]
+    pub field_9: Option<GeneratedData1>,
 }
   
   pub type GeneratedProps = GeneratedData0;
@@ -63,9 +76,11 @@ pub struct GeneratedData0 {
   impl OverlayControlHandle {
       pub fn state_0(&self) -> Result<bool, Value> { self.state("open").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
     pub fn state_1(&self) -> Result<bool, Value> { self.state("disabled").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn state_2(&self) -> Result<bool, Value> { self.state("scopeActive").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn state_3(&self) -> Result<bool, Value> { self.state("focusVisible").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
-    pub fn method_5(&self, argument_0: f64, argument_1: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn state_2(&self) -> Result<f64, Value> { self.state("defaultChoice").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_3(&self) -> Result<f64, Value> { self.state("cancelChoice").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_4(&self) -> Result<bool, Value> { self.state("scopeActive").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn state_5(&self) -> Result<bool, Value> { self.state("focusVisible").map(|value| serde_json::from_value(value).expect("checked exposed State")) }
+    pub fn method_8(&self, argument_0: f64, argument_1: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -81,7 +96,7 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_6(&self, argument_0: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+    pub fn method_9(&self, argument_0: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -97,7 +112,39 @@ pub struct GeneratedData0 {
         if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
         outcome
     }
-    pub fn method_7(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
+    pub fn method_10(&self, argument_0: f64, argument_1: bool, argument_2: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+        let outcome = catch_authored(|| {
+        refresh_native_atoms(&self.owner, window, cx);
+          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
+        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument"))];
+        let callback = self.owner.borrow().exposes.get("chooseSelection").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("chooseSelection", &arguments);
+        let result = invoke(&self.owner, "expose-method", &callback, arguments);
+        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
+        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
+        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
+        serde_json::from_value(result).expect("checked exposed method result")
+        });
+        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+        outcome
+    }
+    pub fn method_11(&self, argument_0: String, argument_1: String, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
+        let outcome = catch_authored(|| {
+        refresh_native_atoms(&self.owner, window, cx);
+          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
+        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument"))];
+        let callback = self.owner.borrow().exposes.get("requestResponse").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
+        check_method("requestResponse", &arguments);
+        let result = invoke(&self.owner, "expose-method", &callback, arguments);
+        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
+        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
+        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
+        serde_json::from_value(result).expect("checked exposed method result")
+        });
+        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+        outcome
+    }
+    pub fn method_12(&self, window: &mut Window, cx: &mut App) -> Result<(), Value> {
         let outcome = catch_authored(|| {
         refresh_native_atoms(&self.owner, window, cx);
           #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
@@ -144,8 +191,10 @@ pub struct GeneratedData0 {
   pub struct OverlayControl { pub owner: OwnerRef, focus: FocusHandle, window_input: Option<FocusHandle>, _focus_subscriptions: Vec<Subscription>, _window_activation: Option<(gpui::WindowId, Subscription)>, _focus_lost: Option<Subscription>, _global_key_capture: Option<Subscription>, _entry_readiness: Option<(gpui::WindowId, Subscription)> }
   impl OverlayControl {
       pub fn create_props(props: GeneratedProps, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> { Self::create(serde_json::to_value(props).expect("portable Props"), parent, window, cx) }
-      pub fn create(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> { Self::create_with_associations(raw_props,parent,NativeInstanceAssociations::default(),window,cx) }
-      pub fn create_with_associations(raw_props: Json, parent: Option<OwnerWeak>, associations: NativeInstanceAssociations, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> {
+      pub fn create(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> {
+          Self::create_with_associations(raw_props, parent, InstanceAssociations::default(), window, cx)
+      }
+      pub fn create_with_associations(raw_props: Json, parent: Option<OwnerWeak>, associations: InstanceAssociations, window: &mut Window, cx: &mut App) -> Result<gpui::Entity<Self>, Value> {
           let mut failure = None;
           let entity = cx.new(|cx| Self::new_with_associations(raw_props, parent, associations, window, cx).unwrap_or_else(|error| {
               failure = Some(error);
@@ -159,12 +208,14 @@ pub struct GeneratedData0 {
           match failure { Some(error) => Err(error), None => Ok(entity) }
       }
       pub fn new_props(props: GeneratedProps, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> { Self::new(serde_json::to_value(props).expect("portable Props"), parent, window, cx) }
-      pub fn new(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> { Self::new_with_associations(raw_props,parent,NativeInstanceAssociations::default(),window,cx) }
-      pub fn new_with_associations(raw_props: Json, parent: Option<OwnerWeak>, associations: NativeInstanceAssociations, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> {
+      pub fn new(raw_props: Json, parent: Option<OwnerWeak>, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> {
+          Self::new_with_associations(raw_props, parent, InstanceAssociations::default(), window, cx)
+      }
+      pub fn new_with_associations(raw_props: Json, parent: Option<OwnerWeak>, associations: InstanceAssociations, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Value> {
           catch_authored(|| {
           let owner_ref = Owner::new(raw_props, parent.unwrap_or_default(), accepts_context, accepts_props, prop_valid, style_vocabulary());
+          initialize_instance_associations(&owner_ref, associations);
           let owner = Rc::downgrade(&owner_ref);
-          set_instance_associations(&owner_ref, associations);
           let focus = cx.focus_handle();
           let view = cx.entity().downgrade();
           let drive_owner=owner.clone(); let drive_focus=focus.clone();
@@ -203,290 +254,486 @@ pub struct GeneratedData0 {
             let v_726f6c65: LexicalBinding<Value> = lexical_binding();
             let v_6f70656e: LexicalBinding<Value> = lexical_binding();
             let v_64697361626c6564: LexicalBinding<Value> = lexical_binding();
+            let v_64656661756c7443686f696365: LexicalBinding<Value> = lexical_binding();
+            let v_63616e63656c43686f696365: LexicalBinding<Value> = lexical_binding();
             let v_666f637573: LexicalBinding<Value> = lexical_binding();
             let v_73636f7065: LexicalBinding<Value> = lexical_binding();
             let v_6f7665726c6179: LexicalBinding<Value> = lexical_binding();
             let v_72756e: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
-            let v_6174746163686564: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
-            let v_646973706f736564: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
-            let v_65706f6368: LexicalBinding<Rc<std::cell::RefCell<Value>>> = lexical_binding();
-            let v_7265616479: LexicalBinding<Value> = lexical_binding();
-            let v_63686f6f7365: LexicalBinding<Value> = lexical_binding();
-            let v_6b6579: LexicalBinding<Value> = lexical_binding();
+            let v_6174746163686564: LexicalBinding<Rc<std::cell::RefCell<bool>>> = lexical_binding();
+            let v_646973706f736564: LexicalBinding<Rc<std::cell::RefCell<bool>>> = lexical_binding();
+            let v_65706f6368: LexicalBinding<Rc<std::cell::RefCell<f64>>> = lexical_binding();
+            let v_7265616479: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn() -> bool>> = lexical_binding();
+            let v_76616c69644b696e6473: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(Value, f64, f64) -> bool>> = lexical_binding();
+            let v_66697273744b696e64: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(Value, f64, f64, f64) -> f64>> = lexical_binding();
+            let v_76616c696443686f69636573: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(Value) -> bool>> = lexical_binding();
+            let v_726573706f6e7365496e646578: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(Value, bool) -> f64>> = lexical_binding();
+            let v_61646d697473: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(f64, Value) -> bool>> = lexical_binding();
+            let v_63686f6f7365: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(f64, Value) -> bool>> = lexical_binding();
+            let v_6b6579: LexicalBinding<native::gpui_native_owner::NativeCallable<dyn Fn(Value) -> bool>> = lexical_binding();
             let v_73796e63: LexicalBinding<Value> = lexical_binding();
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":15:5
-            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("description", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("role", record(vec![("type", Value::string("string")), ("default", Value::string("dialog"))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("open", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(true))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("defaultChoice", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("cancelChoice", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("choices", record(vec![("type", Value::string("number")), ("default", Value::number(2.0))]))])) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":22:11
-            v_6c6162656c.initialize({ let v_7075695f6e61746976655f31 = v_646566.clone(); create_state(&owner, "string", Value::string("label"), Value::string(""), Value::Undefined) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":22:56
-            v_6465736372697074696f6e.initialize({ let v_7075695f6e61746976655f32 = v_646566.clone(); create_state(&owner, "string", Value::string("description"), Value::string(""), Value::Undefined) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":23:11
-            v_726f6c65.initialize({ let v_7075695f6e61746976655f33 = v_646566.clone(); create_state(&owner, "string", Value::string("role"), Value::string("dialog"), Value::Undefined) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":23:60
-            v_6f70656e.initialize({ let v_7075695f6e61746976655f34 = v_646566.clone(); create_state(&owner, "bool", Value::string("open"), Value::boolean(false), Value::Undefined) });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":16:5
+            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("description", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("role", record(vec![("type", Value::string("string")), ("default", Value::string("dialog"))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("open", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(true))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("defaultChoice", record(vec![("type", Value::string("number")), ("default", Value::number(1.0_f64))])), ("cancelChoice", record(vec![("type", Value::string("number")), ("default", Value::number(0.0_f64))])), ("choices", record(vec![("type", Value::string("number")), ("default", Value::number(2.0_f64))])), ("responseKinds", record(vec![("type", Value::string("object")), ("default", Value::Json(Json::Null))]))])) };
             // Source "frontend/proto-ui/src/overlay-control.proto.ts":24:11
-            v_64697361626c6564.initialize({ let v_7075695f6e61746976655f35 = v_646566.clone(); create_state(&owner, "bool", Value::string("disabled"), Value::boolean(false), Value::Undefined) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":24:63
-            let v_6d6f64616c = { let v_7075695f6e61746976655f36 = v_646566.clone(); create_state(&owner, "bool", Value::string("modal"), Value::boolean(true), Value::Undefined) };
+            v_6c6162656c.initialize({ let v_7075695f6e61746976655f31 = v_646566.clone(); create_state(&owner, "string", Value::string("label"), Value::string(""), Value::Undefined) });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":24:56
+            v_6465736372697074696f6e.initialize({ let v_7075695f6e61746976655f32 = v_646566.clone(); create_state(&owner, "string", Value::string("description"), Value::string(""), Value::Undefined) });
             // Source "frontend/proto-ui/src/overlay-control.proto.ts":25:11
-            v_666f637573.initialize(native_builtin_hook(&owner, "asFocusable", || as_focusable(&owner)));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":25:34
-            { let v_7075695f6e61746976655f37 = v_666f637573.read(); focus_setup_config(&(v_7075695f6e61746976655f37.clone()).owner(), "focus", record(vec![("disabled", Value::boolean(false))])) };
+            v_726f6c65.initialize({ let v_7075695f6e61746976655f33 = v_646566.clone(); create_state(&owner, "string", Value::string("role"), Value::string("dialog"), Value::Undefined) });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":25:60
+            v_6f70656e.initialize({ let v_7075695f6e61746976655f34 = v_646566.clone(); create_state(&owner, "bool", Value::string("open"), Value::boolean(false), Value::Undefined) });
             // Source "frontend/proto-ui/src/overlay-control.proto.ts":26:11
-            v_73636f7065.initialize(native_builtin_hook(&owner, "asFocusScope", || focus_setup(&owner, "focus-scope")));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":27:5
-            { let v_7075695f6e61746976655f38 = v_73636f7065.read(); focus_setup_config(&(v_7075695f6e61746976655f38.clone()).owner(), "focus-scope", record(vec![("trap", Value::boolean(true)), ("loop", Value::boolean(true)), ("navigation", Value::string("tab")), ("entry", Value::string("first")), ("emptyPolicy", Value::string("container")), ("restore", Value::string("previous"))])) };
+            v_64697361626c6564.initialize({ let v_7075695f6e61746976655f35 = v_646566.clone(); create_state(&owner, "bool", Value::string("disabled"), Value::boolean(false), Value::Undefined) });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":26:63
+            let v_6d6f64616c = { let v_7075695f6e61746976655f36 = v_646566.clone(); create_state(&owner, "bool", Value::string("modal"), Value::boolean(true), Value::Undefined) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":27:11
+            v_64656661756c7443686f696365.initialize({ let v_7075695f6e61746976655f37 = v_646566.clone(); create_state(&owner, "discrete", Value::string("defaultChoice"), Value::number(-(1.0_f64)), Value::Undefined) });
             // Source "frontend/proto-ui/src/overlay-control.proto.ts":28:11
+            v_63616e63656c43686f696365.initialize({ let v_7075695f6e61746976655f38 = v_646566.clone(); create_state(&owner, "discrete", Value::string("cancelChoice"), Value::number(-(1.0_f64)), Value::Undefined) });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":29:11
+            v_666f637573.initialize(native_builtin_hook(&owner, "asFocusable", || as_focusable(&owner)));
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":29:34
+            { let v_7075695f6e61746976655f39 = v_666f637573.read(); focus_setup_config(&(v_7075695f6e61746976655f39.clone()).owner(), "focus", record(vec![("disabled", Value::boolean(false))])) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":30:11
+            v_73636f7065.initialize(native_builtin_hook(&owner, "asFocusScope", || focus_setup(&owner, "focus-scope")));
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":31:5
+            { let v_7075695f6e61746976655f3130 = v_73636f7065.read(); focus_setup_config(&(v_7075695f6e61746976655f3130.clone()).owner(), "focus-scope", record(vec![("trap", Value::boolean(true)), ("loop", Value::boolean(true)), ("navigation", Value::string("tab")), ("entry", Value::string("first")), ("emptyPolicy", Value::string("container")), ("restore", Value::string("previous"))])) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":32:11
             v_6f7665726c6179.initialize(native_builtin_hook(&owner, "asOverlay", || overlay_setup(&owner)));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":29:5
-            { let v_7075695f6e61746976655f39 = v_6f7665726c6179.read(); overlay_configure(&(v_7075695f6e61746976655f39.clone()).owner(), record(vec![("defaultOpen", Value::boolean(true)), ("modal", Value::boolean(true)), ("portal", Value::boolean(false)), ("anchored", Value::boolean(false)), ("closeOnEscape", Value::boolean(false)), ("closeOnOutsidePress", Value::boolean(false)), ("closeOnFocusOutside", Value::boolean(false)), ("entry", Value::string("manual")), ("restore", Value::string("none")), ("layerRole", Value::string("dialog-content"))]), false) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":32:5
-            { let v_7075695f6e61746976655f3130 = v_6f7665726c6179.read(); overlay_keep_mounted(&(v_7075695f6e61746976655f3130.clone()).owner()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":33:11
-            let v_61313179 = native_builtin_hook(&owner, "asAccessible", || as_accessible(&owner));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":33:34
-            { let v_7075695f6e61746976655f3131 = v_61313179.clone(); accessible_role(&(v_7075695f6e61746976655f3131.clone()).owner(), v_726f6c65.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":33:51
-            { let v_7075695f6e61746976655f3132 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3132.clone()).owner(), "name", v_6c6162656c.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":33:69
-            { let v_7075695f6e61746976655f3133 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3133.clone()).owner(), "description", v_6465736372697074696f6e.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":34:5
-            { let v_7075695f6e61746976655f3134 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3134.clone()).owner(), Value::string("modal"), v_6d6f64616c.clone(), Value::Undefined) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":34:33
-            { let v_7075695f6e61746976655f3135 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3135.clone()).owner(), Value::string("disabled"), v_64697361626c6564.read(), Value::Undefined) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":35:5
-            { let v_7075695f6e61746976655f3136 = v_646566.clone(); expose_state(&owner, Value::string("open"), v_6f70656e.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":35:37
-            { let v_7075695f6e61746976655f3137 = v_646566.clone(); expose_state(&owner, Value::string("disabled"), v_64697361626c6564.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":33:5
+            { let v_7075695f6e61746976655f3131 = v_6f7665726c6179.read(); overlay_configure(&(v_7075695f6e61746976655f3131.clone()).owner(), record(vec![("defaultOpen", Value::boolean(true)), ("modal", Value::boolean(true)), ("portal", Value::boolean(false)), ("anchored", Value::boolean(false)), ("closeOnEscape", Value::boolean(false)), ("closeOnOutsidePress", Value::boolean(false)), ("closeOnFocusOutside", Value::boolean(false)), ("entry", Value::string("manual")), ("restore", Value::string("none")), ("layerRole", Value::string("dialog-content"))]), false) };
             // Source "frontend/proto-ui/src/overlay-control.proto.ts":36:5
-            { let v_7075695f6e61746976655f3138 = v_646566.clone(); expose_state(&owner, Value::string("scopeActive"), (v_73636f7065.read()).member("active", false)) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":36:52
-            { let v_7075695f6e61746976655f3139 = v_646566.clone(); expose_state(&owner, Value::string("focusVisible"), (v_666f637573.read()).member("focusVisible", false)) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":37:5
-            { let v_7075695f6e61746976655f3230 = v_646566.clone(); expose_event(&owner, Value::string("response")) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":38:9
+            { let v_7075695f6e61746976655f3132 = v_6f7665726c6179.read(); overlay_keep_mounted(&(v_7075695f6e61746976655f3132.clone()).owner()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":37:11
+            let v_61313179 = native_builtin_hook(&owner, "asAccessible", || as_accessible(&owner));
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":37:34
+            { let v_7075695f6e61746976655f3133 = v_61313179.clone(); accessible_role(&(v_7075695f6e61746976655f3133.clone()).owner(), v_726f6c65.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":37:51
+            { let v_7075695f6e61746976655f3134 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3134.clone()).owner(), "name", v_6c6162656c.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":37:69
+            { let v_7075695f6e61746976655f3135 = v_61313179.clone(); accessible_text(&(v_7075695f6e61746976655f3135.clone()).owner(), "description", v_6465736372697074696f6e.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":38:5
+            { let v_7075695f6e61746976655f3136 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3136.clone()).owner(), Value::string("modal"), v_6d6f64616c.clone(), Value::Undefined) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":38:33
+            { let v_7075695f6e61746976655f3137 = v_61313179.clone(); accessible_state(&(v_7075695f6e61746976655f3137.clone()).owner(), Value::string("disabled"), v_64697361626c6564.read(), Value::Undefined) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":39:5
+            { let v_7075695f6e61746976655f3138 = v_646566.clone(); expose_state(&owner, Value::string("open"), v_6f70656e.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":39:37
+            { let v_7075695f6e61746976655f3139 = v_646566.clone(); expose_state(&owner, Value::string("disabled"), v_64697361626c6564.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":40:5
+            { let v_7075695f6e61746976655f3230 = v_646566.clone(); expose_state(&owner, Value::string("defaultChoice"), v_64656661756c7443686f696365.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":40:55
+            { let v_7075695f6e61746976655f3231 = v_646566.clone(); expose_state(&owner, Value::string("cancelChoice"), v_63616e63656c43686f696365.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":41:5
+            { let v_7075695f6e61746976655f3232 = v_646566.clone(); expose_state(&owner, Value::string("scopeActive"), (v_73636f7065.read()).member("active", false)) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":41:52
+            { let v_7075695f6e61746976655f3233 = v_646566.clone(); expose_state(&owner, Value::string("focusVisible"), (v_666f637573.read()).member("focusVisible", false)) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":42:5
+            { let v_7075695f6e61746976655f3234 = v_646566.clone(); expose_event(&owner, Value::string("response")) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":43:5
+            { let v_7075695f6e61746976655f3235 = v_646566.clone(); expose_event(&owner, Value::string("selection")) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":44:9
             v_72756e.initialize(Rc::new(std::cell::RefCell::new(Value::Json(Json::Null))));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":39:9
-            v_6174746163686564.initialize(Rc::new(std::cell::RefCell::new(Value::boolean(false))));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":39:31
-            v_646973706f736564.initialize(Rc::new(std::cell::RefCell::new(Value::boolean(false))));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":39:53
-            v_65706f6368.initialize(Rc::new(std::cell::RefCell::new(Value::number(0.0))));
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":40:11
-            v_7265616479.initialize({  let v_6f70656e = v_6f70656e.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":40:34
-                return { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let value = (v_72756e.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))); if left.truthy() { { let value = (v_6174746163686564.read()).borrow().clone(); value } } else { left } }; if left.truthy() { Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()) } else { left } }; if left.truthy() { { let v_7075695f6e61746976655f3231 = v_6f70656e.read(); (v_7075695f6e61746976655f3231.clone()).get() } } else { left } }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3232 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3232.clone()).get() }).truthy()) } else { left } };
-            })) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":41:11
-            v_63686f6f7365.initialize({  let v_72756e = v_72756e.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_696e646578: Value = arg(&arguments, 0);
-                let v_6261736973: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":42:7
-                if ({ let left = Value::boolean(!({ let value = (v_72756e.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":42:29
-                    return Value::boolean(false);
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":45:9
+            v_6174746163686564.initialize(Rc::new(std::cell::RefCell::new(false)));
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":45:31
+            v_646973706f736564.initialize(Rc::new(std::cell::RefCell::new(false)));
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":45:53
+            v_65706f6368.initialize(Rc::new(std::cell::RefCell::new(0.0_f64)));
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":46:11
+            v_7265616479.initialize({  let v_6f70656e = v_6f70656e.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let call:Rc<dyn Fn()->bool>=Rc::new(move || -> bool {
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":46:34
+                return { let pui_native_26={ let pui_native_28={ let pui_native_30={ let pui_native_32=(Value::boolean(!strict_equal(&({ let value = (v_72756e.read()).borrow().clone(); value }), &(Value::Json(Json::Null))))).bool(); if (pui_native_32) {{ let value=(v_6174746163686564.read()).borrow().clone(); value }} else {pui_native_32} }; if (pui_native_30) {!({ let value=(v_646973706f736564.read()).borrow().clone(); value })} else {pui_native_30} }; if (pui_native_28) {({ let v_7075695f6e61746976655f3336 = v_6f70656e.read(); Value::boolean(((v_7075695f6e61746976655f3336.clone()).get()).bool()) }).bool()} else {pui_native_28} }; if (pui_native_26) {!(({ let v_7075695f6e61746976655f3337 = v_64697361626c6564.read(); Value::boolean(((v_7075695f6e61746976655f3337.clone()).get()).bool()) }).bool())} else {pui_native_26} };
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call())}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":50:11
+            v_76616c69644b696e6473.initialize({  let v_76616c69644b696e6473 = v_76616c69644b696e6473.clone(); let call:Rc<dyn Fn(Value, f64, f64)->bool>=Rc::new(move |argument_0: Value, argument_1: f64, argument_2: f64| -> bool {
+                let v_76616c7565735f5f30303633653934313764613265333933: Value = argument_0;
+                let v_73746172745f5f31633637383433323661356438343363: f64 = argument_1;
+                let v_656e645f5f66393965663861323962396665343436: f64 = argument_2;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":51:7
+                if { let pui_native_38:f64=v_656e645f5f66393965663861323962396665343436.clone(); let pui_native_39:f64=v_73746172745f5f31633637383433323661356438343363.clone(); pui_native_38 <= pui_native_39 } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":51:25
+                    return true;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":43:13
-                let v_6f776e65725f5f31313364326362633862363663326164 = { let value = (v_72756e.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":44:13
-                let v_70726f70735f5f34343864666632623264333631653633 = { let v_7075695f6e61746976655f3233 = v_6f776e65725f5f31313364326362633862363663326164.clone(); read_props(&(v_7075695f6e61746976655f3233.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":45:7
-                if ({ let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6261736973.clone()), &({ let left = (v_70726f70735f5f34343864666632623264333631653633.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }))); if !left.truthy() { Value::boolean(!(number_is_finite(&(v_696e646578.clone()))).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(Value::number((v_696e646578.clone()).scalar_number() % (Value::number(1.0)).scalar_number())), &(Value::number(0.0)))) } else { left } }; if !left.truthy() { { let relational_left = v_696e646578.clone(); let relational_right = Value::number(0.0); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }; if !left.truthy() { { let relational_left = v_696e646578.clone(); let relational_right = { let left = (v_70726f70735f5f34343864666632623264333631653633.clone()).member("choices", false); if left.nullish() { Value::number(2.0) } else { left } }; Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":45:137
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":46:7
-                { let v_7075695f6e61746976655f3234 = v_6f776e65725f5f31313364326362633862363663326164.clone(); emit(&(v_7075695f6e61746976655f3234.clone()).owner(), Value::string("response"), record(vec![("index", v_696e646578.clone()), ("revision", v_6261736973.clone())])) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":47:7
-                return Value::boolean(true);
-            })) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":49:11
-            v_6b6579.initialize({  let v_72756e = v_72756e.clone(); let v_7265616479 = v_7265616479.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e616d65: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":50:7
-                if ({ let left = Value::boolean(!({ let value = (v_72756e.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(!(v_7265616479.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":50:29
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":51:13
-                let v_70726f70735f5f63326361373438316134356463633239 = { let v_7075695f6e61746976655f3235 = { let value = (v_72756e.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f3235.clone()).owner(), false) };
                 // Source "frontend/proto-ui/src/overlay-control.proto.ts":52:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Escape"))))).truthy() {
+                if { let pui_native_40={ let pui_native_42:f64=v_656e645f5f66393965663861323962396665343436.clone(); let pui_native_43:f64=v_73746172745f5f31633637383433323661356438343363.clone(); pui_native_42 - pui_native_43 }; let pui_native_41=1.0_f64; (pui_native_40==pui_native_41) } {
                     // Source "frontend/proto-ui/src/overlay-control.proto.ts":52:30
-                    return v_63686f6f7365.read().call_authored(vec![{ let left = (v_70726f70735f5f63326361373438316134356463633239.clone()).member("cancelChoice", false); if left.nullish() { Value::number(0.0) } else { left } }, { let left = (v_70726f70735f5f63326361373438316134356463633239.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }]);
+                    return { let pui_native_44={ let pui_native_46={ let pui_native_48=(Value::boolean(strict_equal(&({ let object = v_76616c7565735f5f30303633653934313764613265333933.clone(); object.caught_member(&property_key(&(Value::number(v_73746172745f5f31633637383433323661356438343363.clone()))), false) }), &(Value::number(0.0_f64))))).bool(); if !(pui_native_48) {(Value::boolean(strict_equal(&({ let object = v_76616c7565735f5f30303633653934313764613265333933.clone(); object.caught_member(&property_key(&(Value::number(v_73746172745f5f31633637383433323661356438343363.clone()))), false) }), &(Value::number(1.0_f64))))).bool()} else {pui_native_48} }; if !(pui_native_46) {(Value::boolean(strict_equal(&({ let object = v_76616c7565735f5f30303633653934313764613265333933.clone(); object.caught_member(&property_key(&(Value::number(v_73746172745f5f31633637383433323661356438343363.clone()))), false) }), &(Value::number(2.0_f64))))).bool()} else {pui_native_46} }; if !(pui_native_44) {(Value::boolean(strict_equal(&({ let object = v_76616c7565735f5f30303633653934313764613265333933.clone(); object.caught_member(&property_key(&(Value::number(v_73746172745f5f31633637383433323661356438343363.clone()))), false) }), &(Value::number(3.0_f64))))).bool()} else {pui_native_44} };
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":53:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Enter"))))).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":53:29
-                    return v_63686f6f7365.read().call_authored(vec![{ let left = (v_70726f70735f5f63326361373438316134356463633239.clone()).member("defaultChoice", false); if left.nullish() { Value::number(1.0) } else { left } }, { let left = (v_70726f70735f5f63326361373438316134356463633239.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }]);
-                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":53:13
+                let v_6d6964646c655f5f39333536656166343635363637303133: f64 = { let pui_native_58:f64={ let pui_native_60:f64={ let pui_native_62:f64=v_73746172745f5f31633637383433323661356438343363.clone(); let pui_native_63:f64=v_656e645f5f66393965663861323962396665343436.clone(); pui_native_62 + pui_native_63 }; let pui_native_61:f64={ let pui_native_64:f64={ let pui_native_66:f64=v_73746172745f5f31633637383433323661356438343363.clone(); let pui_native_67:f64=v_656e645f5f66393965663861323962396665343436.clone(); pui_native_66 + pui_native_67 }; let pui_native_65:f64=2.0_f64; pui_native_64 % pui_native_65 }; pui_native_60 - pui_native_61 }; let pui_native_59:f64=2.0_f64; pui_native_58 / pui_native_59 };
                 // Source "frontend/proto-ui/src/overlay-control.proto.ts":54:7
-                return Value::boolean(false);
-            })) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":56:5
-            { let v_7075695f6e61746976655f3236 = v_646566.clone(); expose_method(&owner, Value::string("choose"), v_63686f6f7365.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":56:42
-            { let v_7075695f6e61746976655f3237 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b6579.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":57:5
-            { let v_7075695f6e61746976655f3238 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":57:44
-                if (v_7265616479.read().call_authored(vec![])).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":57:57
-                    { let v_7075695f6e61746976655f3239 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3239.clone()).owner(), Value::Undefined, false) };
+                return { let pui_native_68=(v_76616c69644b696e6473.read().call)(v_76616c7565735f5f30303633653934313764613265333933.clone(), v_73746172745f5f31633637383433323661356438343363.clone(), v_6d6964646c655f5f39333536656166343635363637303133.clone()); if (pui_native_68) {(v_76616c69644b696e6473.read().call)(v_76616c7565735f5f30303633653934313764613265333933.clone(), v_6d6964646c655f5f39333536656166343635363637303133.clone(), v_656e645f5f66393965663861323962396665343436.clone())} else {pui_native_68} };
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call(arg(&arguments,0), (arg(&arguments,1)).num(), (arg(&arguments,2)).num()))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":56:11
+            v_66697273744b696e64.initialize({  let v_66697273744b696e64 = v_66697273744b696e64.clone(); let call:Rc<dyn Fn(Value, f64, f64, f64)->f64>=Rc::new(move |argument_0: Value, argument_1: f64, argument_2: f64, argument_3: f64| -> f64 {
+                let v_76616c7565735f5f38343233666162373131616264303738: Value = argument_0;
+                let v_73746172745f5f65346330643561633939373934646164: f64 = argument_1;
+                let v_656e645f5f62366563616236383762663636386232: f64 = argument_2;
+                let v_6b696e64: f64 = argument_3;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":57:7
+                if { let pui_native_70:f64=v_656e645f5f62366563616236383762663636386232.clone(); let pui_native_71:f64=v_73746172745f5f65346330643561633939373934646164.clone(); pui_native_70 <= pui_native_71 } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":57:25
+                    return -(1.0_f64);
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":58:7
+                if { let pui_native_72={ let pui_native_74:f64=v_656e645f5f62366563616236383762663636386232.clone(); let pui_native_75:f64=v_73746172745f5f65346330643561633939373934646164.clone(); pui_native_74 - pui_native_75 }; let pui_native_73=1.0_f64; (pui_native_72==pui_native_73) } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":58:30
+                    return if (Value::boolean(strict_equal(&({ let object = v_76616c7565735f5f38343233666162373131616264303738.clone(); object.caught_member(&property_key(&(Value::number(v_73746172745f5f65346330643561633939373934646164.clone()))), false) }), &(Value::number(v_6b696e64.clone()))))).bool() {v_73746172745f5f65346330643561633939373934646164.clone()} else {-(1.0_f64)};
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":59:13
+                let v_6d6964646c655f5f65623764376161306563623533383334: f64 = { let pui_native_78:f64={ let pui_native_80:f64={ let pui_native_82:f64=v_73746172745f5f65346330643561633939373934646164.clone(); let pui_native_83:f64=v_656e645f5f62366563616236383762663636386232.clone(); pui_native_82 + pui_native_83 }; let pui_native_81:f64={ let pui_native_84:f64={ let pui_native_86:f64=v_73746172745f5f65346330643561633939373934646164.clone(); let pui_native_87:f64=v_656e645f5f62366563616236383762663636386232.clone(); pui_native_86 + pui_native_87 }; let pui_native_85:f64=2.0_f64; pui_native_84 % pui_native_85 }; pui_native_80 - pui_native_81 }; let pui_native_79:f64=2.0_f64; pui_native_78 / pui_native_79 };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":60:13
+                let v_6669727374: f64 = (v_66697273744b696e64.read().call)(v_76616c7565735f5f38343233666162373131616264303738.clone(), v_73746172745f5f65346330643561633939373934646164.clone(), v_6d6964646c655f5f65623764376161306563623533383334.clone(), v_6b696e64.clone());
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":61:7
+                return if { let pui_native_88:f64=v_6669727374.clone(); let pui_native_89:f64=0.0_f64; pui_native_88 >= pui_native_89 } {v_6669727374.clone()} else {(v_66697273744b696e64.read().call)(v_76616c7565735f5f38343233666162373131616264303738.clone(), v_6d6964646c655f5f65623764376161306563623533383334.clone(), v_656e645f5f62366563616236383762663636386232.clone(), v_6b696e64.clone())};
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::number(ordinary_call(arg(&arguments,0), (arg(&arguments,1)).num(), (arg(&arguments,2)).num(), (arg(&arguments,3)).num()))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":63:11
+            v_76616c696443686f69636573.initialize({  let v_76616c69644b696e6473 = v_76616c69644b696e6473.clone(); let call:Rc<dyn Fn(Value)->bool>=Rc::new(move |argument_0: Value| -> bool {
+                let v_70726f70735f5f62396131356338343431353265353933: Value = argument_0;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":64:13
+                let v_636f756e74: f64 = { let pui_native_90=(v_70726f70735f5f62396131356338343431353265353933.clone()).member("choices", false); if pui_native_90.nullish() {2.0_f64} else {(pui_native_90).num()} };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":65:7
+                if { let pui_native_92={ let pui_native_94={ let pui_native_96=!((v_636f756e74.clone()).is_finite()); if !(pui_native_96) {{ let pui_native_98={ let pui_native_100:f64=v_636f756e74.clone(); let pui_native_101:f64=1.0_f64; pui_native_100 % pui_native_101 }; let pui_native_99=0.0_f64; !(pui_native_98==pui_native_99) }} else {pui_native_96} }; if !(pui_native_94) {{ let pui_native_102:f64=v_636f756e74.clone(); let pui_native_103:f64=0.0_f64; pui_native_102 < pui_native_103 }} else {pui_native_94} }; if !(pui_native_92) {{ let pui_native_104:f64=v_636f756e74.clone(); let pui_native_105:f64=1000000.0_f64; pui_native_104 > pui_native_105 }} else {pui_native_92} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":65:87
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":66:13
+                let v_6b696e64735f5f36316661373931653133316433366664 = (v_70726f70735f5f62396131356338343431353265353933.clone()).member("responseKinds", false);
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":67:7
+                return { let pui_native_106={ let pui_native_108=(Value::boolean(strict_equal(&(v_6b696e64735f5f36316661373931653133316433366664.clone()), &(Value::Json(Json::Null))))).bool(); if !(pui_native_108) {(Value::boolean(strict_equal(&(v_6b696e64735f5f36316661373931653133316433366664.clone()), &(Value::Undefined)))).bool()} else {pui_native_108} }; if !(pui_native_106) {{ let pui_native_114={ let pui_native_116=(Value::boolean(matches!(&(v_6b696e64735f5f36316661373931653133316433366664.clone()), Value::Array(_) | Value::Json(Json::Array(_))))).bool(); if (pui_native_116) {{ let pui_native_118=((v_6b696e64735f5f36316661373931653133316433366664.clone()).member("length", false)).num(); let pui_native_119=v_636f756e74.clone(); (pui_native_118==pui_native_119) }} else {pui_native_116} }; if (pui_native_114) {(v_76616c69644b696e6473.read().call)(v_6b696e64735f5f36316661373931653133316433366664.clone(), 0.0_f64, ((v_6b696e64735f5f36316661373931653133316433366664.clone()).member("length", false)).num())} else {pui_native_114} }} else {pui_native_106} };
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call(arg(&arguments,0)))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":69:11
+            v_726573706f6e7365496e646578.initialize({  let v_66697273744b696e64 = v_66697273744b696e64.clone(); let v_76616c696443686f69636573 = v_76616c696443686f69636573.clone(); let call:Rc<dyn Fn(Value, bool)->f64>=Rc::new(move |argument_0: Value, argument_1: bool| -> f64 {
+                let v_70726f70735f5f62373933336635656261626231656335: Value = argument_0;
+                let v_63616e63656c: bool = argument_1;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":70:7
+                if !((v_76616c696443686f69636573.read().call)(v_70726f70735f5f62373933336635656261626231656335.clone())) {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":70:33
+                    return -(1.0_f64);
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":71:13
+                let v_6b696e64735f5f33316330343361343239343663336331 = (v_70726f70735f5f62373933336635656261626231656335.clone()).member("responseKinds", false);
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":72:7
+                if { let pui_native_120=(Value::boolean(!strict_equal(&(v_6b696e64735f5f33316330343361343239343663336331.clone()), &(Value::Json(Json::Null))))).bool(); if (pui_native_120) {(Value::boolean(!strict_equal(&(v_6b696e64735f5f33316330343361343239343663336331.clone()), &(Value::Undefined)))).bool()} else {pui_native_120} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":73:15
+                    let v_5f5f7075694d6f64756c6530: f64 = (v_66697273744b696e64.read().call)(v_6b696e64735f5f33316330343361343239343663336331.clone(), 0.0_f64, ((v_6b696e64735f5f33316330343361343239343663336331.clone()).member("length", false)).num(), if v_63616e63656c.clone() {2.0_f64} else {3.0_f64});
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":74:9
+                    return if { let pui_native_126={ let pui_native_128:f64=v_5f5f7075694d6f64756c6530.clone(); let pui_native_129:f64=0.0_f64; pui_native_128 >= pui_native_129 }; if !(pui_native_126) {v_63616e63656c.clone()} else {pui_native_126} } {v_5f5f7075694d6f64756c6530.clone()} else {(v_66697273744b696e64.read().call)(v_6b696e64735f5f33316330343361343239343663336331.clone(), 0.0_f64, ((v_6b696e64735f5f33316330343361343239343663336331.clone()).member("length", false)).num(), 1.0_f64)};
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":76:13
+                let v_696e6465785f5f64653939636237346336636535313738: f64 = if v_63616e63656c.clone() {{ let pui_native_130=(v_70726f70735f5f62373933336635656261626231656335.clone()).member("cancelChoice", false); if pui_native_130.nullish() {0.0_f64} else {(pui_native_130).num()} }} else {{ let pui_native_132=(v_70726f70735f5f62373933336635656261626231656335.clone()).member("defaultChoice", false); if pui_native_132.nullish() {1.0_f64} else {(pui_native_132).num()} }};
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":77:7
+                return if { let pui_native_134={ let pui_native_136={ let pui_native_138=(v_696e6465785f5f64653939636237346336636535313738.clone()).is_finite(); if (pui_native_138) {{ let pui_native_140={ let pui_native_142:f64=v_696e6465785f5f64653939636237346336636535313738.clone(); let pui_native_143:f64=1.0_f64; pui_native_142 % pui_native_143 }; let pui_native_141=0.0_f64; (pui_native_140==pui_native_141) }} else {pui_native_138} }; if (pui_native_136) {{ let pui_native_144:f64=v_696e6465785f5f64653939636237346336636535313738.clone(); let pui_native_145:f64=0.0_f64; pui_native_144 >= pui_native_145 }} else {pui_native_136} }; if (pui_native_134) {{ let pui_native_146:f64=v_696e6465785f5f64653939636237346336636535313738.clone(); let pui_native_147:f64={ let pui_native_148=(v_70726f70735f5f62373933336635656261626231656335.clone()).member("choices", false); if pui_native_148.nullish() {2.0_f64} else {(pui_native_148).num()} }; pui_native_146 < pui_native_147 }} else {pui_native_134} } {v_696e6465785f5f64653939636237346336636535313738.clone()} else {-(1.0_f64)};
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::number(ordinary_call(arg(&arguments,0), (arg(&arguments,1)).bool()))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":79:11
+            v_61646d697473.initialize({  let v_72756e = v_72756e.clone(); let v_7265616479 = v_7265616479.clone(); let v_76616c696443686f69636573 = v_76616c696443686f69636573.clone(); let call:Rc<dyn Fn(f64, Value)->bool>=Rc::new(move |argument_0: f64, argument_1: Value| -> bool {
+                let v_696e6465785f5f32373839383963313039383662326438: f64 = argument_0;
+                let v_62617369735f5f66373432323564313239326366396138: Value = argument_1;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":80:7
+                if { let pui_native_150=!(({ let value = (v_72756e.read()).borrow().clone(); value }).truthy()); if !(pui_native_150) {!((v_7265616479.read().call)())} else {pui_native_150} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":80:29
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":81:13
+                let v_70726f70735f5f34383666323938613962366436343563 = { let v_7075695f6e61746976655f313532 = { let value = (v_72756e.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f313532.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":82:7
+                if { let pui_native_153={ let pui_native_155={ let pui_native_157={ let pui_native_159={ let pui_native_161=(Value::boolean(!strict_equal(&(v_62617369735f5f66373432323564313239326366396138.clone()), &({ let left = (v_70726f70735f5f34383666323938613962366436343563.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } })))).bool(); if !(pui_native_161) {!((v_76616c696443686f69636573.read().call)(v_70726f70735f5f34383666323938613962366436343563.clone()))} else {pui_native_161} }; if !(pui_native_159) {!((v_696e6465785f5f32373839383963313039383662326438.clone()).is_finite())} else {pui_native_159} }; if !(pui_native_157) {{ let pui_native_165={ let pui_native_167:f64=v_696e6465785f5f32373839383963313039383662326438.clone(); let pui_native_168:f64=1.0_f64; pui_native_167 % pui_native_168 }; let pui_native_166=0.0_f64; !(pui_native_165==pui_native_166) }} else {pui_native_157} }; if !(pui_native_155) {{ let pui_native_169:f64=v_696e6465785f5f32373839383963313039383662326438.clone(); let pui_native_170:f64=0.0_f64; pui_native_169 < pui_native_170 }} else {pui_native_155} }; if !(pui_native_153) {{ let pui_native_171:f64=v_696e6465785f5f32373839383963313039383662326438.clone(); let pui_native_172:f64=((v_70726f70735f5f34383666323938613962366436343563.clone()).member("choices", false)).num(); pui_native_171 >= pui_native_172 }} else {pui_native_153} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":82:161
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":83:13
+                let v_6b696e64735f5f62613262326438376465663065633465 = (v_70726f70735f5f34383666323938613962366436343563.clone()).member("responseKinds", false);
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":84:7
+                if { let pui_native_175={ let pui_native_177=(Value::boolean(!strict_equal(&(v_6b696e64735f5f62613262326438376465663065633465.clone()), &(Value::Json(Json::Null))))).bool(); if (pui_native_177) {(Value::boolean(!strict_equal(&(v_6b696e64735f5f62613262326438376465663065633465.clone()), &(Value::Undefined)))).bool()} else {pui_native_177} }; if (pui_native_175) {(Value::boolean(strict_equal(&({ let object = v_6b696e64735f5f62613262326438376465663065633465.clone(); object.caught_member(&property_key(&(Value::number(v_696e6465785f5f32373839383963313039383662326438.clone()))), false) }), &(Value::number(0.0_f64))))).bool()} else {pui_native_175} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":84:72
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":85:7
+                return true;
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call((arg(&arguments,0)).num(), arg(&arguments,1)))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":87:11
+            v_63686f6f7365.initialize({  let v_72756e = v_72756e.clone(); let v_61646d697473 = v_61646d697473.clone(); let call:Rc<dyn Fn(f64, Value)->bool>=Rc::new(move |argument_0: f64, argument_1: Value| -> bool {
+                let v_696e6465785f5f32373363326464346666386338356461: f64 = argument_0;
+                let v_62617369735f5f30346335356530326130383361313137: Value = argument_1;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":88:7
+                if { let pui_native_185=!((v_61646d697473.read().call)(v_696e6465785f5f32373363326464346666386338356461.clone(), v_62617369735f5f30346335356530326130383361313137.clone())); if !(pui_native_185) {!(({ let value = (v_72756e.read()).borrow().clone(); value }).truthy())} else {pui_native_185} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":88:42
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":89:7
+                { let v_7075695f6e61746976655f313837 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f313837.clone()).owner(), Value::string("response"), record(vec![("index", Value::number(v_696e6465785f5f32373363326464346666386338356461.clone())), ("revision", v_62617369735f5f30346335356530326130383361313137.clone())])) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":90:7
+                return true;
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call((arg(&arguments,0)).num(), arg(&arguments,1)))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":92:11
+            v_6b6579.initialize({  let v_72756e = v_72756e.clone(); let v_7265616479 = v_7265616479.clone(); let v_726573706f6e7365496e646578 = v_726573706f6e7365496e646578.clone(); let v_63686f6f7365 = v_63686f6f7365.clone(); let call:Rc<dyn Fn(Value)->bool>=Rc::new(move |argument_0: Value| -> bool {
+                let v_6e616d655f5f66346261636235356164383535326464: Value = argument_0;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":93:7
+                if { let pui_native_188=!(({ let value = (v_72756e.read()).borrow().clone(); value }).truthy()); if !(pui_native_188) {!((v_7265616479.read().call)())} else {pui_native_188} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":93:29
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":94:13
+                let v_70726f70735f5f36653130366238326466373363336637 = { let v_7075695f6e61746976655f313930 = { let value = (v_72756e.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f313930.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":95:7
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f66346261636235356164383535326464.clone()), &(Value::string("Escape"))))).bool() {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":95:30
+                    return (v_63686f6f7365.read().call)((v_726573706f6e7365496e646578.read().call)(v_70726f70735f5f36653130366238326466373363336637.clone(), true), { let left = (v_70726f70735f5f36653130366238326466373363336637.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } });
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":96:7
+                if (Value::boolean(strict_equal(&(v_6e616d655f5f66346261636235356164383535326464.clone()), &(Value::string("Enter"))))).bool() {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":96:29
+                    return (v_63686f6f7365.read().call)((v_726573706f6e7365496e646578.read().call)(v_70726f70735f5f36653130366238326466373363336637.clone(), false), { let left = (v_70726f70735f5f36653130366238326466373363336637.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } });
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":97:7
+                return false;
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call(arg(&arguments,0)))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } });
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":99:5
+            { let v_7075695f6e61746976655f313935 = v_646566.clone(); expose_method(&owner, Value::string("choose"), (v_63686f6f7365.read()).ordinary.clone().expect("checked native data callable")) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":99:42
+            { let v_7075695f6e61746976655f313936 = v_646566.clone(); expose_method(&owner, Value::string("key"), (v_6b6579.read()).ordinary.clone().expect("checked native data callable")) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":102:5
+            { let v_7075695f6e61746976655f313937 = v_646566.clone(); expose_method(&owner, Value::string("chooseSelection"), ({  let v_72756e = v_72756e.clone(); let v_61646d697473 = v_61646d697473.clone(); let call:Rc<dyn Fn(f64, bool, Value)->bool>=Rc::new(move |argument_0: f64, argument_1: bool, argument_2: Value| -> bool {
+                let v_696e6465785f5f66356235303038356234656332386233: f64 = argument_0;
+                let v_73656c6563746564: bool = argument_1;
+                let v_62617369735f5f63393931323163356139666265343763: Value = argument_2;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":103:7
+                if { let pui_native_198={ let pui_native_200=(Value::boolean(!strict_equal(&(typeof_value(&(Value::boolean(v_73656c6563746564.clone())))), &(Value::string("boolean"))))).bool(); if !(pui_native_200) {!((v_61646d697473.read().call)(v_696e6465785f5f66356235303038356234656332386233.clone(), v_62617369735f5f63393931323163356139666265343763.clone()))} else {pui_native_200} }; if !(pui_native_198) {!(({ let value = (v_72756e.read()).borrow().clone(); value }).truthy())} else {pui_native_198} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":103:75
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":104:7
+                { let v_7075695f6e61746976655f323034 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f323034.clone()).owner(), Value::string("selection"), record(vec![("index", Value::number(v_696e6465785f5f66356235303038356234656332386233.clone())), ("selected", Value::boolean(v_73656c6563746564.clone())), ("revision", v_62617369735f5f63393931323163356139666265343763.clone())])) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":105:7
+                return true;
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call((arg(&arguments,0)).num(), (arg(&arguments,1)).bool(), arg(&arguments,2)))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } }).ordinary.clone().expect("checked native data callable")) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":109:5
+            { let v_7075695f6e61746976655f323035 = v_646566.clone(); expose_method(&owner, Value::string("requestResponse"), ({  let v_72756e = v_72756e.clone(); let v_6b6579 = v_6b6579.clone(); let call:Rc<dyn Fn(Value, Value)->bool>=Rc::new(move |argument_0: Value, argument_1: Value| -> bool {
+                let v_6e616d655f5f35363566396663313366663731636639: Value = argument_0;
+                let v_62617369735f5f36326363396133303639633438633038: Value = argument_1;
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":110:7
+                if { let pui_native_206=!(({ let value = (v_72756e.read()).borrow().clone(); value }).truthy()); if !(pui_native_206) {(Value::boolean(!strict_equal(&(v_62617369735f5f36326363396133303639633438633038.clone()), &({ let left = ({ let v_7075695f6e61746976655f323130 = { let value = (v_72756e.read()).borrow().clone(); value }; read_props(&(v_7075695f6e61746976655f323130.clone()).owner(), false) }).member("revision", false); if left.nullish() { Value::string("") } else { left } })))).bool()} else {pui_native_206} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":110:63
+                    return false;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":111:7
+                return (v_6b6579.read().call)(v_6e616d655f5f35363566396663313366663731636639.clone());
+            }); {
+      let ordinary_call=call.clone();
+      let ordinary=Value::Function(Rc::new(move |arguments:Vec<Value>| {Value::boolean(ordinary_call(arg(&arguments,0), arg(&arguments,1)))}));
+      native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:Some(ordinary) }
+    } }).ordinary.clone().expect("checked native data callable")) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":113:5
+            { let v_7075695f6e61746976655f323131 = v_646566.clone(); expose_method(&owner, Value::string("focusSelf"), {  let v_666f637573 = v_666f637573.clone(); let v_7265616479 = v_7265616479.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":113:44
+                if (v_7265616479.read().call)() {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":113:57
+                    { let v_7075695f6e61746976655f323132 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f323132.clone()).owner(), Value::Undefined, false) };
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":58:5
-            { let v_7075695f6e61746976655f3330 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b6579 = v_6b6579.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":114:5
+            { let v_7075695f6e61746976655f323133 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b6579 = v_6b6579.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_5f63757272656e74: Value = arg(&arguments, 0);
                 let v_6576656e74: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":59:7
-                if (v_6b6579.read().call_authored(vec![{ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }])).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":59:33
-                    { let v_7075695f6e61746976655f3331 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f3331.clone()) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":115:7
+                if (v_6b6579.read().call)({ let left = (v_6576656e74.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }) {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":115:33
+                    { let v_7075695f6e61746976655f323134 = v_6576656e74.clone(); prevent(v_7075695f6e61746976655f323134.clone()) };
                 }
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":61:11
-            v_73796e63.initialize({  let v_6c6162656c = v_6c6162656c.clone(); let v_6465736372697074696f6e = v_6465736372697074696f6e.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_6f70656e = v_6f70656e.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_666f637573 = v_666f637573.clone(); let v_73636f7065 = v_73636f7065.clone(); let v_6f7665726c6179 = v_6f7665726c6179.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6f776e65725f5f32643534346533373138323333326131: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":62:7
-                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":62:21
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":117:11
+            v_73796e63.initialize({  let v_6c6162656c = v_6c6162656c.clone(); let v_6465736372697074696f6e = v_6465736372697074696f6e.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_6f70656e = v_6f70656e.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_64656661756c7443686f696365 = v_64656661756c7443686f696365.clone(); let v_63616e63656c43686f696365 = v_63616e63656c43686f696365.clone(); let v_666f637573 = v_666f637573.clone(); let v_73636f7065 = v_73636f7065.clone(); let v_6f7665726c6179 = v_6f7665726c6179.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_726573706f6e7365496e646578 = v_726573706f6e7365496e646578.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6f776e65725f5f38386435313231356239363632396432: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":118:7
+                if { let value=(v_646973706f736564.read()).borrow().clone(); value } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":118:21
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":63:7
-                { let value = v_6f776e65725f5f32643534346533373138323333326131.clone(); *(v_72756e.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":63:26
-                let v_7469636b6574 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":63:50
-                let v_70726f70735f5f39313266313337383736313037343732 = { let v_7075695f6e61746976655f3332 = v_6f776e65725f5f32643534346533373138323333326131.clone(); read_props(&(v_7075695f6e61746976655f3332.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":64:7
-                { let v_7075695f6e61746976655f3333 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f3333.clone(), { let left = (v_70726f70735f5f39313266313337383736313037343732.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: overlay name")) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":65:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":65:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":119:7
+                { let value = v_6f776e65725f5f38386435313231356239363632396432.clone(); *(v_72756e.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":119:26
+                let v_7469636b6574: f64 = { let cell=v_65706f6368.read(); let previous=cell.borrow().clone(); let value=previous + 1.0; *cell.borrow_mut()=value; value };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":119:50
+                let v_70726f70735f5f32343164613164313638373632356661 = { let v_7075695f6e61746976655f323135 = v_6f776e65725f5f38386435313231356239363632396432.clone(); read_props(&(v_7075695f6e61746976655f323135.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":120:7
+                { let v_7075695f6e61746976655f323136 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f323136.clone(), { let left = (v_70726f70735f5f32343164613164313638373632356661.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: overlay name")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":121:7
+                if { let pui_native_217={ let pui_native_219=v_7469636b6574.clone(); let pui_native_220={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_219==pui_native_220) }; if !(pui_native_217) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_217} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":121:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":66:7
-                { let v_7075695f6e61746976655f3334 = v_6465736372697074696f6e.read(); state_set(v_7075695f6e61746976655f3334.clone(), { let left = (v_70726f70735f5f39313266313337383736313037343732.clone()).member("description", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: overlay description")) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":67:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":67:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":122:7
+                { let v_7075695f6e61746976655f323231 = v_6465736372697074696f6e.read(); state_set(v_7075695f6e61746976655f323231.clone(), { let left = (v_70726f70735f5f32343164613164313638373632356661.clone()).member("description", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: overlay description")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":123:7
+                if { let pui_native_222={ let pui_native_224=v_7469636b6574.clone(); let pui_native_225={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_224==pui_native_225) }; if !(pui_native_222) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_222} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":123:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":68:7
-                { let v_7075695f6e61746976655f3335 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f3335.clone(), { let left = (v_70726f70735f5f39313266313337383736313037343732.clone()).member("role", false); if left.nullish() { Value::string("dialog") } else { left } }, Value::string("reason: overlay role")) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":69:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":69:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":124:7
+                { let v_7075695f6e61746976655f323236 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f323236.clone(), { let left = (v_70726f70735f5f32343164613164313638373632356661.clone()).member("role", false); if left.nullish() { Value::string("dialog") } else { left } }, Value::string("reason: overlay role")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":125:7
+                if { let pui_native_227={ let pui_native_229=v_7469636b6574.clone(); let pui_native_230={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_229==pui_native_230) }; if !(pui_native_227) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_227} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":125:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":70:7
-                { let v_7075695f6e61746976655f3336 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f3336.clone(), { let left = (v_70726f70735f5f39313266313337383736313037343732.clone()).member("disabled", false); if left.nullish() { Value::boolean(false) } else { left } }, Value::string("reason: overlay policy")) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":71:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":71:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":126:7
+                { let v_7075695f6e61746976655f323331 = v_64656661756c7443686f696365.read(); state_set(v_7075695f6e61746976655f323331.clone(), Value::number((v_726573706f6e7365496e646578.read().call)(v_70726f70735f5f32343164613164313638373632356661.clone(), false)), Value::string("reason: overlay default response")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":127:7
+                if { let pui_native_232={ let pui_native_234=v_7469636b6574.clone(); let pui_native_235={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_234==pui_native_235) }; if !(pui_native_232) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_232} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":127:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":72:7
-                { let v_7075695f6e61746976655f3337 = v_6f70656e.read(); state_set(v_7075695f6e61746976655f3337.clone(), { let left = (v_70726f70735f5f39313266313337383736313037343732.clone()).member("open", false); if left.nullish() { Value::boolean(true) } else { left } }, Value::string("reason: accepted overlay visibility")) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":73:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":73:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":128:7
+                { let v_7075695f6e61746976655f323336 = v_63616e63656c43686f696365.read(); state_set(v_7075695f6e61746976655f323336.clone(), Value::number((v_726573706f6e7365496e646578.read().call)(v_70726f70735f5f32343164613164313638373632356661.clone(), true)), Value::string("reason: overlay cancel response")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":129:7
+                if { let pui_native_237={ let pui_native_239=v_7469636b6574.clone(); let pui_native_240={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_239==pui_native_240) }; if !(pui_native_237) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_237} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":129:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":74:7
-                { let v_7075695f6e61746976655f3338 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f3338.clone()).owner(), { let left = Value::boolean(!({ let v_7075695f6e61746976655f3339 = v_6f70656e.read(); (v_7075695f6e61746976655f3339.clone()).get() }).truthy()); if !left.truthy() { { let v_7075695f6e61746976655f3430 = v_64697361626c6564.read(); (v_7075695f6e61746976655f3430.clone()).get() } } else { left } }) };
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":75:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":75:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":130:7
+                { let v_7075695f6e61746976655f323431 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f323431.clone(), Value::boolean(((v_70726f70735f5f32343164613164313638373632356661.clone()).member("disabled", false)).bool()), Value::string("reason: overlay policy")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":131:7
+                if { let pui_native_244={ let pui_native_246=v_7469636b6574.clone(); let pui_native_247={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_246==pui_native_247) }; if !(pui_native_244) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_244} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":131:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":76:7
-                if ({ let v_7075695f6e61746976655f3431 = v_6f70656e.read(); (v_7075695f6e61746976655f3431.clone()).get() }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":76:23
-                    { let v_7075695f6e61746976655f3432 = v_6f7665726c6179.read(); overlay_intent(&(v_7075695f6e61746976655f3432.clone()).owner(), "openOverlay", Value::string("controlled.sync")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":132:7
+                { let v_7075695f6e61746976655f323438 = v_6f70656e.read(); state_set(v_7075695f6e61746976655f323438.clone(), Value::boolean(((v_70726f70735f5f32343164613164313638373632356661.clone()).member("open", false)).bool()), Value::string("reason: accepted overlay visibility")) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":133:7
+                if { let pui_native_251={ let pui_native_253=v_7469636b6574.clone(); let pui_native_254={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_253==pui_native_254) }; if !(pui_native_251) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_251} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":133:41
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":134:7
+                { let v_7075695f6e61746976655f323535 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f323535.clone()).owner(), Value::boolean({ let pui_native_256=!(({ let v_7075695f6e61746976655f323538 = v_6f70656e.read(); Value::boolean(((v_7075695f6e61746976655f323538.clone()).get()).bool()) }).bool()); if !(pui_native_256) {({ let v_7075695f6e61746976655f323539 = v_64697361626c6564.read(); Value::boolean(((v_7075695f6e61746976655f323539.clone()).get()).bool()) }).bool()} else {pui_native_256} })) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":135:7
+                if { let pui_native_260={ let pui_native_262=v_7469636b6574.clone(); let pui_native_263={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_262==pui_native_263) }; if !(pui_native_260) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_260} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":135:41
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":136:7
+                if ({ let v_7075695f6e61746976655f323634 = v_6f70656e.read(); Value::boolean(((v_7075695f6e61746976655f323634.clone()).get()).bool()) }).bool() {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":136:23
+                    { let v_7075695f6e61746976655f323635 = v_6f7665726c6179.read(); overlay_intent(&(v_7075695f6e61746976655f323635.clone()).owner(), "openOverlay", Value::string("controlled.sync")) };
                 } else {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":76:68
-                    { let v_7075695f6e61746976655f3433 = v_6f7665726c6179.read(); overlay_intent(&(v_7075695f6e61746976655f3433.clone()).owner(), "close", Value::string("controlled.sync")) };
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":136:68
+                    { let v_7075695f6e61746976655f323636 = v_6f7665726c6179.read(); overlay_intent(&(v_7075695f6e61746976655f323636.clone()).owner(), "close", Value::string("controlled.sync")) };
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":77:7
-                if ({ let left = { let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }; if !left.truthy() { Value::boolean(!({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":77:54
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":137:7
+                if { let pui_native_267={ let pui_native_269={ let pui_native_271=v_7469636b6574.clone(); let pui_native_272={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_271==pui_native_272) }; if !(pui_native_269) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_269} }; if !(pui_native_267) {!({ let value=(v_6174746163686564.read()).borrow().clone(); value })} else {pui_native_267} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":137:54
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":78:7
-                if ({ let left = { let v_7075695f6e61746976655f3434 = v_6f70656e.read(); (v_7075695f6e61746976655f3434.clone()).get() }; if left.truthy() { Value::boolean(!({ let v_7075695f6e61746976655f3435 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3435.clone()).owner()) }).truthy()) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":78:44
-                    { let v_7075695f6e61746976655f3436 = v_73636f7065.read(); focus_activate(&(v_7075695f6e61746976655f3436.clone()).owner(), Value::Undefined) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":138:7
+                if { let pui_native_273=({ let v_7075695f6e61746976655f323735 = v_6f70656e.read(); Value::boolean(((v_7075695f6e61746976655f323735.clone()).get()).bool()) }).bool(); if (pui_native_273) {!(({ let v_7075695f6e61746976655f323736 = v_73636f7065.read(); Value::boolean((focus_is_active(&(v_7075695f6e61746976655f323736.clone()).owner())).bool()) }).bool())} else {pui_native_273} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":138:44
+                    { let v_7075695f6e61746976655f323737 = v_73636f7065.read(); focus_activate(&(v_7075695f6e61746976655f323737.clone()).owner(), Value::Undefined) };
                 } else {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":79:12
-                    if ({ let left = Value::boolean(!({ let v_7075695f6e61746976655f3437 = v_6f70656e.read(); (v_7075695f6e61746976655f3437.clone()).get() }).truthy()); if left.truthy() { { let v_7075695f6e61746976655f3438 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3438.clone()).owner()) } } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/overlay-control.proto.ts":79:49
-                        { let v_7075695f6e61746976655f3439 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f3439.clone()).owner(), Value::Undefined) };
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":139:12
+                    if { let pui_native_278=!(({ let v_7075695f6e61746976655f323830 = v_6f70656e.read(); Value::boolean(((v_7075695f6e61746976655f323830.clone()).get()).bool()) }).bool()); if (pui_native_278) {({ let v_7075695f6e61746976655f323831 = v_73636f7065.read(); Value::boolean((focus_is_active(&(v_7075695f6e61746976655f323831.clone()).owner())).bool()) }).bool()} else {pui_native_278} } {
+                        // Source "frontend/proto-ui/src/overlay-control.proto.ts":139:49
+                        { let v_7075695f6e61746976655f323832 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f323832.clone()).owner(), Value::Undefined) };
                     }
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":80:7
-                if ({ let left = Value::boolean(!strict_equal(&(v_7469636b6574.clone()), &({ let value = (v_65706f6368.read()).borrow().clone(); value }))); if !left.truthy() { { let value = (v_646973706f736564.read()).borrow().clone(); value } } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":80:41
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":140:7
+                if { let pui_native_283={ let pui_native_285=v_7469636b6574.clone(); let pui_native_286={ let value=(v_65706f6368.read()).borrow().clone(); value }; !(pui_native_285==pui_native_286) }; if !(pui_native_283) {{ let value=(v_646973706f736564.read()).borrow().clone(); value }} else {pui_native_283} } {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":140:41
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":81:7
-                { let v_7075695f6e61746976655f3530 = v_6f776e65725f5f32643534346533373138323333326131.clone(); request_update(&(v_7075695f6e61746976655f3530.clone()).owner()) };
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":141:7
+                { let v_7075695f6e61746976655f323837 = v_6f776e65725f5f38386435313231356239363632396432.clone(); request_update(&(v_7075695f6e61746976655f323837.clone()).owner()) };
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":83:5
-            { let v_7075695f6e61746976655f3531 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":84:5
-            { let v_7075695f6e61746976655f3532 = v_646566.clone(); register_life(&owner, "mounted", {  let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6f776e65725f5f36313963333462633631353162326563: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":84:42
-                if (Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":84:59
-                    { let value = Value::boolean(true); *(v_6174746163686564.read()).borrow_mut() = value; }
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":84:76
-                    v_73796e63.read().call_authored(vec![v_6f776e65725f5f36313963333462633631353162326563.clone()]);
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":143:5
+            { let v_7075695f6e61746976655f323838 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":144:5
+            { let v_7075695f6e61746976655f323839 = v_646566.clone(); register_life(&owner, "mounted", {  let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_6f776e65725f5f66666633343831316437333438656534: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":144:42
+                if !({ let value=(v_646973706f736564.read()).borrow().clone(); value }) {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":144:59
+                    Value::boolean({ let value=true; *(v_6174746163686564.read()).borrow_mut()=value.clone(); value });
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":144:76
+                    v_73796e63.read().call_authored(vec![v_6f776e65725f5f66666633343831316437333438656534.clone()]);
                 }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":85:5
-            { let v_7075695f6e61746976655f3533 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("label"), Value::string("description"), Value::string("role"), Value::string("open"), Value::string("disabled"), Value::string("defaultChoice"), Value::string("cancelChoice"), Value::string("choices"), Value::string("revision")]))), false, v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":86:5
-            { let v_7075695f6e61746976655f3534 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_73636f7065 = v_73636f7065.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":86:39
-                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":86:48
-                { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":86:66
-                if ({ let v_7075695f6e61746976655f3535 = v_73636f7065.read(); focus_is_active(&(v_7075695f6e61746976655f3535.clone()).owner()) }).truthy() {
-                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":86:88
-                    { let v_7075695f6e61746976655f3536 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f3536.clone()).owner(), Value::Undefined) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":145:5
+            { let v_7075695f6e61746976655f323930 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("label"), Value::string("description"), Value::string("role"), Value::string("open"), Value::string("disabled"), Value::string("defaultChoice"), Value::string("cancelChoice"), Value::string("choices"), Value::string("responseKinds"), Value::string("revision")]))), false, v_73796e63.read()) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":146:5
+            { let v_7075695f6e61746976655f323931 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_73636f7065 = v_73636f7065.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":146:39
+                Value::number({ let cell=v_65706f6368.read(); let previous=cell.borrow().clone(); let value=previous + 1.0; *cell.borrow_mut()=value; value });
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":146:48
+                Value::boolean({ let value=false; *(v_6174746163686564.read()).borrow_mut()=value.clone(); value });
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":146:66
+                if ({ let v_7075695f6e61746976655f323932 = v_73636f7065.read(); Value::boolean((focus_is_active(&(v_7075695f6e61746976655f323932.clone()).owner())).bool()) }).bool() {
+                    // Source "frontend/proto-ui/src/overlay-control.proto.ts":146:88
+                    { let v_7075695f6e61746976655f323933 = v_73636f7065.read(); focus_deactivate(&(v_7075695f6e61746976655f323933.clone()).owner(), Value::Undefined) };
                 }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":86:108
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":146:108
                 { let value = Value::Json(Json::Null); *(v_72756e.read()).borrow_mut() = value; }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":87:5
-            { let v_7075695f6e61746976655f3537 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":87:43
-                { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":87:52
-                { let value = Value::boolean(true); *(v_646973706f736564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":87:69
-                { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":87:87
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":147:5
+            { let v_7075695f6e61746976655f323934 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":147:43
+                Value::number({ let cell=v_65706f6368.read(); let previous=cell.borrow().clone(); let value=previous + 1.0; *cell.borrow_mut()=value; value });
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":147:52
+                Value::boolean({ let value=true; *(v_646973706f736564.read()).borrow_mut()=value.clone(); value });
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":147:69
+                Value::boolean({ let value=false; *(v_6174746163686564.read()).borrow_mut()=value.clone(); value });
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":147:87
                 { let value = Value::Json(Json::Null); *(v_72756e.read()).borrow_mut() = value; }
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":88:5
-            { let v_7075695f6e61746976655f3538 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
-            // Source "frontend/proto-ui/src/overlay-control.proto.ts":89:5
-            return { let callable={ let pui_native_59={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":148:5
+            { let v_7075695f6e61746976655f323935 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
+            // Source "frontend/proto-ui/src/overlay-control.proto.ts":149:5
+            return { let callable={ let pui_native_296={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "frontend/proto-ui/src/overlay-control.proto.ts":89:24
-                return { let v_7075695f6e61746976655f3630 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
-            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_59.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_59.call)(arg(&arguments,0))})} }; match callable {
+                // Source "frontend/proto-ui/src/overlay-control.proto.ts":149:24
+                return { let v_7075695f6e61746976655f323937 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
+            }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call, ordinary:None } }; Value::NativeFunction{identity:pui_native_296.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_296.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{identity,render} => capture_renderer(Value::NativeFunction{identity,render:render.clone()},render),
       Value::Renderer(adapter) => Value::Renderer(adapter),
       Value::Function(callback) => capture_renderer(Value::Function(callback.clone()),Rc::new(move |arguments:Vec<Value>| { panic!("checked native renderer entry has no scalar callback alternative") })),
@@ -559,10 +806,15 @@ pub struct GeneratedData0 {
           if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
           outcome?; self.drive(window, cx)
       }
+      pub fn set_instance_associations(&mut self, associations: InstanceAssociations, window: &mut Window, cx: &mut Context<Self>) -> Result<(), Value> {
+          let outcome = catch_authored(|| replace_instance_associations(&self.owner, associations));
+          if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
+          outcome?; drive_owners(window, cx); self.drive(window, cx)
+      }
       pub fn set_slot(&mut self, slot: Vec<native::gpui_native_owner::NativeSnapshot>, cx: &mut Context<Self>) -> Result<(), Value> { catch_authored(|| { ensure(&Rc::downgrade(&self.owner)); assert_native_slot_children(&slot); let mut owner = self.owner.borrow_mut(); owner.slot = slot; owner.dirty = true; cx.notify(); }) }
       pub fn set_parent(&mut self, parent: Option<OwnerWeak>, cx: &mut Context<Self>) -> Result<(), Value> { catch_authored(|| { if let Err(error)=set_native_parent(&self.owner, parent.unwrap_or_default()){throw_error("NATIVE_PARENT_INVALID", error)} cx.notify(); }) }
       fn bind_window_activation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-          if !native_window_observation_needed(&self.owner) { self._window_activation.take(); return; }
+          if !native_focus_observation_needed(&self.owner) && !native::gpui_native_move::move_owner_has_binding(&self.owner) && !control_label_is_label(&self.owner) { self._window_activation.take(); return; }
           let id = window.window_handle().window_id();
           if self._window_activation.as_ref().is_some_and(|(bound, _)| *bound == id) { return; }
           self._window_activation.take();

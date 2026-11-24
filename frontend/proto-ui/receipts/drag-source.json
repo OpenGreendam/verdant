@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e"
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -50,7 +50,7 @@
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "e374ba03f76079fd191d63c2da1f62861b7e90bbeba64a0b310027fc2c15b7f8",
+    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
@@ -81,33 +81,33 @@
     "features": [
       "gpui-modern-element-api"
     ],
-    "contentSha256": "e7bade58e60d8e4addfb42ca1228c0c38f066d0093f148eae3101cdcad5aca35"
+    "contentSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b"
   },
   "artifacts": [
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
+      "sha256": "3df6fc5b2e1829daf10101fdd08b6d838c1049affa0f645b13aa11997b7ecc65"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "50a6222d68217c0a449f04bd3a67000d630fe013ca48e3b18b1e5afde28a729a"
+      "sha256": "b4874e85b005297b719f12a814fc9758c2bc780a13fdff39dc14001a39004a2f"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "b4fc9ebbbc79ec27d31658aa3035239e1a8e9ed2d874ee8c8980302ec1e6ea65"
+      "sha256": "378c285c03427eeb433da9880b45c50720607f934762b36153aad1b9f4ae2b16"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "c597ef087649a39fb89e030ff89511b86fddfab085ab79713d4e4314093b33fb"
+      "sha256": "f0ea00ebf17205ee7ebf60b739cb33b511b3b6a99ed3729523348949c9aaf66d"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "6beed40803d7de8d8d57928410324b5a67b9bb64c372f3de67b7d0ba4b5b89f0"
+      "sha256": "4486b5531e4e6a9c950793bd590ac3e49c8648576959d088fe12c7345f1c19db"
     }
   ]
 }
