@@ -1,18 +1,19 @@
-# Vendored Proto-UI Input editor
+# Vendored Proto-UI Base Input
 
-`root.proto.ts` and `types.ts` are exact copies of
+`root.proto.ts` and `types.ts` are byte-for-byte copies of
 `packages/prototypes/base/src/input/` at Proto-UI commit
-[`4e499ae25e825e130e740f16af66d70b23a743cf`](https://github.com/Proto-UI/Proto-UI/tree/4e499ae25e825e130e740f16af66d70b23a743cf/packages/prototypes/base/src/input).
-The accompanying MIT license is copied from that same commit.
-The compiler pin binds this identical immutable upstream revision.
+`26b9258dbb1ce580ec05763e78b7b4fc5f89e709`. The accompanying MIT license
+applies to both files. `provenance.json` records their upstream paths and
+SHA-256 identities; the source producer also records them in its source graph.
 
-Verdant's source producer admits repository-local relative imports. These
-copies retain the upstream shared `asInputEditor` / `asTextControl` author
-contract, including reset and controlled-value behavior. Native shaping,
-UTF-16 conversion, IME, selection, clipboard and text undo remain in the
-generated Proto-UI SDK.
+The Verdant producer admits repository-local relative imports. These copies
+preserve the complete official `asInputRoot` contract, including its real
+ControlLabel target, `asTextControl` editor, and lifecycle-safe `resetValue`.
+The reset capability was contributed upstream as part of this migration;
+there is no private reduced editor hook in this copy.
 
-`../text-field.proto.ts` composes the editor with Verdant submit, cancel,
-advance and selection-request policy. These fields provide direct accessible
-names. The complete upstream `asInputRoot` still composes the real ControlLabel
-target protocol; the separate native Label association is not claimed here.
+`../text-field.proto.ts` composes `asInputRoot` with Verdant submit, cancel,
+advance, numeric-step and selection-request policy. Native shaping, UTF-16
+conversion, IME, selection, clipboard and text undo remain in the generated
+Proto-UI SDK. The fields provide direct accessible names while retaining the
+upstream label-association contract.

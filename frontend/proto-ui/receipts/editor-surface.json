@@ -21,7 +21,7 @@
     },
     {
       "path": "frontend/proto-ui/src/editor-surface.proto.ts",
-      "sha256": "72892d90e704e1d0dceb3b850526c1be24b5d0efde8cf1412eb48c732280c039"
+      "sha256": "7d206a18bb1269703533825ce62de2b91351a9f00c4ee487cdfe1685a52a8f30"
     },
     {
       "path": "frontend/proto-ui/src/node_modules/@proto.ui/core/package.json",
@@ -42,7 +42,7 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "4e499ae25e825e130e740f16af66d70b23a743cf"
+    "revision": "bd5800dcc833e3155f7b8ca89d10d03aaef6606e"
   },
   "packageVersions": {
     "protoUi": "0.3.0-alpha.2",
@@ -92,22 +92,22 @@
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "2406bac9b1d2e51fb6e58de04843a1ab4eaad57ec814dbee848da8c258d0ab0d"
+      "sha256": "5ae2c0925d282c87f802113c8ed87134437af5d44c4df767f52e8140aa977453"
     },
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "0cb9db7765f9da1f48fbf5ba6950b0c4993b3e3053f6ea666204e41524073fdb"
+      "sha256": "40ead88717d08a266679096edbf25756443051dd99accd5868fa90697a690020"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "12d89edb9d1cfab4f4144588af8ebc8abc6576a33a3d88b3036212e94f598ced"
+      "sha256": "3e5d2ceeaca54f3da657ca3ebd3beeb81367891023c7234e6eedffa00b6293c5"
     },
     {
       "path": "provenance.json",
       "kind": "manifest",
-      "sha256": "cf3912ba841610678ec93fc3d0037037b3e42ac273787b2edfafa1f1aea4d6bc"
+      "sha256": "db3ec21269236186442c55404b7a759497adcc76984cce5c08e99dd335a74b51"
     }
   ]
 }

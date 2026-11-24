@@ -1,7 +1,7 @@
 import { definePrototype, tw, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable } from '@proto.ui/hooks';
 
-type Props = { label?: string; revision?: string; disabled?: boolean; threshold?: number; commandMode?: string };
+type Props = { label?: string; revision?: string; disabled?: boolean; threshold?: number; commands?: string };
 
 /**
  * Portable editing surface. A host supplies hit testing and domain transactions;
@@ -17,7 +17,7 @@ export default definePrototype<Props>({
       revision: { type: 'string', default: '' },
       disabled: { type: 'boolean', default: false },
       threshold: { type: 'number', default: 0 },
-      commandMode: { type: 'string', default: '' },
+      commands: { type: 'string', default: 'none' },
     });
     const phase = def.state.string('phase', 'idle');
     const pointer = def.state.string('pointer', '');
@@ -42,7 +42,6 @@ export default definePrototype<Props>({
     def.expose.state('focused', focus.focused);
     def.expose.state('focusVisible', focus.focusVisible);
     def.expose.event('interactionCancel', { payload: 'json' });
-    def.expose.event('command', { payload: 'json' });
     let run: RunHandle<Props> | null = null;
     let attached = false;
     let disposed = false;
@@ -272,27 +271,28 @@ export default definePrototype<Props>({
       return { position, delta: velocity * (elapsed < 0.05 ? elapsed : 0.05), active: outside !== 0,
         snap: phase.get() === 'pressed', accepted: true };
     });
-    def.event.on('key.down', (_run, event) => {
-      const handle = run;
-      if (!handle || syncing || !attached || disposed || disabled.get() || event.repeat) return;
-      const audio = handle.props.get().commandMode === 'audio';
-      const secondary = event.ctrlKey || event.metaKey;
+    // Application command vocabulary stays authored alongside the contact
+    // state. Native code maps only portable keys and the returned domain ID.
+    def.expose.method('audioKey', (key: string, shift: boolean, secondary: boolean, alt: boolean, repeat: boolean, basis: string) => {
+      if (!run || syncing || !attached || disposed || disabled.get() || repeat || basis !== revision
+        || run.props.get().commands !== 'audio') return '';
       let command = '';
-      if (audio) {
-        if ((event.key === 'Delete' || event.key === 'Backspace') && !secondary) command = event.shiftKey ? 'ripple-delete' : 'delete';
-        else if ((event.key === 'i' || event.key === 'I') && secondary) command = 'split';
-        else if ((event.key === 'a' || event.key === 'A') && secondary) command = 'select-all';
-        else if ((event.key === 'j' || event.key === 'J') && secondary) command = 'join';
-        else if ((event.key === 'r' || event.key === 'R') && !secondary && !event.altKey) command = 'range-tool';
-        else if ((event.key === 'v' || event.key === 'V') && !secondary && !event.altKey) command = 'select-tool';
-        else if (event.key === 'Escape') command = 'clear-range';
-      }
-      if (command === '' && (event.key !== 'Escape' || phase.get() === 'idle')) return;
+      if ((key === 'Delete' || key === 'Backspace') && !secondary) command = shift ? 'ripple-delete' : 'delete';
+      else if ((key === 'i' || key === 'I') && secondary) command = 'split';
+      else if ((key === 'a' || key === 'A') && secondary) command = 'select-all';
+      else if ((key === 'j' || key === 'J') && secondary) command = 'join';
+      else if ((key === 'r' || key === 'R') && !secondary && !alt) command = 'range-tool';
+      else if ((key === 'v' || key === 'V') && !secondary && !alt) command = 'select-tool';
+      else if (key === 'Escape') command = 'escape';
+      if (command === '') return '';
       const ticket = epoch + 1;
       cancel();
-      if (!current(ticket) || syncing || !attached || disabled.get()) return;
+      return current(ticket) && attached && !syncing && !disabled.get() ? command : '';
+    });
+    def.event.on('key.down', (_run, event) => {
+      if (event.key !== 'Escape' || phase.get() === 'idle') return;
       event.control.requestDefaultActionPrevention();
-      if (command !== '') handle.expose.emit('command', { command, revision });
+      cancel();
     });
     def.event.on('host:blur', cancel);
     const sync = (handle: RunHandle<Props>) => {
@@ -358,7 +358,7 @@ export default definePrototype<Props>({
     };
     def.lifecycle.onCreated(sync);
     def.lifecycle.onMounted((handle) => { attached = true; sync(handle); });
-    def.props.watch(['label', 'revision', 'disabled', 'threshold', 'commandMode'], sync);
+    def.props.watch(['label', 'revision', 'disabled', 'threshold', 'commands'], sync);
     def.lifecycle.onUnmounted(() => retire(false));
     def.lifecycle.onBeforeDispose(() => retire(true));
     return (renderer) => renderer.slot();

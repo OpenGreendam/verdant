@@ -1,11 +1,11 @@
 {
   "repository": "https://github.com/Proto-UI/Proto-UI",
-  "revision": "4e499ae25e825e130e740f16af66d70b23a743cf",
+  "revision": "26b9258dbb1ce580ec05763e78b7b4fc5f89e709",
   "files": [
     {
       "path": "root.proto.ts",
       "upstreamPath": "packages/prototypes/base/src/input/root.proto.ts",
-      "sha256": "851fabc3b1b9b859e5ee4a8888a27a03f415e3352180b86253163cc8ee4719fc"
+      "sha256": "e80593b3872c8006104374a3fad1a47b0f163b575f67f9076cb7c45a6a589e9e"
     },
     {
       "path": "types.ts",

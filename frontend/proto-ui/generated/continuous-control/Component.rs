@@ -17,7 +17,7 @@
           _ => false,
       }
   }
-  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("value").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("min").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("max").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("step").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("fineStep").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("defaultValue").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("revision").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("role").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("dragMode").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("doubleAction").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("tapAction").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("previewEcho").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("keyMode").map_or(true, |prop| prop.is_null() || prop.is_string()) }
+  fn accepts_props(value: &Json) -> bool { value.is_object() && value.get("value").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("min").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("max").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("step").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("fineStep").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("defaultValue").map_or(true, |prop| prop.is_null() || prop.as_f64().is_some_and(f64::is_finite)) && value.get("label").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("disabled").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("revision").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("role").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("dragMode").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("doubleAction").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("tapAction").map_or(true, |prop| prop.is_null() || prop.is_string()) && value.get("previewEcho").map_or(true, |prop| prop.is_null() || prop.is_boolean()) && value.get("keyboardMode").map_or(true, |prop| prop.is_null() || prop.is_string()) }
   fn prop_valid(key: &str, value: &Json) -> bool { match key { "value" => value.as_f64().is_some_and(f64::is_finite),
         "min" => value.as_f64().is_some_and(f64::is_finite),
         "max" => value.as_f64().is_some_and(f64::is_finite),
@@ -32,7 +32,7 @@
         "doubleAction" => value.is_string(),
         "tapAction" => value.is_string(),
         "previewEcho" => value.is_boolean(),
-        "keyMode" => value.is_string(), _ => false } }
+        "keyboardMode" => value.is_string(), _ => false } }
   fn check_method(name: &str, arguments: &[Value]) { match name {
           "begin" => if !(arguments.len() <= 4 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
         "sample" => if !(arguments.len() <= 4 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
@@ -41,7 +41,6 @@
         "edit" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
         "reset" => if !(arguments.len() <= 0 && true) { value_type_error("invalid exposed method arguments") },
         "adjust" => if !(arguments.len() <= 2 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.as_f64().is_some_and(f64::is_finite))) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
-        "key" => if !(arguments.len() <= 4 && arguments.get(0).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_string())) && arguments.get(1).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(2).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean())) && arguments.get(3).map_or(false, |value| (value).try_data().is_some_and(|data| data.is_boolean()))) { value_type_error("invalid exposed method arguments") },
           _ => value_error("unknown exposed method"),
   } }
   
@@ -75,7 +74,7 @@ pub struct GeneratedData0 {
     pub field_12: Option<String>,
     #[serde(rename = "previewEcho", default, skip_serializing_if = "Option::is_none")]
     pub field_13: Option<bool>,
-    #[serde(rename = "keyMode", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "keyboardMode", default, skip_serializing_if = "Option::is_none")]
     pub field_14: Option<String>,
 }
   
@@ -193,22 +192,6 @@ pub struct GeneratedData0 {
         let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument"))];
         let callback = self.owner.borrow().exposes.get("adjust").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
         check_method("adjust", &arguments);
-        let result = invoke(&self.owner, "expose-method", &callback, arguments);
-        let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
-        let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
-        if !(result.is_boolean()) { value_type_error("exposed method returned invalid portable data") }
-        serde_json::from_value(result).expect("checked exposed method result")
-        });
-        if outcome.is_err() { drive_pending_native_events(&self.owner, window, cx); }
-        outcome
-    }
-    pub fn method_19(&self, argument_0: String, argument_1: bool, argument_2: bool, argument_3: bool, window: &mut Window, cx: &mut App) -> Result<bool, Value> {
-        let outcome = catch_authored(|| {
-        refresh_native_atoms(&self.owner, window, cx);
-          #[cfg(feature = "experimental-focus-tree")] refresh_native_entry(&self.owner, window);
-        let arguments = vec![Value::json(serde_json::to_value(argument_0).expect("portable argument")), Value::json(serde_json::to_value(argument_1).expect("portable argument")), Value::json(serde_json::to_value(argument_2).expect("portable argument")), Value::json(serde_json::to_value(argument_3).expect("portable argument"))];
-        let callback = self.owner.borrow().exposes.get("key").cloned().unwrap_or_else(|| value_error("unknown exposed method"));
-        check_method("key", &arguments);
         let result = invoke(&self.owner, "expose-method", &callback, arguments);
         let drive = self.owner.borrow().native_drive.clone(); if let Some(drive) = drive { drive(window, cx); }
         let result = if matches!(result, Value::Undefined) { Json::Null } else { result.data() };
@@ -338,11 +321,10 @@ pub struct GeneratedData0 {
             let v_7265736574: LexicalBinding<Value> = lexical_binding();
             let v_73616d706c65: LexicalBinding<Value> = lexical_binding();
             let v_61646a757374: LexicalBinding<Value> = lexical_binding();
-            let v_6b6579: LexicalBinding<Value> = lexical_binding();
             let v_73796e63: LexicalBinding<Value> = lexical_binding();
             let v_726574697265: LexicalBinding<Value> = lexical_binding();
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":18:5
-            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("value", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("min", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("max", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("step", record(vec![("type", Value::string("number")), ("default", Value::number(0.01))])), ("fineStep", record(vec![("type", Value::string("number")), ("default", Value::number(0.001))])), ("defaultValue", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("role", record(vec![("type", Value::string("string")), ("default", Value::string("slider"))])), ("dragMode", record(vec![("type", Value::string("string")), ("default", Value::string("absolute"))])), ("doubleAction", record(vec![("type", Value::string("string")), ("default", Value::string("reset"))])), ("tapAction", record(vec![("type", Value::string("string")), ("default", Value::string("none"))])), ("previewEcho", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("keyMode", record(vec![("type", Value::string("string")), ("default", Value::string("scalar"))]))])) };
+            { let v_7075695f6e61746976655f30 = v_646566.clone(); props_define(&owner, record(vec![("value", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("min", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("max", record(vec![("type", Value::string("number")), ("default", Value::number(1.0))])), ("step", record(vec![("type", Value::string("number")), ("default", Value::number(0.01))])), ("fineStep", record(vec![("type", Value::string("number")), ("default", Value::number(0.001))])), ("defaultValue", record(vec![("type", Value::string("number")), ("default", Value::number(0.0))])), ("label", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("disabled", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("revision", record(vec![("type", Value::string("string")), ("default", Value::string(""))])), ("role", record(vec![("type", Value::string("string")), ("default", Value::string("slider"))])), ("dragMode", record(vec![("type", Value::string("string")), ("default", Value::string("absolute"))])), ("doubleAction", record(vec![("type", Value::string("string")), ("default", Value::string("reset"))])), ("tapAction", record(vec![("type", Value::string("string")), ("default", Value::string("none"))])), ("previewEcho", record(vec![("type", Value::string("boolean")), ("default", Value::boolean(false))])), ("keyboardMode", record(vec![("type", Value::string("string")), ("default", Value::string("full"))]))])) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":28:11
             v_7068617365.initialize({ let v_7075695f6e61746976655f31 = v_646566.clone(); create_state(&owner, "string", Value::string("phase"), Value::string("idle"), Value::Undefined) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":29:11
@@ -384,7 +366,7 @@ pub struct GeneratedData0 {
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":47:5
             { let v_7075695f6e61746976655f3138 = v_61636365737369626c65.clone(); accessible_action_spec(&(v_7075695f6e61746976655f3138.clone()).owner(), Value::string("setValue"), record(vec![("event", Value::string("host:verdant-scalar-set-value"))])) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":50:5
-            { let v_7075695f6e61746976655f3139 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into()), ("min-w-0".into(), "min-w-".into()), ("min-h-0".into(), "min-h-".into())])]) };
+            { let v_7075695f6e61746976655f3139 = v_646566.clone(); style_use(&owner, vec![Value::Style(vec![("w-full".into(), "w-".into()), ("h-full".into(), "h-".into())])]) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":51:5
             { let v_7075695f6e61746976655f3230 = v_646566.clone(); expose_state(&owner, Value::string("value"), v_76616c7565.read()) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":52:5
@@ -436,18 +418,18 @@ pub struct GeneratedData0 {
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":73:66
             v_746170506f6c696379.initialize(Rc::new(std::cell::RefCell::new(Value::string("none"))));
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":73:90
-            v_6b6579626f617264506f6c696379.initialize(Rc::new(std::cell::RefCell::new(Value::string("scalar"))));
+            v_6b6579626f617264506f6c696379.initialize(Rc::new(std::cell::RefCell::new(Value::string("full"))));
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":74:11
             v_63757272656e74.initialize({  let v_72756e = v_72756e.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_65706f6368 = v_65706f6368.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_7469636b65745f5f34653238656432366334303030303265: Value = arg(&arguments, 0);
+                let v_7469636b65745f5f32643736383038393763336666366561: Value = arg(&arguments, 0);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":74:50
-                return { let left = { let left = Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()); if left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_72756e.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f34653238656432366334303030303265.clone()))) } else { left } };
+                return { let left = { let left = Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()); if left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_72756e.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let value = (v_65706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32643736383038393763336666366561.clone()))) } else { left } };
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":75:11
             v_617574686f7269747943757272656e74.initialize({  let v_72756e = v_72756e.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_617574686f7269747945706f6368 = v_617574686f7269747945706f6368.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_7469636b65745f5f35313838383865333462313934656136: Value = arg(&arguments, 0);
+                let v_7469636b65745f5f38333463376234323566326630613533: Value = arg(&arguments, 0);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":75:59
-                return { let left = { let left = Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()); if left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_72756e.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f35313838383865333462313934656136.clone()))) } else { left } };
+                return { let left = { let left = Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy()); if left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_72756e.read()).borrow().clone(); value }), &(Value::Json(Json::Null)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f38333463376234323566326630613533.clone()))) } else { left } };
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":76:11
             v_656e61626c6564.initialize({  let v_64697361626c6564 = v_64697361626c6564.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63696e67 = v_73796e63696e67.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
@@ -456,38 +438,38 @@ pub struct GeneratedData0 {
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":77:11
             v_636c616d70.initialize({  let v_6d696e696d756d = v_6d696e696d756d.clone(); let v_6d6178696d756d = v_6d6178696d756d.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f38306161363332333738313931363233: Value = arg(&arguments, 0);
+                let v_6e6578745f5f32336234663963393262386433356565: Value = arg(&arguments, 0);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":78:7
-                if (Value::boolean(!(number_is_finite(&(v_6e6578745f5f38306161363332333738313931363233.clone()))).truthy())).truthy() {
+                if (Value::boolean(!(number_is_finite(&(v_6e6578745f5f32336234663963393262386433356565.clone()))).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":78:35
                     return { let v_7075695f6e61746976655f3333 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3333.clone()).get() };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":79:7
-                if ({ let relational_left = v_6e6578745f5f38306161363332333738313931363233.clone(); let relational_right = { let v_7075695f6e61746976655f3334 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3334.clone()).get() }; Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
+                if ({ let relational_left = v_6e6578745f5f32336234663963393262386433356565.clone(); let relational_right = { let v_7075695f6e61746976655f3334 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3334.clone()).get() }; Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":79:33
                     return { let v_7075695f6e61746976655f3335 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3335.clone()).get() };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":80:7
-                if ({ let relational_left = v_6e6578745f5f38306161363332333738313931363233.clone(); let relational_right = { let v_7075695f6e61746976655f3336 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3336.clone()).get() }; Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
+                if ({ let relational_left = v_6e6578745f5f32336234663963393262386433356565.clone(); let relational_right = { let v_7075695f6e61746976655f3336 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3336.clone()).get() }; Value::boolean(relational_left.scalar_number() > relational_right.scalar_number()) }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":80:33
                     return { let v_7075695f6e61746976655f3337 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3337.clone()).get() };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":81:7
-                return v_6e6578745f5f38306161363332333738313931363233.clone();
+                return v_6e6578745f5f32336234663963393262386433356565.clone();
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":83:11
             v_7075626c697368.initialize({  let v_76616c7565 = v_76616c7565.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_636c616d70 = v_636c616d70.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f34323630656562383533396238663164: Value = arg(&arguments, 0);
-                let v_7469636b65745f5f64653366326261356464333666653861: Value = arg(&arguments, 1);
+                let v_6e6578745f5f32613130376635356265303964356537: Value = arg(&arguments, 0);
+                let v_7469636b65745f5f33383138313766616537646330373130: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":84:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64653366326261356464333666653861.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f33383138313766616537646330373130.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":84:29
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":85:7
-                { let v_7075695f6e61746976655f3338 = v_76616c7565.read(); state_set(v_7075695f6e61746976655f3338.clone(), v_636c616d70.read().call_authored(vec![v_6e6578745f5f34323630656562383533396238663164.clone()]), Value::string("reason: continuous control display")) };
+                { let v_7075695f6e61746976655f3338 = v_76616c7565.read(); state_set(v_7075695f6e61746976655f3338.clone(), v_636c616d70.read().call_authored(vec![v_6e6578745f5f32613130376635356265303964356537.clone()]), Value::string("reason: continuous control display")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":86:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64653366326261356464333666653861.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f33383138313766616537646330373130.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":86:29
                     return Value::boolean(false);
                 }
@@ -497,87 +479,87 @@ pub struct GeneratedData0 {
                     { let v_7075695f6e61746976655f3339 = { let value = (v_72756e.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3339.clone()).owner()) };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":88:7
-                return v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64653366326261356464333666653861.clone()]);
+                return v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f33383138313766616537646330373130.clone()]);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":90:11
             v_63616e63656c.initialize({  let v_7068617365 = v_7068617365.clone(); let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7075626c697368 = v_7075626c697368.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":91:13
-                let v_7469636b65745f5f64326335646230333836306132666632 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                let v_7469636b65745f5f35646338346663646162653035333132 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":92:7
                 if ({ let left = Value::boolean(!({ let value = (v_72756e.read()).borrow().clone(); value }).truthy()); if !left.truthy() { Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3430 = v_7068617365.read(); (v_7075695f6e61746976655f3430.clone()).get() }), &(Value::string("idle")))) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":92:43
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":93:13
-                let v_62617369735f5f35376264356135636338646163343563 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
+                let v_62617369735f5f30363162316334636435333561643132 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":94:7
                 { let v_7075695f6e61746976655f3431 = v_7068617365.read(); state_set(v_7075695f6e61746976655f3431.clone(), Value::string("idle"), Value::string("reason: continuous control canceled")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":95:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64326335646230333836306132666632.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_7075626c697368.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f64326335646230333836306132666632.clone()])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f35646338346663646162653035333132.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_7075626c697368.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f35646338346663646162653035333132.clone()])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":95:59
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":96:7
                 if ({ let value = (v_72756e.read()).borrow().clone(); value }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":96:16
-                    { let v_7075695f6e61746976655f3432 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3432.clone()).owner(), Value::string("interactionCancel"), record(vec![("value", { let value = (v_6163636570746564.read()).borrow().clone(); value }), ("revision", v_62617369735f5f35376264356135636338646163343563.clone())])) };
+                    { let v_7075695f6e61746976655f3432 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3432.clone()).owner(), Value::string("interactionCancel"), record(vec![("value", { let value = (v_6163636570746564.read()).borrow().clone(); value }), ("revision", v_62617369735f5f30363162316334636435333561643132.clone())])) };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":97:7
                 return Value::boolean(true);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":99:11
             v_70726f706f7365.initialize({  let v_7068617365 = v_7068617365.clone(); let v_6d696e696d756d = v_6d696e696d756d.clone(); let v_6d6178696d756d = v_6d6178696d756d.clone(); let v_72756e = v_72756e.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_73746570506f6c696379 = v_73746570506f6c696379.clone(); let v_66696e65506f6c696379 = v_66696e65506f6c696379.clone(); let v_64726167506f6c696379 = v_64726167506f6c696379.clone(); let v_646f75626c65506f6c696379 = v_646f75626c65506f6c696379.clone(); let v_746170506f6c696379 = v_746170506f6c696379.clone(); let v_6b6579626f617264506f6c696379 = v_6b6579626f617264506f6c696379.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_636c616d70 = v_636c616d70.clone(); let v_7075626c697368 = v_7075626c697368.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f62343530636237336332633561306132: Value = arg(&arguments, 0);
-                let v_7469636b65745f5f65626536366437313864613864373433: Value = arg(&arguments, 1);
+                let v_6e6578745f5f36313263353961616232376330333930: Value = arg(&arguments, 0);
+                let v_7469636b65745f5f66663662663063666338663666363131: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":100:7
-                if ({ let left = { let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65626536366437313864613864373433.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_6e6578745f5f62343530636237336332633561306132.clone()))).truthy()) } else { left } }).truthy() {
+                if ({ let left = { let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f66663662663063666338663666363131.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_6e6578745f5f36313263353961616232376330333930.clone()))).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":100:69
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":101:13
-                let v_70726f706f73616c = v_636c616d70.read().call_authored(vec![v_6e6578745f5f62343530636237336332633561306132.clone()]);
+                let v_70726f706f73616c = v_636c616d70.read().call_authored(vec![v_6e6578745f5f36313263353961616232376330333930.clone()]);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":102:13
-                let v_62617369735f5f31303637303538613462363564333265 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
+                let v_62617369735f5f61333763383461613563363130323832 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":103:13
-                let v_70726f70735f5f33356666666236623964383533303061 = { let v_7075695f6e61746976655f3433 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3433.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3433.clone()).owner(), false) } };
+                let v_70726f70735f5f35306233383665373930623464616438 = { let v_7075695f6e61746976655f3433 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3433.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3433.clone()).owner(), false) } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":108:13
-                let v_6563686f65645f5f30623563653365323362316238663138 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3434 = v_7068617365.read(); (v_7075695f6e61746976655f3434.clone()).get() }), &(Value::string("idle")))); if left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f33356666666236623964383533303061.clone()).member("previewEcho", true)), &(Value::boolean(true)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f33356666666236623964383533303061.clone()).member("value", false)), &(v_70726f706f73616c.clone()))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }), &(v_62617369735f5f31303637303538613462363564333265.clone()))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("min", false); if left.nullish() { Value::number(0.0) } else { left } }), &({ let v_7075695f6e61746976655f3435 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3435.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("max", false); if left.nullish() { Value::number(1.0) } else { left } }), &({ let v_7075695f6e61746976655f3436 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3436.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&((v_70726f70735f5f33356666666236623964383533303061.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("step", false); if left.nullish() { Value::number(0.01) } else { left } }), &({ let value = (v_73746570506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } }), &({ let value = (v_66696e65506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("dragMode", false); if left.nullish() { Value::string("absolute") } else { left } }), &({ let value = (v_64726167506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("doubleAction", false); if left.nullish() { Value::string("reset") } else { left } }), &({ let value = (v_646f75626c65506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("tapAction", false); if left.nullish() { Value::string("none") } else { left } }), &({ let value = (v_746170506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f33356666666236623964383533303061.clone()).member("keyMode", false); if left.nullish() { Value::string("scalar") } else { left } }), &({ let value = (v_6b6579626f617264506f6c696379.read()).borrow().clone(); value }))) } else { left } };
+                let v_6563686f65645f5f31646639353466643236333035393661 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3434 = v_7068617365.read(); (v_7075695f6e61746976655f3434.clone()).get() }), &(Value::string("idle")))); if left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f35306233383665373930623464616438.clone()).member("previewEcho", true)), &(Value::boolean(true)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f35306233383665373930623464616438.clone()).member("value", false)), &(v_70726f706f73616c.clone()))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }), &(v_62617369735f5f61333763383461613563363130323832.clone()))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("min", false); if left.nullish() { Value::number(0.0) } else { left } }), &({ let v_7075695f6e61746976655f3435 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3435.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("max", false); if left.nullish() { Value::number(1.0) } else { left } }), &({ let v_7075695f6e61746976655f3436 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3436.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&((v_70726f70735f5f35306233383665373930623464616438.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("step", false); if left.nullish() { Value::number(0.01) } else { left } }), &({ let value = (v_73746570506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } }), &({ let value = (v_66696e65506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("dragMode", false); if left.nullish() { Value::string("absolute") } else { left } }), &({ let value = (v_64726167506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("doubleAction", false); if left.nullish() { Value::string("reset") } else { left } }), &({ let value = (v_646f75626c65506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("tapAction", false); if left.nullish() { Value::string("none") } else { left } }), &({ let value = (v_746170506f6c696379.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f35306233383665373930623464616438.clone()).member("keyboardMode", false); if left.nullish() { Value::string("full") } else { left } }), &({ let value = (v_6b6579626f617264506f6c696379.read()).borrow().clone(); value }))) } else { left } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":115:7
                 { let v_7075695f6e61746976655f3437 = v_7068617365.read(); state_set(v_7075695f6e61746976655f3437.clone(), Value::string("idle"), Value::string("reason: continuous control proposal")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":116:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65626536366437313864613864373433.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f66663662663063666338663666363131.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":116:29
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":117:7
-                if (v_6563686f65645f5f30623563653365323362316238663138.clone()).truthy() {
+                if (v_6563686f65645f5f31646639353466643236333035393661.clone()).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":117:19
                     { let value = v_70726f706f73616c.clone(); *(v_6163636570746564.read()).borrow_mut() = value; }
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":118:7
-                if (Value::boolean(!(v_7075626c697368.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f65626536366437313864613864373433.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_7075626c697368.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f66663662663063666338663666363131.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":118:39
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":119:7
                 if ({ let value = (v_72756e.read()).borrow().clone(); value }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":119:16
-                    { let v_7075695f6e61746976655f3438 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3438.clone()).owner(), Value::string("valueCommit"), record(vec![("value", v_70726f706f73616c.clone()), ("revision", v_62617369735f5f31303637303538613462363564333265.clone())])) };
+                    { let v_7075695f6e61746976655f3438 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3438.clone()).owner(), Value::string("valueCommit"), record(vec![("value", v_70726f706f73616c.clone()), ("revision", v_62617369735f5f61333763383461613563363130323832.clone())])) };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":120:7
                 return Value::boolean(true);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":122:11
             v_70726576696577.initialize({  let v_76616c7565 = v_76616c7565.clone(); let v_72756e = v_72756e.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_7075626c697368 = v_7075626c697368.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e6578745f5f39356437666630663563376664663234: Value = arg(&arguments, 0);
-                let v_7469636b65745f5f38333136373639633633653334396636: Value = arg(&arguments, 1);
+                let v_6e6578745f5f34393664383439363035643539306130: Value = arg(&arguments, 0);
+                let v_7469636b65745f5f39303532386639613231343737363136: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":123:7
-                if ({ let left = { let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f38333136373639633633653334396636.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_6e6578745f5f39356437666630663563376664663234.clone()))).truthy()) } else { left } }).truthy() {
+                if ({ let left = { let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f39303532386639613231343737363136.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_6e6578745f5f34393664383439363035643539306130.clone()))).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":123:69
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":124:7
-                if (Value::boolean(!(v_7075626c697368.read().call_authored(vec![v_6e6578745f5f39356437666630663563376664663234.clone(), v_7469636b65745f5f38333136373639633633653334396636.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_7075626c697368.read().call_authored(vec![v_6e6578745f5f34393664383439363035643539306130.clone(), v_7469636b65745f5f39303532386639613231343737363136.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":124:35
                     return Value::boolean(false);
                 }
@@ -587,7 +569,7 @@ pub struct GeneratedData0 {
                     { let v_7075695f6e61746976655f3439 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3439.clone()).owner(), Value::string("valuePreview"), record(vec![("value", { let v_7075695f6e61746976655f3530 = v_76616c7565.read(); (v_7075695f6e61746976655f3530.clone()).get() }), ("revision", { let value = (v_7265766973696f6e.read()).borrow().clone(); value })])) };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":126:7
-                return v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f38333136373639633633653334396636.clone()]);
+                return v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f39303532386639613231343737363136.clone()]);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":128:11
             v_65646974.initialize({  let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_63616e63656c = v_63616e63656c.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
@@ -597,11 +579,11 @@ pub struct GeneratedData0 {
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":130:13
-                let v_7469636b65745f5f64646264363531316236613263386431 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
+                let v_7469636b65745f5f30633237393064313538646633613830 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":131:7
                 v_63616e63656c.read().call_authored(vec![]);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":132:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64646264363531316236613263386431.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f30633237393064313538646633613830.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":132:43
                     return Value::boolean(false);
                 }
@@ -621,25 +603,25 @@ pub struct GeneratedData0 {
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":138:13
-                let v_7469636b65745f5f65316139323061646635356636333933 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
+                let v_7469636b65745f5f37636233326633353331656437373231 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":139:7
                 v_63616e63656c.read().call_authored(vec![]);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":140:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65316139323061646635356636333933.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f37636233326633353331656437373231.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":140:43
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":141:7
-                return v_70726f706f7365.read().call_authored(vec![{ let left = ({ let v_7075695f6e61746976655f3532 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3532.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3532.clone()).owner(), false) } }).member("defaultValue", true); if left.nullish() { { let value = (v_6163636570746564.read()).borrow().clone(); value } } else { left } }, v_7469636b65745f5f65316139323061646635356636333933.clone()]);
+                return v_70726f706f7365.read().call_authored(vec![{ let left = ({ let v_7075695f6e61746976655f3532 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3532.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3532.clone()).owner(), false) } }).member("defaultValue", true); if left.nullish() { { let value = (v_6163636570746564.read()).borrow().clone(); value } } else { left } }, v_7469636b65745f5f37636233326633353331656437373231.clone()]);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":143:5
             { let v_7075695f6e61746976655f3533 = v_646566.clone(); expose_method(&owner, Value::string("begin"), {  let v_7068617365 = v_7068617365.clone(); let v_696e697469616c56616c7565 = v_696e697469616c56616c7565.clone(); let v_666f637573 = v_666f637573.clone(); let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_70726576696577 = v_70726576696577.clone(); let v_65646974 = v_65646974.clone(); let v_7265736574 = v_7265736574.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_63616e6469646174655f5f39383836346239656138306134303166: Value = arg(&arguments, 0);
+                let v_63616e6469646174655f5f66623331666638643538623163363735: Value = arg(&arguments, 0);
                 let v_6a756d70: Value = arg(&arguments, 1);
                 let v_72657365744d6f646966696572: Value = arg(&arguments, 2);
                 let v_646f75626c65: Value = arg(&arguments, 3);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":144:7
-                if ({ let left = { let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3534 = v_7068617365.read(); (v_7075695f6e61746976655f3534.clone()).get() }), &(Value::string("idle")))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_63616e6469646174655f5f39383836346239656138306134303166.clone()))).truthy()) } else { left } }).truthy() {
+                if ({ let left = { let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3534 = v_7068617365.read(); (v_7075695f6e61746976655f3534.clone()).get() }), &(Value::string("idle")))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_63616e6469646174655f5f66623331666638643538623163363735.clone()))).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":144:80
                     return Value::boolean(false);
                 }
@@ -654,25 +636,25 @@ pub struct GeneratedData0 {
                     return v_7265736574.read().call_authored(vec![]);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":147:13
-                let v_7469636b65745f5f65616431666461383165326338663337 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                let v_7469636b65745f5f65313238656538366536656235623666 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":148:7
                 { let v_7075695f6e61746976655f3537 = v_666f637573.read(); focus_request(&(v_7075695f6e61746976655f3537.clone()).owner(), Value::Undefined, false) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":149:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65616431666461383165326338663337.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65313238656538366536656235623666.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":149:43
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":150:7
                 { let v_7075695f6e61746976655f3538 = v_696e697469616c56616c7565.read(); state_set(v_7075695f6e61746976655f3538.clone(), { let value = (v_6163636570746564.read()).borrow().clone(); value }, Value::string("reason: continuous control starting authority")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":151:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65616431666461383165326338663337.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65313238656538366536656235623666.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":151:29
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":152:7
                 { let v_7075695f6e61746976655f3539 = v_7068617365.read(); state_set(v_7075695f6e61746976655f3539.clone(), if (v_6a756d70.clone()).truthy() { Value::string("dragging") } else { Value::string("armed") }, Value::string("reason: continuous control press")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":153:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65616431666461383165326338663337.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65313238656538366536656235623666.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":153:29
                     return Value::boolean(false);
                 }
@@ -682,14 +664,14 @@ pub struct GeneratedData0 {
                     { let v_7075695f6e61746976655f3630 = { let value = (v_72756e.read()).borrow().clone(); value }; emit(&(v_7075695f6e61746976655f3630.clone()).owner(), Value::string("interactionStart"), record(vec![("value", { let value = (v_6163636570746564.read()).borrow().clone(); value }), ("revision", { let value = (v_7265766973696f6e.read()).borrow().clone(); value })])) };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":155:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65616431666461383165326338663337.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65313238656538366536656235623666.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":155:29
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":156:7
                 if (v_6a756d70.clone()).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":156:17
-                    return v_70726576696577.read().call_authored(vec![v_63616e6469646174655f5f39383836346239656138306134303166.clone(), v_7469636b65745f5f65616431666461383165326338663337.clone()]);
+                    return v_70726576696577.read().call_authored(vec![v_63616e6469646174655f5f66623331666638643538623163363735.clone(), v_7469636b65745f5f65313238656538366536656235623666.clone()]);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":157:7
                 if ({ let value = (v_72756e.read()).borrow().clone(); value }).truthy() {
@@ -697,88 +679,88 @@ pub struct GeneratedData0 {
                     { let v_7075695f6e61746976655f3631 = { let value = (v_72756e.read()).borrow().clone(); value }; request_update(&(v_7075695f6e61746976655f3631.clone()).owner()) };
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":158:7
-                return v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65616431666461383165326338663337.clone()]);
+                return v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f65313238656538366536656235623666.clone()]);
             })) }) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":160:11
             v_73616d706c65.initialize({  let v_7068617365 = v_7068617365.clone(); let v_696e697469616c56616c7565 = v_696e697469616c56616c7565.clone(); let v_72756e = v_72756e.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_63616e63656c = v_63616e63656c.clone(); let v_70726576696577 = v_70726576696577.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_63616e6469646174655f5f66396364663334666239346264373932: Value = arg(&arguments, 0);
-                let v_66696e6543616e6469646174655f5f66383430363439363131333634386431: Value = arg(&arguments, 1);
-                let v_63726f737365645f5f66393836616266333261623466386336: Value = arg(&arguments, 2);
-                let v_66696e655f5f31383764643033363066623231643039: Value = arg(&arguments, 3);
-                let v_7469636b65745f5f35393739333237626338626437306331: Value = arg(&arguments, 4);
+                let v_63616e6469646174655f5f33623232346135383539613334346532: Value = arg(&arguments, 0);
+                let v_66696e6543616e6469646174655f5f39376139356464613739343238356338: Value = arg(&arguments, 1);
+                let v_63726f737365645f5f34346538323835626338373666383363: Value = arg(&arguments, 2);
+                let v_66696e655f5f66363238613462396663653538383936: Value = arg(&arguments, 3);
+                let v_7469636b65745f5f63663636303335393239373366613533: Value = arg(&arguments, 4);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":161:7
-                if ({ let left = { let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f35393739333237626338626437306331.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3632 = v_7068617365.read(); (v_7075695f6e61746976655f3632.clone()).get() }), &(Value::string("idle")))) } else { left } }).truthy() {
+                if ({ let left = { let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f63663636303335393239373366613533.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3632 = v_7068617365.read(); (v_7075695f6e61746976655f3632.clone()).get() }), &(Value::string("idle")))) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":161:69
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":162:7
-                if ({ let left = Value::boolean(!(number_is_finite(&(v_63616e6469646174655f5f66396364663334666239346264373932.clone()))).truthy()); if !left.truthy() { Value::boolean(!(number_is_finite(&(v_66696e6543616e6469646174655f5f66383430363439363131333634386431.clone()))).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(number_is_finite(&(v_63616e6469646174655f5f33623232346135383539613334346532.clone()))).truthy()); if !left.truthy() { Value::boolean(!(number_is_finite(&(v_66696e6543616e6469646174655f5f39376139356464613739343238356338.clone()))).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":162:77
                     v_63616e63656c.read().call_authored(vec![]);
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":162:87
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":163:7
-                if ({ let left = Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3633 = v_7068617365.read(); (v_7075695f6e61746976655f3633.clone()).get() }), &(Value::string("armed")))); if left.truthy() { Value::boolean(!(v_63726f737365645f5f66393836616266333261623466386336.clone()).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3633 = v_7068617365.read(); (v_7075695f6e61746976655f3633.clone()).get() }), &(Value::string("armed")))); if left.truthy() { Value::boolean(!(v_63726f737365645f5f34346538323835626338373666383363.clone()).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":163:48
                     return Value::boolean(true);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":164:7
                 { let v_7075695f6e61746976655f3634 = v_7068617365.read(); state_set(v_7075695f6e61746976655f3634.clone(), Value::string("dragging"), Value::string("reason: continuous control dragging")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":165:7
-                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f35393739333237626338626437306331.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f63663636303335393239373366613533.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":165:29
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":166:11
-                let v_6e6578745f5f35333437323333373330353138636165 = Rc::new(std::cell::RefCell::new(if (v_66696e655f5f31383764643033363066623231643039.clone()).truthy() { v_66696e6543616e6469646174655f5f66383430363439363131333634386431.clone() } else { v_63616e6469646174655f5f66396364663334666239346264373932.clone() }));
+                let v_6e6578745f5f63333030383539663964643130376463 = Rc::new(std::cell::RefCell::new(if (v_66696e655f5f66363238613462396663653538383936.clone()).truthy() { v_66696e6543616e6469646174655f5f39376139356464613739343238356338.clone() } else { v_63616e6469646174655f5f33623232346135383539613334346532.clone() }));
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":167:13
-                let v_68616e646c655f5f63633738666639336539353764376564 = { let value = (v_72756e.read()).borrow().clone(); value };
+                let v_68616e646c655f5f63353734616236636434333135346530 = { let value = (v_72756e.read()).borrow().clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":168:7
-                if ({ let left = v_68616e646c655f5f63633738666639336539353764376564.clone(); if left.truthy() { Value::boolean(strict_equal(&(({ let v_7075695f6e61746976655f3635 = v_68616e646c655f5f63633738666639336539353764376564.clone(); read_props(&(v_7075695f6e61746976655f3635.clone()).owner(), false) }).member("dragMode", false)), &(Value::string("steps")))) } else { left } }).truthy() {
+                if ({ let left = v_68616e646c655f5f63353734616236636434333135346530.clone(); if left.truthy() { Value::boolean(strict_equal(&(({ let v_7075695f6e61746976655f3635 = v_68616e646c655f5f63353734616236636434333135346530.clone(); read_props(&(v_7075695f6e61746976655f3635.clone()).owner(), false) }).member("dragMode", false)), &(Value::string("steps")))) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":169:15
-                    let v_616d6f756e745f5f65323230383363363766306662633730 = if (v_66696e655f5f31383764643033363066623231643039.clone()).truthy() { { let left = ({ let v_7075695f6e61746976655f3636 = v_68616e646c655f5f63633738666639336539353764376564.clone(); read_props(&(v_7075695f6e61746976655f3636.clone()).owner(), false) }).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } } } else { { let left = ({ let v_7075695f6e61746976655f3637 = v_68616e646c655f5f63633738666639336539353764376564.clone(); read_props(&(v_7075695f6e61746976655f3637.clone()).owner(), false) }).member("step", false); if left.nullish() { Value::number(0.01) } else { left } } };
+                    let v_616d6f756e745f5f32663637666639393161383134366264 = if (v_66696e655f5f66363238613462396663653538383936.clone()).truthy() { { let left = ({ let v_7075695f6e61746976655f3636 = v_68616e646c655f5f63353734616236636434333135346530.clone(); read_props(&(v_7075695f6e61746976655f3636.clone()).owner(), false) }).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } } } else { { let left = ({ let v_7075695f6e61746976655f3637 = v_68616e646c655f5f63353734616236636434333135346530.clone(); read_props(&(v_7075695f6e61746976655f3637.clone()).owner(), false) }).member("step", false); if left.nullish() { Value::number(0.01) } else { left } } };
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":170:9
-                    { let value = add({ let v_7075695f6e61746976655f3638 = v_696e697469616c56616c7565.read(); (v_7075695f6e61746976655f3638.clone()).get() }, Value::number((Value::number({ let input: f64 = (v_63616e6469646174655f5f66396364663334666239346264373932.clone()).scalar_number(); if !input.is_finite() || input == 0.0 || input.abs() >= 4503599627370496.0 { input } else if input >= -0.5 && input < 0.0 { -0.0 } else { let lower = input.floor(); if input - lower >= 0.5 { lower + 1.0 } else { lower } } })).scalar_number() * (v_616d6f756e745f5f65323230383363363766306662633730.clone()).scalar_number())); *(v_6e6578745f5f35333437323333373330353138636165.clone()).borrow_mut() = value; }
+                    { let value = add({ let v_7075695f6e61746976655f3638 = v_696e697469616c56616c7565.read(); (v_7075695f6e61746976655f3638.clone()).get() }, Value::number((Value::number({ let input: f64 = (v_63616e6469646174655f5f33623232346135383539613334346532.clone()).scalar_number(); if !input.is_finite() || input == 0.0 || input.abs() >= 4503599627370496.0 { input } else if input >= -0.5 && input < 0.0 { -0.0 } else { let lower = input.floor(); if input - lower >= 0.5 { lower + 1.0 } else { lower } } })).scalar_number() * (v_616d6f756e745f5f32663637666639393161383134366264.clone()).scalar_number())); *(v_6e6578745f5f63333030383539663964643130376463.clone()).borrow_mut() = value; }
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":172:7
-                return v_70726576696577.read().call_authored(vec![{ let value = (v_6e6578745f5f35333437323333373330353138636165.clone()).borrow().clone(); value }, v_7469636b65745f5f35393739333237626338626437306331.clone()]);
+                return v_70726576696577.read().call_authored(vec![{ let value = (v_6e6578745f5f63333030383539663964643130376463.clone()).borrow().clone(); value }, v_7469636b65745f5f63663636303335393239373366613533.clone()]);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":174:5
             { let v_7075695f6e61746976655f3639 = v_646566.clone(); expose_method(&owner, Value::string("sample"), {  let v_65706f6368 = v_65706f6368.clone(); let v_73616d706c65 = v_73616d706c65.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_63616e6469646174655f5f32303334333739656635616634626663: Value = arg(&arguments, 0);
-                let v_66696e6543616e6469646174655f5f63363166613436633661306534343930: Value = arg(&arguments, 1);
-                let v_63726f737365645f5f36313336643463613231646436353265: Value = arg(&arguments, 2);
-                let v_66696e655f5f33313035326334656364623930313239: Value = arg(&arguments, 3);
+                let v_63616e6469646174655f5f33333232633664613132636161613763: Value = arg(&arguments, 0);
+                let v_66696e6543616e6469646174655f5f62363133623562303538303561613131: Value = arg(&arguments, 1);
+                let v_63726f737365645f5f35303538343337333363643537316135: Value = arg(&arguments, 2);
+                let v_66696e655f5f36313561366432366461653963323937: Value = arg(&arguments, 3);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":175:13
-                let v_7469636b65745f5f34346437656539373833343661383539 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                let v_7469636b65745f5f39333332363732383366616232626236 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":176:7
-                return v_73616d706c65.read().call_authored(vec![v_63616e6469646174655f5f32303334333739656635616634626663.clone(), v_66696e6543616e6469646174655f5f63363166613436633661306534343930.clone(), v_63726f737365645f5f36313336643463613231646436353265.clone(), v_66696e655f5f33313035326334656364623930313239.clone(), v_7469636b65745f5f34346437656539373833343661383539.clone()]);
+                return v_73616d706c65.read().call_authored(vec![v_63616e6469646174655f5f33333232633664613132636161613763.clone(), v_66696e6543616e6469646174655f5f62363133623562303538303561613131.clone(), v_63726f737365645f5f35303538343337333363643537316135.clone(), v_66696e655f5f36313561366432366461653963323937.clone(), v_7469636b65745f5f39333332363732383366616232626236.clone()]);
             })) }) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":178:5
             { let v_7075695f6e61746976655f3730 = v_646566.clone(); expose_method(&owner, Value::string("finish"), {  let v_7068617365 = v_7068617365.clone(); let v_76616c7565 = v_76616c7565.clone(); let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_7075626c697368 = v_7075626c697368.clone(); let v_70726f706f7365 = v_70726f706f7365.clone(); let v_73616d706c65 = v_73616d706c65.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_63616e6469646174655f5f37623563613835613162643632323335: Value = arg(&arguments, 0);
-                let v_66696e6543616e6469646174655f5f38646237336638656637333061623064: Value = arg(&arguments, 1);
-                let v_63726f737365645f5f31373764353031323765623065626235: Value = arg(&arguments, 2);
-                let v_66696e655f5f30623532613038373033653031636564: Value = arg(&arguments, 3);
+                let v_63616e6469646174655f5f64323461386564663633353939616630: Value = arg(&arguments, 0);
+                let v_66696e6543616e6469646174655f5f35393437383836313930376561303331: Value = arg(&arguments, 1);
+                let v_63726f737365645f5f33633565303536666336386535616231: Value = arg(&arguments, 2);
+                let v_66696e655f5f33306430383839643132616661303866: Value = arg(&arguments, 3);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":179:13
-                let v_7469636b65745f5f31376239333931623833333938653038 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                let v_7469636b65745f5f32336265343766626461346233663534 = { let cell = v_65706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":180:7
-                if ({ let left = Value::boolean(!(v_73616d706c65.read().call_authored(vec![v_63616e6469646174655f5f37623563613835613162643632323335.clone(), v_66696e6543616e6469646174655f5f38646237336638656637333061623064.clone(), v_63726f737365645f5f31373764353031323765623065626235.clone(), v_66696e655f5f30623532613038373033653031636564.clone(), v_7469636b65745f5f31376239333931623833333938653038.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f31376239333931623833333938653038.clone()])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_73616d706c65.read().call_authored(vec![v_63616e6469646174655f5f64323461386564663633353939616630.clone(), v_66696e6543616e6469646174655f5f35393437383836313930376561303331.clone(), v_63726f737365645f5f33633565303536666336386535616231.clone(), v_66696e655f5f33306430383839643132616661303866.clone(), v_7469636b65745f5f32336265343766626461346233663534.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f32336265343766626461346233663534.clone()])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":180:89
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":181:7
                 if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f3731 = v_7068617365.read(); (v_7075695f6e61746976655f3731.clone()).get() }), &(Value::string("dragging"))))).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":181:39
-                    return v_70726f706f7365.read().call_authored(vec![{ let v_7075695f6e61746976655f3732 = v_76616c7565.read(); (v_7075695f6e61746976655f3732.clone()).get() }, v_7469636b65745f5f31376239333931623833333938653038.clone()]);
+                    return v_70726f706f7365.read().call_authored(vec![{ let v_7075695f6e61746976655f3732 = v_76616c7565.read(); (v_7075695f6e61746976655f3732.clone()).get() }, v_7469636b65745f5f32336265343766626461346233663534.clone()]);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":182:13
                 let v_616374696f6e = { let left = ({ let v_7075695f6e61746976655f3733 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3733.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3733.clone()).owner(), false) } }).member("tapAction", true); if left.nullish() { Value::string("none") } else { left } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":183:7
                 { let v_7075695f6e61746976655f3734 = v_7068617365.read(); state_set(v_7075695f6e61746976655f3734.clone(), Value::string("idle"), Value::string("reason: continuous control released")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":184:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f31376239333931623833333938653038.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_7075626c697368.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f31376239333931623833333938653038.clone()])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f32336265343766626461346233663534.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_7075626c697368.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f32336265343766626461346233663534.clone()])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":184:59
                     return Value::boolean(false);
                 }
@@ -790,7 +772,7 @@ pub struct GeneratedData0 {
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":186:7
                 if (Value::boolean(strict_equal(&(v_616374696f6e.clone()), &(Value::string("commit"))))).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":186:32
-                    return v_70726f706f7365.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f31376239333931623833333938653038.clone()]);
+                    return v_70726f706f7365.read().call_authored(vec![{ let value = (v_6163636570746564.read()).borrow().clone(); value }, v_7469636b65745f5f32336265343766626461346233663534.clone()]);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":187:7
                 if ({ let left = { let left = { let value = (v_72756e.read()).borrow().clone(); value }; if left.truthy() { Value::boolean(!strict_equal(&(v_616374696f6e.clone()), &(Value::string("activate")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_616374696f6e.clone()), &(Value::string("commit")))) } else { left } }).truthy() {
@@ -808,28 +790,28 @@ pub struct GeneratedData0 {
             { let v_7075695f6e61746976655f3739 = v_646566.clone(); expose_method(&owner, Value::string("reset"), v_7265736574.read()) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":193:11
             v_61646a757374.initialize({  let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_63616e63656c = v_63616e63656c.clone(); let v_70726f706f7365 = v_70726f706f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_646972656374696f6e5f5f37373836363836316538343434393238: Value = arg(&arguments, 0);
-                let v_66696e655f5f34396636313436306538393838323134: Value = arg(&arguments, 1);
+                let v_646972656374696f6e5f5f32366337373531613065353461356466: Value = arg(&arguments, 0);
+                let v_66696e655f5f31336331376333383237313435663535: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":194:7
-                if ({ let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!(number_is_finite(&(v_646972656374696f6e5f5f37373836363836316538343434393238.clone()))).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!(number_is_finite(&(v_646972656374696f6e5f5f32366337373531613065353461356466.clone()))).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":194:54
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":195:13
-                let v_7469636b65745f5f64363061646664653662356166303037 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
+                let v_7469636b65745f5f61666236333663643538306639316334 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":196:7
                 v_63616e63656c.read().call_authored(vec![]);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":197:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64363061646664653662356166303037.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f61666236333663643538306639316334.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":197:43
                     return Value::boolean(false);
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":198:13
-                let v_70726f70735f5f62623833666435303635316464653833 = { let v_7075695f6e61746976655f3830 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3830.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3830.clone()).owner(), false) } };
+                let v_70726f70735f5f34626534363265626637316431613265 = { let v_7075695f6e61746976655f3830 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3830.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3830.clone()).owner(), false) } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":199:13
-                let v_616d6f756e745f5f37646164306663626564353435613336 = if (v_66696e655f5f34396636313436306538393838323134.clone()).truthy() { { let left = (v_70726f70735f5f62623833666435303635316464653833.clone()).member("fineStep", true); if left.nullish() { Value::number(0.001) } else { left } } } else { { let left = (v_70726f70735f5f62623833666435303635316464653833.clone()).member("step", true); if left.nullish() { Value::number(0.01) } else { left } } };
+                let v_616d6f756e745f5f65663432373138353930633738383737 = if (v_66696e655f5f31336331376333383237313435663535.clone()).truthy() { { let left = (v_70726f70735f5f34626534363265626637316431613265.clone()).member("fineStep", true); if left.nullish() { Value::number(0.001) } else { left } } } else { { let left = (v_70726f70735f5f34626534363265626637316431613265.clone()).member("step", true); if left.nullish() { Value::number(0.01) } else { left } } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":200:7
-                return v_70726f706f7365.read().call_authored(vec![add({ let value = (v_6163636570746564.read()).borrow().clone(); value }, Value::number((v_646972656374696f6e5f5f37373836363836316538343434393238.clone()).scalar_number() * (v_616d6f756e745f5f37646164306663626564353435613336.clone()).scalar_number())), v_7469636b65745f5f64363061646664653662356166303037.clone()]);
+                return v_70726f706f7365.read().call_authored(vec![add({ let value = (v_6163636570746564.read()).borrow().clone(); value }, Value::number((v_646972656374696f6e5f5f32366337373531613065353461356466.clone()).scalar_number() * (v_616d6f756e745f5f65663432373138353930633738383737.clone()).scalar_number())), v_7469636b65745f5f61666236333663643538306639316334.clone()]);
             })) });
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":202:5
             { let v_7075695f6e61746976655f3831 = v_646566.clone(); expose_method(&owner, Value::string("adjust"), v_61646a757374.read()) };
@@ -847,332 +829,323 @@ pub struct GeneratedData0 {
             })) }, Value::Undefined) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":205:5
             { let v_7075695f6e61746976655f3834 = v_646566.clone(); listen_numeric_value(&owner, Value::string("host:verdant-scalar-set-value"), false, {  let v_65706f6368 = v_65706f6368.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_63616e63656c = v_63616e63656c.clone(); let v_70726f706f7365 = v_70726f706f7365.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_5f63757272656e745f5f66366332376462333063633166356339: Value = arg(&arguments, 0);
+                let v_5f63757272656e745f5f32356130383432356631643038316532: Value = arg(&arguments, 0);
                 let v_6f7061717565: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":206:13
-                let v_6576656e745f5f66613762356539613661396230383336 = v_6f7061717565.clone();
+                let v_6576656e745f5f30356139313934336232656266333366 = v_6f7061717565.clone();
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":207:13
-                let v_6e6578745f5f37393139333764343563376462633531 = (v_6576656e745f5f66613762356539613661396230383336.clone()).member("value", false);
+                let v_6e6578745f5f37333965303864353139636330656638 = (v_6576656e745f5f30356139313934336232656266333366.clone()).member("value", false);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":208:7
-                if ({ let left = { let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(typeof_value(&(v_6e6578745f5f37393139333764343563376462633531.clone()))), &(Value::string("number")))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_6e6578745f5f37393139333764343563376462633531.clone()))).truthy()) } else { left } }).truthy() {
+                if ({ let left = { let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { Value::boolean(!strict_equal(&(typeof_value(&(v_6e6578745f5f37333965303864353139636330656638.clone()))), &(Value::string("number")))) } else { left } }; if !left.truthy() { Value::boolean(!(number_is_finite(&(v_6e6578745f5f37333965303864353139636330656638.clone()))).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":208:77
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":209:13
-                let v_7469636b65745f5f64636164386133666563333064333832 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
+                let v_7469636b65745f5f39343236316235396363653863633066 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":210:7
                 v_63616e63656c.read().call_authored(vec![]);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":211:7
-                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f64636164386133666563333064333832.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
+                if ({ let left = Value::boolean(!(v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f39343236316235396363653863633066.clone()])).truthy()); if !left.truthy() { Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()) } else { left } }).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":211:43
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":212:7
-                v_70726f706f7365.read().call_authored(vec![v_6e6578745f5f37393139333764343563376462633531.clone(), v_7469636b65745f5f64636164386133666563333064333832.clone()]);
+                v_70726f706f7365.read().call_authored(vec![v_6e6578745f5f37333965303864353139636330656638.clone(), v_7469636b65745f5f39343236316235396363653863633066.clone()]);
                 Value::Undefined
             })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":214:11
-            v_6b6579.initialize({  let v_7068617365 = v_7068617365.clone(); let v_6d696e696d756d = v_6d696e696d756d.clone(); let v_6d6178696d756d = v_6d6178696d756d.clone(); let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_63616e63656c = v_63616e63656c.clone(); let v_70726f706f7365 = v_70726f706f7365.clone(); let v_65646974 = v_65646974.clone(); let v_7265736574 = v_7265736574.clone(); let v_61646a757374 = v_61646a757374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_6e616d65: Value = arg(&arguments, 0);
-                let v_7368696674: Value = arg(&arguments, 1);
-                let v_636f6d6d616e64: Value = arg(&arguments, 2);
-                let v_616c74: Value = arg(&arguments, 3);
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":214:5
+            { let v_7075695f6e61746976655f3835 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_7068617365 = v_7068617365.clone(); let v_6d696e696d756d = v_6d696e696d756d.clone(); let v_6d6178696d756d = v_6d6178696d756d.clone(); let v_72756e = v_72756e.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_63757272656e74 = v_63757272656e74.clone(); let v_656e61626c6564 = v_656e61626c6564.clone(); let v_63616e63656c = v_63616e63656c.clone(); let v_70726f706f7365 = v_70726f706f7365.clone(); let v_65646974 = v_65646974.clone(); let v_7265736574 = v_7265736574.clone(); let v_61646a757374 = v_61646a757374.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_5f63757272656e745f5f63383735333766353566613662363633: Value = arg(&arguments, 0);
+                let v_6576656e745f5f33643636356539333466316638633565: Value = arg(&arguments, 1);
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":215:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Escape"))))).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":216:15
-                    let v_616374697665 = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3835 = v_7068617365.read(); (v_7075695f6e61746976655f3835.clone()).get() }), &(Value::string("idle"))));
+                if (Value::boolean(strict_equal(&((v_6576656e745f5f33643636356539333466316638633565.clone()).member("key", false)), &(Value::string("Escape"))))).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":216:9
+                    if (Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3836 = v_7068617365.read(); (v_7075695f6e61746976655f3836.clone()).get() }), &(Value::string("idle"))))).truthy() {
+                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":216:37
+                        { let v_7075695f6e61746976655f3837 = v_6576656e745f5f33643636356539333466316638633565.clone(); prevent(v_7075695f6e61746976655f3837.clone()) };
+                    }
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":217:9
                     v_63616e63656c.read().call_authored(vec![]);
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":217:19
-                    return v_616374697665.clone();
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":219:7
-                if ({ let left = { let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { v_616c74.clone() } else { left } }; if !left.truthy() { v_636f6d6d616e64.clone() } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":219:41
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":222:7
-                if ({ let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(({ let v_7075695f6e61746976655f3836 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3836.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3836.clone()).owner(), false) } }).member("keyMode", true)), &(Value::string("table-point")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("+")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("=")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("-")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":223:58
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":224:7
-                if ({ let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowLeft")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowRight")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("PageUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("PageDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("Home")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("End")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("Enter")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("Backspace")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("+")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("=")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6e616d65.clone()), &(Value::string("-")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":226:102
-                    return Value::boolean(false);
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":227:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Enter"))))).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":227:31
-                    v_65646974.read().call_authored(vec![]);
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":227:39
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":228:7
-                if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Backspace"))))).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":228:35
-                    v_7265736574.read().call_authored(vec![]);
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":228:44
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":229:7
-                if ({ let left = Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Home")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("End")))) } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":230:15
-                    let v_7469636b65745f5f39393631666463356235643834643032 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":230:35
-                    v_63616e63656c.read().call_authored(vec![]);
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":231:9
-                    if ({ let left = v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f39393631666463356235643834643032.clone()]); if left.truthy() { v_656e61626c6564.read().call_authored(vec![]) } else { left } }).truthy() {
-                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":231:43
-                        v_70726f706f7365.read().call_authored(vec![if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("Home"))))).truthy() { { let v_7075695f6e61746976655f3837 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3837.clone()).get() } } else { { let v_7075695f6e61746976655f3838 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3838.clone()).get() } }, v_7469636b65745f5f39393631666463356235643834643032.clone()]);
-                    }
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":232:9
-                    return Value::boolean(true);
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":234:13
-                let v_646972656374696f6e5f5f61346138613361353561336361366366 = if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("PageUp"))))).truthy() { Value::number(10.0) } else { if (Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("PageDown"))))).truthy() { Value::number(-(Value::number(10.0)).scalar_number()) } else { if ({ let left = { let left = { let left = Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowRight")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("+")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6e616d65.clone()), &(Value::string("=")))) } else { left } }).truthy() { Value::number(1.0) } else { Value::number(-(Value::number(1.0)).scalar_number()) } } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":236:7
-                v_61646a757374.read().call_authored(vec![v_646972656374696f6e5f5f61346138613361353561336361366366.clone(), v_7368696674.clone()]);
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":237:7
-                return Value::boolean(true);
-            })) });
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":239:5
-            { let v_7075695f6e61746976655f3839 = v_646566.clone(); expose_method(&owner, Value::string("key"), v_6b6579.read()) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":240:5
-            { let v_7075695f6e61746976655f3930 = v_646566.clone(); listen(&owner, Value::string("key.down"), false, {  let v_6b6579 = v_6b6579.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_5f63757272656e745f5f39626535623834363661396364616434: Value = arg(&arguments, 0);
-                let v_6576656e745f5f33356561366436353636373335373039: Value = arg(&arguments, 1);
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":241:7
-                if (v_6b6579.read().call_authored(vec![{ let left = (v_6576656e745f5f33356561366436353636373335373039.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } }, Value::boolean(strict_equal(&((v_6576656e745f5f33356561366436353636373335373039.clone()).member("shiftKey", false)), &(Value::boolean(true)))), { let left = Value::boolean(strict_equal(&((v_6576656e745f5f33356561366436353636373335373039.clone()).member("ctrlKey", false)), &(Value::boolean(true)))); if !left.truthy() { Value::boolean(strict_equal(&((v_6576656e745f5f33356561366436353636373335373039.clone()).member("metaKey", false)), &(Value::boolean(true)))) } else { left } }, Value::boolean(strict_equal(&((v_6576656e745f5f33356561366436353636373335373039.clone()).member("altKey", false)), &(Value::boolean(true))))])).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":241:131
-                    { let v_7075695f6e61746976655f3931 = v_6576656e745f5f33356561366436353636373335373039.clone(); prevent(v_7075695f6e61746976655f3931.clone()) };
-                }
-                Value::Undefined
-            })) }, Value::Undefined) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":243:11
-            v_73796e63.initialize({  let v_7068617365 = v_7068617365.clone(); let v_76616c7565 = v_76616c7565.clone(); let v_6d696e696d756d = v_6d696e696d756d.clone(); let v_6d6178696d756d = v_6d6178696d756d.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_6c6162656c = v_6c6162656c.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_666f637573 = v_666f637573.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63696e67 = v_73796e63696e67.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_617574686f7269747945706f6368 = v_617574686f7269747945706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_73746570506f6c696379 = v_73746570506f6c696379.clone(); let v_66696e65506f6c696379 = v_66696e65506f6c696379.clone(); let v_64726167506f6c696379 = v_64726167506f6c696379.clone(); let v_646f75626c65506f6c696379 = v_646f75626c65506f6c696379.clone(); let v_746170506f6c696379 = v_746170506f6c696379.clone(); let v_6b6579626f617264506f6c696379 = v_6b6579626f617264506f6c696379.clone(); let v_617574686f7269747943757272656e74 = v_617574686f7269747943757272656e74.clone(); let v_636c616d70 = v_636c616d70.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_68616e646c655f5f39343061373865643433373564383833: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":244:7
-                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":244:21
                     return Value::Undefined;
                 }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":219:7
+                if ({ let left = { let left = { let left = Value::boolean(!(v_656e61626c6564.read().call_authored(vec![])).truthy()); if !left.truthy() { (v_6576656e745f5f33643636356539333466316638633565.clone()).member("altKey", false) } else { left } }; if !left.truthy() { (v_6576656e745f5f33643636356539333466316638633565.clone()).member("ctrlKey", false) } else { left } }; if !left.truthy() { (v_6576656e745f5f33643636356539333466316638633565.clone()).member("metaKey", false) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":219:73
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":220:13
+                let v_6b6579 = { let left = (v_6576656e745f5f33643636356539333466316638633565.clone()).member("key", false); if left.nullish() { Value::string("") } else { left } };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":224:7
+                if ({ let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&(({ let v_7075695f6e61746976655f3838 = { let value = (v_72756e.read()).borrow().clone(); value }; if v_7075695f6e61746976655f3838.nullish() { Value::Undefined } else { read_props(&(v_7075695f6e61746976655f3838.clone()).owner(), false) } }).member("keyboardMode", true)), &(Value::string("vertical-step")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("+")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("=")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("-")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":225:99
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":226:7
+                if ({ let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowLeft")))); if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowRight")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("PageUp")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("PageDown")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("Home")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("End")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("Enter")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("Backspace")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("+")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("=")))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&(v_6b6579.clone()), &(Value::string("-")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":228:97
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":229:7
+                { let v_7075695f6e61746976655f3839 = v_6576656e745f5f33643636356539333466316638633565.clone(); prevent(v_7075695f6e61746976655f3839.clone()) };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":230:7
+                if (Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Enter"))))).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":230:30
+                    v_65646974.read().call_authored(vec![]);
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":230:38
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":231:7
+                if (Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Backspace"))))).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":231:34
+                    v_7265736574.read().call_authored(vec![]);
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":231:43
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":232:7
+                if ({ let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Home")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("End")))) } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":233:15
+                    let v_7469636b65745f5f31316232666465386562636163633565 = add({ let value = (v_65706f6368.read()).borrow().clone(); value }, Value::number(1.0));
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":233:35
+                    v_63616e63656c.read().call_authored(vec![]);
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":234:9
+                    if ({ let left = v_63757272656e74.read().call_authored(vec![v_7469636b65745f5f31316232666465386562636163633565.clone()]); if left.truthy() { v_656e61626c6564.read().call_authored(vec![]) } else { left } }).truthy() {
+                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":234:43
+                        v_70726f706f7365.read().call_authored(vec![if (Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("Home"))))).truthy() { { let v_7075695f6e61746976655f3930 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3930.clone()).get() } } else { { let v_7075695f6e61746976655f3931 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3931.clone()).get() } }, v_7469636b65745f5f31316232666465386562636163633565.clone()]);
+                    }
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":235:9
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":237:13
+                let v_646972656374696f6e5f5f65383235326538376365663830353537 = if (Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("PageUp"))))).truthy() { Value::number(10.0) } else { if (Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("PageDown"))))).truthy() { Value::number(-(Value::number(10.0)).scalar_number()) } else { if ({ let left = { let left = { let left = Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowRight")))); if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("ArrowUp")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("+")))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&(v_6b6579.clone()), &(Value::string("=")))) } else { left } }).truthy() { Value::number(1.0) } else { Value::number(-(Value::number(1.0)).scalar_number()) } } };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":239:7
+                v_61646a757374.read().call_authored(vec![v_646972656374696f6e5f5f65383235326538376365663830353537.clone(), Value::boolean(strict_equal(&((v_6576656e745f5f33643636356539333466316638633565.clone()).member("shiftKey", false)), &(Value::boolean(true))))]);
+                Value::Undefined
+            })) }, Value::Undefined) };
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":241:11
+            v_73796e63.initialize({  let v_7068617365 = v_7068617365.clone(); let v_76616c7565 = v_76616c7565.clone(); let v_6d696e696d756d = v_6d696e696d756d.clone(); let v_6d6178696d756d = v_6d6178696d756d.clone(); let v_64697361626c6564 = v_64697361626c6564.clone(); let v_6c6162656c = v_6c6162656c.clone(); let v_726f6c65 = v_726f6c65.clone(); let v_666f637573 = v_666f637573.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63696e67 = v_73796e63696e67.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_617574686f7269747945706f6368 = v_617574686f7269747945706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_73746570506f6c696379 = v_73746570506f6c696379.clone(); let v_66696e65506f6c696379 = v_66696e65506f6c696379.clone(); let v_64726167506f6c696379 = v_64726167506f6c696379.clone(); let v_646f75626c65506f6c696379 = v_646f75626c65506f6c696379.clone(); let v_746170506f6c696379 = v_746170506f6c696379.clone(); let v_6b6579626f617264506f6c696379 = v_6b6579626f617264506f6c696379.clone(); let v_617574686f7269747943757272656e74 = v_617574686f7269747943757272656e74.clone(); let v_636c616d70 = v_636c616d70.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
+                let v_68616e646c655f5f30343232363333363637633038306632: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":242:7
+                if ({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":242:21
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":243:13
+                let v_70726f70735f5f65363464323566646166613737636632 = { let v_7075695f6e61746976655f3932 = v_68616e646c655f5f30343232363333363637633038306632.clone(); read_props(&(v_7075695f6e61746976655f3932.clone()).owner(), false) };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":244:13
+                let v_62617369735f5f36386566643130306664363265663033 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":245:13
-                let v_70726f70735f5f64373235346431346335363437376337 = { let v_7075695f6e61746976655f3932 = v_68616e646c655f5f39343061373865643433373564383833.clone(); read_props(&(v_7075695f6e61746976655f3932.clone()).owner(), false) };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":246:13
-                let v_62617369735f5f36396433313931386563376236353531 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":247:13
                 let v_70726576696f7573 = { let value = (v_6163636570746564.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":248:13
-                let v_706f6c6963794368616e676564 = { let left = { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let value = (v_73746570506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("step", false); if left.nullish() { Value::number(0.01) } else { left } }))); if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_66696e65506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_64726167506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("dragMode", false); if left.nullish() { Value::string("absolute") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_646f75626c65506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("doubleAction", false); if left.nullish() { Value::string("reset") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_746170506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("tapAction", false); if left.nullish() { Value::string("none") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_6b6579626f617264506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("keyMode", false); if left.nullish() { Value::string("scalar") } else { left } }))) } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":252:13
-                let v_6563686f65645f5f61383832373063636565653034376361 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&((v_70726f70735f5f64373235346431346335363437376337.clone()).member("previewEcho", false)), &(Value::boolean(true)))); if left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3933 = v_7068617365.read(); (v_7075695f6e61746976655f3933.clone()).get() }), &(Value::string("idle")))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f64373235346431346335363437376337.clone()).member("value", false)), &({ let v_7075695f6e61746976655f3934 = v_76616c7565.read(); (v_7075695f6e61746976655f3934.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("min", false); if left.nullish() { Value::number(0.0) } else { left } }), &({ let v_7075695f6e61746976655f3935 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3935.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("max", false); if left.nullish() { Value::number(1.0) } else { left } }), &({ let v_7075695f6e61746976655f3936 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3936.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&((v_70726f70735f5f64373235346431346335363437376337.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }; if left.truthy() { Value::boolean(!(v_706f6c6963794368616e676564.clone()).truthy()) } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":259:7
-                if (Value::boolean(!(v_6563686f65645f5f61383832373063636565653034376361.clone()).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":259:20
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":246:13
+                let v_706f6c6963794368616e676564 = { let left = { let left = { let left = { let left = { let left = Value::boolean(!strict_equal(&({ let value = (v_73746570506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("step", false); if left.nullish() { Value::number(0.01) } else { left } }))); if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_66696e65506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_64726167506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("dragMode", false); if left.nullish() { Value::string("absolute") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_646f75626c65506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("doubleAction", false); if left.nullish() { Value::string("reset") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_746170506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("tapAction", false); if left.nullish() { Value::string("none") } else { left } }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&({ let value = (v_6b6579626f617264506f6c696379.read()).borrow().clone(); value }), &({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("keyboardMode", false); if left.nullish() { Value::string("full") } else { left } }))) } else { left } };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":250:13
+                let v_6563686f65645f5f39363138356434623762653239626636 = { let left = { let left = { let left = { let left = { let left = { let left = { let left = Value::boolean(strict_equal(&((v_70726f70735f5f65363464323566646166613737636632.clone()).member("previewEcho", false)), &(Value::boolean(true)))); if left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3933 = v_7068617365.read(); (v_7075695f6e61746976655f3933.clone()).get() }), &(Value::string("idle")))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } }), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f65363464323566646166613737636632.clone()).member("value", false)), &({ let v_7075695f6e61746976655f3934 = v_76616c7565.read(); (v_7075695f6e61746976655f3934.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("min", false); if left.nullish() { Value::number(0.0) } else { left } }), &({ let v_7075695f6e61746976655f3935 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3935.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("max", false); if left.nullish() { Value::number(1.0) } else { left } }), &({ let v_7075695f6e61746976655f3936 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3936.clone()).get() }))) } else { left } }; if left.truthy() { Value::boolean(!strict_equal(&((v_70726f70735f5f65363464323566646166613737636632.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }; if left.truthy() { Value::boolean(!(v_706f6c6963794368616e676564.clone()).truthy()) } else { left } };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":257:7
+                if (Value::boolean(!(v_6563686f65645f5f39363138356434623762653239626636.clone()).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":257:20
                     { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
                 }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":260:13
-                let v_7469636b65745f5f31396134653934313436323235633230 = { let cell = v_617574686f7269747945706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":261:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":258:13
+                let v_7469636b65745f5f30376461633930333161636430326237 = { let cell = v_617574686f7269747945706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":259:7
                 { let value = Value::boolean(true); *(v_73796e63696e67.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":260:7
+                { let value = v_68616e646c655f5f30343232363333363637633038306632.clone(); *(v_72756e.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":261:7
+                { let value = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("step", false); if left.nullish() { Value::number(0.01) } else { left } }; *(v_73746570506f6c696379.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":261:40
+                { let value = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } }; *(v_66696e65506f6c696379.read()).borrow_mut() = value; }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":262:7
-                { let value = v_68616e646c655f5f39343061373865643433373564383833.clone(); *(v_72756e.read()).borrow_mut() = value; }
+                { let value = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("dragMode", false); if left.nullish() { Value::string("absolute") } else { left } }; *(v_64726167506f6c696379.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":262:50
+                { let value = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("doubleAction", false); if left.nullish() { Value::string("reset") } else { left } }; *(v_646f75626c65506f6c696379.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":262:96
+                { let value = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("tapAction", false); if left.nullish() { Value::string("none") } else { left } }; *(v_746170506f6c696379.read()).borrow_mut() = value; }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":263:7
-                { let value = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("step", false); if left.nullish() { Value::number(0.01) } else { left } }; *(v_73746570506f6c696379.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":263:40
-                { let value = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("fineStep", false); if left.nullish() { Value::number(0.001) } else { left } }; *(v_66696e65506f6c696379.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":264:7
-                { let value = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("dragMode", false); if left.nullish() { Value::string("absolute") } else { left } }; *(v_64726167506f6c696379.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":264:50
-                { let value = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("doubleAction", false); if left.nullish() { Value::string("reset") } else { left } }; *(v_646f75626c65506f6c696379.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":264:96
-                { let value = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("tapAction", false); if left.nullish() { Value::string("none") } else { left } }; *(v_746170506f6c696379.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":265:7
-                { let value = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("keyMode", false); if left.nullish() { Value::string("scalar") } else { left } }; *(v_6b6579626f617264506f6c696379.read()).borrow_mut() = value; }
+                { let value = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("keyboardMode", false); if left.nullish() { Value::string("full") } else { left } }; *(v_6b6579626f617264506f6c696379.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":264:13
+                let v_6c6f77 = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("min", false); if left.nullish() { Value::number(0.0) } else { left } };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":265:13
+                let v_68696768 = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("max", false); if left.nullish() { Value::number(1.0) } else { left } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":266:13
-                let v_6c6f77 = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("min", false); if left.nullish() { Value::number(0.0) } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":267:13
-                let v_68696768 = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("max", false); if left.nullish() { Value::number(1.0) } else { left } };
+                let v_76616c6964 = { let left = { let left = { let left = { let left = { let left = number_is_finite(&(v_6c6f77.clone())); if left.truthy() { number_is_finite(&(v_68696768.clone())) } else { left } }; if left.truthy() { { let relational_left = v_6c6f77.clone(); let relational_right = v_68696768.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }; if left.truthy() { number_is_finite(&({ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("value", false); if left.nullish() { Value::number(0.0) } else { left } })) } else { left } }; if left.truthy() { { let relational_left = v_6c6f77.clone(); let relational_right = Value::number(-(Value::number(1000000000000000.0)).scalar_number()); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }; if left.truthy() { { let relational_left = v_68696768.clone(); let relational_right = Value::number(1000000000000000.0); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) } } else { left } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":268:13
-                let v_76616c6964 = { let left = { let left = { let left = { let left = { let left = number_is_finite(&(v_6c6f77.clone())); if left.truthy() { number_is_finite(&(v_68696768.clone())) } else { left } }; if left.truthy() { { let relational_left = v_6c6f77.clone(); let relational_right = v_68696768.clone(); Value::boolean(relational_left.scalar_number() < relational_right.scalar_number()) } } else { left } }; if left.truthy() { number_is_finite(&({ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("value", false); if left.nullish() { Value::number(0.0) } else { left } })) } else { left } }; if left.truthy() { { let relational_left = v_6c6f77.clone(); let relational_right = Value::number(-(Value::number(1000000000000000.0)).scalar_number()); Value::boolean(relational_left.scalar_number() >= relational_right.scalar_number()) } } else { left } }; if left.truthy() { { let relational_left = v_68696768.clone(); let relational_right = Value::number(1000000000000000.0); Value::boolean(relational_left.scalar_number() <= relational_right.scalar_number()) } } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":270:13
                 let v_72616e67654368616e676564 = { let left = Value::boolean(!strict_equal(&(v_6c6f77.clone()), &({ let v_7075695f6e61746976655f3937 = v_6d696e696d756d.read(); (v_7075695f6e61746976655f3937.clone()).get() }))); if !left.truthy() { Value::boolean(!strict_equal(&(v_68696768.clone()), &({ let v_7075695f6e61746976655f3938 = v_6d6178696d756d.read(); (v_7075695f6e61746976655f3938.clone()).get() }))) } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":271:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":269:7
                 { let v_7075695f6e61746976655f3939 = v_6d696e696d756d.read(); state_set(v_7075695f6e61746976655f3939.clone(), if (v_76616c6964.clone()).truthy() { v_6c6f77.clone() } else { Value::number(0.0) }, Value::string("reason: continuous control minimum")) };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":270:7
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":270:38
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":271:7
+                { let v_7075695f6e61746976655f313030 = v_6d6178696d756d.read(); state_set(v_7075695f6e61746976655f313030.clone(), if (v_76616c6964.clone()).truthy() { v_68696768.clone() } else { Value::number(1.0) }, Value::string("reason: continuous control maximum")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":272:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":272:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":273:7
-                { let v_7075695f6e61746976655f313030 = v_6d6178696d756d.read(); state_set(v_7075695f6e61746976655f313030.clone(), if (v_76616c6964.clone()).truthy() { v_68696768.clone() } else { Value::number(1.0) }, Value::string("reason: continuous control maximum")) };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":274:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":274:38
-                    return Value::Undefined;
-                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":273:13
+                let v_6e6578745f5f61363466613435373036383137396466 = v_636c616d70.read().call_authored(vec![{ let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("value", false); if left.nullish() { Value::number(0.0) } else { left } }]);
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":274:13
+                let v_6e6578745265766973696f6e = { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":275:13
-                let v_6e6578745f5f30633538646561313464366433653565 = v_636c616d70.read().call_authored(vec![{ let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("value", false); if left.nullish() { Value::number(0.0) } else { left } }]);
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":276:13
-                let v_6e6578745265766973696f6e = { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } };
+                let v_6563686f = { let left = { let left = { let left = Value::boolean(strict_equal(&((v_70726f70735f5f65363464323566646166613737636632.clone()).member("previewEcho", false)), &(Value::boolean(true)))); if left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313031 = v_7068617365.read(); (v_7075695f6e61746976655f313031.clone()).get() }), &(Value::string("idle")))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&(v_6e6578745265766973696f6e.clone()), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&(v_6e6578745f5f61363466613435373036383137396466.clone()), &({ let v_7075695f6e61746976655f313032 = v_76616c7565.read(); (v_7075695f6e61746976655f313032.clone()).get() }))) } else { left } };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":277:13
-                let v_6563686f = { let left = { let left = { let left = Value::boolean(strict_equal(&((v_70726f70735f5f64373235346431346335363437376337.clone()).member("previewEcho", false)), &(Value::boolean(true)))); if left.truthy() { Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313031 = v_7068617365.read(); (v_7075695f6e61746976655f313031.clone()).get() }), &(Value::string("idle")))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&(v_6e6578745265766973696f6e.clone()), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if left.truthy() { Value::boolean(strict_equal(&(v_6e6578745f5f30633538646561313464366433653565.clone()), &({ let v_7075695f6e61746976655f313032 = v_76616c7565.read(); (v_7075695f6e61746976655f313032.clone()).get() }))) } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":279:13
-                let v_73686f756c6443616e63656c = { let left = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313033 = v_7068617365.read(); (v_7075695f6e61746976655f313033.clone()).get() }), &(Value::string("idle")))); if left.truthy() { { let left = { let left = { let left = { let left = { let left = Value::boolean(!(v_76616c6964.clone()).truthy()); if !left.truthy() { v_72616e67654368616e676564.clone() } else { left } }; if !left.truthy() { v_706f6c6963794368616e676564.clone() } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f64373235346431346335363437376337.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_6e6578745265766973696f6e.clone()), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { { let left = Value::boolean(!(v_6563686f.clone()).truthy()); if left.truthy() { Value::boolean(!strict_equal(&(v_6e6578745f5f30633538646561313464366433653565.clone()), &({ let value = (v_6163636570746564.read()).borrow().clone(); value }))) } else { left } } } else { left } } } else { left } };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":281:7
+                let v_73686f756c6443616e63656c = { let left = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313033 = v_7068617365.read(); (v_7075695f6e61746976655f313033.clone()).get() }), &(Value::string("idle")))); if left.truthy() { { let left = { let left = { let left = { let left = { let left = Value::boolean(!(v_76616c6964.clone()).truthy()); if !left.truthy() { v_72616e67654368616e676564.clone() } else { left } }; if !left.truthy() { v_706f6c6963794368616e676564.clone() } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f65363464323566646166613737636632.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_6e6578745265766973696f6e.clone()), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { { let left = Value::boolean(!(v_6563686f.clone()).truthy()); if left.truthy() { Value::boolean(!strict_equal(&(v_6e6578745f5f61363466613435373036383137396466.clone()), &({ let value = (v_6163636570746564.read()).borrow().clone(); value }))) } else { left } } } else { left } } } else { left } };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":279:7
                 if (Value::boolean(!(v_6563686f.clone()).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":281:18
-                    { let value = v_6e6578745f5f30633538646561313464366433653565.clone(); *(v_6163636570746564.read()).borrow_mut() = value; }
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":279:18
+                    { let value = v_6e6578745f5f61363466613435373036383137396466.clone(); *(v_6163636570746564.read()).borrow_mut() = value; }
                 }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":282:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":280:7
                 { let value = v_6e6578745265766973696f6e.clone(); *(v_7265766973696f6e.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":283:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":281:7
                 if (v_73686f756c6443616e63656c.clone()).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":284:9
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":282:9
                     { let v_7075695f6e61746976655f313034 = v_7068617365.read(); state_set(v_7075695f6e61746976655f313034.clone(), Value::string("idle"), Value::string("reason: continuous control authority changed")) };
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":285:9
-                    if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
-                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":285:40
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":283:9
+                    if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
+                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":283:40
                         return Value::Undefined;
                     }
                 }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":285:7
+                { let v_7075695f6e61746976655f313035 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f313035.clone(), { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: continuous control label")) };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":286:7
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":286:38
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":287:7
-                { let v_7075695f6e61746976655f313035 = v_6c6162656c.read(); state_set(v_7075695f6e61746976655f313035.clone(), { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }, Value::string("reason: continuous control label")) };
+                { let v_7075695f6e61746976655f313036 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f313036.clone(), { let left = (v_70726f70735f5f65363464323566646166613737636632.clone()).member("role", false); if left.nullish() { Value::string("slider") } else { left } }, Value::string("reason: continuous control role")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":288:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":288:38
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":289:7
-                { let v_7075695f6e61746976655f313036 = v_726f6c65.read(); state_set(v_7075695f6e61746976655f313036.clone(), { let left = (v_70726f70735f5f64373235346431346335363437376337.clone()).member("role", false); if left.nullish() { Value::string("slider") } else { left } }, Value::string("reason: continuous control role")) };
+                { let v_7075695f6e61746976655f313037 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f313037.clone(), { let left = Value::boolean(!(v_76616c6964.clone()).truthy()); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f65363464323566646166613737636632.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }, Value::string("reason: continuous control policy")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":290:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":290:38
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":291:7
-                { let v_7075695f6e61746976655f313037 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f313037.clone(), { let left = Value::boolean(!(v_76616c6964.clone()).truthy()); if !left.truthy() { Value::boolean(strict_equal(&((v_70726f70735f5f64373235346431346335363437376337.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } }, Value::string("reason: continuous control policy")) };
+                { let v_7075695f6e61746976655f313038 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f313038.clone()).owner(), { let v_7075695f6e61746976655f313039 = v_64697361626c6564.read(); (v_7075695f6e61746976655f313039.clone()).get() }) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":292:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":292:38
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":293:7
-                { let v_7075695f6e61746976655f313038 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f313038.clone()).owner(), { let v_7075695f6e61746976655f313039 = v_64697361626c6564.read(); (v_7075695f6e61746976655f313039.clone()).get() }) };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":294:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":294:38
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":295:7
                 if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f313130 = v_7068617365.read(); (v_7075695f6e61746976655f313130.clone()).get() }), &(Value::string("idle"))))).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":296:9
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":294:9
                     { let v_7075695f6e61746976655f313131 = v_76616c7565.read(); state_set(v_7075695f6e61746976655f313131.clone(), { let value = (v_6163636570746564.read()).borrow().clone(); value }, Value::string("reason: continuous control authoritative display")) };
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":297:9
-                    if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
-                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":297:40
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":295:9
+                    if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
+                        // Source "frontend/proto-ui/src/continuous-control.proto.ts":295:40
                         return Value::Undefined;
                     }
                 }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":299:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":297:7
                 if (v_73686f756c6443616e63656c.clone()).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":299:25
-                    { let v_7075695f6e61746976655f313132 = v_68616e646c655f5f39343061373865643433373564383833.clone(); emit(&(v_7075695f6e61746976655f313132.clone()).owner(), Value::string("interactionCancel"), record(vec![("value", v_70726576696f7573.clone()), ("revision", v_62617369735f5f36396433313931386563376236353531.clone())])) };
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":297:25
+                    { let v_7075695f6e61746976655f313132 = v_68616e646c655f5f30343232363333363637633038306632.clone(); emit(&(v_7075695f6e61746976655f313132.clone()).owner(), Value::string("interactionCancel"), record(vec![("value", v_70726576696f7573.clone()), ("revision", v_62617369735f5f36386566643130306664363265663033.clone())])) };
                 }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":300:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f31396134653934313436323235633230.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":300:38
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":298:7
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f30376461633930333161636430326237.clone()])).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":298:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":301:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":299:7
                 { let value = Value::boolean(false); *(v_73796e63696e67.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":302:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":300:7
                 if ({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":302:21
-                    { let v_7075695f6e61746976655f313133 = v_68616e646c655f5f39343061373865643433373564383833.clone(); request_update(&(v_7075695f6e61746976655f313133.clone()).owner()) };
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":300:21
+                    { let v_7075695f6e61746976655f313133 = v_68616e646c655f5f30343232363333363637633038306632.clone(); request_update(&(v_7075695f6e61746976655f313133.clone()).owner()) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":304:11
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":302:11
             v_726574697265.initialize({  let v_7068617365 = v_7068617365.clone(); let v_76616c7565 = v_76616c7565.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63696e67 = v_73796e63696e67.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_617574686f7269747945706f6368 = v_617574686f7269747945706f6368.clone(); let v_6163636570746564 = v_6163636570746564.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_7065726d616e656e74: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":305:13
-                let v_68616e646c655f5f34323635393230323831323662336661 = { let value = (v_72756e.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":306:13
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":303:13
+                let v_68616e646c655f5f35353264376463643363363934323930 = { let value = (v_72756e.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":304:13
                 let v_776173416374697665 = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313134 = v_7068617365.read(); (v_7075695f6e61746976655f313134.clone()).get() }), &(Value::string("idle"))));
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":307:13
-                let v_62617369735f5f35373135333435383530396239363265 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":308:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":305:13
+                let v_62617369735f5f34346265386566633638333238376239 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":306:7
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":309:13
-                let v_7469636b65745f5f34363766363362363463363632396330 = { let cell = v_617574686f7269747945706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":310:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":307:13
+                let v_7469636b65745f5f36623565313336633064656632313335 = { let cell = v_617574686f7269747945706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":308:7
                 { let value = Value::boolean(false); *(v_73796e63696e67.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":310:24
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":308:24
                 { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":310:42
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":308:42
                 { let value = { let left = { let value = (v_646973706f736564.read()).borrow().clone(); value }; if !left.truthy() { v_7065726d616e656e74.clone() } else { left } }; *(v_646973706f736564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":310:76
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":308:76
                 { let value = Value::Json(Json::Null); *(v_72756e.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":311:7
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":309:7
                 if (v_7065726d616e656e74.clone()).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":311:22
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":309:22
+                    return Value::Undefined;
+                }
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":310:7
+                { let v_7075695f6e61746976655f313135 = v_7068617365.read(); state_set(v_7075695f6e61746976655f313135.clone(), Value::string("idle"), Value::string("reason: continuous control detached")) };
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":311:7
+                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f36623565313336633064656632313335.clone())))).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":311:38
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":312:7
-                { let v_7075695f6e61746976655f313135 = v_7068617365.read(); state_set(v_7075695f6e61746976655f313135.clone(), Value::string("idle"), Value::string("reason: continuous control detached")) };
+                { let v_7075695f6e61746976655f313136 = v_76616c7565.read(); state_set(v_7075695f6e61746976655f313136.clone(), { let value = (v_6163636570746564.read()).borrow().clone(); value }, Value::string("reason: continuous control detached display")) };
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":313:7
-                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f34363766363362363463363632396330.clone())))).truthy() {
+                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f36623565313336633064656632313335.clone())))).truthy() {
                     // Source "frontend/proto-ui/src/continuous-control.proto.ts":313:38
                     return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/continuous-control.proto.ts":314:7
-                { let v_7075695f6e61746976655f313136 = v_76616c7565.read(); state_set(v_7075695f6e61746976655f313136.clone(), { let value = (v_6163636570746564.read()).borrow().clone(); value }, Value::string("reason: continuous control detached display")) };
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":315:7
-                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f34363766363362363463363632396330.clone())))).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":315:38
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":316:7
-                if ({ let left = v_776173416374697665.clone(); if left.truthy() { v_68616e646c655f5f34323635393230323831323662336661.clone() } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":316:32
-                    { let v_7075695f6e61746976655f313137 = v_68616e646c655f5f34323635393230323831323662336661.clone(); emit(&(v_7075695f6e61746976655f313137.clone()).owner(), Value::string("interactionCancel"), record(vec![("value", { let value = (v_6163636570746564.read()).borrow().clone(); value }), ("revision", v_62617369735f5f35373135333435383530396239363265.clone())])) };
+                if ({ let left = v_776173416374697665.clone(); if left.truthy() { v_68616e646c655f5f35353264376463643363363934323930.clone() } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":314:32
+                    { let v_7075695f6e61746976655f313137 = v_68616e646c655f5f35353264376463643363363934323930.clone(); emit(&(v_7075695f6e61746976655f313137.clone()).owner(), Value::string("interactionCancel"), record(vec![("value", { let value = (v_6163636570746564.read()).borrow().clone(); value }), ("revision", v_62617369735f5f34346265386566633638333238376239.clone())])) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":318:5
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":316:5
             { let v_7075695f6e61746976655f313138 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":319:5
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":317:5
             { let v_7075695f6e61746976655f313139 = v_646566.clone(); register_life(&owner, "mounted", {  let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_68616e646c655f5f66356636646536333037326564393036: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":319:43
+                let v_68616e646c655f5f38373561346331383537383565353037: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":317:43
                 if (Value::boolean(!({ let value = (v_646973706f736564.read()).borrow().clone(); value }).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":319:60
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":317:60
                     { let value = Value::boolean(true); *(v_6174746163686564.read()).borrow_mut() = value; }
-                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":319:77
-                    v_73796e63.read().call_authored(vec![v_68616e646c655f5f66356636646536333037326564393036.clone()]);
+                    // Source "frontend/proto-ui/src/continuous-control.proto.ts":317:77
+                    v_73796e63.read().call_authored(vec![v_68616e646c655f5f38373561346331383537383565353037.clone()]);
                 }
                 Value::Undefined
             })) }) };
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":318:5
+            { let v_7075695f6e61746976655f313230 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("value"), Value::string("min"), Value::string("max"), Value::string("step"), Value::string("fineStep"), Value::string("defaultValue"), Value::string("label"), Value::string("disabled"), Value::string("revision"), Value::string("role"), Value::string("dragMode"), Value::string("doubleAction"), Value::string("tapAction"), Value::string("previewEcho"), Value::string("keyboardMode")]))), false, v_73796e63.read()) };
             // Source "frontend/proto-ui/src/continuous-control.proto.ts":320:5
-            { let v_7075695f6e61746976655f313230 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("value"), Value::string("min"), Value::string("max"), Value::string("step"), Value::string("fineStep"), Value::string("defaultValue"), Value::string("label"), Value::string("disabled"), Value::string("revision"), Value::string("role"), Value::string("dragMode"), Value::string("doubleAction"), Value::string("tapAction"), Value::string("previewEcho"), Value::string("keyMode")]))), false, v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":322:5
             { let v_7075695f6e61746976655f313231 = v_646566.clone(); listen(&owner, Value::string("host:blur"), false, v_63616e63656c.read(), Value::Undefined) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":323:5
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":321:5
             { let v_7075695f6e61746976655f313232 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_726574697265 = v_726574697265.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":323:37
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":321:37
                 return v_726574697265.read().call_authored(vec![Value::boolean(false)]);
             })) }) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":324:5
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":322:5
             { let v_7075695f6e61746976655f313233 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_726574697265 = v_726574697265.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":324:41
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":322:41
                 return v_726574697265.read().call_authored(vec![Value::boolean(true)]);
             })) }) };
-            // Source "frontend/proto-ui/src/continuous-control.proto.ts":325:5
+            // Source "frontend/proto-ui/src/continuous-control.proto.ts":323:5
             return { let callable={ let pui_native_124={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "frontend/proto-ui/src/continuous-control.proto.ts":325:26
+                // Source "frontend/proto-ui/src/continuous-control.proto.ts":323:26
                 return { let v_7075695f6e61746976655f313235 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
             }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_124.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_124.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{identity,render} => capture_renderer(Value::NativeFunction{identity,render:render.clone()},render),

@@ -22,8 +22,8 @@ test('vendored Base Input preserves the exact recorded official source', () => {
     if (upstream) assert.deepEqual(bytes, execFileSync('git', ['show', `${record.revision}:${file.upstreamPath}`], { cwd: upstream }));
   }
   const entry = readFileSync(path.join(repository, 'frontend/proto-ui/src/text-field.proto.ts'), 'utf8');
-  assert.match(entry, /const inherited = asInputEditor\(\)/);
-  assert.doesNotMatch(entry, /const inherited = asInputRoot\(\)/);
+  assert.match(entry, /const inherited = asInputRoot\(\)/);
+  assert.doesNotMatch(entry, /asInputEditor/);
 });
 let prototype, createRuntimeSession, caps, dom;
 if (upstream) {

@@ -942,200 +942,200 @@ pub struct GeneratedData0 {
                 let v_70726f7073 = { let v_7075695f6e61746976655f3937 = v_68616e646c655f5f61323336653831363963633263646137.clone(); read_props(&(v_7075695f6e61746976655f3937.clone()).owner(), false) };
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":204:47
                 let v_6e6578745265766973696f6e = { let left = (v_70726f7073.clone()).member("revision", false); if left.nullish() { Value::string("") } else { left } };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":205:13
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":204:90
                 let v_70726576696f75735265766973696f6e = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":205:13
+                let v_6e657874585f5f33666236613030636635303763366666 = v_636c616d70.read().call_authored(vec![{ let left = (v_70726f7073.clone()).member("x", false); if left.nullish() { Value::number(0.5) } else { left } }, { let left = (v_70726f7073.clone()).member("minX", false); if left.nullish() { Value::number(0.0) } else { left } }, { let left = (v_70726f7073.clone()).member("maxX", false); if left.nullish() { Value::number(1.0) } else { left } }]);
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":206:13
-                let v_6e657874585f5f61616138646166333036303661623235 = v_636c616d70.read().call_authored(vec![{ let left = (v_70726f7073.clone()).member("x", false); if left.nullish() { Value::number(0.5) } else { left } }, { let left = (v_70726f7073.clone()).member("minX", false); if left.nullish() { Value::number(0.0) } else { left } }, { let left = (v_70726f7073.clone()).member("maxX", false); if left.nullish() { Value::number(1.0) } else { left } }]);
+                let v_6e657874595f5f37383036376538613932613437323437 = v_636c616d70.read().call_authored(vec![{ let left = (v_70726f7073.clone()).member("y", false); if left.nullish() { Value::number(0.5) } else { left } }, { let left = (v_70726f7073.clone()).member("minY", false); if left.nullish() { Value::number(0.0) } else { left } }, { let left = (v_70726f7073.clone()).member("maxY", false); if left.nullish() { Value::number(1.0) } else { left } }]);
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":207:13
-                let v_6e657874595f5f38623130646238336532383562363332 = v_636c616d70.read().call_authored(vec![{ let left = (v_70726f7073.clone()).member("y", false); if left.nullish() { Value::number(0.5) } else { left } }, { let left = (v_70726f7073.clone()).member("minY", false); if left.nullish() { Value::number(0.0) } else { left } }, { let left = (v_70726f7073.clone()).member("maxY", false); if left.nullish() { Value::number(1.0) } else { left } }]);
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":208:13
-                let v_73686f756c6443616e63656c = { let left = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3938 = v_7068617365.read(); (v_7075695f6e61746976655f3938.clone()).get() }), &(Value::string("idle")))); if left.truthy() { { let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6e6578745265766973696f6e.clone()), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!strict_equal(&(v_6e657874585f5f61616138646166333036303661623235.clone()), &({ let value = (v_616363657074656458.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_6e657874595f5f38623130646238336532383562363332.clone()), &({ let value = (v_616363657074656459.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } } } else { left } };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:7
+                let v_73686f756c6443616e63656c = { let left = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f3938 = v_7068617365.read(); (v_7075695f6e61746976655f3938.clone()).get() }), &(Value::string("idle")))); if left.truthy() { { let left = { let left = { let left = Value::boolean(!strict_equal(&(v_6e6578745265766973696f6e.clone()), &({ let value = (v_7265766973696f6e.read()).borrow().clone(); value }))); if !left.truthy() { Value::boolean(!strict_equal(&(v_6e657874585f5f33666236613030636635303763366666.clone()), &({ let value = (v_616363657074656458.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { Value::boolean(!strict_equal(&(v_6e657874595f5f37383036376538613932613437323437.clone()), &({ let value = (v_616363657074656459.read()).borrow().clone(); value }))) } else { left } }; if !left.truthy() { Value::boolean(strict_equal(&((v_70726f7073.clone()).member("disabled", false)), &(Value::boolean(true)))) } else { left } } } else { left } };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":208:7
                 { let value = v_6e6578745265766973696f6e.clone(); *(v_7265766973696f6e.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:32
-                { let value = v_6e657874585f5f61616138646166333036303661623235.clone(); *(v_616363657074656458.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:51
-                { let value = v_6e657874595f5f38623130646238336532383562363332.clone(); *(v_616363657074656459.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":210:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":208:32
+                { let value = v_6e657874585f5f33666236613030636635303763366666.clone(); *(v_616363657074656458.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":208:51
+                { let value = v_6e657874595f5f37383036376538613932613437323437.clone(); *(v_616363657074656459.read()).borrow_mut() = value; }
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:7
                 { let value = { let left = (v_70726f7073.clone()).member("minX", false); if left.nullish() { Value::number(0.0) } else { left } }; *(v_6c6f7758.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":210:31
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:31
                 { let value = { let left = (v_70726f7073.clone()).member("maxX", false); if left.nullish() { Value::number(1.0) } else { left } }; *(v_6869676858.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":210:56
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:56
                 { let value = { let left = (v_70726f7073.clone()).member("minY", false); if left.nullish() { Value::number(0.0) } else { left } }; *(v_6c6f7759.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":210:80
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":209:80
                 { let value = { let left = (v_70726f7073.clone()).member("maxY", false); if left.nullish() { Value::number(1.0) } else { left } }; *(v_6869676859.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":211:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":210:7
                 { let value = { let left = (v_70726f7073.clone()).member("hasX", false); if left.nullish() { Value::boolean(true) } else { left } }; *(v_68617358.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":211:34
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":210:34
                 { let value = { let left = (v_70726f7073.clone()).member("hasY", false); if left.nullish() { Value::boolean(true) } else { left } }; *(v_68617359.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":212:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":211:7
                 { let value = { let left = (v_70726f7073.clone()).member("label", false); if left.nullish() { Value::string("") } else { left } }; *(v_626173654c6162656c.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":212:38
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":211:38
                 { let value = { let left = (v_70726f7073.clone()).member("xLabel", false); if left.nullish() { Value::string("横轴") } else { left } }; *(v_784c6162656c.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":212:69
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":211:69
                 { let value = { let left = (v_70726f7073.clone()).member("yLabel", false); if left.nullish() { Value::string("纵轴") } else { left } }; *(v_794c6162656c.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":213:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":212:7
                 { let v_7075695f6e61746976655f3939 = v_64697361626c6564.read(); state_set(v_7075695f6e61746976655f3939.clone(), { let left = (v_70726f7073.clone()).member("disabled", false); if left.nullish() { Value::boolean(false) } else { left } }, Value::string("reason: graph policy")) };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":213:7
+                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":213:38
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":214:7
-                if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":214:38
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":215:7
                 { let v_7075695f6e61746976655f313030 = v_666f637573.read(); focus_disabled(&(v_7075695f6e61746976655f313030.clone()).owner(), { let v_7075695f6e61746976655f313031 = v_64697361626c6564.read(); (v_7075695f6e61746976655f313031.clone()).get() }) };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":216:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":215:7
                 if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":216:38
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":215:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":217:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":216:7
                 if (v_73686f756c6443616e63656c.clone()).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":217:25
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":216:25
                     { let v_7075695f6e61746976655f313032 = v_7068617365.read(); state_set(v_7075695f6e61746976655f313032.clone(), Value::string("idle"), Value::string("reason: graph authority changed")) };
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":218:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":217:7
                 if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":218:38
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":217:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":219:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":218:7
                 if (Value::boolean(!({ let value = (v_68617359.read()).borrow().clone(); value }).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":219:18
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":218:18
                     { let v_7075695f6e61746976655f313033 = v_61786973.read(); state_set(v_7075695f6e61746976655f313033.clone(), Value::string("x"), Value::string("reason: graph available axis")) };
                 } else {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":220:12
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":219:12
                     if (Value::boolean(!({ let value = (v_68617358.read()).borrow().clone(); value }).truthy())).truthy() {
-                        // Source "frontend/proto-ui/src/graph-point.proto.ts":220:23
+                        // Source "frontend/proto-ui/src/graph-point.proto.ts":219:23
                         { let v_7075695f6e61746976655f313034 = v_61786973.read(); state_set(v_7075695f6e61746976655f313034.clone(), Value::string("y"), Value::string("reason: graph available axis")) };
                     }
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":221:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":220:7
                 if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":221:38
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":220:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":222:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":221:7
                 if (Value::boolean(strict_equal(&({ let v_7075695f6e61746976655f313035 = v_7068617365.read(); (v_7075695f6e61746976655f313035.clone()).get() }), &(Value::string("idle"))))).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":223:9
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":222:9
                     { let v_7075695f6e61746976655f313036 = v_78.read(); state_set(v_7075695f6e61746976655f313036.clone(), { let value = (v_616363657074656458.read()).borrow().clone(); value }, Value::string("reason: graph horizontal authority")) };
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":223:9
+                    if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
+                        // Source "frontend/proto-ui/src/graph-point.proto.ts":223:40
+                        return Value::Undefined;
+                    }
                     // Source "frontend/proto-ui/src/graph-point.proto.ts":224:9
-                    if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                        // Source "frontend/proto-ui/src/graph-point.proto.ts":224:40
-                        return Value::Undefined;
-                    }
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":225:9
                     { let v_7075695f6e61746976655f313037 = v_79.read(); state_set(v_7075695f6e61746976655f313037.clone(), { let value = (v_616363657074656459.read()).borrow().clone(); value }, Value::string("reason: graph vertical authority")) };
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":226:9
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":225:9
                     if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                        // Source "frontend/proto-ui/src/graph-point.proto.ts":226:40
+                        // Source "frontend/proto-ui/src/graph-point.proto.ts":225:40
                         return Value::Undefined;
                     }
+                }
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":227:7
+                if (Value::boolean(!(v_70726f6a656374696f6e.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone(), Value::boolean(true)])).truthy())).truthy() {
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":227:38
+                    return Value::Undefined;
                 }
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":228:7
-                if (Value::boolean(!(v_70726f6a656374696f6e.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone(), Value::boolean(true)])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":228:38
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":229:7
                 if (v_73686f756c6443616e63656c.clone()).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":229:25
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":228:25
                     { let v_7075695f6e61746976655f313038 = v_68616e646c655f5f61323336653831363963633263646137.clone(); emit(&(v_7075695f6e61746976655f313038.clone()).owner(), Value::string("interactionCancel"), record(vec![("revision", v_70726576696f75735265766973696f6e.clone())])) };
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":230:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":229:7
                 if (Value::boolean(!(v_617574686f7269747943757272656e74.read().call_authored(vec![v_7469636b65745f5f34383863353335333164346263333537.clone()])).truthy())).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":230:38
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":229:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":231:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":230:7
                 { let value = Value::boolean(false); *(v_73796e63696e67.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":231:24
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":230:24
                 if ({ let value = (v_6174746163686564.read()).borrow().clone(); value }).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":231:38
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":230:38
                     { let v_7075695f6e61746976655f313039 = v_68616e646c655f5f61323336653831363963633263646137.clone(); request_update(&(v_7075695f6e61746976655f313039.clone()).owner()) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":233:11
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":232:11
             v_726574697265.initialize({  let v_7068617365 = v_7068617365.clone(); let v_78 = v_78.clone(); let v_79 = v_79.clone(); let v_72756e = v_72756e.clone(); let v_6174746163686564 = v_6174746163686564.clone(); let v_646973706f736564 = v_646973706f736564.clone(); let v_73796e63696e67 = v_73796e63696e67.clone(); let v_65706f6368 = v_65706f6368.clone(); let v_617574686f7269747945706f6368 = v_617574686f7269747945706f6368.clone(); let v_7265766973696f6e = v_7265766973696f6e.clone(); let v_616363657074656458 = v_616363657074656458.clone(); let v_616363657074656459 = v_616363657074656459.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
                 let v_7065726d616e656e74: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:13
-                let v_68616e646c655f5f63643761363561653065386437613762 = { let value = (v_72756e.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:33
-                let v_6163746976655f5f37346336666162376666663231363966 = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313130 = v_7068617365.read(); (v_7075695f6e61746976655f313130.clone()).get() }), &(Value::string("idle"))));
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:72
-                let v_62617369735f5f37656438323135666166313266383034 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":233:13
+                let v_68616e646c655f5f34343339643365653937306535303363 = { let value = (v_72756e.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":233:33
+                let v_6163746976655f5f35616365636433346433306630383638 = Value::boolean(!strict_equal(&({ let v_7075695f6e61746976655f313130 = v_7068617365.read(); (v_7075695f6e61746976655f313130.clone()).get() }), &(Value::string("idle"))));
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":233:72
+                let v_62617369735f5f35343238663939653330303563323866 = { let value = (v_7265766973696f6e.read()).borrow().clone(); value };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:7
                 { let cell = v_65706f6368.read(); let next = cell.borrow().scalar_number() + 1.0; *cell.borrow_mut() = Value::number(next); }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:22
-                let v_7469636b65745f5f30613937666130623633303565653466 = { let cell = v_617574686f7269747945706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:49
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:22
+                let v_7469636b65745f5f32663937306530613935663139653363 = { let cell = v_617574686f7269747945706f6368.read(); let previous = cell.borrow().clone(); let value = Value::number(previous.scalar_number() + 1.0); *cell.borrow_mut() = value.clone(); value };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:49
                 { let value = Value::boolean(false); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:67
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:67
                 { let value = { let left = { let value = (v_646973706f736564.read()).borrow().clone(); value }; if !left.truthy() { v_7065726d616e656e74.clone() } else { left } }; *(v_646973706f736564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:101
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:101
                 { let value = Value::Json(Json::Null); *(v_72756e.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:113
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":234:113
                 { let value = Value::boolean(false); *(v_73796e63696e67.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":236:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":235:7
                 if (v_7065726d616e656e74.clone()).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":236:22
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":235:22
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":237:7
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":236:7
                 { let v_7075695f6e61746976655f313131 = v_7068617365.read(); state_set(v_7075695f6e61746976655f313131.clone(), Value::string("idle"), Value::string("reason: graph point detached")) };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":237:7
+                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32663937306530613935663139653363.clone())))).truthy() {
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":237:38
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":238:7
-                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30613937666130623633303565653466.clone())))).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":238:38
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":239:7
                 { let v_7075695f6e61746976655f313132 = v_78.read(); state_set(v_7075695f6e61746976655f313132.clone(), { let value = (v_616363657074656458.read()).borrow().clone(); value }, Value::string("reason: graph point detached horizontal")) };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":239:7
+                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32663937306530613935663139653363.clone())))).truthy() {
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":239:38
+                    return Value::Undefined;
+                }
                 // Source "frontend/proto-ui/src/graph-point.proto.ts":240:7
-                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30613937666130623633303565653466.clone())))).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":240:38
-                    return Value::Undefined;
-                }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":241:7
                 { let v_7075695f6e61746976655f313133 = v_79.read(); state_set(v_7075695f6e61746976655f313133.clone(), { let value = (v_616363657074656459.read()).borrow().clone(); value }, Value::string("reason: graph point detached vertical")) };
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":242:7
-                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f30613937666130623633303565653466.clone())))).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":242:38
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":241:7
+                if (Value::boolean(!strict_equal(&({ let value = (v_617574686f7269747945706f6368.read()).borrow().clone(); value }), &(v_7469636b65745f5f32663937306530613935663139653363.clone())))).truthy() {
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":241:38
                     return Value::Undefined;
                 }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":243:7
-                if ({ let left = v_6163746976655f5f37346336666162376666663231363966.clone(); if left.truthy() { v_68616e646c655f5f63643761363561653065386437613762.clone() } else { left } }).truthy() {
-                    // Source "frontend/proto-ui/src/graph-point.proto.ts":243:29
-                    { let v_7075695f6e61746976655f313134 = v_68616e646c655f5f63643761363561653065386437613762.clone(); emit(&(v_7075695f6e61746976655f313134.clone()).owner(), Value::string("interactionCancel"), record(vec![("revision", v_62617369735f5f37656438323135666166313266383034.clone())])) };
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":242:7
+                if ({ let left = v_6163746976655f5f35616365636433346433306630383638.clone(); if left.truthy() { v_68616e646c655f5f34343339643365653937306535303363.clone() } else { left } }).truthy() {
+                    // Source "frontend/proto-ui/src/graph-point.proto.ts":242:29
+                    { let v_7075695f6e61746976655f313134 = v_68616e646c655f5f34343339643365653937306535303363.clone(); emit(&(v_7075695f6e61746976655f313134.clone()).owner(), Value::string("interactionCancel"), record(vec![("revision", v_62617369735f5f35343238663939653330303563323866.clone())])) };
                 }
                 Value::Undefined
             })) });
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":245:5
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":244:5
             { let v_7075695f6e61746976655f313135 = v_646566.clone(); register_life(&owner, "created", v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":246:5
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":245:5
             { let v_7075695f6e61746976655f313136 = v_646566.clone(); register_life(&owner, "mounted", {  let v_6174746163686564 = v_6174746163686564.clone(); let v_73796e63 = v_73796e63.clone(); Value::Function(Rc::new(move |arguments: Vec<Value>| {
-                let v_68616e646c655f5f30366663363562336338346163623361: Value = arg(&arguments, 0);
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":246:43
+                let v_68616e646c655f5f65306166303930373066653433646431: Value = arg(&arguments, 0);
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":245:43
                 { let value = Value::boolean(true); *(v_6174746163686564.read()).borrow_mut() = value; }
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":246:60
-                v_73796e63.read().call_authored(vec![v_68616e646c655f5f30366663363562336338346163623361.clone()]);
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":245:60
+                v_73796e63.read().call_authored(vec![v_68616e646c655f5f65306166303930373066653433646431.clone()]);
                 Value::Undefined
             })) }) };
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":247:5
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":246:5
             { let v_7075695f6e61746976655f313137 = v_646566.clone(); watch_props(&owner, Some(Value::Array(Rc::new(vec![Value::string("x"), Value::string("y"), Value::string("minX"), Value::string("maxX"), Value::string("minY"), Value::string("maxY"), Value::string("hasX"), Value::string("hasY"), Value::string("label"), Value::string("xLabel"), Value::string("yLabel"), Value::string("disabled"), Value::string("revision")]))), false, v_73796e63.read()) };
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":248:5
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":247:5
             { let v_7075695f6e61746976655f313138 = v_646566.clone(); register_life(&owner, "unmounted", {  let v_726574697265 = v_726574697265.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":248:37
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":247:37
                 return v_726574697265.read().call_authored(vec![Value::boolean(false)]);
             })) }) };
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":249:5
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":248:5
             { let v_7075695f6e61746976655f313139 = v_646566.clone(); register_life(&owner, "before-dispose", {  let v_726574697265 = v_726574697265.clone(); Value::Function(Rc::new(move |_: Vec<Value>| {
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":249:41
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":248:41
                 return v_726574697265.read().call_authored(vec![Value::boolean(true)]);
             })) }) };
-            // Source "frontend/proto-ui/src/graph-point.proto.ts":250:5
+            // Source "frontend/proto-ui/src/graph-point.proto.ts":249:5
             return { let callable={ let pui_native_120={   let call:Rc<dyn Fn(Value)->native::gpui_native_owner::NativeSnapshot>=Rc::new(move |argument_0: Value| -> native::gpui_native_owner::NativeSnapshot {
                 let v_72656e6465726572: Value = argument_0;
-                // Source "frontend/proto-ui/src/graph-point.proto.ts":250:26
+                // Source "frontend/proto-ui/src/graph-point.proto.ts":249:26
                 return { let v_7075695f6e61746976655f313231 = v_72656e6465726572.clone(); native::gpui_native_owner::NativeSnapshot::slot() };
             }); native::gpui_native_owner::NativeCallable { identity:Rc::new(()), call } }; Value::NativeFunction{identity:pui_native_120.identity.clone(),render:Rc::new(move |arguments:Vec<Value>| {(pui_native_120.call)(arg(&arguments,0))})} }; match callable {
       Value::NativeFunction{identity,render} => capture_renderer(Value::NativeFunction{identity,render:render.clone()},render),

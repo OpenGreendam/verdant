@@ -2,7 +2,7 @@
   "source": {
     "file": "frontend/proto-ui/src/continuous-control.proto.ts",
     "exportName": "default",
-    "sha256": "6e8a575a8ff471f548e1bfc275b10298b2d06e5c11360f255c9f873f5f13e839"
+    "sha256": "15e239f4a432d6c7e8460cc1fd6b1fc119dd1fcf65e7e8da408aa02726133e5f"
   },
   "irVersion": 7,
   "backend": "gpui-source-v1",
@@ -88,30 +88,30 @@
   "sourceFiles": [
     {
       "file": "frontend/proto-ui/src/continuous-control.proto.ts",
-      "sha256": "ddb91e63af42da867e8754638ff05f65a323c4b1d0059cfabc70e62c4cfb881f"
+      "sha256": "534e82f3a28160ccc1965274c2965640d2950b7ae6297b7c9d32ba6076b032b7"
     }
   ],
-  "generatedSha256": "b78e26f70a070faaadede5146896da00f945b9a42583d61ef1871ab63a527e97",
+  "generatedSha256": "04a1189eaff340d4f0adcbe39bb82e4ac0854aace54b15aed33ddb4413a3552b",
   "artifacts": [
     {
       "path": "Component.rs",
       "kind": "source",
-      "sha256": "b78e26f70a070faaadede5146896da00f945b9a42583d61ef1871ab63a527e97"
+      "sha256": "04a1189eaff340d4f0adcbe39bb82e4ac0854aace54b15aed33ddb4413a3552b"
     },
     {
       "path": "Cargo.toml",
       "kind": "source",
-      "sha256": "2cd86a53a059d321b5b745045839d7b38b7b77c3bfbbf71be347833c4ea3eceb"
+      "sha256": "9ac34c5d3e863310432c57cdb46abe88c874025696d5455ec5814dba682f029c"
     },
     {
       "path": ".proto-ui/fixtures/style-tokens.json",
       "kind": "source",
-      "sha256": "758bed537c6f6467a0ed3ed480495d96c7e5ed8dd00b9386c8cdb825eb870f02"
+      "sha256": "74c9b3be54541e620fe9e20dadc43404ce3b906fb46ab090fa5c7b8e37b8793c"
     },
     {
       "path": "Component.rs.map",
       "kind": "source-map",
-      "sha256": "386c4057a5221f82f36faf7bbd70aa491d4cc69d1de9135b77b8b78b0936690e"
+      "sha256": "fe12598861c4e8f999867060f147464f7f9d8a0e523d34da3bdf10f2fe916777"
     }
   ]
 }

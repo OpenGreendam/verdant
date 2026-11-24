@@ -1,10 +1,4 @@
-import {
-  defineAsHook,
-  definePrototype,
-  type AsHookResult,
-  type DefHandle,
-  type RunHandle,
-} from '@proto.ui/core';
+import { defineAsHook, definePrototype, type DefHandle, type RunHandle } from '@proto.ui/core';
 import { asAccessible, asFocusable, asTextControl, asControlLabel } from '@proto.ui/hooks';
 import { declareTextControl } from '@proto.ui/module-text-control';
 import type {
@@ -26,7 +20,7 @@ export type {
   InputValueChangeDetail,
 } from './types';
 
-function setupInputEditor(def: DefHandle<InputRootProps, InputRootExposes>) {
+function setupInputRoot(def: DefHandle<InputRootProps, InputRootExposes>) {
   const accessible = asAccessible();
   def.props.define({
     value: { type: 'string', empty: 'fallback' },
@@ -105,6 +99,10 @@ function setupInputEditor(def: DefHandle<InputRootProps, InputRootExposes>) {
     // authority after that callback instead of publishing a stale snapshot.
     value.set(control.snapshot()?.value ?? '', 'reason: input reset value');
     return currentView === run && viewEpoch === epoch && accepted;
+  });
+  asControlLabel().target((_, request) => {
+    if (!disabled.get() && request.isCurrent())
+      focusable.focusSelf({ reason: request.source === 'pointer' ? 'pointer' : 'programmatic' });
   });
   def.expose.event('valueChange', { payload: 'json' });
   def.expose.event('change', { payload: 'json' });
@@ -232,60 +230,10 @@ function setupInputEditor(def: DefHandle<InputRootProps, InputRootExposes>) {
   return () => null;
 }
 
-/** Text editing protocol reusable by directly named controls with no independent Label pair. */
-export const asInputEditor = defineAsHook<
-  InputRootProps,
-  InputRootExposes,
-  InputRootAsHookContract
->({
-  name: 'as-input-editor',
-  modules: [declareTextControl({ content: 'plain-text', lineMode: 'single', engine: 'host' })],
-  setup: setupInputEditor,
-});
-
-function setupInputRoot(_def: DefHandle<InputRootProps, InputRootExposes>) {
-  const inherited = asInputEditor();
-  const state = inherited.stateHandles;
-  if (!state) throw new Error('[base-input-root] editing state projection is required.');
-  const focusable = asFocusable<InputRootProps>();
-  asControlLabel().target((_, request) => {
-    if (!state.disabled.get() && request.isCurrent())
-      focusable.focusSelf({ reason: request.source === 'pointer' ? 'pointer' : 'programmatic' });
-  });
-  return inherited.render;
-}
-
-export const asInputRoot = defineAsHook<
-  InputRootProps,
-  InputRootExposes,
-  InputRootAsHookContract & {
-    asHooks: { 'as-input-editor': AsHookResult<InputRootProps, InputRootAsHookContract> };
-  }
->({
+export const asInputRoot = defineAsHook<InputRootProps, InputRootExposes, InputRootAsHookContract>({
   name: 'as-input-root',
-  modules: asInputEditor.modules,
+  modules: [declareTextControl({ content: 'plain-text', lineMode: 'single', engine: 'host' })],
   setup: setupInputRoot,
-  projectHandle(result) {
-    const editor = result.getAsHookHandle?.('as-input-editor');
-    if (!editor) throw new Error('[as-input-root] editing handle projection is required.');
-    // Nested authored capture intentionally keeps ownership in the editor.
-    // Reproject its borrowed handles to preserve the existing InputRoot API.
-    return {
-      ...result,
-      props: editor.props,
-      state: editor.state,
-      stateHandles: editor.stateHandles,
-      getState: editor.getState,
-      methods: editor.methods,
-      getMethod: editor.getMethod,
-      artifacts: {
-        ...result.artifacts,
-        stateHandles: editor.stateHandles,
-        eventKeys: editor.artifacts?.eventKeys,
-        methods: editor.methods,
-      },
-    };
-  },
 });
 
 const inputRoot = definePrototype({

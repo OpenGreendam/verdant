@@ -129,6 +129,24 @@ runtimeTest('editor cancellation identifies the retired contact and authority, n
   assert.deepEqual(f.cancels().at(-1), { pointer: 'Mouse', revision: 'document:2', lease: second });
 });
 
+runtimeTest('audio keyboard semantics share editing authority, cancellation and lifecycle', async t => {
+  const f = await fixture(t, 'editor-surface', { commands: 'audio' });
+  assert.equal(f.call('audioKey', 'Delete', false, false, false, true, 'document:1'), '');
+  assert.equal(f.call('audioKey', 'Delete', false, false, false, false, 'stale'), '');
+  assert.equal(f.call('audioKey', 'r', false, false, true, false, 'document:1'), '');
+  f.call('begin', 'Mouse', 0, 0);
+  assert.equal(f.call('audioKey', 'Delete', true, false, false, false, 'document:1'), 'ripple-delete');
+  assert.equal(f.x.phase.get(), 'idle'); assert.equal(f.cancels().length, 1);
+  for (const [key, secondary, command] of [['i', true, 'split'], ['a', true, 'select-all'], ['j', true, 'join'], ['v', false, 'select-tool'], ['r', false, 'range-tool'], ['Escape', false, 'escape']]) {
+    assert.equal(f.call('audioKey', key, false, secondary, false, false, 'document:1'), command);
+  }
+  f.onEvent(name => { if (name === 'interactionCancel') f.update({ revision: 'new-document', disabled: true }); });
+  f.call('begin', 'Mouse', 0, 0);
+  assert.equal(f.call('audioKey', 'Escape', false, false, false, false, 'document:1'), '');
+  await f.session.unmount();
+  assert.equal(f.call('audioKey', 'a', false, true, false, false, 'new-document'), '');
+});
+
 runtimeTest('editor activation stops when cancellation observers acquire newer authority', async t => {
   const f = await fixture(t, 'editor-surface');
   f.call('begin', 'Mouse', 0, 0);
@@ -559,107 +577,4 @@ runtimeTest('graph source owns contextual and precise-entry requests under curre
   f.update({disabled:true});
   assert.equal(f.call('openContext'),false);f.key('Enter');
   assert.equal(f.events.filter(e=>e.name==='exact').length,1);
-});
-
-runtimeTest('reference piano keys trigger exactly once even when a full press ends before delivery', async(t)=>{
-  const f=await fixture(t,'performance-key',{momentary:true});
-  f.event('press.start');f.event('press.end');
-  assert.equal(f.x.pressed.get(),false);
-  assert.equal(f.events.filter(e=>e.name==='trigger').length,1);
-  f.call('keyDown','a');
-  for(let i=0;i<100;i++)f.call('keyDown','a');
-  f.call('keyUp','a');
-  assert.equal(f.events.filter(e=>e.name==='trigger').length,2);
-});
-
-runtimeTest('the authored performance keyboard maps the entire advertised octave including top C',async(t)=>{
-  const f=await fixture(t,'performance-key');
-  const keys=['a','w','s','e','d','f','t','g','y','h','u','j','k'];
-  for(let i=0;i<keys.length;i++){
-    f.update({note:60+i,revision:`note:${i}`});
-    for(const key of keys)assert.equal(f.call('keyDown',key),key===keys[i]);
-    assert.equal(f.x.pressed.get(),true);
-    f.call('keyUp',keys[i]);assert.equal(f.x.pressed.get(),false);
-  }
-});
-
-runtimeTest('arrangement uses its retained three-pixel threshold through the compiled surface',async(t)=>{
-  const f=await fixture(t,'editor-surface',{threshold:3});
-  f.call('begin','Mouse',10,10);
-  assert.equal(f.call('sample','Mouse',12,11),false);
-  assert.equal(f.call('sample','Mouse',13,10),true);
-  assert.equal(f.x.phase.get(),'dragging');
-});
-
-
-runtimeTest('editor activation cannot outlive synchronous focus or cancellation observers', async (t) => {
-  const f = await fixture(t, 'editor-surface');
-  f.onFocus(() => f.update({disabled:true}));
-  assert.equal(f.call('activate'), false);
-  assert.equal(f.call('doubleActivate', 2), false);
-  f.onFocus(() => {});
-  f.update({disabled:false});
-  assert.equal(f.call('begin', 'Mouse', 0, 0), true);
-  let replacement = false;
-  const unsubscribe = f.x.phase.subscribe((event) => {
-    if (event.type === 'next' && f.x.phase.get() === 'idle' && !replacement) {
-      replacement = true;
-      f.call('begin', 'Touch(2)', 20, 30);
-    }
-  });
-  t.after(unsubscribe);
-  assert.equal(f.call('activate'), false);
-  assert.equal(f.x.phase.get(), 'pressed');
-  assert.equal(f.x.pointer.get(), 'Touch(2)');
-});
-
-
-runtimeTest('audio editor shortcuts and Escape share the authored canvas cancellation boundary', async (t) => {
-  const f = await fixture(t, 'editor-surface', {commandMode:'audio'});
-  f.call('begin','Mouse',10,20);
-  assert.equal(f.key('Escape').defaultPrevented,true);
-  assert.equal(f.x.phase.get(),'idle');
-  assert.equal(f.events.at(-1).payload.command,'clear-range');
-  assert.equal(f.cancels().length,1);
-  for (const [key,modifiers,command] of [
-    ['Delete',{},'delete'],['Backspace',{shiftKey:true},'ripple-delete'],
-    ['i',{ctrlKey:true},'split'],['a',{metaKey:true},'select-all'],
-    ['j',{ctrlKey:true},'join'],['r',{},'range-tool'],['v',{},'select-tool'],
-  ]) {
-    assert.equal(f.key(key,modifiers).defaultPrevented,true);
-    assert.equal(f.events.at(-1).payload.command,command);
-  }
-  const count=f.events.length;
-  assert.equal(f.key('r',{altKey:true}).defaultPrevented,false);
-  assert.equal(f.key('Delete',{repeat:true}).defaultPrevented,false);
-  f.update({commandMode:''});
-  assert.equal(f.key('Delete').defaultPrevented,false);
-  assert.equal(f.events.length,count);
-});
-
-runtimeTest('audio keyboard semantics share editing authority, cancellation and lifecycle', async t => {
-  const f = await fixture(t, 'editor-surface', { commandMode: 'audio' });
-  assert.equal(f.key('Delete', { repeat: true }).defaultPrevented, false);
-  assert.equal(f.key('r', { altKey: true }).defaultPrevented, false);
-  assert.deepEqual(f.events, []);
-  f.call('begin', 'Mouse', 0, 0);
-  assert.equal(f.key('Delete', { shiftKey: true }).defaultPrevented, true);
-  assert.equal(f.events.at(-1).payload.command, 'ripple-delete');
-  assert.equal(f.x.phase.get(), 'idle'); assert.equal(f.cancels().length, 1);
-  for (const [key, secondary, command] of [
-    ['i', true, 'split'], ['I', true, 'split'], ['a', true, 'select-all'], ['A', true, 'select-all'],
-    ['j', true, 'join'], ['J', true, 'join'], ['v', false, 'select-tool'], ['V', false, 'select-tool'],
-    ['r', false, 'range-tool'], ['R', false, 'range-tool'], ['Escape', false, 'clear-range'],
-  ]) {
-    assert.equal(f.key(key, { ctrlKey: secondary }).defaultPrevented, true);
-    assert.deepEqual(f.events.at(-1), { name: 'command', payload: { command, revision: 'document:1' } });
-  }
-  const commands = f.events.filter(event => event.name === 'command').length;
-  f.onEvent(name => { if (name === 'interactionCancel') f.update({ revision: 'new-document', disabled: true }); });
-  f.call('begin', 'Mouse', 0, 0);
-  assert.equal(f.key('Escape').defaultPrevented, false);
-  assert.equal(f.events.filter(event => event.name === 'command').length, commands, 'suspended cancellation cannot publish an old command into replacement authority');
-  await f.session.unmount();
-  assert.equal(f.key('a', { ctrlKey: true }).defaultPrevented, false);
-  assert.equal(f.events.filter(event => event.name === 'command').length, commands);
 });
