@@ -8,6 +8,8 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 
 本轮补齐连续输入的阈值／步进、受控 `selected` 的真实宿主消费，以及弹窗和乐谱导出表单的默认响应、子输入提交与关闭退役。逐控件对应和仍需继续迁移的项目见 [RCIP 清单](RCIP-2026-11-24.md)，准确执行范围见 [本轮验证记录](VALIDATION-RCIP-2026-11-24.json)。这些工作分支结果不表示上游修复或 Verdant 改动已经合入主线。
 
+本轮本地验证已通过：14 个单元／81 个产物的 fresh 与 retained 检查、236 项源与 producer 测试、298 项应用原生测试、SDK 两组配置的 63／62 项、33 项 session／protocol 测试，以及最终实际 all-features 依赖图。上游较广编译器套件保留 1 项已复现的基线失败；本轮跨平台包和实际 OS 窗口结果仍以对应 PR 的新 CI 为准。
+
 ## 2026-11-23 已合入主线的整合记录
 
 Verdant [PR #12](https://github.com/OpenGreendam/verdant/pull/12) 已于 2026-11-23 合入 `main`，合并提交为 `afd3eda361874f275422263473334daba7575b59`。该轮保留 18 类交互对应的 14 个编译入口、Adwaita 绘图和音乐领域层，并将编辑操作选择、连续值精度和输入生命周期放进作者源码。
