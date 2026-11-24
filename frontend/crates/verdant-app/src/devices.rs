@@ -1266,6 +1266,7 @@ fn chain_command(ed: &Editor, track: TrackId, action: ChainAction, cx: &Context<
             }
     });
     let before_cancel = allowed.clone();
+    let bypass_track = track.clone();
     let activate = semantic_command(editor.clone(), editor.clone(), move |ed, event, window, cx| {
         if !allowed(ed, window) || !may_begin_device_input(ed) { return; }
         match action {
@@ -1297,7 +1298,16 @@ fn chain_command(ed: &Editor, track: TrackId, action: ChainAction, cx: &Context<
         }
     });
     Rc::new(move |event, window, cx| {
-        let current = editor.upgrade().is_some_and(|editor| before_cancel(editor.read(cx), window));
+        let current = editor.upgrade().is_some_and(|editor| {
+            let ed = editor.read(cx);
+            if !before_cancel(ed, window) { return false; }
+            if let (ChainAction::Bypass { slot, .. }, Some(event)) = (action, event) {
+                let bypass = !event.selected();
+                // An idempotent source proposal must not cancel a held preview.
+                return ed.insert_specs(&bypass_track).get(slot).is_some_and(|spec| spec.bypass != bypass);
+            }
+            true
+        });
         if current { activate(event, window, cx); }
     })
 }
