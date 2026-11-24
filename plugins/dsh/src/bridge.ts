@@ -599,7 +599,12 @@ export class VerdantBridge {
       progress(event)
     })
     const result = object(response.result, 'render result')
-    run.cliJobId = text(result.job_id, 'Verdant job ID')
+    const jobId = text(result.job_id, 'Verdant job ID')
+    if ((run.cliJobId !== undefined && run.cliJobId !== jobId)
+      || (response.job_id !== undefined && response.job_id !== null && response.job_id !== jobId)) {
+      throw new BridgeError('Native terminal job identity disagrees with the render stream', 'PROTOCOL_ERROR')
+    }
+    run.cliJobId = jobId
     const frames = integer(result.frames, 'rendered frames')
     const sampleRate = integer(result.sample_rate, 'rendered sample rate', 1)
     if (frames / sampleRate > this.config.maxRenderSeconds) throw new BridgeError('Rendered duration exceeds configured limit', 'RESOURCE_EXHAUSTED')
