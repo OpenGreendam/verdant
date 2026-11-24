@@ -240,14 +240,18 @@ pub fn dispatch<T: CommandTarget>(target: &mut T, cmd: CommandId, arg: CommandAr
     assert_eq!(command(cmd).arg, arg.kind(), "generated command argument mismatch");
     target.run_command(cmd, arg, window, cx);
 }
-pub fn command_button<T: CommandTarget>(cmd: CommandId, arg: CommandArg, label: impl Into<SharedString>,
-    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> crate::proto_controls::Action {
+pub fn command_surface(cmd: CommandId, arg: &CommandArg, label: impl Into<SharedString>,
+    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla) -> crate::proto_controls::Action {
     assert_eq!(command(cmd).arg, arg.kind(), "generated command argument mismatch");
     let label: SharedString = label.into();
     crate::proto_controls::action(key, label.clone()).authority(format!("{cmd:?}:{arg:?}"))
         .flex().items_center().justify_center().px(px(6.0)).py(px(3.0))
         .rounded(px(3.0)).text_xs().text_color(fg).bg(bg).hover(move |s| s.bg(hover))
         .child(label)
+}
+pub fn command_button<T: CommandTarget>(cmd: CommandId, arg: CommandArg, label: impl Into<SharedString>,
+    key: impl Into<ElementId>, fg: Hsla, bg: Hsla, hover: Hsla, cx: &mut Context<T>) -> crate::proto_controls::Action {
+    command_surface(cmd, &arg, label, key, fg, bg, hover)
         .on_click(cx.listener(move |target, _: &crate::proto_controls::Activation, window, cx| dispatch(target, cmd, arg.clone(), window, cx)))
 }
 

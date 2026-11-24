@@ -230,10 +230,15 @@ impl Editor {
     }
 
     pub fn toggle_phoneme_approximation(&mut self, id: &NoteId, cx: &mut Context<Self>) {
+        let Some(note) = self.active_track().and_then(|t| self.index.note(t, id)) else { return };
+        self.set_phoneme_approximation(id, !note.pronunciation.allow_approximation, cx);
+    }
+
+    pub(crate) fn set_phoneme_approximation(&mut self, id: &NoteId, selected: bool, cx: &mut Context<Self>) {
         let Some(note) = self.active_track().and_then(|t| self.index.note(t, id)).cloned() else { return };
         let mut pronunciation = note.pronunciation;
-        if pronunciation.alphabet.is_none() { return; }
-        pronunciation.allow_approximation = !pronunciation.allow_approximation;
+        if pronunciation.alphabet.is_none() || pronunciation.allow_approximation == selected { return; }
+        pronunciation.allow_approximation = selected;
         self.commit(self.revision(), CommandBatch::single("切换音素近似映射", Command::SetPronunciation {
             track: self.session.track.clone(), note_id: id.clone(), pronunciation,
         }), cx);

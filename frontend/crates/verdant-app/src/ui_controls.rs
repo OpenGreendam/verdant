@@ -262,19 +262,28 @@ pub fn selectable_command_button(
 ) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
-    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
-    controls::command_button(
-        cmd,
-        arg,
-        label.clone(),
-        key,
-        th.text.into(),
-        if active { th.checked.into() } else { th.control.into() },
-        if active { th.checked.into() } else { th.control_pressed.into() },
-        cx,
-    )
+    let basis = crate::proto_controls::editor_authority(ed);
+    let authority = format!("{basis}:{cmd:?}:{arg:?}");
+    let selection = ed.source_command_selection(cmd, &arg);
+    let active = selection.unwrap_or(active);
+    let fg = th.text.into();
+    let bg = if active { th.checked.into() } else { th.control.into() };
+    let hover = if active { th.checked.into() } else { th.control_pressed.into() };
+    let button = if let Some(accepted) = selection {
+        // Install one consumer, not an additional listener after the ordinary
+        // toggle-command callback. The source supplies the proposed value.
+        controls::command_surface(cmd, &arg, label.clone(), key, fg, bg, hover)
+            .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+                if crate::proto_controls::editor_authority(ed) != basis
+                    || ed.source_command_selection(cmd, &arg) != Some(accepted) { return; }
+                ed.accept_source_command_selection(cmd, &arg, event.selected(), cx);
+            }))
+    } else {
+        controls::command_button(cmd, arg, label.clone(), key, fg, bg, hover, cx)
+    };
+    button
     .authority(authority)
-    .role(Role::Button)
+    .role(if selection.is_some() { Role::Switch } else { Role::Button })
     .aria_label(label)
     .aria_selected(active)
     .h(px(BAR_BTN_H))
@@ -944,6 +953,10 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 })),
         )
 }
+
+#[cfg(test)]
+#[path = "ui_controls_selection_tests.rs"]
+mod source_selection_tests;
 
 #[cfg(test)]
 mod tests {

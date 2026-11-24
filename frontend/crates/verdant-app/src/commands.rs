@@ -327,6 +327,44 @@ impl CommandTarget for Editor {
     }
 }
 
+impl Editor {
+    /// Only these commands represent an accepted Boolean value. Mode choices,
+    /// transport requests and ordinary actions retain their command semantics.
+    pub(crate) fn source_command_selection(&self, command: CommandId, arg: &CommandArg) -> Option<bool> {
+        use CommandArg as A;
+        use CommandId as C;
+        match (command, arg) {
+            (C::ToggleMute, A::Track(id)) => self.project().track(id).map(|track| track.muted),
+            (C::ToggleSolo, A::Track(id)) => self.project().track(id).map(|track| track.solo),
+            (C::ToggleTrackAutomation, A::Track(id)) => self.project().track(id).map(|_| self.automation_ui.expanded_tracks.contains(id)),
+            (C::ToggleMasterMute, A::None) => Some(crate::mix::MasterBusSettings::from_project(self.project()).muted),
+            (C::ToggleMasterAutomation, A::None) => Some(self.automation_ui.show_master),
+            (C::TogglePhonemeApproximation, A::Note(id)) => self.active_track().and_then(|track| self.index.note(track, id))
+                .filter(|note| note.pronunciation.alphabet.is_some()).map(|note| note.pronunciation.allow_approximation),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn accept_source_command_selection(&mut self, command: CommandId, arg: &CommandArg, selected: bool, cx: &mut Context<Self>) {
+        use CommandArg as A;
+        use CommandId as C;
+        if self.source_command_selection(command, arg).is_none_or(|current| current == selected) { return; }
+        match (command, arg) {
+            (C::ToggleMute, A::Track(id)) => self.edit_header(id, "轨道静音", cx, |header| header.muted = selected),
+            (C::ToggleSolo, A::Track(id)) => self.edit_header(id, "轨道独奏", cx, |header| header.solo = selected),
+            (C::ToggleTrackAutomation, A::Track(id)) => {
+                if selected { self.automation_ui.expanded_tracks.insert(id.clone()); }
+                else { self.automation_ui.expanded_tracks.remove(id); }
+            },
+            (C::ToggleMasterMute, A::None) => self.edit_master_bus("主总线静音", cx, |settings| settings.muted = selected),
+            (C::ToggleMasterAutomation, A::None) => self.automation_ui.show_master = selected,
+            (C::TogglePhonemeApproximation, A::Note(id)) => self.set_phoneme_approximation(id, selected, cx),
+            _ => return,
+        }
+        cx.notify();
+    }
+}
+
 impl NumericTarget for Editor {
     fn numeric_value(&self, id: NumericId, arg: CommandArg) -> f64 {
         use NumericId as N;
