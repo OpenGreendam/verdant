@@ -166,7 +166,7 @@ pub(crate) fn toggle_follow(editor: &mut Editor, cx: &mut Context<Editor>) {
 
 /// Commands may request a toggle; a compiled control supplies its accepted
 /// selected proposal directly. Repeating that proposal is a no-op.
-fn set_follow(editor: &mut Editor, enabled: bool, cx: &mut Context<Editor>) {
+pub(crate) fn set_follow(editor: &mut Editor, enabled: bool, cx: &mut Context<Editor>) {
     if editor.session.follow_playhead == enabled { return; }
     editor.session.follow_playhead = enabled;
     editor.playback.driver.update(cx, |driver, cx| {

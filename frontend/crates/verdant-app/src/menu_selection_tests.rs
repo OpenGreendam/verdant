@@ -6,12 +6,17 @@ use verdant_action_control::{ActionControlHandle, native::gpui_native_owner::{
 }};
 use verdant_collection_control::{CollectionControlHandle, native::gpui_native_owner::{all_owners, resolved}};
 
-struct Harness { editor: Entity<Editor>, parts: [String; 2], _changed: Subscription }
+struct Harness { editor: Entity<Editor>, parts: [String; 2], clock: bool, _changed: Subscription }
 impl Render for Harness {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.editor.update(cx, |ed, cx| match ed.menu.clone() {
-            Some(menu) => context_menu_layer(ed, &menu, window, cx).into_any_element(),
-            None => div().into_any_element(),
+        let clock = self.clock;
+        self.editor.update(cx, |ed, cx| {
+            let menu = match ed.menu.clone() {
+                Some(menu) => context_menu_layer(ed, &menu, window, cx).into_any_element(),
+                None => div().into_any_element(),
+            };
+            if clock { div().size_full().child(menu).child(ed.playback.driver.clone()).into_any_element() }
+            else { menu }
         })
     }
 }
@@ -40,7 +45,7 @@ fn fixture(cx: &mut TestAppContext) -> WindowHandle<Harness> {
             ed.session.follow_playhead = false;
             ed.show_menu(gpui::point(px(80.), px(40.)), items(ed), window, cx);
         });
-        Harness { editor, parts: [first, second], _changed: changed }
+        Harness { editor, parts: [first, second], clock: false, _changed: changed }
     });
     window.update(cx, |_, window, _| window.activate_window()).unwrap();
     crate::native_test_support::frames(window, cx);
@@ -159,6 +164,37 @@ fn menu_rejects_retired_ui_only_acceptance_and_reconciles_the_next_render(cx: &m
         assert!(!ed.session.follow_playhead);
         assert_eq!(ed.revision().get(), 0);
         assert!(ed.menu.is_none());
+    }).unwrap();
+}
+
+#[gpui::test]
+fn menu_follow_starts_the_idle_clock_driver_and_moves_both_viewports(cx: &mut TestAppContext) {
+    let window = fixture(cx);
+    window.update(cx, |host, _, cx| {
+        host.clock = true;
+        host.editor.update(cx, |ed, _| {
+            assert_ne!(ed.audio.transport(), verdant_audio::Transport::Playing);
+            ed.session.viewport.start_tick = 12000.0;
+            ed.arrange.start_tick = 12000.0;
+        });
+        cx.notify();
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |host, window, cx| {
+        let ed = host.editor.read(cx);
+        assert_eq!(ed.session.viewport.start_tick, 12000.0);
+        assert_eq!(ed.arrange.start_tick, 12000.0);
+        assert!(!ed.session.follow_playhead);
+        dispatch_accessibility_action(&row(window, "Menu follow").owner, "activate", None); drive_owners(window, cx);
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |host, _, cx| {
+        let ed = host.editor.read(cx);
+        assert!(ed.session.follow_playhead);
+        assert_ne!(ed.audio.transport(), verdant_audio::Transport::Playing);
+        assert!(ed.session.viewport.start_tick < 12000.0, "the idle piano-roll viewport follows after the source menu enables follow");
+        assert!(ed.arrange.start_tick < 12000.0, "the idle arrangement viewport follows through the same clock driver");
+        assert_eq!(ed.revision().get(), 0);
     }).unwrap();
 }
 

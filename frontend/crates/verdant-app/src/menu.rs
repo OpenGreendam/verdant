@@ -57,7 +57,7 @@ impl MenuBoolean {
         if self.current(ed).is_none_or(|current| current == selected) { return; }
         match self {
             Self::Command(command, arg) => ed.accept_source_command_selection(*command, arg, selected, cx),
-            Self::FollowPlayhead => ed.session.follow_playhead = selected,
+            Self::FollowPlayhead => crate::clock::set_follow(ed, selected, cx),
             Self::ExportClick => ed.edit_playback("导出节拍器", cx, |settings| settings.export_click = selected),
             Self::PartMuted(id) => {
                 if let Err(error) = ed.edit_part(id, "片段静音", cx, |part| { part.muted = selected; Ok(()) }) { ed.notice(error); }
