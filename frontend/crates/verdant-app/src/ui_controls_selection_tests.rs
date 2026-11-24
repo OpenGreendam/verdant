@@ -141,6 +141,9 @@ fn flat_controls_and_synthesis_switch_rows_preserve_proposals_and_ui_authority(c
         window.update(cx, |_, window, _| window.activate_window()).unwrap();
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, window, cx| {
+            // The first native frame records window bounds in preferences.
+            // Establish a clean baseline after that observer, before the input.
+            host.editor.update(cx, |ed, _| ed.prefs_dirty = false);
             assert_eq!(host.editor.read(cx).source_command_selection(host.cmd, &host.arg), Some(false));
             let source = source(window);
             let mut props = source.owner.borrow().props.clone(); props["selected"] = serde_json::json!(true);
@@ -152,7 +155,7 @@ fn flat_controls_and_synthesis_switch_rows_preserve_proposals_and_ui_authority(c
             let ed = host.editor.read(cx);
             assert_eq!(ed.source_command_selection(host.cmd, &host.arg), Some(false), "family {family} accepts source false");
             assert_eq!(ed.revision().get(), 0);
-            assert!(!ed.prefs_dirty, "a no-op must not dirty layout preferences");
+            assert!(!ed.prefs_dirty, "family {family}: a no-op must not dirty layout preferences");
             let source = source(window);
             let mut props = source.owner.borrow().props.clone(); props["selected"] = serde_json::json!(false);
             replace_props(&source.owner, props); drive_owners(window, cx);
