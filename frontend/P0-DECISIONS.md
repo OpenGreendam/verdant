@@ -4,7 +4,7 @@
 
 ## 依赖与生成
 
-- GPUI 与 `gpui_platform` 锁定到 [cyjin-yl/z3rm](https://github.com/cyjin-yl/z3rm/tree/e5f2f9db75e97613232b5c1946333e61fa3828ab) 的 `e5f2f9db75e97613232b5c1946333e61fa3828ab`，见 [Cargo.toml](Cargo.toml) 与 [Cargo.lock](Cargo.lock)。它继承最初 Zed `48741fd` 审阅基线并加入 Wayland 触摸支持；不能将原始审阅当成后续提交的验收。
+- GPUI 与 `gpui_platform` 锁定到 [cyjin-yl/z3rm](https://github.com/cyjin-yl/z3rm/tree/28f0728802599ad9ac902b86e322f783081c7df3) 的 `28f0728802599ad9ac902b86e322f783081c7df3`，见 [Cargo.toml](Cargo.toml) 与 [Cargo.lock](Cargo.lock)。它继承最初 Zed `48741fd` 审阅基线，包含 Wayland 触摸支持和[窗口内 prompt 的 deferred 绘制修复](https://github.com/cyjin-yl/z3rm/pull/83)；不能将原始审阅当成后续提交的验收。
 - Linux 显式启用 `font-kit`、`x11`、`wayland`。缺少窗口后端特性会进入 headless，不能用进程存活判断窗口成功。
 - 编译工具链由 [rust-toolchain.toml](rust-toolchain.toml) 固定。Cargo 工作区版本为 0.1.0；编辑器、worker、后端及 `verdant-voice` 共用版本。
 - 控件与命令表保留 `frontend/crates/verdant-app/src/generated/controls.rs` 的检入源码。`frontend/proto-ui/` 将 pitch slot、note/control planner 和有状态旋钮分为四个编译单元：两个原生组件经上游 `nativeSdkPath` 共用一个 SDK，两个 planner 经 `rust-data-v1` 生成无 Cargo 依赖的稳定 Rust crate。Rust 会话通过类型化 `verdant-ui-protocol` 调用编译出的决策函数，处理守卫、capture 与领域副作用；旋钮实例由原型持有值、phase、取消、键盘/焦点和 Slider 辅助功能语义，宿主提供 Adwaita 绘图与经 revision 校验的提交。见 [集成边界与检查命令](proto-ui/README.md) 和 [compiler.pin.json](proto-ui/compiler.pin.json)。

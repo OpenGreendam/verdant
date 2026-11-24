@@ -181,4 +181,69 @@ mod tests {
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, _, _| assert_eq!(host.responses, vec![1, 0, 0], "Escape selects the source cancel response exactly once")).unwrap();
     }
+
+    struct PromptHarness;
+    impl Render for PromptHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size_full()
+        }
+    }
+
+    #[gpui::test]
+    fn actual_window_prompt_draws_compiled_overlay_and_resolves_response(cx: &mut TestAppContext) {
+        cx.update(install);
+        let window = cx.open_window(size(px(620.), px(440.)), |_, _| PromptHarness);
+        let mut response = window.update(cx, |_, window, cx| {
+            window.activate_window();
+            window.prompt(
+                PromptLevel::Warning,
+                "恢复工程？",
+                Some("发现比已保存工程更新的恢复记录。"),
+                &[PromptButton::cancel("取消"), PromptButton::new("恢复"), PromptButton::new("放弃")],
+                cx,
+            )
+        }).unwrap();
+
+        // The dialog must enter Window::prompt's late prepaint branch. A root
+        // child fixture misses deferred overlays created by the actual prompt.
+        for _ in 0..3 {
+            cx.run_until_parked();
+            cx.update_window(window.into(), |_, window, cx| {
+                window.simulate_next_frame(cx);
+                window.draw(cx).clear(cx);
+                assert!(window.has_active_prompt());
+            }).unwrap();
+        }
+        assert_eq!(response.try_recv().expect("pending prompt receiver"), None);
+        window.update(cx, |_, window, cx| {
+            let owner = all_owners().into_iter().find(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.modules.accessible_text.get("name").is_some_and(|value| resolved(value).text() == "恢复工程？")
+            }).expect("compiled overlay mounted through Window::prompt");
+            let source = verdant_overlay_control::OverlayControlHandle { owner };
+            assert_eq!(suggested_response(&source), Some(1));
+            focus_action("取消", window, cx);
+        }).unwrap();
+        for _ in 0..3 {
+            cx.run_until_parked();
+            cx.update_window(window.into(), |_, window, cx| {
+                window.simulate_next_frame(cx);
+                window.draw(cx).clear(cx);
+            }).unwrap();
+        }
+        cx.simulate_keystrokes(window.into(), "enter");
+        for _ in 0..3 {
+            cx.run_until_parked();
+            cx.update_window(window.into(), |_, window, cx| {
+                window.simulate_next_frame(cx);
+                window.draw(cx).clear(cx);
+            }).unwrap();
+        }
+        assert_eq!(response.try_recv().expect("resolved prompt receiver"), Some(1));
+        cx.update_window(window.into(), |_, window, cx| {
+            assert!(!window.has_active_prompt());
+            window.draw(cx).clear(cx);
+        }).unwrap();
+    }
 }
