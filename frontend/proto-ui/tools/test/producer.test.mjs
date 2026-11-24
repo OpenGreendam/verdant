@@ -38,7 +38,11 @@ test('fresh checks fail when the pinned upstream is absent', async (t) => {
 });
 
 for (const [name, replace] of [
-  ['revision', (text) => text.replaceAll('e5f2f9db75e97613232b5c1946333e61fa3828ab', 'a'.repeat(40))],
+  ['revision', (text) => {
+    const revision = parseCargoManifest(text).workspace.dependencies.gpui.rev;
+    const differentRevision = revision === 'a'.repeat(40) ? 'b'.repeat(40) : 'a'.repeat(40);
+    return text.replaceAll(revision, differentRevision);
+  }],
   ['source repository', (text) => text.replaceAll('https://github.com/cyjin-yl/z3rm', 'https://github.com/other/gpui')],
   ['default features', (text) => text.replace('gpui = { git', 'gpui = { default-features = false, git')],
   ['additive features', (text) => text.replace('gpui = { git', 'gpui = { features = ["test-support"], git')],
@@ -46,7 +50,10 @@ for (const [name, replace] of [
   test(`workspace ${name} is checked before missing upstream in both check modes`, async (t) => {
     const root = fixture(t);
     const manifest = path.join(root, 'frontend/Cargo.toml');
-    writeFileSync(manifest, replace(readFileSync(manifest, 'utf8')));
+    const original = readFileSync(manifest, 'utf8');
+    const mutated = replace(original);
+    assert.notEqual(mutated, original, 'workspace ' + name + ' mutation must change the manifest');
+    writeFileSync(manifest, mutated);
     for (const mode of ['--check', '--check-retained']) {
       await assert.rejects(runProducer([mode, ...absentUpstream(root)], root), code(EXIT.admission));
     }
