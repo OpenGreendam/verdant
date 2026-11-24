@@ -127,3 +127,87 @@ fn master_bypass_rejects_retired_document_replaced_slot_and_newly_busy_chain(cx:
         }
     }
 }
+
+struct TrackHarness { editor: Entity<Editor>, track: TrackId, _changed: Subscription }
+impl Render for TrackHarness {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let editor = self.editor.clone();
+        self.editor.update(cx, |ed, cx| crate::devices::device_view(ed, &editor, window, cx))
+    }
+}
+
+fn track_fixture(cx: &mut TestAppContext) -> gpui::WindowHandle<TrackHarness> {
+    cx.open_window(size(px(720.), px(400.)), |window, cx| {
+        let editor = cx.new(|cx| {
+            let mut project = verdant_domain::Project::new_empty();
+            let mut spec = InsertSpec::new("fixture-missing", "rcip-device-power", "RCIP device", "");
+            spec.instance_id = "rcip-track-instance".into();
+            spec.state_b64 = "cHJlc2VydmVkLXN0YXRl".into();
+            spec.extra.insert("future-field".into(), serde_json::json!({"keep": true}));
+            verdant_plugins::project::write_inserts(&mut project.tracks[0].unknown, &[spec]);
+            let mut ed = Editor::for_native_test(project, window, cx);
+            ed.insert_runtime.callback_budget = ed.audio.callback_budget();
+            ed.insert_runtime.tracks = ed.project().tracks.iter().map(|track| {
+                let specs = verdant_plugins::project::read_inserts(&track.unknown);
+                AppliedTrack { id: track.id.clone(), live_states: vec![None; specs.len()],
+                    processors: (0..specs.len()).map(|_| None).collect(), specs, padding: 0 }
+            }).collect();
+            for track in &ed.insert_runtime.tracks {
+                ed.inserts.insert(track.id.clone(), track.specs.iter().map(|spec|
+                    InsertSlot::Missing { spec: spec.clone(), reason: "test fixture".into() }).collect());
+            }
+            ed
+        });
+        let track = editor.read(cx).session.track.clone();
+        let changed = cx.observe(&editor, |_, _, cx| cx.notify());
+        TrackHarness { editor, track, _changed: changed }
+    })
+}
+
+fn power_source(window: &Window) -> ActionControlHandle {
+    let owner = all_owners().into_iter().find(|owner| {
+        let owner = owner.borrow();
+        owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+            && owner.modules.accessible_text.get("name")
+                .is_some_and(|name| resolved(name).text() == "启用效果器")
+    }).expect("production device card uses generated ActionControl");
+    ActionControlHandle { owner }
+}
+
+#[gpui::test]
+fn device_power_switch_preserves_source_selection_and_opaque_insert_state(cx: &mut TestAppContext) {
+    let window = track_fixture(cx);
+    window.update(cx, |_, window, _| window.activate_window()).unwrap();
+    crate::native_test_support::frames(window, cx);
+    let original = window.update(cx, |host, window, cx| {
+        let original = host.editor.read(cx).insert_specs(&host.track)[0].clone();
+        let source = power_source(window);
+        let mut props = source.owner.borrow().props.clone();
+        props["selected"] = serde_json::json!(false);
+        replace_props(&source.owner, props); drive_owners(window, cx);
+        // The proposal is enabled=true. Re-toggling accepted bypass=false
+        // would disable the effect, reversing the source's selected value.
+        dispatch_accessibility_action(&source.owner, "activate", None); drive_owners(window, cx);
+        original
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |host, window, cx| {
+        assert_eq!(host.editor.read(cx).insert_specs(&host.track)[0], original,
+            "source selected=true must keep an already-enabled device enabled");
+        assert_eq!(host.editor.read(cx).revision().get(), 0, "same-value power selection cannot write history");
+        let source = power_source(window);
+        let mut props = source.owner.borrow().props.clone();
+        props["selected"] = serde_json::json!(true);
+        replace_props(&source.owner, props); drive_owners(window, cx);
+        dispatch_accessibility_action(&source.owner, "activate", None);
+        dispatch_accessibility_action(&source.owner, "activate", None);
+        drive_owners(window, cx);
+    }).unwrap();
+    crate::native_test_support::frames(window, cx);
+    window.update(cx, |host, _, cx| {
+        let mut expected = original; expected.bypass = true;
+        assert_eq!(host.editor.read(cx).insert_specs(&host.track)[0], expected,
+            "source selected=false bypasses once without losing opaque state or unknown fields");
+        assert_eq!(host.editor.read(cx).revision().get(), 1);
+    }).unwrap();
+}
