@@ -329,7 +329,7 @@ impl CommandTarget for Editor {
 
 impl Editor {
     /// Only these commands represent an accepted Boolean value. Mode choices,
-    /// transport requests and ordinary actions retain their command semantics.
+    /// playback requests and ordinary actions retain their command semantics.
     pub(crate) fn source_command_selection(&self, command: CommandId, arg: &CommandArg) -> Option<bool> {
         use CommandArg as A;
         use CommandId as C;
@@ -341,6 +341,14 @@ impl Editor {
             (C::ToggleMasterAutomation, A::None) => Some(self.automation_ui.show_master),
             (C::TogglePhonemeApproximation, A::Note(id)) => self.active_track().and_then(|track| self.index.note(track, id))
                 .filter(|note| note.pronunciation.alphabet.is_some()).map(|note| note.pronunciation.allow_approximation),
+            (C::ToggleLoop, A::None) => Some(self.playback_settings().looping),
+            (C::ToggleMetronome, A::None) => Some(self.playback_settings().metronome),
+            (C::TogglePhonemeLane, A::None) => Some(self.layout.show_phoneme_lane),
+            (C::ToggleTempoLane, A::None) => Some(self.layout.show_tempo_lane),
+            (C::ToggleOtherTracks, A::None) => Some(self.integrations.other_tracks),
+            (C::ToggleF0Overlay, A::None) => Some(self.show_f0),
+            (C::TogglePhonemeTiming, A::None) => Some(self.project().render_preferences.phoneme_timing.is_some()),
+            (C::ToggleOutputTransients, A::None) => Some(self.project().render_preferences.output_transients.is_some()),
             _ => None,
         }
     }
@@ -359,6 +367,31 @@ impl Editor {
             (C::ToggleMasterMute, A::None) => self.edit_master_bus("主总线静音", cx, |settings| settings.muted = selected),
             (C::ToggleMasterAutomation, A::None) => self.automation_ui.show_master = selected,
             (C::TogglePhonemeApproximation, A::Note(id)) => self.set_phoneme_approximation(id, selected, cx),
+            (C::ToggleLoop, A::None) => {
+                let anchor = self.playback_settings().loop_start.max(0);
+                let length = self.meter().bar_ticks_at(anchor);
+                self.edit_playback("循环播放", cx, |settings| {
+                    if settings.loop_end <= settings.loop_start { settings.loop_end = settings.loop_start + length; }
+                    settings.looping = selected;
+                });
+            },
+            (C::ToggleMetronome, A::None) => self.edit_playback("节拍器", cx, |settings| settings.metronome = selected),
+            (C::TogglePhonemeLane | C::ToggleTempoLane, A::None) => {
+                if command == C::TogglePhonemeLane { self.layout.show_phoneme_lane = selected; }
+                else { self.layout.show_tempo_lane = selected; }
+                self.layout.store(&mut self.prefs);
+                self.prefs_dirty = true;
+            },
+            (C::ToggleOtherTracks, A::None) => self.integrations.other_tracks = selected,
+            (C::ToggleF0Overlay, A::None) => self.show_f0 = selected,
+            (C::TogglePhonemeTiming, A::None) => {
+                let settings = selected.then(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1);
+                self.commit(self.revision(), CommandBatch::single("元音对拍", Command::SetPhonemeTiming { settings }), cx);
+            },
+            (C::ToggleOutputTransients, A::None) => {
+                let settings = selected.then(verdant_domain::OutputTransientsSettings::phoneme_output_envelope_v1);
+                self.commit(self.revision(), CommandBatch::single("最终辅音约束", Command::SetOutputTransients { settings }), cx);
+            },
             _ => return,
         }
         cx.notify();

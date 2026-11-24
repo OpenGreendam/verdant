@@ -250,6 +250,34 @@ pub fn select_button(
         .child(svg().path(icon("chevron-down")).size(px(13.0)).flex_none().text_color(th.text_secondary))
 }
 
+/// Attach exactly one command consumer to a surface that has no listener yet.
+/// Only classified Boolean commands accept the source's selected proposal.
+pub(crate) fn bind_command_action(
+    ed: &Editor,
+    cmd: Cmd,
+    arg: Arg,
+    action: crate::proto_controls::Action,
+    active: bool,
+    cx: &mut Context<Editor>,
+) -> crate::proto_controls::Action {
+    let basis = crate::proto_controls::editor_authority(ed);
+    let authority = format!("{basis}:{cmd:?}:{arg:?}");
+    let selection = ed.source_command_selection(cmd, &arg);
+    let button = if let Some(accepted) = selection {
+        action.on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
+            if crate::proto_controls::editor_authority(ed) != basis
+                || ed.source_command_selection(cmd, &arg) != Some(accepted) { return; }
+            ed.accept_source_command_selection(cmd, &arg, event.selected(), cx);
+        }))
+    } else {
+        action.on_click(cx.listener(move |ed, _, window, cx| controls::dispatch(ed, cmd, arg.clone(), window, cx)))
+    };
+    button
+        .authority(authority)
+        .role(if selection.is_some() { Role::Switch } else { Role::Button })
+        .aria_selected(selection.unwrap_or(active))
+}
+
 /// Command button with explicit visual active state and uniform `BAR_BTN_H` height.
 pub fn selectable_command_button(
     ed: &Editor,
@@ -262,30 +290,12 @@ pub fn selectable_command_button(
 ) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
-    let basis = crate::proto_controls::editor_authority(ed);
-    let authority = format!("{basis}:{cmd:?}:{arg:?}");
-    let selection = ed.source_command_selection(cmd, &arg);
-    let active = selection.unwrap_or(active);
-    let fg = th.text.into();
-    let bg = if active { th.checked.into() } else { th.control.into() };
-    let hover = if active { th.checked.into() } else { th.control_pressed.into() };
-    let button = if let Some(accepted) = selection {
-        // Install one consumer, not an additional listener after the ordinary
-        // toggle-command callback. The source supplies the proposed value.
-        controls::command_surface(cmd, &arg, label.clone(), key, fg, bg, hover)
-            .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
-                if crate::proto_controls::editor_authority(ed) != basis
-                    || ed.source_command_selection(cmd, &arg) != Some(accepted) { return; }
-                ed.accept_source_command_selection(cmd, &arg, event.selected(), cx);
-            }))
-    } else {
-        controls::command_button(cmd, arg, label.clone(), key, fg, bg, hover, cx)
-    };
-    button
-    .authority(authority)
-    .role(if selection.is_some() { Role::Switch } else { Role::Button })
+    let active = ed.source_command_selection(cmd, &arg).unwrap_or(active);
+    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(),
+        if active { th.checked.into() } else { th.control.into() },
+        if active { th.checked.into() } else { th.control_pressed.into() });
+    bind_command_action(ed, cmd, arg, action, active, cx)
     .aria_label(label)
-    .aria_selected(active)
     .h(px(BAR_BTN_H))
     .py(px(0.0))
     .px(px(11.0))
@@ -310,21 +320,12 @@ pub fn flat_command_button(
     let label = label.into();
     let th = ed.theme;
     let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
-    let authority = format!("{}:{cmd:?}:{arg:?}", crate::proto_controls::editor_authority(ed));
-    controls::command_button(
-        cmd,
-        arg,
-        label.clone(),
-        key,
-        th.text.into(),
+    let active = ed.source_command_selection(cmd, &arg).unwrap_or(active);
+    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(),
         if active { th.checked.into() } else { clear.into() },
-        if active { th.checked.into() } else { th.hover.into() },
-        cx,
-    )
-    .authority(authority)
-    .role(Role::Button)
+        if active { th.checked.into() } else { th.hover.into() });
+    bind_command_action(ed, cmd, arg, action, active, cx)
     .aria_label(label)
-    .aria_selected(active)
     .py(px(0.0))
     .rounded(px(6.0))
 }
