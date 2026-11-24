@@ -37,6 +37,9 @@ mod analysis_tools;
 mod graph_control;
 mod presentation;
 
+#[cfg(test)]
+mod source_selection_tests;
+
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub(crate) enum DeviceTarget { Track(TrackId), Master }
 
