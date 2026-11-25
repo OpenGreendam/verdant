@@ -1,415 +1,98 @@
-name: frontend
+name: RIIP pinned generation (temporary)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: frontend-${{ github.ref }}
+  group: riip-generation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  proto-retained:
-    name: Proto-UI retained artifacts and regression tests
+  generate:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=512
+      PROTO_UI_UPSTREAM: ${{ github.workspace }}/.ci/proto-ui-upstream
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify the isolated generation commit
+        run: |
+          test "$(git rev-parse HEAD^)" = b0647a1a35ceaab3c7327f8f4112eb1190fe91ef
+          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/frontend.yml
+          mkdir -p .ci/riip-generation/logs
       - uses: actions/setup-node@v4
         with:
           node-version: '24.22.3'
       - uses: pnpm/action-setup@v4
         with:
           version: '10.32.1'
-      - name: Install locked producer dependencies
-        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
-      - name: Check retained artifacts without an upstream checkout
-        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
-      - name: Regress TOML, pin, and publication boundaries
-        run: pnpm --dir frontend/proto-ui test
-
-  proto-fresh:
-    name: Proto-UI fresh pinned compilation
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.22.3'
-      - name: Read the compiler pin
-        id: compiler-pin
-        run: |
-          node --input-type=module <<'JS'
-          import { appendFileSync, readFileSync } from 'node:fs';
-          const pin = JSON.parse(readFileSync('frontend/proto-ui/compiler.pin.json', 'utf8'));
-          const input = JSON.parse(readFileSync('frontend/proto-ui/src/upstream-input/provenance.json', 'utf8'));
-          if (pin.upstream.repository !== 'https://github.com/Proto-UI/Proto-UI'
-            || !/^[0-9a-f]{40}$/.test(pin.upstream.revision)
-            || !/^pnpm@\d+\.\d+\.\d+$/.test(pin.packageVersions.packageManager)) {
-            throw new Error('Unsupported compiler repository, revision, or package-manager pin');
-          }
-          if (input.repository !== pin.upstream.repository || !/^[0-9a-f]{40}$/.test(input.revision)) {
-            throw new Error('Unsupported vendored Input repository or source revision');
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT,
-            `revision=${pin.upstream.revision}\npnpm=${pin.packageVersions.packageManager.slice(5)}\ninput-revision=${input.revision}\n`);
-          JS
       - uses: actions/checkout@v4
         with:
           repository: Proto-UI/Proto-UI
-          ref: ${{ steps.compiler-pin.outputs.revision }}
+          ref: e9340df6279e063cf372080bf4cc97caea3fd901
           path: .ci/proto-ui-upstream
           persist-credentials: false
-      - name: Fetch the recorded official Input source for identity checks
-        env:
-          INPUT_SOURCE_REVISION: ${{ steps.compiler-pin.outputs.input-revision }}
-        # Keep the compiler checkout at its pin; the source identity test also
-        # compares the vendored bytes with this separately recorded Git commit.
-        run: git -C .ci/proto-ui-upstream fetch --no-tags --depth=1 origin "$INPUT_SOURCE_REVISION"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ steps.compiler-pin.outputs.pnpm }}
-      - name: Install full pinned compiler and producer dependency closures
+      - name: Fetch the separately pinned Input source
+        run: git -C .ci/proto-ui-upstream fetch --no-tags --depth=1 origin 4e499ae25e825e130e740f16af66d70b23a743cf
+      - name: Install the locked producer and compiler
         run: |
           pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
           pnpm --dir .ci/proto-ui-upstream install --frozen-lockfile --ignore-scripts
-      - name: Recompile every unit with the pinned compiler
-        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check --upstream .ci/proto-ui-upstream
-      - name: Verify source-graph changes and producer boundaries
-        env:
-          PROTO_UI_UPSTREAM: ${{ github.workspace }}/.ci/proto-ui-upstream
-        run: pnpm --dir frontend/proto-ui test
-      - name: Prepare a native consumer source-mutation experiment
-        run: node frontend/proto-ui/tools/check-native-source-mutation.mjs --prepare .ci/proto-ui-source-mutation --upstream .ci/proto-ui-upstream
-      - name: Pass verbatim compiler outputs to the native Rust lane
-        uses: actions/upload-artifact@v4
-        with:
-          name: proto-ui-source-mutation-fixtures
-          path: .ci/proto-ui-source-mutation/
-          include-hidden-files: true
-          if-no-files-found: error
-
-  headless-session:
-    name: Session build without native UI libraries
-    needs: [proto-retained, proto-fresh]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.22.3'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: '10.32.1'
-      - name: Install the locked graph checker
-        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
-      - uses: actions/cache@v4
-        with:
-          path: |
-            .ci/headless-cargo/registry
-            .ci/headless-cargo/git
-            .ci/headless-target
-          key: ${{ runner.os }}-verdant-headless-${{ hashFiles('frontend/Cargo.lock', 'frontend/Dockerfile') }}
-          restore-keys: ${{ runner.os }}-verdant-headless-
-      - name: Resolve the full workspace in the plain Rust image
+          test "$(git -C .ci/proto-ui-upstream rev-parse HEAD)" = e9340df6279e063cf372080bf4cc97caea3fd901
+          test -z "$(git -C .ci/proto-ui-upstream status --porcelain)"
+      - name: Focused authored timeline regression
+        run: node --test --test-concurrency=1 frontend/proto-ui/tools/test/continuous-control.test.mjs | tee .ci/riip-generation/logs/continuous.log
+      - name: Generate every unit with the pinned compiler
+        run: node frontend/proto-ui/tools/build-proto-ui.mjs --upstream .ci/proto-ui-upstream | tee .ci/riip-generation/logs/generate.log
+      - name: Full source and producer regression
+        run: node --test --test-concurrency=1 frontend/proto-ui/tools/test/*.test.mjs | tee .ci/riip-generation/logs/source-suite.log
+      - name: Independently check fresh outputs
+        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check --upstream .ci/proto-ui-upstream | tee .ci/riip-generation/logs/fresh-check.log
+      - name: Check retained closure
+        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained | tee .ci/riip-generation/logs/retained-check.log
+      - name: Export only generated artifacts and receipts
         run: |
-          mkdir -p .ci/headless-cargo .ci/headless-target
-          rust_image=$(sed -n 's/^ARG RUST_IMAGE=//p' frontend/Dockerfile)
-          test -n "$rust_image"
-          docker run --rm --memory=8g --cpus=2 \
-            --mount type=bind,src="$PWD",dst=/workspace \
-            --mount type=bind,src="$PWD/.ci/headless-cargo",dst=/cargo-cache \
-            --env CARGO_HOME=/cargo-cache --env CARGO_BUILD_JOBS=2 \
-            --workdir /workspace/frontend "$rust_image" sh -eu -c '
-              cargo fetch --locked
-              cargo metadata --locked --all-features --offline --format-version 1 > /workspace/.ci/headless-metadata.json
-            '
-      - name: Prove session dependencies exclude native components and support
-        run: |
-          node frontend/proto-ui/tools/check-cargo-gpui.mjs --metadata .ci/headless-metadata.json > .ci/headless-graph.json
-          cat .ci/headless-graph.json
-      - name: Compile and test the real session and typed planners without native UI libraries
-        run: |
-          rust_image=$(sed -n 's/^ARG RUST_IMAGE=//p' frontend/Dockerfile)
-          # Use the unmodified Rust base image, not verdant-dev; no GPUI apt
-          # packages or native build cache are installed or mounted here.
-          docker run --rm --memory=8g --cpus=2 \
-            --mount type=bind,src="$PWD",dst=/workspace \
-            --mount type=bind,src="$PWD/.ci/headless-cargo",dst=/cargo-cache \
-            --mount type=bind,src="$PWD/.ci/headless-target",dst=/build \
-            --env CARGO_HOME=/cargo-cache --env CARGO_TARGET_DIR=/build \
-            --env CARGO_BUILD_JOBS=2 --env CARGO_INCREMENTAL=0 \
-            --env CARGO_PROFILE_DEV_DEBUG=0 --env CARGO_PROFILE_TEST_DEBUG=0 \
-            --workdir /workspace/frontend "$rust_image" \
-            cargo test --locked --offline --all-features \
-              -p verdant-session -p verdant-ui-protocol \
-              -p verdant-note-gesture-data -p verdant-control-gesture-data
-      - name: Retain complete headless graph evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: proto-ui-headless-session
-          path: |
-            .ci/headless-metadata.json
-            .ci/headless-graph.json
-          if-no-files-found: error
-
-  linux:
-    needs: [proto-retained, proto-fresh, headless-session]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.22.3'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: '10.32.1'
-      - name: Install locked retained-artifact checker
-        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
-      - uses: actions/download-artifact@v4
-        with:
-          name: proto-ui-source-mutation-fixtures
-          path: .ci/proto-ui-source-mutation
-      - uses: actions/cache@v4
-        with:
-          path: |
-            .ci/cargo/registry
-            .ci/cargo/git
-            .ci/target
-          key: ${{ runner.os }}-verdant-${{ hashFiles('frontend/Cargo.lock', 'frontend/Dockerfile') }}
-          restore-keys: ${{ runner.os }}-verdant-
-      - name: Build the development image
-        run: docker build --tag verdant-dev --file frontend/Dockerfile frontend
-      - name: Validate retained artifacts, resolve Cargo identities, build, test, and package
-        run: |
-          mkdir -p .ci/cargo .ci/target
-          docker run --rm --memory=8g --cpus=2 \
-            --mount type=bind,src="$PWD",dst=/workspace \
-            --mount type=bind,src="$PWD/.ci/cargo",dst=/cargo-cache \
-            --mount type=bind,src="$PWD/.ci/target",dst=/build \
-            --env VERDANT_PROTO_UI_MODE=retained \
-            --env CARGO_HOME=/cargo-cache --env GIT_CONFIG_COUNT=1 \
-            --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/workspace verdant-dev \
-            sh /workspace/tools/check_frontend.sh
-      - name: Execute baseline and mutated source in compiled Rust consumers
-        run: |
-          docker run --rm --memory=8g --cpus=2 \
-            --mount type=bind,src="$PWD",dst=/workspace \
-            --mount type=bind,src="$PWD/.ci/cargo",dst=/cargo-cache \
-            --mount type=bind,src="$PWD/.ci/target",dst=/build \
-            --env CARGO_HOME=/cargo-cache --env GIT_CONFIG_COUNT=1 \
-            --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/workspace verdant-dev \
-            node /workspace/frontend/proto-ui/tools/check-native-source-mutation.mjs --run /workspace/.ci/proto-ui-source-mutation
-      - name: Retain native source-mutation observations
-        uses: actions/upload-artifact@v4
-        with:
-          name: proto-ui-native-source-mutation
-          path: |
-            .ci/proto-ui-source-mutation/experiment.json
-            .ci/proto-ui-source-mutation/result.json
-            .ci/proto-ui-source-mutation/*-cargo-graph.json
-          if-no-files-found: error
-      - name: Retain the guarded Linux package
-        uses: actions/upload-artifact@v4
-        with:
-          name: verdant-linux
-          path: |
-            .ci/target/package-smoke.*/*.tar.gz
-            .ci/target/package-smoke.*/*.sha256
-          if-no-files-found: error
-      - name: Retain Cargo graph evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: proto-ui-cargo-linux
-          path: .ci/target/proto-ui-gpui-graph.json
-          if-no-files-found: error
-
-  native-input:
-    name: Real Linux window input and accessibility (22 original + 6 control cases)
-    needs: [linux]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create OS evidence directory
-        run: mkdir -p .ci/native-input-evidence
-      - uses: actions/download-artifact@v4
-        with:
-          # No run-id or cross-run artifact lookup: these are the exact package
-          # bytes validated by this workflow's linux producer job.
-          name: verdant-linux
-          path: .ci/native-input-download
-      - name: Install only this job's native display and accessibility dependencies
-        run: |
-          sudo apt-get update 2>&1 | tee .ci/native-input-evidence/apt-update.log
-          sudo apt-get install --no-install-recommends -y \
-            xvfb xauth xdotool x11-xkb-utils xkb-data weston \
-            dbus-daemon dbus-x11 at-spi2-core gir1.2-atspi-2.0 \
-            python3-dbus python3-gi python3-pyatspi gsettings-desktop-schemas \
-            fontconfig fonts-dejavu-core fonts-noto-cjk \
-            mesa-vulkan-drivers libvulkan1 libgl1-mesa-dri libegl1 libgbm1 \
-            libasound2t64 libx11-xcb1 libxcb-xinput0 libxkbcommon-x11-0 \
-            2>&1 | tee .ci/native-input-evidence/apt-install.log
-          dpkg-query -W > .ci/native-input-evidence/installed-packages.txt
-          /usr/bin/python3 -B -m unittest discover -s tools/native-input -p 'test_*.py' -v
-      - name: Bind the packaged app and worker to this checkout
-        id: package
-        run: |
-          /usr/bin/python3 -B tools/native-input/ci.py prepare \
-            --artifact-dir .ci/native-input-download --repo "$PWD" \
-            --work-dir "$RUNNER_TEMP/verdant-native-package" \
-            --evidence-dir .ci/native-input-evidence/package \
-            --expected-source-commit "$GITHUB_SHA"
-      - name: Run all 11 real X11 input and accessibility cases
-        if: ${{ always() && steps.package.outcome == 'success' }}
-        timeout-minutes: 8
-        run: |
-          /usr/bin/python3 -B tools/native-input/ci.py run \
-            --package-info .ci/native-input-evidence/package/package.json \
-            --repo "$PWD" --deps-root / --backend x11 \
-            --run-dir "$RUNNER_TEMP/verdant-os-x11"
-      - name: Run all 11 real windowed Wayland input and accessibility cases
-        if: ${{ always() && steps.package.outcome == 'success' }}
-        timeout-minutes: 8
-        run: |
-          /usr/bin/python3 -B tools/native-input/ci.py run \
-            --package-info .ci/native-input-evidence/package/package.json \
-            --repo "$PWD" --deps-root / --backend wayland \
-            --run-dir "$RUNNER_TEMP/verdant-os-wayland"
-      - name: Run migrated text, collection, scroll and mixer controls on X11
-        if: ${{ always() && steps.package.outcome == 'success' }}
-        timeout-minutes: 8
-        run: |
-          /usr/bin/python3 -B tools/native-input/ci.py run \
-            --package-info .ci/native-input-evidence/package/package.json \
-            --repo "$PWD" --deps-root / --backend x11 --suite controls \
-            --run-dir "$RUNNER_TEMP/verdant-controls-x11"
-      - name: Run migrated text, collection, scroll and mixer controls on Wayland
-        if: ${{ always() && steps.package.outcome == 'success' }}
-        timeout-minutes: 8
-        run: |
-          /usr/bin/python3 -B tools/native-input/ci.py run \
-            --package-info .ci/native-input-evidence/package/package.json \
-            --repo "$PWD" --deps-root / --backend wayland --suite controls \
-            --run-dir "$RUNNER_TEMP/verdant-controls-wayland"
-      - name: Require all four complete observations and retain their evidence
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, tarfile
+          root = pathlib.Path.cwd()
+          out = root / ".ci/riip-generation"
+          extra = subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard",
+              "frontend/proto-ui/generated", "frontend/proto-ui/receipts"], text=True).splitlines()
+          if extra:
+              subprocess.run(["git", "add", "--intent-to-add", "--", *extra], check=True)
+          changed = subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines()
+          assert changed, "expected the new ContinuousControl artifacts"
+          for name in changed:
+              assert name.startswith(("frontend/proto-ui/generated/", "frontend/proto-ui/receipts/")) or name == "frontend/proto-ui/compiler.pin.json", name
+              assert (root/name).is_file() and not (root/name).is_symlink(), name
+          subprocess.run(["git", "diff", "--check"], check=True)
+          manifest = {
+              "schema": "verdant.riip.generated-export.v1",
+              "sourceCommit": "b0647a1a35ceaab3c7327f8f4112eb1190fe91ef",
+              "workflowCommit": os.environ["GITHUB_SHA"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "compiler": "e9340df6279e063cf372080bf4cc97caea3fd901",
+              "files": [{"path": name, "sha256": hashlib.sha256((root/name).read_bytes()).hexdigest(),
+                         "bytes": (root/name).stat().st_size} for name in changed],
+          }
+          (out/"manifest.json").write_text(json.dumps(manifest, indent=2)+"\n")
+          (out/"generated.patch").write_bytes(subprocess.check_output(["git", "diff", "--binary", "--", *changed]))
+          with tarfile.open(out/"generated.tar.gz", "w:gz") as archive:
+              for name in changed:
+                  archive.add(root/name, arcname=name, recursive=False)
+          print(json.dumps(manifest, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          /usr/bin/python3 -B tools/native-input/ci.py check \
-            --package-info .ci/native-input-evidence/package/package.json \
-            --x11-run "$RUNNER_TEMP/verdant-os-x11" \
-            --wayland-run "$RUNNER_TEMP/verdant-os-wayland" \
-            --controls-x11-run "$RUNNER_TEMP/verdant-controls-x11" \
-            --controls-wayland-run "$RUNNER_TEMP/verdant-controls-wayland" \
-            --output .ci/native-input-evidence/result.json
-      - name: Upload all OS evidence including failures
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: native-input-linux
-          path: .ci/native-input-evidence/
+          name: riip-timeline-generated
+          path: .ci/riip-generation/
           include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 14
-
-  native:
-    needs: [proto-retained, proto-fresh, headless-session]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: windows-2025
-            target: windows-x86_64
-          - runner: macos-15
-            target: macos-aarch64
-    runs-on: ${{ matrix.runner }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Preserve Git blob bytes on Windows
-        if: runner.os == 'Windows'
-        run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.22.3'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: '10.32.1'
-      - name: Install locked retained-artifact checker
-        run: pnpm --dir frontend/proto-ui install --frozen-lockfile --ignore-scripts
-      - name: Validate retained Proto-UI artifacts on this platform
-        run: node frontend/proto-ui/tools/build-proto-ui.mjs --check-retained
-      - name: Fetch locked build inputs
-        working-directory: frontend
-        run: cargo fetch --locked
-      - name: Check complete Cargo GPUI and shared SDK identities
-        run: |
-          mkdir -p .ci
-          node frontend/proto-ui/tools/check-cargo-gpui.mjs --offline > .ci/proto-ui-gpui-graph.json
-          cat .ci/proto-ui-gpui-graph.json
-      - name: Retain Cargo graph evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: proto-ui-cargo-${{ matrix.target }}
-          path: .ci/proto-ui-gpui-graph.json
-          if-no-files-found: error
-      - name: Build and test native executables
-        working-directory: frontend
-        env:
-          VERDANT_VOICE_BANK_SHA256: e2415c3917dd102861ce8043b0c0daf497b18a0903f7255f314baf72cb73bbc1
-        run: |
-          # Check filesystem and launcher portability before the full GUI build.
-          cargo test --offline --locked --release -p verdant-agent-skills -p verdant-launcher
-          cargo test --offline --locked --release -p verdant-cli --test entrypoints
-          # Exercise real shared-memory attachment before the full GUI build.
-          cargo test --offline --locked --release -p verdant-plugins --lib shm::tests
-          cargo build --offline --locked --release -p verdant-app -p verdant-cli -p verdant-launcher -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
-          cargo test --offline --locked --release -p verdant-cli --test native_studio
-          cargo test --offline --locked --release -p verdant-media --test advanced_edits
-          cargo test --offline --locked --release -p verdant-service audio_edit::
-          cargo test --offline --locked --release -p verdant-service studio::tests
-          cargo test --offline --locked --release -p verdant-plughost factory_library_is_complete_distinct_and_audible
-          host="$PWD/target/release/verdant-plughost"
-          if [ "$RUNNER_OS" = Windows ]; then host="$host.exe"; fi
-          VERDANT_PLUGIN_HOST="$host" cargo test --offline --locked --release -p verdant-plugins --test builtin_signal export_hosts_process_at_each_admitted_rate -- --ignored
-          cargo test --offline --locked --release -p verdant-ui-protocol -p verdant-session
-          # The compiler migration spans text, collections, overlays and editing
-          # surfaces as well as knobs. Exercise the complete application suite
-          # on every native runner, including the generated SDK regressions.
-          cargo test --offline --locked --release -p verdant-app --bin verdant-gui -- --test-threads=1
-          cargo test --offline --locked --release -p proto-ui-gpui-native --features test-support,gpui/test-support --lib -- --test-threads=1
-          # Exercise the selection notification path enabled by the app itself.
-          cargo test --offline --locked --release -p proto-ui-gpui-native --features test-support,gpui/test-support,gpui-modern-element-api,gpui-text-selection-notification --lib -- --test-threads=1
-          cargo test --offline --locked --release -p verdant-worker --bin verdant-worker --test voice_package
-          if [ "$RUNNER_OS" = Windows ]; then
-            cargo test --offline --locked --release -p verdant-cli windows_path_tests
-          fi
-      - name: Assemble and check the native package
-        env:
-          VERDANT_PACKAGE_TARGET: ${{ matrix.target }}
-        run: |
-          mkdir -p .ci/runtime .ci/package
-          release=frontend/target/release/verdant-release
-          if [ "$RUNNER_OS" = Windows ]; then release="$release.exe"; fi
-          runtime=$("$release" runtime-inputs --target "$VERDANT_PACKAGE_TARGET")
-          curl --fail --location --max-time 120 "$(jq -er .wheel_url <<< "$runtime")" --output .ci/runtime/onnxruntime.whl
-          selection_sha=$("$release" select-source --repo . --output .ci/source-selection.json | jq -er .sha256)
-          export SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
-          "$release" package --repo . --binaries frontend/target/release --target "$VERDANT_PACKAGE_TARGET" \
-            --onnxruntime-wheel .ci/runtime/onnxruntime.whl --output .ci/package \
-            --source-selection .ci/source-selection.json --source-selection-sha256 "$selection_sha"
-          "$release" check --check .ci/package --require-package --expected-source-commit "$GITHUB_SHA" \
-            --expected-source-selection-sha256 "$selection_sha"
-      - name: Retain the guarded native package
-        uses: actions/upload-artifact@v4
-        with:
-          name: verdant-${{ matrix.target }}
-          path: .ci/package/
           if-no-files-found: error
