@@ -90,6 +90,9 @@ fn source_kind(path: &str) -> bool {
     PUBLIC_PYTHON_SOURCES.contains(&path)
         || matches!(name, "Dockerfile" | "LICENSE" | "NOTICE" | "COPYING" | ".gitignore" | ".gitattributes" | ".dockerignore")
         || name.starts_with("LICENSE-")
+        // Embedded OFL fonts ship in their preferred form for modification;
+        // admitted only beside their bundled licence, never elsewhere.
+        || (path.starts_with("frontend/crates/verdant-app/assets/fonts/") && name.ends_with(".otf"))
         || Path::new(path).extension().and_then(|s| s.to_str()).is_some_and(|ext| matches!(ext,
             "rs" | "toml" | "lock" | "json" | "md" | "txt" | "html" | "css" | "js" | "mjs" | "ts"
             | "sh" | "ps1" | "cmd" | "bat" | "sha256" | "verp" | "ufdata" | "vsqx" | "desktop"

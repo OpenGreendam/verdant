@@ -294,3 +294,25 @@ fn admission_json_rejects_duplicate_keys_at_every_depth() {
     assert!(files::parse_json::<serde_json::Value>(br#"{"schema":"a","schema":"b"}"#).is_err());
     assert!(files::parse_json::<serde_json::Value>(br#"{"grant":{"sha256":"a","sha256":"b"}}"#).is_err());
 }
+
+#[test]
+fn embedded_fonts_are_admitted_only_beside_their_licence() {
+    let root = source_repository();
+    let content = b"synthetic font\n";
+    for (path, admitted) in [
+        ("frontend/crates/verdant-app/assets/fonts/Inter-Regular.otf", true),
+        ("frontend/crates/verdant-app/assets/Inter-Regular.otf", false),
+        ("frontend/crates/verdant-app/assets/fonts/Inter-Regular.ttf", false),
+    ] {
+        let mut selection = source::select(root.path()).unwrap();
+        selection.files.push(source::SelectedFile { path: path.into(), bytes: content.len() as u64,
+            sha256: hex::encode(Sha256::digest(content)), mode: 0o644, git_blob: "b".repeat(40) });
+        let result = source::validate(&selection);
+        if admitted {
+            assert!(result.as_ref().map_or_else(|e| !e.to_string().contains("unapproved"), |_| true), "{result:?}");
+        } else {
+            let error = result.unwrap_err().to_string();
+            assert!(error.contains("unapproved corresponding-source input") && error.contains(path), "{error}");
+        }
+    }
+}
