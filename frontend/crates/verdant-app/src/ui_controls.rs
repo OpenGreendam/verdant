@@ -1151,3 +1151,7 @@ mod width_class_tests {
         assert_eq!(layout.inspector_width, 300.0);
     }
 }
+
+#[cfg(test)]
+#[path = "ui_controls_timeline_tests.rs"]
+mod timeline_tests;

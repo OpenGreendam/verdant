@@ -2,11 +2,17 @@
 
 Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生成原生组件，`rust-data-v1` 生成只依赖 Rust 标准库的类型化决策函数。保留的 Rust 源码全部由上游 compiler 发射；不要手改 `generated/`。版本、完整 GPUI 来源、工具链要求、共享 SDK 内容和各编译单元的目标由 [compiler.pin.json](compiler.pin.json) 绑定。
 
-## 2026-11-24 RCIP 推进
+## 2026-11-25 RIIP：时间线按压策略
 
-当前分支把 compiler 从 `4e499ae25e825e130e740f16af66d70b23a743cf` 升到公开提交 [`e9340df6279e063cf372080bf4cc97caea3fd901`](https://github.com/Proto-UI/Proto-UI/commit/e9340df6279e063cf372080bf4cc97caea3fd901)，基于上游主线 `88fc0883bec70abbc0d7505d88370657c279639e`，通用兼容修复见 [Proto-UI PR #1791](https://github.com/Proto-UI/Proto-UI/pull/1791)。共享 SDK 内容摘要为 `832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b`；SDK 版本仍为 `0.2.0`，14 个单元和 receipt 全部通过固定干净编译器重新生成。
+编曲区与钢琴卷帘的 `TimelineScrollbar` 使用同一作者源码 `ContinuousControl.beginTrack`。宿主只给 thumb 命中、槽位候选和位移换算；源码的 `trackPress` 决定立即跳转或等待拖动，并发布独立的 `dragOrigin`。取消仍回到原接受值，预览重绘不会重新选择拖动起点。详细职责、原生事件回归与剩余边界见 [本批记录](RIIP-2026-11-25.md)。
 
-本轮补齐连续输入的阈值／步进、受控 `selected` 的真实宿主消费，以及弹窗和乐谱导出表单的默认响应、子输入提交与关闭退役。逐控件对应和仍需继续迁移的项目见 [RCIP 清单](RCIP-2026-11-24.md)，准确执行范围见 [本轮验证记录](VALIDATION-RCIP-2026-11-24.json)。这些工作分支结果不表示上游修复或 Verdant 改动已经合入主线。
+本批基于主线 `93ff60c1420850c6db7f3248d234faee9cc655fa`。原清单中的主总线 insert bypass、布尔命令按钮和 checked menu 选择值消费已经存在于该基线，不重复算作本批迁移。继续使用下述 compiler pin 与共享 SDK；生成、平台包和输入验收以本批准确提交的 CI 为准。
+
+## 2026-11-24 RCIP 历史记录
+
+该轮把 compiler 从 `4e499ae25e825e130e740f16af66d70b23a743cf` 升到公开提交 [`e9340df6279e063cf372080bf4cc97caea3fd901`](https://github.com/Proto-UI/Proto-UI/commit/e9340df6279e063cf372080bf4cc97caea3fd901)，基于上游主线 `88fc0883bec70abbc0d7505d88370657c279639e`，通用兼容修复见 [Proto-UI PR #1791](https://github.com/Proto-UI/Proto-UI/pull/1791)。共享 SDK 内容摘要为 `832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b`；SDK 版本仍为 `0.2.0`，14 个单元和 receipt 全部通过固定干净编译器重新生成。
+
+本轮补齐连续输入的阈值／步进、受控 `selected` 的真实宿主消费，以及弹窗和乐谱导出表单的默认响应、子输入提交与关闭退役。逐控件对应和仍需继续迁移的项目见 [RCIP 清单](RCIP-2026-11-24.md)，准确执行范围见 [本轮验证记录](VALIDATION-RCIP-2026-11-24.json)。这些实现和 compiler pin 已包含在上述 2026-11-25 主线基线中；下列旧执行数量仍只对应原记录中的候选，后续修复和本批改动各自验证。
 
 本轮本地验证已通过：14 个单元／81 个产物的 fresh 与 retained 检查、236 项源与 producer 测试、298 项应用原生测试、SDK 两组配置的 63／62 项、33 项 session／protocol 测试，以及最终实际 all-features 依赖图。上游较广编译器套件保留 1 项已复现的基线失败；本轮跨平台包和实际 OS 窗口结果仍以对应 PR 的新 CI 为准。
 

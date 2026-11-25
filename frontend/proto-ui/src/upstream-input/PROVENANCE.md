@@ -4,7 +4,10 @@
 `packages/prototypes/base/src/input/` at Proto-UI commit
 [`4e499ae25e825e130e740f16af66d70b23a743cf`](https://github.com/Proto-UI/Proto-UI/tree/4e499ae25e825e130e740f16af66d70b23a743cf/packages/prototypes/base/src/input).
 The accompanying MIT license is copied from that same commit.
-The compiler pin binds this identical immutable upstream revision.
+These vendored files have their own immutable source revision in
+`provenance.json`. The compiler is independently pinned by
+`../../compiler.pin.json`; upgrading that compiler does not replace these
+vendored Input files.
 
 Verdant's source producer admits repository-local relative imports. These
 copies retain the upstream shared `asInputEditor` / `asTextControl` author
