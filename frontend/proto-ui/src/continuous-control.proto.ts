@@ -5,7 +5,7 @@ type Props = {
   value?: number; min?: number; max?: number; step?: number; fineStep?: number;
   defaultValue?: number; label?: string; disabled?: boolean; revision?: string;
   role?: string; dragMode?: string; doubleAction?: string; tapAction?: string;
-  previewEcho?: boolean; keyMode?: string;
+  previewEcho?: boolean; keyMode?: string; trackPress?: string;
 };
 
 // Geometry and musical/plugin unit conversion stay at the native boundary.
@@ -23,11 +23,13 @@ export default definePrototype<Props>({
       revision: { type: 'string', default: '' }, role: { type: 'string', default: 'slider' },
       dragMode: { type: 'string', default: 'absolute' }, doubleAction: { type: 'string', default: 'reset' },
       tapAction: { type: 'string', default: 'none' }, previewEcho: { type: 'boolean', default: false },
-      keyMode: { type: 'string', default: 'scalar' },
+      keyMode: { type: 'string', default: 'scalar' }, trackPress: { type: 'string', default: 'jump' },
     });
     const phase = def.state.string('phase', 'idle');
     const value = def.state.numberRange('value', 0, { min: -1e15, max: 1e15 });
     const initialValue = def.state.numberRange('initialValue', 0, { min: -1e15, max: 1e15 });
+    // A track jump changes the drag anchor, never the authority used to cancel.
+    const dragOrigin = def.state.numberRange('dragOrigin', 0, { min: -1e15, max: 1e15 });
     const minimum = def.state.numberRange('minimum', 0, { min: -1e15, max: 1e15 });
     const maximum = def.state.numberRange('maximum', 1, { min: -1e15, max: 1e15 });
     const disabled = def.state.bool('disabled', false);
@@ -50,6 +52,7 @@ export default definePrototype<Props>({
     def.feedback.style.use(tw('w-full h-full min-w-0 min-h-0'));
     def.expose.state('value', value);
     def.expose.state('initialValue', initialValue);
+    def.expose.state('dragOrigin', dragOrigin);
     def.expose.state('phase', phase);
     def.expose.state('disabled', disabled);
     def.expose.state('focused', focus.focused);
@@ -71,6 +74,7 @@ export default definePrototype<Props>({
     let revision = '';
     let stepPolicy = 0.01; let finePolicy = 0.001;
     let dragPolicy = 'absolute'; let doublePolicy = 'reset'; let tapPolicy = 'none'; let keyboardPolicy = 'scalar';
+    let trackPolicy = 'jump';
     const current = (ticket: number): boolean => !disposed && run !== null && epoch === ticket;
     const authorityCurrent = (ticket: number): boolean => !disposed && run !== null && authorityEpoch === ticket;
     const enabled = (): boolean => run !== null && attached && !disposed && !syncing && !disabled.get();
@@ -111,7 +115,7 @@ export default definePrototype<Props>({
         && props.disabled !== true && (props.step ?? 0.01) === stepPolicy
         && (props.fineStep ?? 0.001) === finePolicy && (props.dragMode ?? 'absolute') === dragPolicy
         && (props.doubleAction ?? 'reset') === doublePolicy && (props.tapAction ?? 'none') === tapPolicy
-        && (props.keyMode ?? 'scalar') === keyboardPolicy;
+        && (props.keyMode ?? 'scalar') === keyboardPolicy && (props.trackPress ?? 'jump') === trackPolicy;
       phase.set('idle', 'reason: continuous control proposal');
       if (!current(ticket)) return false;
       if (echoed) accepted = proposal;
@@ -140,7 +144,7 @@ export default definePrototype<Props>({
       if (!current(ticket) || !enabled()) return false;
       return propose(run?.props.get().defaultValue ?? accepted, ticket);
     };
-    def.expose.method('begin', (candidate: number, jump: boolean, resetModifier: boolean, double: boolean) => {
+    const begin = (candidate: number, jump: boolean, origin: number, resetModifier: boolean, double: boolean): boolean => {
       if (!enabled() || phase.get() !== 'idle' || !Number.isFinite(candidate)) return false;
       if (double && run?.props.get().doubleAction === 'edit') return edit();
       if (resetModifier || (double && run?.props.get().doubleAction === 'reset')) return reset();
@@ -149,6 +153,8 @@ export default definePrototype<Props>({
       if (!current(ticket) || !enabled()) return false;
       initialValue.set(accepted, 'reason: continuous control starting authority');
       if (!current(ticket)) return false;
+      dragOrigin.set(origin, 'reason: continuous control starting drag origin');
+      if (!current(ticket)) return false;
       phase.set(jump ? 'dragging' : 'armed', 'reason: continuous control press');
       if (!current(ticket)) return false;
       if (run) run.expose.emit('interactionStart', { value: accepted, revision });
@@ -156,6 +162,16 @@ export default definePrototype<Props>({
       if (jump) return preview(candidate, ticket);
       if (run) run.update();
       return current(ticket);
+    };
+    def.expose.method('begin', (candidate: number, jump: boolean, resetModifier: boolean, double: boolean) => {
+      return begin(candidate, jump, accepted, resetModifier, double);
+    });
+    def.expose.method('beginTrack', (candidate: number, thumbHit: boolean, resetModifier: boolean, double: boolean) => {
+      if (typeof thumbHit !== 'boolean') return false;
+      // The host supplies a geometric hit and mapped target, not a jump decision.
+      // Freeze the authored anchor before a preview can synchronously echo back.
+      const jump = !thumbHit && (run?.props.get().trackPress ?? 'jump') === 'jump';
+      return begin(candidate, jump, jump ? clamp(candidate) : accepted, resetModifier, double);
     });
     const sample = (candidate: number, fineCandidate: number, deltaX: number, deltaY: number, fine: boolean, ticket: number): boolean => {
       if (!current(ticket) || !enabled() || phase.get() === 'idle') return false;
@@ -254,7 +270,7 @@ export default definePrototype<Props>({
       const policyChanged = stepPolicy !== (props.step ?? 0.01) || finePolicy !== (props.fineStep ?? 0.001)
         || dragPolicy !== (props.dragMode ?? 'absolute')
         || doublePolicy !== (props.doubleAction ?? 'reset') || tapPolicy !== (props.tapAction ?? 'none')
-        || keyboardPolicy !== (props.keyMode ?? 'scalar');
+        || keyboardPolicy !== (props.keyMode ?? 'scalar') || trackPolicy !== (props.trackPress ?? 'jump');
       const echoed = props.previewEcho === true && phase.get() !== 'idle'
         && (props.revision ?? '') === revision && props.value === value.get()
         && (props.min ?? 0) === minimum.get() && (props.max ?? 1) === maximum.get()
@@ -268,7 +284,7 @@ export default definePrototype<Props>({
       run = handle;
       stepPolicy = props.step ?? 0.01; finePolicy = props.fineStep ?? 0.001;
       dragPolicy = props.dragMode ?? 'absolute'; doublePolicy = props.doubleAction ?? 'reset'; tapPolicy = props.tapAction ?? 'none';
-      keyboardPolicy = props.keyMode ?? 'scalar';
+      keyboardPolicy = props.keyMode ?? 'scalar'; trackPolicy = props.trackPress ?? 'jump';
       const low = props.min ?? 0;
       const high = props.max ?? 1;
       const valid = Number.isFinite(low) && Number.isFinite(high) && low < high
@@ -324,7 +340,7 @@ export default definePrototype<Props>({
     def.lifecycle.onCreated(sync);
     def.lifecycle.onMounted((handle) => { if (!disposed) { attached = true; sync(handle); } });
     def.props.watch(['value', 'min', 'max', 'step', 'fineStep', 'defaultValue', 'label', 'disabled',
-      'revision', 'role', 'dragMode', 'doubleAction', 'tapAction', 'previewEcho', 'keyMode'], sync);
+      'revision', 'role', 'dragMode', 'doubleAction', 'tapAction', 'previewEcho', 'keyMode', 'trackPress'], sync);
     def.event.on('host:blur', cancel);
     def.lifecycle.onUnmounted(() => retire(false));
     def.lifecycle.onBeforeDispose(() => retire(true));

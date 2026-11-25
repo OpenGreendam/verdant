@@ -270,7 +270,7 @@ runtimeTest('continuous cancellation carries the retired accepted value and orig
 
 
 runtimeTest('continuous preview echo cannot mask a synchronous policy change during finish', async t => {
-  for (const policy of [{ max: 2 }, { disabled: true }, { step: 0.2 }, { dragMode: 'relative' }, { keyMode: 'table-point' }]) {
+  for (const policy of [{ max: 2 }, { disabled: true }, { step: 0.2 }, { dragMode: 'relative' }, { keyMode: 'table-point' }, { trackPress: 'drag' }]) {
     const f = await fixture(t, { previewEcho: true });
     f.call('begin', 0.5, false, false, false);
     f.onEvent((name, payload) => { if (name === 'valuePreview') f.update({ value: payload.value, ...policy }); });
@@ -385,4 +385,189 @@ runtimeTest('continuous commit echo cannot overwrite a reentrant host replacemen
   assert.equal(f.x.initialValue.get(), 0.2);
   f.call('cancel');
   assert.deepEqual(f.cancels(), [{ value: 0.2, revision: 'document:2' }]);
+});
+
+runtimeTest('track presses separate thumb hits and clamped slot origins from rollback authority', async (t) => {
+  for (const [candidate, thumbHit, origin, phase] of [
+    [80, true, 20, 'armed'], [80, false, 80, 'dragging'],
+    [150, false, 100, 'dragging'], [-20, false, 0, 'dragging'],
+  ]) {
+    const f = await fixture(t, { value: 20, min: 0, max: 100, role: 'scrollbar' });
+    assert.equal(f.call('beginTrack', candidate, thumbHit, false, false), true);
+    assert.equal(f.x.initialValue.get(), 20);
+    assert.equal(f.x.dragOrigin.get(), origin);
+    assert.equal(f.x.phase.get(), phase);
+    assert.equal(f.x.value.get(), origin);
+    assert.deepEqual(f.events.filter(event => event.name === 'interactionStart').map(event => event.payload),
+      [{ value: 20, revision: 'document:1' }]);
+    assert.deepEqual(f.events.filter(event => event.name === 'valuePreview').map(event => event.payload),
+      thumbHit ? [] : [{ value: origin, revision: 'document:1' }]);
+    assert.deepEqual(f.commits(), []);
+    assert.equal(f.semantics().role, 'scrollbar');
+    f.call('cancel');
+    assert.equal(f.x.value.get(), 20);
+    assert.deepEqual(f.cancels(), [{ value: 20, revision: 'document:1' }]);
+  }
+});
+
+runtimeTest('trackPress changes the origin and phase for the same geometric slot facts', async (t) => {
+  const f = await fixture(t, { value: 20, min: 0, max: 100 });
+  assert.equal(f.call('beginTrack', 80, false, false, false), true);
+  assert.equal(f.x.dragOrigin.get(), 80);
+  assert.equal(f.x.phase.get(), 'dragging');
+  f.call('cancel');
+  f.update({ trackPress: 'drag' });
+  const before = f.events.length;
+  assert.equal(f.call('beginTrack', 80, false, false, false), true);
+  assert.equal(f.x.dragOrigin.get(), 20);
+  assert.equal(f.x.initialValue.get(), 20);
+  assert.equal(f.x.phase.get(), 'armed');
+  assert.equal(f.x.value.get(), 20);
+  assert.deepEqual(f.events.slice(before).map(event => event.name), ['interactionStart']);
+  // The host maps displacement from the source's selected origin, not the slot target.
+  const origin = f.x.dragOrigin.get();
+  assert.equal(f.call('finish', origin + 12, origin + 1.2, 12, 0, false), true);
+  assert.deepEqual(f.commits(), [{ value: 32, revision: 'document:1' }]);
+});
+
+runtimeTest('track release samples the terminal position once even without a preceding move', async (t) => {
+  for (const [trackPress, thumbHit, delta, fine, expected] of [
+    ['jump', false, 0, false, 80], ['jump', true, 0, false, null],
+    ['drag', false, 0, false, null], ['jump', true, 12, false, 32],
+    ['jump', false, 12, false, 92], ['drag', false, 12, false, 32],
+    ['jump', false, 5, true, 80.5],
+  ]) {
+    const f = await fixture(t, { value: 20, min: 0, max: 100, trackPress });
+    assert.equal(f.call('beginTrack', 80, thumbHit, false, false), true);
+    const origin = f.x.dragOrigin.get();
+    assert.equal(f.call('finish', origin + delta, origin + delta * 0.1, delta, 0, fine), true);
+    assert.equal(f.call('finish', 100, 100, 20, 0, false), false);
+    assert.equal(f.x.phase.get(), 'idle');
+    assert.equal(f.x.value.get(), 20, 'an unaccepted proposal cannot replace the rollback authority');
+    assert.deepEqual(f.commits(), expected === null ? [] : [{ value: expected, revision: 'document:1' }]);
+    assert.deepEqual(f.cancels(), expected === null ? [{ value: 20, revision: 'document:1' }] : []);
+  }
+});
+
+runtimeTest('track origins stay fixed across preview echoes and the next gesture uses committed authority', async (t) => {
+  for (const outcome of ['cancel', 'commit', 'replace']) {
+    const f = await fixture(t, { value: 20, min: 0, max: 100, previewEcho: true });
+    f.onEvent((name, payload) => {
+      if (name === 'valuePreview') f.update({ value: payload.value });
+      if (name === 'valueCommit' && outcome === 'replace') f.update({ value: 40, revision: 'document:2' });
+    });
+    assert.equal(f.call('beginTrack', 80, false, false, false), true);
+    for (const delta of [5, 10]) {
+      const origin = f.x.dragOrigin.get();
+      assert.equal(f.call('sample', origin + delta, origin + delta * 0.1, delta, 0, false), true);
+      assert.equal(f.x.dragOrigin.get(), 80, 'a host preview echo cannot move the frozen drag anchor');
+      assert.equal(f.x.initialValue.get(), 20, 'the initial authority remains available for cancellation');
+      assert.equal(f.x.value.get(), 80 + delta);
+    }
+    if (outcome === 'cancel') {
+      f.call('cancel');
+      assert.deepEqual(f.cancels(), [{ value: 20, revision: 'document:1' }]);
+      assert.deepEqual(f.commits(), []);
+    } else {
+      assert.equal(f.call('finish', 92, 81.2, 12, 0, false), true);
+      assert.deepEqual(f.commits(), [{ value: 92, revision: 'document:1' }]);
+      assert.deepEqual(f.cancels(), []);
+    }
+    const accepted = outcome === 'cancel' ? 20 : outcome === 'replace' ? 40 : 92;
+    assert.equal(f.x.value.get(), accepted);
+    assert.equal(f.call('beginTrack', 0, true, false, false), true);
+    assert.equal(f.x.initialValue.get(), accepted);
+    assert.equal(f.x.dragOrigin.get(), accepted);
+    f.call('cancel');
+  }
+});
+
+runtimeTest('track policy revision and disabled changes retire the active origin before late release', async (t) => {
+  for (const [patch, accepted] of [
+    [{ trackPress: 'drag' }, 20], [{ disabled: true }, 20],
+    [{ value: 40, revision: 'document:2' }, 40],
+  ]) {
+    const f = await fixture(t, { value: 20, min: 0, max: 100, previewEcho: true });
+    f.onEvent((name, payload) => { if (name === 'valuePreview') f.update({ value: payload.value }); });
+    assert.equal(f.call('beginTrack', 80, false, false, false), true);
+    f.update(patch);
+    assert.equal(f.x.phase.get(), 'idle');
+    assert.equal(f.x.value.get(), accepted);
+    assert.deepEqual(f.cancels(), [{ value: 20, revision: 'document:1' }]);
+    assert.equal(f.call('finish', 90, 81, 10, 0, false), false);
+    assert.deepEqual(f.commits(), []);
+  }
+});
+
+runtimeTest('track press and release stop when a synchronous observer replaces their policy', async (t) => {
+  for (const stage of ['focus', 'start', 'preview', 'finish']) {
+    const f = await fixture(t, { value: 20, min: 0, max: 100, previewEcho: true });
+    if (stage === 'focus') {
+      f.onFocus(() => f.update({ trackPress: 'drag' }));
+    } else if (stage === 'start') {
+      f.onEvent(name => { if (name === 'interactionStart') f.update({ trackPress: 'drag' }); });
+    } else {
+      if (stage === 'finish') assert.equal(f.call('beginTrack', 80, false, false, false), true);
+      f.onEvent((name, payload) => {
+        if (name === 'valuePreview') f.update({ value: payload.value, trackPress: 'drag' });
+      });
+    }
+    const result = stage === 'finish'
+      ? f.call('finish', 90, 81, 10, 0, false)
+      : f.call('beginTrack', 80, false, false, false);
+    assert.equal(result, false, stage);
+    assert.equal(f.x.phase.get(), 'idle', stage);
+    assert.equal(f.x.value.get(), 20, stage);
+    assert.deepEqual(f.commits(), [], stage);
+    assert.deepEqual(f.cancels(), stage === 'focus' ? [] : [{ value: 20, revision: 'document:1' }], stage);
+    assert.equal(f.call('finish', 95, 81.5, 15, 0, false), false, stage);
+  }
+});
+
+runtimeTest('track admission refuses invalid facts and nested starts without replacing the live contact', async (t) => {
+  const f = await fixture(t, { value: 20, min: 0, max: 100 });
+  for (const candidate of [NaN, Infinity, -Infinity]) {
+    for (const thumbHit of [false, true]) assert.equal(f.call('beginTrack', candidate, thumbHit, false, false), false);
+  }
+  for (const thumbHit of [undefined, null, 0, 1, 'true']) {
+    assert.equal(f.call('beginTrack', 80, thumbHit, false, false), false);
+  }
+  assert.deepEqual(f.events, []);
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.x.value.get(), 20);
+  f.onEvent(name => {
+    if (name === 'interactionStart') assert.equal(f.call('beginTrack', 40, false, false, false), false);
+  });
+  assert.equal(f.call('beginTrack', 80, false, false, false), true);
+  assert.equal(f.x.dragOrigin.get(), 80);
+  assert.equal(f.x.phase.get(), 'dragging');
+  assert.equal(f.call('beginTrack', NaN, false, false, false), false);
+  assert.equal(f.x.value.get(), 80);
+  await f.session.unmount();
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.x.value.get(), 20);
+  assert.deepEqual(f.cancels(), [{ value: 20, revision: 'document:1' }]);
+  assert.equal(f.call('beginTrack', 80, false, false, false), false);
+  assert.equal(f.call('finish', 90, 81, 10, 0, false), false);
+  assert.deepEqual(f.commits(), []);
+});
+
+runtimeTest('track presses retain reset and edit precedence while legacy begin keeps its explicit jump', async (t) => {
+  const f = await fixture(t, {
+    value: 20, min: 0, max: 100, defaultValue: 10, doubleAction: 'edit', trackPress: 'drag',
+  });
+  assert.equal(f.call('beginTrack', 80, false, false, true), true);
+  assert.equal(f.events.at(-1).name, 'editRequest');
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.call('beginTrack', 80, false, true, false), true);
+  assert.deepEqual(f.commits(), [{ value: 10, revision: 'document:1' }]);
+  assert.equal(f.x.phase.get(), 'idle');
+  assert.equal(f.x.value.get(), 20);
+  assert.equal(f.call('begin', 80, true, false, false), true);
+  assert.equal(f.x.phase.get(), 'dragging');
+  assert.equal(f.x.initialValue.get(), 20);
+  assert.equal(f.x.dragOrigin.get(), 20, 'legacy consumers still map displacement from accepted initialValue');
+  assert.equal(f.x.value.get(), 80);
+  f.call('cancel');
+  assert.equal(f.x.value.get(), 20);
 });
