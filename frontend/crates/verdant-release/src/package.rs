@@ -16,6 +16,7 @@ const DOCUMENTS: &[&str] = &[
     "backend/RUNTIME.md", "frontend/README.md", "frontend/P0-DECISIONS.md", "docs/verdant-voice.md",
     "frontend/docs/PLUGIN-HOST.md", "frontend/docs/THIRD_PARTY-PLUGINS.md", "frontend/docs/AGENT-AUTOMATION.md",
     "frontend/crates/verdant-app/assets/icons/LICENSE-lucide.txt",
+    "frontend/crates/verdant-app/assets/fonts/LICENSE-OFL.txt",
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

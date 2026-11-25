@@ -1935,7 +1935,7 @@ impl Render for Editor {
             .flex_col()
             .bg(th.window)
             .text_color(th.text)
-            .font_family(self.ui_font.clone())
+            .font(crate::theme::ui_font(self.ui_font.clone()))
             .key_context("Verdant")
             .on_action(cx.listener(|ed, _: &WorkflowMenu, w, cx| ed.workflow_menu(w, cx)))
             .on_action(cx.listener(|ed, action: &crate::shortcuts::WorkflowShortcut, w, cx| crate::shortcuts::dispatch(ed, action, w, cx)))
