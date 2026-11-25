@@ -858,7 +858,7 @@ mod splitter_precision_tests {
 struct TimelineScrollbar { editor: Entity<Editor>, arrange: bool, theme: Theme }
 impl gpui::RenderOnce for TimelineScrollbar {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
+        use crate::proto_scalar::{EventKind, Sample, Spec, TrackPress, scalar};
         let ed = self.editor.read(cx);
         let arrange = self.arrange;
         let vp = if arrange { ed.arrange } else { ed.session.viewport };
@@ -872,16 +872,12 @@ impl gpui::RenderOnce for TimelineScrollbar {
         spec.role = "scrollbar"; spec.step = visible / 10.0; spec.fine_step = visible / 100.0;
         spec.default_value = 0.0; spec.preview_echo = true;
         scalar(self.editor, if arrange { "arrange-timeline-scroll" } else { "roll-timeline-scroll" }, spec,
-            move |sample, bounds, initial| {
+            move |sample, bounds, origin| {
                 let w = f64::from(bounds.size.width);
                 let thumb_w = (w * ratio).max(24.0).min(w);
                 let travel = (w - thumb_w).max(1.0);
-                let initial_x = initial / max_scroll * travel;
-                let pointer_start = sample.position.x - sample.total_delta.x;
-                let on_thumb = (initial_x..=initial_x + thumb_w).contains(&pointer_start);
-                let start = if on_thumb { initial } else { ((pointer_start-thumb_w*0.5)/travel).clamp(0.0, 1.0)*max_scroll };
                 let delta = sample.total_delta.x / travel * max_scroll;
-                Sample { value: start + delta, fine: start + delta * 0.1, jump: !on_thumb }
+                Sample { value: origin + delta, fine: origin + delta * 0.1, jump: false }
             },
             move |display, _, _, _| canvas(|bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
                 move |bounds, hitbox, window, _| {
@@ -897,6 +893,17 @@ impl gpui::RenderOnce for TimelineScrollbar {
                 if matches!(event.kind, EventKind::Preview | EventKind::Commit | EventKind::Cancel) {
                     if arrange { ed.arrange.start_tick = event.value; } else { ed.session.viewport.start_tick = event.value; }
                     ed.notify_viewport(if arrange { crate::clock::Space::Arrange } else { crate::clock::Space::Editor }, cx);
+                }
+            })
+            .track_begin(move |sample, bounds, accepted| {
+                let w = f64::from(bounds.size.width);
+                let thumb_w = (w * ratio).max(24.0).min(w);
+                let travel = (w - thumb_w).max(1.0);
+                let thumb_x = accepted / max_scroll * travel;
+                let pointer_start = sample.position.x - sample.total_delta.x;
+                TrackPress {
+                    value: ((pointer_start - thumb_w * 0.5) / travel).clamp(0.0, 1.0) * max_scroll,
+                    thumb_hit: (thumb_x..=thumb_x + thumb_w).contains(&pointer_start),
                 }
             })
     }
