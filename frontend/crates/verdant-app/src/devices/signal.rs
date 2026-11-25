@@ -215,8 +215,9 @@ pub(super) fn paint_spectrum(window: &mut Window, plot: Plot, measured: Option<&
 pub(super) fn compact(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey) -> gpui::AnyElement {
     let th = ed.theme;
     let Some(s) = snapshot(ed, owner, slot, key) else {
-        return div().min_h(gpui::rems(26./16.)).flex().items_center().text_xs().text_color(th.text_secondary)
-            .child("等待音频 · 输入与输出计量在播放后显示").into_any_element();
+        // Before any audio the graph already says it is waiting; a second
+        // line here would only repeat it.
+        return div().into_any_element();
     };
     let stale = s.captured_at.elapsed() > Duration::from_secs(1);
     let label = |name: &str, peaks: [f32; 2], color| div().flex().items_center().gap(gpui::rems(6./16.))

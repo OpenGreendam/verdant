@@ -392,7 +392,7 @@ impl Library {
             // triggers would turn the favorite into the option's press target.
             list = list.child(div().id(SharedString::from(row.id.clone())).flex_none()
                 .rounded(px(8.)).border_1().border_color(if selected { with_alpha(th.accent, 0.5) } else { with_alpha(th.text, 0.) })
-                .bg(if selected { th.checked } else { th.card }).hover(move |s| s.bg(if selected { th.checked } else { th.hover }))
+                .bg(if selected { th.checked } else { th.card }).hover(move |s| s.bg(if selected { th.checked } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if selected { th.checked } else { th.hover })))
                 .pr(px(12.)).flex().items_center().gap(px(10.))
                 .child(crate::proto_controls::action(format!("preset-option-{}", row.id), row.preset.name.clone())
                     .role(Role::ListBoxOption).aria_selected(selected).flex_1().min_w_0().px(px(12.)).py(px(9.))

@@ -391,7 +391,7 @@ impl Render for LcdView {
                 .authority(follow_authority.clone())
                 .flex_none().h(px(28.0)).px(px(8.0)).flex().items_center().rounded(px(6.0)).text_size(px(12.0))
                 .when(follow, |d| d.bg(th.checked))
-                .text_color(if follow { th.text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.checked } else { th.hover }))
+                .text_color(if follow { th.text } else { th.text_secondary }).hover(move |s| s.bg(if follow { th.checked } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if follow { th.checked } else { th.hover })))
                 .child("跟随")
                 .on_click(move |event, _, cx| editor.update(cx, |ed, cx| {
                     if crate::proto_controls::editor_authority(ed) != follow_authority

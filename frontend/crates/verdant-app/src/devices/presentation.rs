@@ -1,6 +1,7 @@
 //! Compact Adwaita surfaces shared by every native processor.
 //! Presentation preferences follow the instance, independently of audio state.
 use super::*;
+use crate::ui_controls::AdwStates;
 
 pub(super) fn page(ed: &Editor, target: &Target) -> u8 {
     workflow::read_workspace(ed, target).editor_page.min(2)
@@ -11,11 +12,43 @@ pub(super) fn button(id: impl Into<gpui::ElementId>, label: impl Into<SharedStri
     crate::proto_controls::action(id, label.clone()).role(Role::Button).tab_index(0).cursor_pointer()
         .flex_none().flex().items_center().justify_center().min_h(gpui::rems(30./16.))
         .px(gpui::rems(10./16.)).py(gpui::rems(4./16.)).rounded(gpui::rems(6./16.))
-        .border_1().border_color(if selected { with_alpha(th.accent, 0.45) } else { with_alpha(th.text, 0.) })
-        .bg(if selected { th.checked } else { with_alpha(th.text, 0.) })
-        .hover(move |s| s.bg(th.hover)).focus(move |s| s.border_color(th.accent))
+        .border_1().border_color(with_alpha(th.text, 0.))
+        .flat_states(th, selected).focus(move |s| s.border_color(th.accent))
         .text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-        .text_color(if selected { th.accent } else { th.text_secondary }).child(label)
+        .text_color(th.text).child(label)
+}
+
+/// A flat square icon button (AdwButton.flat with an icon child). `label`
+/// is its accessible name; `selected` uses the checked ramp.
+pub(super) fn icon_button(id: impl Into<gpui::ElementId>, icon_name: &'static str, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
+    let label = label.into();
+    crate::proto_controls::action(id, label.clone()).role(Role::Button).aria_label(label).tab_index(0).cursor_pointer()
+        .flex_none().flex().items_center().justify_center().size(gpui::rems(30./16.)).rounded(gpui::rems(6./16.))
+        .border_1().border_color(with_alpha(th.text, 0.)).flat_states(th, selected).focus(move |s| s.border_color(th.accent))
+        .child(svg().path(icon(icon_name)).size(gpui::rems(16./16.)).text_color(th.text))
+}
+
+/// Buttons joined into one AdwToggleGroup-style trough.
+pub(super) fn linked(children: impl IntoIterator<Item = gpui::AnyElement>, th: Theme) -> gpui::AnyElement {
+    div().flex().items_center().gap(gpui::rems(2./16.)).p(gpui::rems(2./16.)).rounded(gpui::rems(8./16.)).bg(th.control)
+        .children(children).into_any_element()
+}
+
+/// One segment of a linked toggle group: the checked segment is a raised
+/// card in the trough (AdwToggleGroup), the others are flat.
+pub(super) fn segment(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
+    let label = label.into();
+    let base = crate::proto_controls::action(id, label.clone()).role(Role::Button).tab_index(0).cursor_pointer()
+        .flex_none().flex().items_center().justify_center().min_h(gpui::rems(26./16.)).min_w(gpui::rems(30./16.))
+        .px(gpui::rems(10./16.)).rounded(gpui::rems(6./16.)).border_1()
+        .focus(move |s| s.border_color(th.accent))
+        .text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).text_color(th.text);
+    let base = if selected {
+        base.border_color(th.shade).bg(th.card).hover(move |s| s.bg(th.card)).active(move |s| s.bg(crate::theme::mix(th.card, th.text, 0.06)))
+    } else {
+        base.border_color(with_alpha(th.text, 0.)).flat_states(th, false)
+    };
+    base.child(label)
 }
 
 fn page_command(target: Target, index: u8, cx: &Context<Editor>) -> SemanticCommand {
@@ -44,10 +77,9 @@ pub(super) fn tabs(ed: &Editor, target: &Target, cx: &mut Context<Editor>) -> gp
         .children([(0u8, "编辑"), (1, "高级"), (2, "计量")].into_iter().map(|(index, label)| {
             let command = page_command(target.clone(), index, cx);
             let navigate: Vec<_> = (0..3).map(|page| page_command(target.clone(), page, cx)).collect();
-            semantic_click(button(format!("device-page-{}-{index}", target.slot), label, selected == index, th)
+            semantic_click(segment(format!("device-page-{}-{index}", target.slot), label, selected == index, th)
                 .authority(suite::action_authority(ed, target))
-                .role(Role::Tab).aria_selected(selected == index).aria_label(format!("{label}工作区"))
-                .when(selected == index, |d| d.bg(th.card).text_color(th.text).border_color(th.shade)), command)
+                .role(Role::Tab).aria_selected(selected == index).aria_label(format!("{label}工作区")), command)
                 .navigation(index as usize, 3, move |index, window, cx| {
                     if let Some(command) = navigate.get(index) { command(None, window, cx); }
                 })
@@ -63,7 +95,7 @@ pub(super) fn section_header(ed: &Editor, target: &Target, label: &str, count: u
         .aria_label(format!("{label} · {count} 个参数")).aria_expanded(expanded)
         .flex().items_center().gap(gpui::rems(10./16.)).w_full().min_h(gpui::rems(42./16.))
         .px(gpui::rems(12./16.)).rounded(gpui::rems(8./16.)).bg(th.card)
-        .border_1().border_color(th.shade).hover(move |s|s.bg(th.hover)).focus(move |s|s.border_color(th.accent)).cursor_pointer()
+        .border_1().border_color(th.shade).hover(move |s|s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover))).focus(move |s|s.border_color(th.accent)).cursor_pointer()
         .child(div().text_sm().text_color(th.text_secondary).child(if expanded { "⌄" } else { "›" }))
         .child(div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(label.to_string()))
         .child(div().text_xs().text_color(th.text_secondary).child(format!("{count} 个参数"))), command)

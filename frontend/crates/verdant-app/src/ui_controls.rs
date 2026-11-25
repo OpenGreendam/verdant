@@ -159,6 +159,45 @@ impl LayoutPrefs {
     }
 }
 
+/// libadwaita state layers. Every clickable surface shows rest, hover and
+/// pressed distinctly, and a checked surface keeps its own darker ramp, so a
+/// press never looks like a hover and a toggle never looks like a press.
+///
+/// | kind   | rest            | hover          | pressed        |
+/// |--------|-----------------|----------------|----------------|
+/// | raised | `control` (10%) | `control_pressed` (15%) | `checked` (30%) |
+/// | flat   | clear           | text @ 7%      | text @ 16%     |
+/// | checked| `checked` (30%) | +7% toward text| +14% toward text|
+pub(crate) trait AdwStates: StatefulInteractiveElement + Styled + Sized {
+    fn raised_states(self, th: Theme, checked: bool) -> Self {
+        let (rest, hover, press) = states(th, checked, false);
+        self.bg(rest).border_color(rest).hover(move |s| s.bg(hover).border_color(hover)).active(move |s| s.bg(press).border_color(press))
+    }
+    fn flat_states(self, th: Theme, checked: bool) -> Self {
+        let (rest, hover, press) = states(th, checked, true);
+        self.bg(rest).hover(move |s| s.bg(hover)).active(move |s| s.bg(press))
+    }
+    /// Only the pressed layer, for surfaces whose rest and hover fills were
+    /// set where they were built (the generated command surfaces).
+    fn pressed_state(self, th: Theme, checked: bool, flat: bool) -> Self {
+        let (_, _, press) = states(th, checked, flat);
+        self.active(move |s| s.bg(press).border_color(press))
+    }
+}
+impl<T: StatefulInteractiveElement + Styled> AdwStates for T {}
+
+/// The pressed fill for a surface hovered with `hover`: 10% further toward
+/// the text colour, darker in light themes and lighter in dark ones.
+pub(crate) fn pressed_fill(th: Theme, hover: gpui::Rgba) -> gpui::Rgba { crate::theme::mix(hover, th.text, 0.10) }
+
+/// (rest, hover, pressed) fills for a surface.
+pub(crate) fn states(th: Theme, checked: bool, flat: bool) -> (gpui::Rgba, gpui::Rgba, gpui::Rgba) {
+    use crate::theme::{mix, with_alpha};
+    if checked { (th.checked, mix(th.checked, th.text, 0.07), mix(th.checked, th.text, 0.14)) }
+    else if flat { (with_alpha(th.text, 0.0), with_alpha(th.text, 0.07), with_alpha(th.text, 0.16)) }
+    else { (th.control, th.control_pressed, th.checked) }
+}
+
 /// Ordinary button with unmistakable visual active state, uniform `BAR_BTN_H` height, and WCAG >= 4.5 contrast.
 pub fn selectable_button(
     id: impl Into<SharedString>,
@@ -177,13 +216,11 @@ pub fn selectable_button(
         .items_center()
         .justify_center()
         .rounded(px(6.0))
-        .bg(if active { th.checked } else { th.control })
         .border_1()
-        .border_color(if active { th.checked } else { th.control })
+        .raised_states(th, active)
         .text_sm()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(th.text)
-        .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
         .child(label)
 }
 
@@ -208,13 +245,11 @@ pub fn icon_selectable_button(
         .items_center()
         .justify_center()
         .rounded(px(6.0))
-        .bg(if active { th.checked } else { th.control })
         .border_1()
-        .border_color(if active { th.checked } else { th.control })
+        .raised_states(th, active)
         .text_sm()
         .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(fg)
-        .hover(move |s| s.bg(if active { th.checked } else { th.control_pressed }))
         .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
         .child(label)
 }
@@ -237,12 +272,10 @@ pub fn select_button(
         .flex()
         .items_center()
         .rounded(px(6.0))
-        .bg(th.control)
         .border_1()
-        .border_color(th.control)
+        .raised_states(th, false)
         .text_sm()
         .text_color(th.text)
-        .hover(move |s| s.bg(th.control_pressed))
         .when_some(leading_icon, |d, ic| {
             d.child(svg().path(icon(ic)).size(px(13.5)).flex_none().text_color(th.text_secondary))
         })
@@ -291,9 +324,8 @@ pub fn selectable_command_button(
     let label = label.into();
     let th = ed.theme;
     let active = ed.source_command_selection(cmd, &arg).unwrap_or(active);
-    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(),
-        if active { th.checked.into() } else { th.control.into() },
-        if active { th.checked.into() } else { th.control_pressed.into() });
+    let (rest, hover, _) = states(th, active, false);
+    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(), rest.into(), hover.into());
     bind_command_action(ed, cmd, arg, action, active, cx)
     .aria_label(label)
     .h(px(BAR_BTN_H))
@@ -302,7 +334,8 @@ pub fn selectable_command_button(
     .rounded(px(6.0))
     .text_sm()
     .border_1()
-    .border_color(if active { th.checked } else { th.control })
+    .border_color(rest)
+    .pressed_state(th, active, false)
     .font_weight(if active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
 }
 
@@ -319,15 +352,14 @@ pub fn flat_command_button(
 ) -> crate::proto_controls::Action {
     let label = label.into();
     let th = ed.theme;
-    let clear = gpui::Rgba { a: 0.0, ..th.headerbar };
     let active = ed.source_command_selection(cmd, &arg).unwrap_or(active);
-    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(),
-        if active { th.checked.into() } else { clear.into() },
-        if active { th.checked.into() } else { th.hover.into() });
+    let (rest, hover, _) = states(th, active, true);
+    let action = controls::command_surface(cmd, &arg, label.clone(), key, th.text.into(), rest.into(), hover.into());
     bind_command_action(ed, cmd, arg, action, active, cx)
     .aria_label(label)
     .py(px(0.0))
     .rounded(px(6.0))
+    .pressed_state(th, active, true)
 }
 
 /// Command button with a leading Lucide SVG icon, text label, and uniform `BAR_BTN_H` height.
@@ -576,7 +608,7 @@ pub fn numeric_pill(ed: &Editor, id: Num, arg: Arg, key: impl Into<SharedString>
                 crate::proto_controls::action(symbol, format!("{label}{}", if direction < 0.0 { "减少" } else { "增加" }))
                     .w(px(if compact { 24.0 } else { 30.0 })).h_full().flex_none()
                     .flex().items_center().justify_center().border_l_1().border_color(th.shade)
-                    .text_color(th.text).hover(move |s| s.bg(th.control_pressed))
+                    .text_color(th.text).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed)))
                     .child(svg().path(icon(symbol)).size(px(13.0)).text_color(th.text))
                     .on_click(move |event, window, cx| {
                         actions.invoke("adjust", vec![direction.into(), event.modifiers().shift.into()], window, cx);
@@ -941,7 +973,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
-                .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
+                .hover(move |s| s.bg(th.control_pressed).text_color(th.text)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed)))
                 .child("−")
                 .on_click(cx.listener(move |ed, _, window, cx| {
                     crate::proto_editor_surface::zoom(ed, is_arrange, "zoom-out", window, cx);
@@ -958,7 +990,7 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
                 .border_color(th.shade)
                 .text_xs()
                 .text_color(th.text_secondary)
-                .hover(move |s| s.bg(th.control_pressed).text_color(th.text))
+                .hover(move |s| s.bg(th.control_pressed).text_color(th.text)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed)))
                 .child("+")
                 .on_click(cx.listener(move |ed, _, window, cx| {
                     crate::proto_editor_surface::zoom(ed, is_arrange, "zoom-in", window, cx);

@@ -88,8 +88,8 @@ impl Editor {
         if self.commit(self.revision(), CommandBatch::single("新建乐器轨", Command::AddTrack { index, track }), cx) {
             self.sync_mixer();
             self.select_track(id.clone(), cx);
+            // The instrument edits inline as the first card of the device chain.
             self.bottom = crate::editor::Bottom::Devices;
-            self.open_builtin_instrument_editor(&id, cx);
         }
     }
 
@@ -145,23 +145,23 @@ impl Editor {
     pub fn use_builtin_synth(&mut self, track: &TrackId, cx: &mut Context<Self>) {
         let (p, _) = SYNTH_PRESETS[0];
         if self.commit_instrument(track, Some(synth_spec(&SynthParams::preset(p).unwrap_or_default(), p)), "乐器：内置合成器", cx) {
+            // The instrument edits inline as the first card of the device chain.
             self.bottom = crate::editor::Bottom::Devices;
-            self.open_builtin_instrument_editor(track, cx);
         }
     }
 
     pub fn use_builtin_one(&mut self, track: &TrackId, cx: &mut Context<Self>) {
         if self.commit_instrument(track, Some(builtin_instrument_spec(ONE_SYNTH_ID, &SynthParams::one_defaults(), "")), "乐器：Verdant One", cx) {
+            // The instrument edits inline as the first card of the device chain.
             self.bottom = crate::editor::Bottom::Devices;
-            self.open_builtin_instrument_editor(track, cx);
         }
     }
 
     pub fn make_instrument_track(&mut self, track: &TrackId, instrument: bool, cx: &mut Context<Self>) {
         let spec = instrument.then(|| { let (p, _) = SYNTH_PRESETS[0]; synth_spec(&SynthParams::preset(p).unwrap_or_default(), p) });
         if self.commit_instrument(track, spec, if instrument { "转为乐器轨" } else { "转为人声轨" }, cx) && instrument {
+            // The instrument edits inline as the first card of the device chain.
             self.bottom = crate::editor::Bottom::Devices;
-            self.open_builtin_instrument_editor(track, cx);
         }
     }
 }

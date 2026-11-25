@@ -107,7 +107,7 @@ pub fn lyric_overlay(ed: &Editor, editor: &Entity<Editor>, _cx: &mut Context<Edi
         let commands = commands.clone();
         pills.push(crate::proto_controls::action(SharedString::from(format!("lyric-tpl-{key}")), label)
             .disabled(composing).px(px(5.)).py(px(2.)).rounded(px(4.)).bg(th.control).border_1().border_color(th.shade)
-            .text_xs().text_color(th.text_secondary).hover(move |s| s.bg(th.control_pressed).text_color(th.text)).child(label)
+            .text_xs().text_color(th.text_secondary).hover(move |s| s.bg(th.control_pressed).text_color(th.text)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed))).child(label)
             .on_click(move |_, window, cx| {
                 if key != "next" {
                     let position = template.encode_utf16().count().saturating_sub(1);
