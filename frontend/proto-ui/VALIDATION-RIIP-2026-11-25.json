@@ -1,0 +1,89 @@
+{
+  "schema": "verdant.riip.timeline.source-validation.v1",
+  "sourceCommit": "b0647a1a35ceaab3c7327f8f4112eb1190fe91ef",
+  "baselineCommit": "93ff60c1420850c6db7f3248d234faee9cc655fa",
+  "generation": {
+    "runId": 45517646744,
+    "url": "https://github.com/OpenGreendam/verdant/actions/runs/45517646744",
+    "jobId": 138881131239,
+    "workflowCommit": "32f8cfeeb6a3f757a6eded34b9350e9d43601968",
+    "isolation": "The generation commit changes only the workflow relative to sourceCommit; the product branch retains its original workflow.",
+    "conclusion": "success",
+    "artifact": {
+      "id": 14977862218,
+      "name": "riip-timeline-generated",
+      "bytes": 76862,
+      "sha256": "3896469049c735e24ff19b0e4299d1ac000fdfa2d1e6710c09cd5ffd8f51d487"
+    }
+  },
+  "compiler": {
+    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901",
+    "node": "24.22.3",
+    "pnpm": "10.32.1",
+    "typescript": "5.9.3",
+    "tsx": "4.21.0",
+    "sharedSdkSha256": "832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b",
+    "sharedSdkChanged": false
+  },
+  "checks": {
+    "focusedContinuous": {
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "allSourceAndProducer": {
+      "passed": 246,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "generation": {
+      "passed": true,
+      "freshCompilation": true,
+      "units": 14,
+      "compilerArtifacts": 81
+    },
+    "independentFreshCheck": {
+      "passed": true,
+      "freshCompilation": true
+    },
+    "retainedCheck": {
+      "passed": true,
+      "freshCompilation": false
+    }
+  },
+  "generatedFiles": [
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/Cargo.toml",
+      "sha256": "f190f6f66339ecdb4adf25eee9f8423f477f3e8cc0484ebde467b9bfbb56a497",
+      "bytes": 730
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/Component.rs",
+      "sha256": "8c1e78b59326f0a5edeeaed497df6b6c2911adebbca3cd30c91ffb44b2d3a388",
+      "bytes": 191806
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/Component.rs.map",
+      "sha256": "8b98fe8c3593e744251505539a870ac963b0d5885b6dbff0e72d9e0a4be26ad3",
+      "bytes": 23378
+    },
+    {
+      "path": "frontend/proto-ui/generated/continuous-control/provenance.json",
+      "sha256": "524d86f8aa497b50ed84c995c5db7330fb93e848a10f7481e10546665ce0144c",
+      "bytes": 2996
+    },
+    {
+      "path": "frontend/proto-ui/receipts/continuous-control.json",
+      "sha256": "b98c0010f4404b2f068c5fbd75861379a12c358456869bc75059698805af534c",
+      "bytes": 3305
+    }
+  ],
+  "consumerIdentity": {
+    "previous": "generated-gpui-c418da798fb27a549347168982b07ae9",
+    "generated": "generated-gpui-cc8b462495c5a44b151afce36e1a7361",
+    "thirdPartyDependencyVersionsChanged": false
+  },
+  "evidenceBoundary": "This record proves source behavior and pinned generation. Native application, platform packages, dependency graph and actual OS input results are supplied by the final product PR's unmodified frontend and DSH checks."
+}
