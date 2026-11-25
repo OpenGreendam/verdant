@@ -58,15 +58,15 @@
   ],
   "upstream": {
     "repository": "https://github.com/Proto-UI/Proto-UI",
-    "revision": "e9340df6279e063cf372080bf4cc97caea3fd901"
+    "revision": "710a90df2ea57d9f93d7d09e43ebfb2b7b8e5057"
   },
   "packageVersions": {
-    "protoUi": "0.3.0-alpha.2",
+    "protoUi": "0.3.0",
     "packageManager": "pnpm@10.32.1",
     "nodeEngine": "24.x"
   },
   "toolchainRequirements": {
-    "lockSha256": "6e21c4b8444ca5e4a2e427287a76a346137b65d76403579942269bfea1fc7fe8",
+    "lockSha256": "eae18430bd967c94def36809b6d3305fa156a96548b08215a18dfe8a43923c07",
     "packages": {
       "typescript": "5.9.3",
       "tsx": "4.21.0"
