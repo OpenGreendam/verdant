@@ -369,9 +369,34 @@ fn native_editor_escape_cancels_timeline_scrollbars_before_late_release(cx: &mut
             assert!(!editor.has_proto_pointer_contact());
             assert!(editor.session.selection.contains(&selected), "the first Escape only cancels the active contact");
         }).unwrap();
+        // A narrow Escape context must not turn the scrollbar into a note
+        // navigation surface: ArrowRight still belongs to authored scalar.
+        let key_expected = {
+            let owner = source.owner.borrow();
+            (accepted + owner.props["step"].as_f64().unwrap()).clamp(
+                owner.props["min"].as_f64().unwrap(), owner.props["max"].as_f64().unwrap())
+        };
+        cx.simulate_keystrokes(window.into(), "right");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |editor, window, _| {
+            near(viewport(editor, arrange), key_expected);
+            near(number(&source, "value"), key_expected);
+            near(resolved(&source.owner.borrow().accessible_states["valueNow"]).num(), key_expected);
+            near(viewport(editor, !arrange), untouched);
+            assert!(editor.session.selection.contains(&selected), "scalar arrow preserves note selection");
+            assert_eq!(editor.revision().get(), revision);
+            assert!(!editor.has_proto_pointer_contact());
+            assert_eq!(source.state("phase").unwrap(), serde_json::json!("idle"));
+            assert!(window.captured_hitbox().is_none());
+            assert!(source.take_failures().is_empty());
+        }).unwrap();
         cx.simulate_keystrokes(window.into(), "escape");
-        window.update(cx, |editor, _, _| {
-            assert!(editor.session.selection.is_empty(), "the next Escape reaches the existing Editor action");
+        window.update(cx, |editor, window, _| {
+            assert!(editor.session.selection.is_empty(),
+                "the next Escape reaches the existing Editor action: arrange={arrange} replace_capture={replace_capture} contexts={:?}",
+                window.context_stack());
+            near(viewport(editor, arrange), key_expected);
+            assert_eq!(editor.revision().get(), revision);
         }).unwrap();
     }
 }

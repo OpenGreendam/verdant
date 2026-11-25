@@ -925,7 +925,11 @@ pub fn horizontal_timeline_bar(editor: Entity<Editor>, is_arrange: bool, th: The
         .bg(th.surface)
         .border_t_1()
         .border_color(th.shade)
-        .child(div().flex_1().h_full().child(TimelineScrollbar { editor, arrange: is_arrange, theme: th }))
+        // The roll bar is outside the canvas's PianoRoll focus context.
+        // Admit the workspace Escape route without claiming note-navigation
+        // keys that belong to the authored scrollbar.
+        .child(div().flex_1().h_full().key_context("TimelineScrollbar")
+            .child(TimelineScrollbar { editor, arrange: is_arrange, theme: th }))
         .child(
             crate::proto_controls::action(SharedString::from(format!("{id_prefix}-zoom-out")), "水平缩小")
                 .w(px(20.0))

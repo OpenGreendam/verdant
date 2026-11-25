@@ -89,7 +89,7 @@ impl Scope {
             Self::Arrange => "Arrange && !LyricEditor && !TextPrompt", Self::Roll => "PianoRoll && !LyricEditor && !TextPrompt",
             Self::Notes => "(PianoRoll || NoteTable) && !LyricEditor && !TextPrompt",
             Self::Timeline => "(Arrange || PianoRoll || Mixer) && !LyricEditor && !TextPrompt",
-            Self::Escape => "(Arrange || PianoRoll || Mixer || NoteTable) && !NoteTablePoint && !LyricEditor && !TextPrompt",
+            Self::Escape => "(Arrange || PianoRoll || Mixer || NoteTable || TimelineScrollbar) && !NoteTablePoint && !LyricEditor && !TextPrompt",
             Self::Text => "LyricEditor || TextPrompt", Self::Lyric => "LyricEditor",
         }
     }
