@@ -28,6 +28,7 @@ pub(crate) struct Spec {
     pub label: String,
     pub role: &'static str,
     pub drag_mode: &'static str,
+    pub track_press: &'static str,
     pub double_action: &'static str,
     pub tap_action: &'static str,
     pub key_mode: &'static str,
@@ -40,7 +41,7 @@ pub(crate) struct Spec {
 impl Spec {
     pub fn slider(value: f64, min: f64, max: f64, label: impl Into<String>) -> Self {
         Self { value, min, max, step: (max-min)/100.0, fine_step: (max-min)/1000.0,
-            default_value: value, label: label.into(), role: "slider", drag_mode: "absolute",
+            default_value: value, label: label.into(), role: "slider", drag_mode: "absolute", track_press: "jump",
             double_action: "reset", tap_action: "none", key_mode: "scalar", preview_echo: false, disabled: false, mixer_preview: false }
     }
 }
@@ -53,9 +54,13 @@ pub(crate) struct Event { pub kind: EventKind, pub value: f64 }
 pub(crate) struct Display { pub value: f64, pub initial: f64, pub active: bool, pub focus_visible: bool }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Sample { pub value: f64, pub fine: f64, pub jump: bool }
+/// Geometric facts at a track press; the source chooses the action and origin.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TrackPress { pub value: f64, pub thumb_hit: bool }
 
 type FocusBinding = Rc<dyn Fn(&gpui::FocusHandle, &mut Window, &mut App)>;
 type Geometry = Rc<dyn Fn(&MoveGestureSample, Bounds<Pixels>, f64) -> Sample>;
+type TrackGeometry = Rc<dyn Fn(&MoveGestureSample, Bounds<Pixels>, f64) -> TrackPress>;
 type Callback = Rc<dyn Fn(&mut Editor, Event, &mut Window, &mut Context<Editor>)>;
 type Validator = Rc<dyn Fn(&Editor) -> bool>;
 type Visual = Rc<dyn Fn(Display, Actions, &mut Window, &mut App) -> gpui::AnyElement>;
@@ -160,18 +165,37 @@ impl Actions {
 
 struct Binding {
     handle: ContinuousControlHandle, target: Rc<RefCell<Target>>, geometry: Rc<RefCell<Geometry>>,
+    track_geometry: Rc<RefCell<Option<TrackGeometry>>>,
     double_click: Rc<Cell<bool>>, contact: Rc<Contact>, capture: RefCell<Option<crate::host_pointer::OwnedPointerCapture>>, window: gpui::AnyWindowHandle, app: gpui::AsyncApp,
 }
 impl Binding {
-    fn sample(&self, sample: &MoveGestureSample, window: &Window) -> Option<Sample> {
+    fn sample_bounds(&self, sample: &MoveGestureSample, window: &Window) -> Option<Bounds<Pixels>> {
         let bounds = self.handle.owner.borrow().native_hitbox.as_ref()?.bounds;
         if !sample.position.x.is_finite() || !sample.position.y.is_finite()
             || !sample.total_delta.x.is_finite() || !sample.total_delta.y.is_finite()
             || !crate::host_pointer::contains_window_point(window, (f64::from(bounds.origin.x) + sample.position.x,
                 f64::from(bounds.origin.y) + sample.position.y)) { return None; }
-        let initial = state::<f64>(&self.handle, if state::<String>(&self.handle, "phase").ok()? == "idle" { "value" } else { "initialValue" }).ok()?;
+        Some(bounds)
+    }
+    fn sample(&self, sample: &MoveGestureSample, window: &Window) -> Option<Sample> {
+        let bounds = self.sample_bounds(sample, window)?;
+        let basis = if state::<String>(&self.handle, "phase").ok()? == "idle" { "value" }
+            else if self.track_geometry.borrow().is_some() { "dragOrigin" } else { "initialValue" };
+        let initial = state::<f64>(&self.handle, basis).ok()?;
         let mapped = (self.geometry.borrow())(sample, bounds, initial);
         (mapped.value.is_finite() && mapped.fine.is_finite()).then_some(mapped)
+    }
+    fn begin_sample(&self, sample: &MoveGestureSample, window: &Window) -> Option<(&'static str, f64, bool)> {
+        let geometry = self.track_geometry.borrow().clone();
+        if let Some(geometry) = geometry {
+            let bounds = self.sample_bounds(sample, window)?;
+            let accepted = state::<f64>(&self.handle, "value").ok()?;
+            let facts = geometry(sample, bounds, accepted);
+            facts.value.is_finite().then_some(("beginTrack", facts.value, facts.thumb_hit))
+        } else {
+            let mapped = self.sample(sample, window)?;
+            Some(("begin", mapped.value, mapped.jump))
+        }
     }
     fn invoke(&self, method: &str, args: Vec<Value>, window: &mut Window, cx: &mut App) -> bool {
         let target = self.target.borrow().clone();
@@ -193,7 +217,7 @@ impl Binding {
 }
 impl MoveGestureBinding for Binding {
     fn should_start(&self, sample: &MoveGestureSample, window: &mut Window, cx: &mut App) -> bool {
-        if !matches!(sample.input, MoveGestureInput::Mouse | MoveGestureInput::Touch) || self.sample(sample, window).is_none() { return false; }
+        if !matches!(sample.input, MoveGestureInput::Mouse | MoveGestureInput::Touch) || self.begin_sample(sample, window).is_none() { return false; }
         let target = self.target.borrow();
         if crate::proto_editor_surface::has_contact(target.editor.entity_id(), cx) { return false; }
         let available = target.editor.upgrade().is_some_and(|entity| {
@@ -211,9 +235,9 @@ impl MoveGestureBinding for Binding {
         self.contact.begin(sample.input);
         let _ = target.editor.update(cx, |editor, _| editor.proto_pointer_contact = Some(Rc::downgrade(&self.contact)));
         if state::<String>(&self.handle, "phase").is_ok_and(|phase| phase != "idle") { cancel_source(&self.handle, &target, window, cx); }
-        let Some(mapped) = self.sample(sample, window) else { self.cancel(window, cx); return; };
+        let Some((method, value, press_fact)) = self.begin_sample(sample, window) else { self.cancel(window, cx); return; };
         let double = sample.input == MoveGestureInput::Mouse && self.double_click.replace(false);
-        let consumed = self.invoke("begin", vec![mapped.value.into(), mapped.jump.into(), sample.modifiers.alt.into(), double.into()], window, cx);
+        let consumed = self.invoke(method, vec![value.into(), press_fact.into(), sample.modifiers.alt.into(), double.into()], window, cx);
         if !consumed || state::<String>(&self.handle, "phase").is_ok_and(|phase| phase == "idle") {
             self.contact.input.set(None);
         } else if sample.input == MoveGestureInput::Mouse && let Some(hitbox) = self.handle.owner.borrow().native_hitbox.as_ref() {
@@ -273,18 +297,25 @@ impl Render for Drawing {
     }
 }
 struct Mount { root: Entity<ContinuousControl>, drawing: Entity<Drawing>, target: Rc<RefCell<Target>>,
-    geometry: Rc<RefCell<Geometry>>, lease: Rc<MoveGestureLease>, contact: Rc<Contact>, props: Value, _changes: Subscription }
+    geometry: Rc<RefCell<Geometry>>, track_geometry: Rc<RefCell<Option<TrackGeometry>>>,
+    lease: Rc<MoveGestureLease>, contact: Rc<Contact>, props: Value, _changes: Subscription }
 
 #[derive(IntoElement)]
-pub(crate) struct Scalar { editor: Entity<Editor>, key: SharedString, spec: Spec, geometry: Geometry, visual: Visual, callback: Callback, valid: Validator, focus_binding: Option<FocusBinding> }
+pub(crate) struct Scalar { editor: Entity<Editor>, key: SharedString, spec: Spec, geometry: Geometry,
+    track_geometry: Option<TrackGeometry>, visual: Visual, callback: Callback, valid: Validator, focus_binding: Option<FocusBinding> }
 pub(crate) fn scalar(editor: Entity<Editor>, key: impl Into<SharedString>, spec: Spec,
     geometry: impl Fn(&MoveGestureSample, Bounds<Pixels>, f64) -> Sample + 'static,
     visual: impl Fn(Display, Actions, &mut Window, &mut App) -> gpui::AnyElement + 'static,
     callback: impl Fn(&mut Editor, Event, &mut Window, &mut Context<Editor>) + 'static) -> Scalar {
-    Scalar { editor, key: key.into(), spec, geometry: Rc::new(geometry), visual: Rc::new(visual),
+    Scalar { editor, key: key.into(), spec, geometry: Rc::new(geometry), track_geometry: None, visual: Rc::new(visual),
         callback: Rc::new(callback), valid: Rc::new(|_| true), focus_binding: None }
 }
 impl Scalar {
+    /// Supply track geometry to authored beginTrack. Subsequent samples use
+    /// its published dragOrigin, including after an echoed viewport repaint.
+    pub fn track_begin(mut self, geometry: impl Fn(&MoveGestureSample, Bounds<Pixels>, f64) -> TrackPress + 'static) -> Self {
+        self.track_geometry = Some(Rc::new(geometry)); self
+    }
     /// Publish the compiler-owned focus target so virtualized owners can retain
     /// a stable item identity without installing a second native focus owner.
     pub fn on_focus_handle(mut self, bind: impl Fn(&gpui::FocusHandle, &mut Window, &mut App) + 'static) -> Self {
@@ -303,13 +334,14 @@ impl RenderOnce for Scalar {
         let spec = self.spec;
         let props = json!({ "value": spec.value, "min": spec.min, "max": spec.max, "step": spec.step,
             "fineStep": spec.fine_step, "defaultValue": spec.default_value, "label": spec.label,
-            "disabled": spec.disabled, "revision": token, "role": spec.role, "dragMode": spec.drag_mode,
+            "disabled": spec.disabled, "revision": token, "role": spec.role, "dragMode": spec.drag_mode, "trackPress": spec.track_press,
             "doubleAction": spec.double_action, "tapAction": spec.tap_action, "previewEcho": spec.preview_echo, "keyMode": spec.key_mode });
         let parent = crate::proto_parent::current(); let initial_parent = parent.clone();
         let initial_props = props.clone();
         let initial_target = target.clone();
         let initial_visual = self.visual.clone();
         let initial_geometry = self.geometry.clone();
+        let initial_track_geometry = self.track_geometry.clone();
         let key = SharedString::from(format!("proto-scalar-{}", self.key));
         let mount = window.use_keyed_state(key, cx, move |window, cx| {
             let root = ContinuousControl::create(initial_props.clone(), initial_parent, window, cx)
@@ -317,6 +349,7 @@ impl RenderOnce for Scalar {
             let handle = root.read(cx).handle();
             let target = Rc::new(RefCell::new(initial_target));
             let geometry = Rc::new(RefCell::new(initial_geometry));
+            let track_geometry = Rc::new(RefCell::new(initial_track_geometry));
             let contact = Rc::new(Contact::default());
             let double_click = Rc::new(Cell::new(false));
             let drawing = cx.new(|_| Drawing { handle: handle.clone(), visual: initial_visual,
@@ -324,7 +357,7 @@ impl RenderOnce for Scalar {
             root.update(cx, |root, cx| root.set_slot(vec![NativeSnapshot::native_view(drawing.clone().into())], cx))
                 .unwrap_or_else(|error| panic!("compiled continuous control slot: {error:?}"));
             let lease = Rc::new(attach_move_gesture(handle.owner(), Box::new(Binding { handle,
-                target: target.clone(), geometry: geometry.clone(), double_click, contact: contact.clone(), capture: RefCell::new(None),
+                target: target.clone(), geometry: geometry.clone(), track_geometry: track_geometry.clone(), double_click, contact: contact.clone(), capture: RefCell::new(None),
                 window: window.window_handle(), app: cx.to_async() })).expect("continuous native capture"));
             contact.window.set(Some(window.window_handle()));
             *contact.lease.borrow_mut() = Some(Rc::downgrade(&lease));
@@ -344,13 +377,14 @@ impl RenderOnce for Scalar {
                     }
                 }); });
             });
-            Mount { root, drawing, target, geometry, lease, contact, props: initial_props, _changes: changes }
+            Mount { root, drawing, target, geometry, track_geometry, lease, contact, props: initial_props, _changes: changes }
         });
         let root = mount.update(cx, |mount, cx| {
             if crate::proto_parent::changed(&mount.root.read(cx).handle().owner, &parent) {
                 mount.root.update(cx, |root, cx| root.set_parent(parent, cx)).expect("compiled continuous parent");
             }
             *mount.geometry.borrow_mut() = self.geometry;
+            *mount.track_geometry.borrow_mut() = self.track_geometry;
             if mount.props != props {
                 match mount.root.update(cx, |root, cx| root.set_props(props.clone(), window, cx)) {
                     Ok(()) => mount.props = props,

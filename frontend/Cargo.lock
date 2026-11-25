@@ -2165,7 +2165,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "generated-gpui-c418da798fb27a549347168982b07ae9"
+name = "generated-gpui-cc8b462495c5a44b151afce36e1a7361"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -6746,7 +6746,7 @@ dependencies = [
  "generated-gpui-b52ed869ec1a5a76be7b9293837850ec",
  "generated-gpui-b839ef9e9422255d8661581dfde3da43",
  "generated-gpui-bcb9600466028d97f55418619b08f828",
- "generated-gpui-c418da798fb27a549347168982b07ae9",
+ "generated-gpui-cc8b462495c5a44b151afce36e1a7361",
  "generated-gpui-cde8247b3e173b0bec12326eb2e32684",
  "generated-gpui-d4689e3e1fc8f199cbb99d47cca12963",
  "generated-gpui-ea1da5215512dd1041ef9decb464d3cc",
