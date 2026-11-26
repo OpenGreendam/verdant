@@ -70,14 +70,15 @@ GPUI 的来源只在两处声明，其余检查都从这两处读取：
 
 两处都改好后：
 
+在仓库根目录运行（`../Proto-UI` 是与 README 相同的上游编译器 checkout）：
+
 ```sh
-cd frontend
-cargo update -p gpui -p gpui_platform -p gpui_wgpu
-node proto-ui/tools/build-proto-ui.mjs --upstream ../Proto-UI          # 重新生成 14 个单元和 receipt
-node proto-ui/tools/build-proto-ui.mjs --check --upstream ../Proto-UI
-node proto-ui/tools/check-proto-ui-rules.mjs
-node proto-ui/tools/check-cargo-gpui.mjs
-cargo test --workspace
+cargo update --manifest-path frontend/Cargo.toml -p gpui -p gpui_platform -p gpui_wgpu
+node frontend/proto-ui/tools/build-proto-ui.mjs --upstream ../Proto-UI          # 重新生成 14 个单元和 receipt
+node frontend/proto-ui/tools/build-proto-ui.mjs --check --upstream ../Proto-UI
+node frontend/proto-ui/tools/check-proto-ui-rules.mjs
+node frontend/proto-ui/tools/check-cargo-gpui.mjs
+cargo test --manifest-path frontend/Cargo.toml --workspace
 ```
 
 `check-proto-ui-rules.mjs` 里出现的 `cyjin-yl/z3rm` 只是固定的测试样例，不需要改。`P0-DECISIONS.md` 中锁定 GPUI 的那条记录需要更新为新的仓库和修订。
