@@ -28,12 +28,35 @@ impl Parts {
         let selected:Vec<_>=t.notes.iter().filter(|n|ids.contains(&n.id)).collect();
         let start=selected.iter().map(|n|n.start_tick).min().ok_or("select notes for a part")?;
         let end=selected.iter().map(|n|n.end_tick()).max().expect("selected notes");
-        if self.instances.iter().any(|p|p.track==*track&&p.bindings.values().any(|id|ids.contains(id))){return Err("selected notes already belong to a part".into());}
+        // Like grouping notes in Synthesizer V, selected notes move out of the
+        // part that holds them into the new one. Linked copies share content,
+        // so taking notes out of one would change the others too.
+        for index in 0..self.instances.len(){
+            let part=&self.instances[index];
+            if part.track!=*track||!part.bindings.values().any(|id|ids.contains(id)){continue;}
+            if self.instances.iter().filter(|p|p.content_id==part.content_id).count()>1{return Err("these notes belong to a linked part; unlink it first".into());}
+            let taken:Vec<NoteId>=part.bindings.iter().filter(|(_,concrete)|ids.contains(concrete)).map(|(source,_)|source.clone()).collect();
+            let content_id=part.content_id.clone();
+            let part=&mut self.instances[index];part.bindings.retain(|source,_|!taken.contains(source));
+            if let Some(content)=self.contents.get_mut(&content_id){content.notes.retain(|n|!taken.contains(&n.id));}
+        }
         let content_id=NoteId::generate().to_string();let id=NoteId::generate().to_string();
         let notes=selected.iter().map(|n|{let mut n=(**n).clone();n.start_tick-=start;n}).collect();
         let bindings=selected.iter().map(|n|(n.id.clone(),n.id.clone())).collect();
         self.contents.insert(content_id.clone(),PartContent{id:content_id.clone(),notes});
         self.instances.push(PartInstance{id:id.clone(),content_id,name,track:track.clone(),start_tick:start,duration_tick:end-start,source_offset_tick:0,muted:false,bindings});Ok(id)
+    }
+    /// Removes a part but keeps its notes on the track as ungrouped notes.
+    /// Returns the track and the notes to insert (with fresh identities, so the
+    /// projection that owned the old ones can drop them).
+    pub fn dissolve(&mut self,project:&Project,id:&str)->Result<(TrackId,Vec<Note>),String>{
+        let index=self.instances.iter().position(|p|p.id==id).ok_or("part no longer exists")?;
+        let part=self.instances.remove(index);
+        let track=project.track(&part.track).ok_or("track no longer exists")?;
+        let owned:BTreeSet<&NoteId>=part.bindings.values().collect();
+        let notes=track.notes.iter().filter(|n|owned.contains(&n.id)).map(|n|{let mut n=n.clone();n.id=NoteId::generate();n}).collect();
+        if !self.instances.iter().any(|p|p.content_id==part.content_id){self.contents.remove(&part.content_id);}
+        Ok((part.track,notes))
     }
     /// An empty part over `[start, start+duration)`. Notes later inserted
     /// wholly inside it join its content (see `synchronize`).
@@ -165,6 +188,30 @@ pub(crate) fn synchronize(before:&Project,project:&mut Project,commands:&[Comman
 mod tests {
     use super::*;
     use crate::{CommandBatch, ProjectStore};
+
+    #[test]
+    fn grouping_moves_notes_between_parts_and_dissolving_keeps_them() {
+        let mut project=Project::new_empty();let track=project.tracks[0].id.clone();
+        for start in [0,480,960]{let mut n=Note::new(start,480,60);n.id=NoteId::generate();project.tracks[0].notes.push(n);}
+        let ids:Vec<NoteId>=project.tracks[0].notes.iter().map(|n|n.id.clone()).collect();
+        let mut store=ProjectStore::new(project);
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        let first=parts.create(&store.snapshot(),&track,&ids,"片段 1".into()).unwrap();
+        store.apply(store.revision(),CommandBatch::single("group",parts.command())).unwrap().unwrap();
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        let second=parts.create(&store.snapshot(),&track,&ids[1..],"片段 2".into()).unwrap();
+        store.apply(store.revision(),CommandBatch::single("regroup",parts.command())).unwrap().unwrap();
+        let parts=Parts::load(&store.snapshot()).unwrap();
+        assert_eq!(parts.instance(&first).unwrap().bindings.len(),1);
+        assert_eq!(parts.instance(&second).unwrap().bindings.len(),2);
+        assert_eq!(store.snapshot().tracks[0].notes.len(),3);
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        let (track,notes)=parts.dissolve(&store.snapshot(),&second).unwrap();
+        assert_eq!(notes.len(),2);
+        store.apply(store.revision(),CommandBatch{label:"dissolve".into(),commands:vec![parts.command(),Command::InsertNotes{track,notes}]}).unwrap().unwrap();
+        assert_eq!(store.snapshot().tracks[0].notes.len(),3);
+        assert!(Parts::load(&store.snapshot()).unwrap().instance(&second).is_none());
+    }
 
     #[test]
     fn empty_part_absorbs_notes_drawn_inside_it() {

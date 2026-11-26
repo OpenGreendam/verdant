@@ -61,7 +61,7 @@ impl MenuBoolean {
             Self::FollowPlayhead => crate::clock::set_follow(ed, selected, cx),
             Self::ExportClick => ed.edit_playback("导出节拍器", cx, |settings| settings.export_click = selected),
             Self::PartMuted(id) => {
-                if let Err(error) = ed.edit_part(id, "片段静音", cx, |part| { part.muted = selected; Ok(()) }) { ed.notice(error); }
+                if let Err(error) = ed.edit_part(id, "音符组静音", cx, |part| { part.muted = selected; Ok(()) }) { ed.notice(error); }
             },
             Self::DeviceParameter { target, slot, parameter, .. } => {
                 ed.set_device_params(target.clone(), *slot, vec![(parameter.clone(), if selected { 1.0 } else { 0.0 })], cx);
@@ -606,15 +606,16 @@ impl Editor {
             MenuItem::boolean_command("当前轨道自动化泳道", CommandId::ToggleTrackAutomation, CommandArg::Track(track), auto_on).with_hint("A"),
             MenuItem::boolean_command("主总线自动化泳道", CommandId::ToggleMasterAutomation, CommandArg::None, self.automation_ui.show_master),
             MenuItem::separator(),
-            MenuItem::submenu("片段 (Part)", vec![
-                MenuItem::action("从选中音符创建片段", MenuAction::Workflow(A::CreatePart)).enabled(!self.session.selection.is_empty()),
-                MenuItem::action("片段名称…", MenuAction::Workflow(A::RenamePart)).enabled(part),
-                MenuItem::action("在播放头分割片段", MenuAction::Workflow(A::SplitPart(tick))).enabled(part),
-                MenuItem::action("连接右侧片段", MenuAction::Workflow(A::JoinPart)).enabled(part),
-                MenuItem::action("链接复制片段", MenuAction::Workflow(A::DuplicatePart(true))).enabled(part),
-                MenuItem::action("独立复制片段", MenuAction::Workflow(A::DuplicatePart(false))).enabled(part),
-                MenuItem::action("取消片段链接", MenuAction::Workflow(A::UnlinkPart)).enabled(part),
-                MenuItem::action("删除片段", MenuAction::Workflow(A::DeletePart)).enabled(part),
+            MenuItem::submenu("音符组 (Part)", vec![
+                MenuItem::action("从选中音符创建音符组", MenuAction::Workflow(A::CreatePart)).with_hint("Ctrl+G").enabled(!self.session.selection.is_empty()),
+                MenuItem::action("音符组名称…", MenuAction::Workflow(A::RenamePart)).enabled(part),
+                MenuItem::action("在播放头分割音符组", MenuAction::Workflow(A::SplitPart(tick))).enabled(part),
+                MenuItem::action("连接右侧音符组", MenuAction::Workflow(A::JoinPart)).enabled(part),
+                MenuItem::action("链接复制音符组", MenuAction::Workflow(A::DuplicatePart(true))).enabled(part),
+                MenuItem::action("独立复制音符组", MenuAction::Workflow(A::DuplicatePart(false))).enabled(part),
+                MenuItem::action("取消音符组链接", MenuAction::Workflow(A::UnlinkPart)).enabled(part),
+                MenuItem::action("解散音符组（保留音符）", MenuAction::Workflow(A::DissolvePart)).with_hint("Ctrl+Shift+G").enabled(part),
+                MenuItem::action("删除音符组", MenuAction::Workflow(A::DeletePart)).enabled(part),
             ]),
             MenuItem::submenu("音频片段", vec![
                 MenuItem::action("导入音频伴奏 / 参考音…", MenuAction::Workflow(A::Integration(I::ImportAudio))),

@@ -529,14 +529,14 @@ pub(crate) fn new_part_span(meter:&verdant_domain::MeterMap,parts:&verdant_domai
     (end>start).then_some((start,end))
 }
 
-/// Double-click on an empty lane: an empty one-bar part named "片段 N",
+/// Double-click on an empty lane: an empty one-bar part named "音符组 N",
 /// selected and opened in the piano roll so notes can be drawn into it.
 pub(crate) fn create_part_at(ed:&mut Editor,track:&TrackId,tick:f64,window:&mut Window,cx:&mut Context<Editor>){
     let result=(||->Result<String,String>{
         let mut parts=verdant_domain::parts::Parts::load(ed.project())?;
-        let(start,end)=new_part_span(&ed.meter(),&parts,track,tick).ok_or("此处已有片段")?;
-        let name=parts.next_name("片段");let id=parts.create_empty(ed.project(),track,start,end-start,name)?;
-        if !ed.commit(ed.revision(),CommandBatch::single("新建片段",parts.command()),cx){return Err("片段未提交".into());}
+        let(start,end)=new_part_span(&ed.meter(),&parts,track,tick).ok_or("此处已有音符组")?;
+        let name=parts.next_name("音符组");let id=parts.create_empty(ed.project(),track,start,end-start,name)?;
+        if !ed.commit(ed.revision(),CommandBatch::single("新建音符组",parts.command()),cx){return Err("音符组未提交".into());}
         Ok(id)
     })();
     match result{
@@ -612,9 +612,9 @@ fn region_down(input:&crate::proto_editor_surface::Input,ed:&mut Editor,x:f64,y:
     };
     if intent.kind=="region-menu"{
         let items=match &target{AuthoredTarget::Part(id)=>{let muted=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|p|p.instance(id).map(|p|p.muted)).unwrap_or(false);vec![
-            I::action("片段名称…",M::Workflow(A::RenamePart)),I::action("精确位置…",M::Workflow(A::MovePart)),I::action("精确裁剪…",M::Workflow(A::TrimPart)),I::separator(),
-            I::action("在此分割",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧片段",M::Workflow(A::JoinPart)),I::action("链接复制片段",M::Workflow(A::DuplicatePart(true))),I::action("独立复制片段",M::Workflow(A::DuplicatePart(false))),I::action("取消片段链接",M::Workflow(A::UnlinkPart)),I::separator(),
-            I::boolean("静音",crate::menu::MenuBoolean::PartMuted(id.clone()),muted),I::action("删除片段",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>ed.audio_menu_items()};ed.show_menu(position,items,window,cx);return false;
+            I::action("音符组名称…",M::Workflow(A::RenamePart)),I::action("精确位置…",M::Workflow(A::MovePart)),I::action("精确裁剪…",M::Workflow(A::TrimPart)),I::separator(),
+            I::action("在此分割",M::Workflow(A::SplitPart(arrange_snap(ed,tick)))),I::action("连接右侧音符组",M::Workflow(A::JoinPart)),I::action("链接复制音符组",M::Workflow(A::DuplicatePart(true))),I::action("独立复制音符组",M::Workflow(A::DuplicatePart(false))),I::action("取消音符组链接",M::Workflow(A::UnlinkPart)),I::action("解散音符组（保留音符）",M::Workflow(A::DissolvePart)),I::separator(),
+            I::boolean("静音",crate::menu::MenuBoolean::PartMuted(id.clone()),muted),I::action("删除音符组",M::Workflow(A::DeletePart))]},AuthoredTarget::Audio(_)=>ed.audio_menu_items()};ed.show_menu(position,items,window,cx);return false;
     }
     if intent.kind=="split" {
         edit_audio_region(ed,AudioRegionEdit::Split(arrange_snap(ed,tick)),cx);return false;
@@ -715,10 +715,10 @@ fn region_up(ed:&mut Editor,pointer:PointerId,window:&mut Window,cx:&mut Context
         }
         cx.notify();return;
     }
-    if drag.base!=ed.revision(){ed.notice("片段拖动期间工程已改变，未写入预览");cx.notify();return;}
+    if drag.base!=ed.revision(){ed.notice("拖动期间工程已改变，未写入预览");cx.notify();return;}
     if drag.start==drag.original_start&&drag.end==drag.original_end&&drag.source_track==drag.destination_track&&drag.fade_frames==drag.original_fade_frames&&drag.audio.as_ref().is_none_or(|audio|audio.start==audio.original_start&&audio.end==audio.original_end){cx.notify();return;}
     let result=(||->Result<(),String>{match drag.target{
-        AuthoredTarget::Part(id)=>{let mut parts=verdant_domain::parts::Parts::load(ed.project())?;let part=parts.instances.iter_mut().find(|part|part.id==id).ok_or("片段已不存在")?;if drag.mode==RegionDragMode::Left{part.source_offset_tick+=drag.start-drag.original_start;}part.start_tick=drag.start;part.duration_tick=drag.end-drag.start;part.track=drag.destination_track.clone();parts.validate(ed.project())?;if !ed.commit(drag.base,CommandBatch::single("拖动片段",parts.command()),cx){return Err("片段未提交".into());}}
+        AuthoredTarget::Part(id)=>{let mut parts=verdant_domain::parts::Parts::load(ed.project())?;let part=parts.instances.iter_mut().find(|part|part.id==id).ok_or("音符组已不存在")?;if drag.mode==RegionDragMode::Left{part.source_offset_tick+=drag.start-drag.original_start;}part.start_tick=drag.start;part.duration_tick=drag.end-drag.start;part.track=drag.destination_track.clone();parts.validate(ed.project())?;if !ed.commit(drag.base,CommandBatch::single("拖动音符组",parts.command()),cx){return Err("音符组未提交".into());}}
         AuthoredTarget::Audio(id)=>{
             use verdant_service::audio_edit::{AudioEdit,AudioClipRef,AudioClipProperties};
             let clip=verdant_media::read_clips(ed.project().track(&drag.source_track).ok_or("音频轨道不存在")?).map_err(|e|e.to_string())?.into_iter().find(|clip|clip.id.to_string()==id).ok_or("音频片段不存在")?;
