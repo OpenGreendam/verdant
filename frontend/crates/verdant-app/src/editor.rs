@@ -169,6 +169,8 @@ pub enum MenuAction {
     },
     ShowHistoryWindow,
     ShowShortcutsWindow,
+    /// Switch the touch (tablet) layout on or off and remember the choice.
+    ToggleTouchLayout,
     ShowDisclosuresWindow,
     /// Open one of the toolbar menus (from the folded menu in narrow windows).
     OpenMenu(TopMenu),
@@ -591,7 +593,10 @@ impl Editor {
             show_inspector: true,
             width_class: Default::default(),
             drawer: None,
-            touch_ui: false,
+            // Touch layout: a saved choice, or VERDANT_TOUCH=1 for tablets and
+            // testing; otherwise the first touch event switches it on.
+            touch_ui: opts.prefs.extra.get("touch_layout").and_then(serde_json::Value::as_bool)
+                .unwrap_or_else(|| std::env::var("VERDANT_TOUCH").is_ok_and(|v| v == "1")),
             window_chrome: Default::default(),
             title_drag: false,
             device_drag: None,
@@ -1664,6 +1669,12 @@ impl Editor {
             }
             MenuAction::ShowHistoryWindow => self.show_history_panel(window, cx),
             MenuAction::ShowShortcutsWindow => crate::shortcuts::open(cx),
+            MenuAction::ToggleTouchLayout => {
+                self.touch_ui = !self.touch_ui;
+                self.prefs.extra.insert("touch_layout".into(), serde_json::Value::Bool(self.touch_ui));
+                self.prefs_dirty = true;
+                cx.notify();
+            }
             MenuAction::ShowDisclosuresWindow => crate::disclosures::open(cx),
             MenuAction::OpenMenu(menu) => self.open_top_menu(menu, window.mouse_position(), window, cx),
             MenuAction::ShowProperties => {

@@ -1922,6 +1922,10 @@ impl Render for Editor {
             self.window_chrome = chrome;
             cx.notify();
         }
+        // Touch layout scales every rem-sized control (≈ +12 %) toward 44 px
+        // touch targets; px-sized canvases keep their musical geometry.
+        let rem = px(crate::ui_controls::rem_size(self.touch_ui));
+        if window.rem_size() != rem { window.set_rem_size(rem); }
         let frame = crate::window_chrome::client_frame(chrome, th_for_frame(self), window);
         let class = WidthClass::of(window.viewport_size().width.as_f32());
         if class != self.width_class {

@@ -85,6 +85,7 @@ pub enum Drawer { Left, Right }
 /// (close to the 44 pt / 48 dp platform guidance within a dense toolbar).
 pub fn bar_button_size(touch: bool) -> f32 { if touch { 36.0 } else { TOP_BTN_H } }
 pub fn bar_height(touch: bool) -> f32 { if touch { 56.0 } else { 48.0 } }
+pub fn rem_size(touch: bool) -> f32 { if touch { 18.0 } else { 16.0 } }
 
 /// Synthesizer V Studio-style right property dock tabs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
