@@ -806,19 +806,6 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
                         if current {
                             crate::proto_collection::call(&source, "focusSelf", vec![], window, cx);
                             window.focus(&focus, cx);
-                            // A collection mounted by a deferred draw can already
-                            // hold focus when its generated listener is installed.
-                            // Publish that observed native focus even when GPUI
-                            // has no new focus transition to deliver.
-                            let mounted = {
-                                let owner = source.owner.borrow();
-                                owner.present && owner.mounted && owner.bounds.is_some()
-                                    && owner.window_id == Some(window.window_handle().window_id())
-                                    && owner.modules.focus.native.as_ref() == Some(&focus)
-                            };
-                            if mounted && focus.is_focused(window) && !source.owner.borrow().focused {
-                                verdant_collection_control::native::gpui_native_owner::native_focus_fact(&source.owner, true);
-                            }
                         }
                     });
                 }
@@ -1092,8 +1079,15 @@ mod native_menu_tests {
         named_source(window, "上下文菜单")
     }
     fn named_source(window:&Window, label: &str)->CollectionControlHandle {
-        let owner=all_owners().into_iter().find(|owner| {let owner=owner.borrow();owner.mounted && owner.window_id==Some(window.window_handle().window_id())
-            && owner.modules.accessible_text.get("name").is_some_and(|value|resolved(value).text()==label)}).unwrap();CollectionControlHandle{owner}
+        let mut matching = all_owners().into_iter().filter(|owner| {
+            let owner = owner.borrow();
+            owner.present && owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.props.get("mode").and_then(serde_json::Value::as_str) == Some("menu")
+                && owner.modules.accessible_text.get("name").is_some_and(|value| resolved(value).text() == label)
+        });
+        let owner = matching.next().unwrap_or_else(|| panic!("no mounted menu collection named {label}"));
+        assert!(matching.next().is_none(), "more than one mounted menu collection named {label}");
+        CollectionControlHandle { owner }
     }
     fn revision(source:&CollectionControlHandle)->String {source.owner.borrow().props["revision"].as_str().unwrap().into()}
     fn click(window: WindowHandle<Harness>, cx: &mut TestAppContext, position: Point<Pixels>, button: MouseButton) {
