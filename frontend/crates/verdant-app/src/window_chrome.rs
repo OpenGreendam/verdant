@@ -6,8 +6,14 @@
 //!   and marks them, and the empty toolbar areas, as native hit-test regions
 //!   (so snap layouts and system drag still work).
 //! - Linux: client-side decorations are requested. When the compositor grants
-//!   them, Verdant draws the buttons the window manager supports, a 1 px frame
-//!   and edge resize zones; otherwise the system title bar stays.
+//!   them, Verdant draws the buttons the window manager supports and frames the
+//!   window like a libadwaita one: 12 px rounded corners, a 1 px border and a
+//!   soft shadow in a transparent margin that also holds the resize zones.
+//!   Maximised, fullscreen and tiled edges are square and unpadded. Otherwise
+//!   the system title bar stays.
+//! - Windows 11 rounds the window itself; Verdant asks DWM for the rounded
+//!   preference explicitly so the custom caption keeps it. macOS rounds titled
+//!   windows natively.
 //!
 //! `VERDANT_WINDOW_DECORATIONS=server` keeps the system title bar everywhere.
 use gpui::{
@@ -21,8 +27,13 @@ use crate::editor::Editor;
 
 /// Room for the macOS traffic lights at the start of the toolbar.
 pub const TRAFFIC_LIGHT_PADDING: f32 = 78.0;
-/// Width of the edge band that resizes a client-decorated window.
+/// Width of the edge band, inside the window content, that resizes a
+/// client-decorated window (in addition to the shadow margin).
 const RESIZE_BAND: f32 = 5.0;
+/// libadwaita's window corner radius.
+pub const CORNER_RADIUS: f32 = 12.0;
+/// Transparent margin around a floating client-decorated window for its shadow.
+const SHADOW_MARGIN: f32 = 12.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ChromeStyle {
@@ -212,9 +223,9 @@ pub fn caption_buttons(chrome: ChromeState, height: f32, th: crate::theme::Theme
     Some(row.into_any_element())
 }
 
-fn resize_edge(pos: Point<Pixels>, size: gpui::Size<Pixels>, tiling: Tiling) -> Option<ResizeEdge> {
-    let band = px(RESIZE_BAND);
-    let corner = px(RESIZE_BAND * 3.0);
+fn resize_edge(pos: Point<Pixels>, size: gpui::Size<Pixels>, tiling: Tiling, margin: f32) -> Option<ResizeEdge> {
+    let band = px(margin + RESIZE_BAND);
+    let corner = px(margin + CORNER_RADIUS.max(RESIZE_BAND * 3.0));
     let (left, right) = (pos.x < band && !tiling.left, pos.x > size.width - band && !tiling.right);
     let (top, bottom) = (pos.y < band && !tiling.top, pos.y > size.height - band && !tiling.bottom);
     let near_left = pos.x < corner && !tiling.left;
@@ -234,26 +245,67 @@ fn resize_edge(pos: Point<Pixels>, size: gpui::Size<Pixels>, tiling: Tiling) -> 
     })
 }
 
-/// Linux client decorations: a 1 px frame plus resize zones along the window
-/// edges, painted above everything without taking hover from the content.
-pub fn client_frame(chrome: ChromeState, th: crate::theme::Theme, window: &mut Window) -> Option<AnyElement> {
+/// The rounded corners of a floating Linux client-decorated window; square
+/// elsewhere, and on tiled, maximised or fullscreen sides. Panes that paint
+/// into a window corner apply the matching radius to their own background,
+/// because GPUI's content masks are rectangular.
+pub fn corner_radii(chrome: ChromeState) -> gpui::Corners<Pixels> {
+    let floating = chrome.style == ChromeStyle::LinuxClient && !chrome.maximized && !chrome.fullscreen;
+    let tiling = chrome.tiling;
+    let radius = |a: bool, b: bool| px(if floating && !a && !b { CORNER_RADIUS } else { 0.0 });
+    gpui::Corners {
+        top_left: radius(tiling.top, tiling.left),
+        top_right: radius(tiling.top, tiling.right),
+        bottom_left: radius(tiling.bottom, tiling.left),
+        bottom_right: radius(tiling.bottom, tiling.right),
+    }
+}
+
+/// Frames the editor's root element for the current chrome.
+///
+/// Linux client decorations get libadwaita's look: the content is clipped to
+/// rounded corners with a 1 px border and sits in a transparent margin that
+/// carries the shadow and the resize zones. Sides that are tiled, maximised or
+/// fullscreen stay square and flush. Other chromes return the root unchanged.
+pub fn frame_window(root: gpui::Stateful<gpui::Div>, chrome: ChromeState, th: crate::theme::Theme, window: &mut Window) -> AnyElement {
+    if chrome.style == ChromeStyle::Windows {
+        prefer_rounded_corners(window);
+    }
     if chrome.style != ChromeStyle::LinuxClient {
         window.set_client_inset(px(0.0));
-        return None;
+        return root.into_any_element();
     }
-    window.set_client_inset(px(0.0));
-    let tiling = chrome.tiling;
-    let resizable = !chrome.maximized && !chrome.fullscreen;
-    Some(div().absolute().inset_0()
-        .when(!chrome.maximized, |d| d
-            .when(!tiling.top, |d| d.border_t_1()).when(!tiling.bottom, |d| d.border_b_1())
-            .when(!tiling.left, |d| d.border_l_1()).when(!tiling.right, |d| d.border_r_1())
-            .border_color(th.shade))
+    let floating = !chrome.maximized && !chrome.fullscreen;
+    let tiling = if floating { chrome.tiling } else { Tiling { top: true, bottom: true, left: true, right: true } };
+    let margin = if floating { SHADOW_MARGIN } else { 0.0 };
+    window.set_client_inset(px(margin));
+    let radii = corner_radii(chrome);
+    window.set_client_corner_radii(radii);
+    let resizable = floating;
+    div().id("verdant-window-frame").size_full().relative()
+        .when(!tiling.top, |d| d.pt(px(margin))).when(!tiling.bottom, |d| d.pb(px(margin)))
+        .when(!tiling.left, |d| d.pl(px(margin))).when(!tiling.right, |d| d.pr(px(margin)))
+        // GPUI clips to rectangles, so the panes that touch a corner round
+        // themselves (see `corner_radii`); this layer only adds the shadow
+        // behind and the border on top.
+        .child(div().size_full().relative()
+            .rounded_tl(radii.top_left).rounded_tr(radii.top_right)
+            .rounded_bl(radii.bottom_left).rounded_br(radii.bottom_right)
+            .when(floating, |d| d.shadow(vec![
+                gpui::BoxShadow { color: gpui::hsla(0., 0., 0., 0.28), offset: point(px(0.), px(2.)), blur_radius: px(margin - 2.), spread_radius: px(0.), inset: false },
+                gpui::BoxShadow { color: gpui::hsla(0., 0., 0., 0.14), offset: point(px(0.), px(0.)), blur_radius: px(2.), spread_radius: px(1.), inset: false },
+            ]))
+            .child(root.size_full()
+                .rounded_tl(radii.top_left).rounded_tr(radii.top_right)
+                .rounded_bl(radii.bottom_left).rounded_br(radii.bottom_right))
+            .when(floating, |d| d.child(div().absolute().inset_0().border_1().border_color(th.shade)
+                .rounded_tl(radii.top_left).rounded_tr(radii.top_right)
+                .rounded_bl(radii.bottom_left).rounded_br(radii.bottom_right))))
         .when(resizable, |d| d.child(canvas(
-            |bounds: Bounds<Pixels>, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+            |bounds: Bounds<Pixels>, window, _| window.insert_hitbox(bounds, HitboxBehavior::BlockMouseExceptScroll),
             move |_, hitbox, window, _| {
                 let size = window.window_bounds().get_bounds().size;
-                if let Some(edge) = resize_edge(window.mouse_position(), size, tiling) {
+                if let Some(edge) = resize_edge(window.mouse_position(), size, tiling, margin) {
                     window.set_cursor_style(match edge {
                         ResizeEdge::Top | ResizeEdge::Bottom => CursorStyle::ResizeUpDown,
                         ResizeEdge::Left | ResizeEdge::Right => CursorStyle::ResizeLeftRight,
@@ -264,15 +316,35 @@ pub fn client_frame(chrome: ChromeState, th: crate::theme::Theme, window: &mut W
                 window.on_mouse_event(move |ev: &MouseDownEvent, phase, window, cx| {
                     if phase != DispatchPhase::Capture || ev.button != MouseButton::Left { return; }
                     let size = window.window_bounds().get_bounds().size;
-                    if let Some(edge) = resize_edge(ev.position, size, tiling) {
+                    if let Some(edge) = resize_edge(ev.position, size, tiling, margin) {
                         window.start_window_resize(edge);
                         cx.stop_propagation();
                     }
                 });
             },
-        ).size_full()))
-        .into_any_element())
+        ).absolute().inset_0()))
+        .into_any_element()
 }
+
+/// Windows 11 rounds windows that keep their frame; ask for it explicitly so
+/// the hidden caption never opts the window out. A no-op before Windows 11.
+#[cfg(target_os = "windows")]
+fn prefer_rounded_corners(window: &Window) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute};
+    let Ok(handle) = window.window_handle() else { return };
+    let RawWindowHandle::Win32(handle) = handle.as_raw() else { return };
+    let preference = DWMWCP_ROUND;
+    // SAFETY: the handle belongs to this live window and the attribute value
+    // is a valid DWM_WINDOW_CORNER_PREFERENCE of the size passed.
+    unsafe {
+        DwmSetWindowAttribute(handle.hwnd.get() as _, DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            (&preference as *const i32).cast(), std::mem::size_of::<i32>() as u32);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn prefer_rounded_corners(_window: &Window) {}
 
 #[cfg(test)]
 mod tests {
@@ -282,12 +354,15 @@ mod tests {
     fn resize_edges_follow_corners_and_skip_tiled_sides() {
         let size = gpui::size(px(800.0), px(600.0));
         let free = Tiling::default();
-        assert_eq!(resize_edge(point(px(2.0), px(300.0)), size, free), Some(ResizeEdge::Left));
-        assert_eq!(resize_edge(point(px(798.0), px(2.0)), size, free), Some(ResizeEdge::TopRight));
-        assert_eq!(resize_edge(point(px(10.0), px(598.0)), size, free), Some(ResizeEdge::BottomLeft));
-        assert_eq!(resize_edge(point(px(400.0), px(300.0)), size, free), None);
+        assert_eq!(resize_edge(point(px(2.0), px(300.0)), size, free, 0.0), Some(ResizeEdge::Left));
+        assert_eq!(resize_edge(point(px(798.0), px(2.0)), size, free, 0.0), Some(ResizeEdge::TopRight));
+        assert_eq!(resize_edge(point(px(10.0), px(598.0)), size, free, 0.0), Some(ResizeEdge::BottomLeft));
+        assert_eq!(resize_edge(point(px(400.0), px(300.0)), size, free, 0.0), None);
         let tiled_left = Tiling { left: true, ..Default::default() };
-        assert_eq!(resize_edge(point(px(2.0), px(300.0)), size, tiled_left), None);
+        assert_eq!(resize_edge(point(px(2.0), px(300.0)), size, tiled_left, 0.0), None);
+        // The shadow margin is part of the resize band.
+        assert_eq!(resize_edge(point(px(14.0), px(300.0)), size, free, SHADOW_MARGIN), Some(ResizeEdge::Left));
+        assert_eq!(resize_edge(point(px(40.0), px(300.0)), size, free, SHADOW_MARGIN), None);
     }
 
     #[test]

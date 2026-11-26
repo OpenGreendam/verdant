@@ -156,7 +156,6 @@ fn cached_view<V: Render>(view: &Entity<V>, style: StyleRefinement, a11y: bool) 
     if a11y { view.clone().into_any_element() } else { view.clone().cached(style).into_any_element() }
 }
 
-fn th_for_frame(ed: &Editor) -> Theme { ed.theme }
 
 fn button(id: impl Into<SharedString>, label: impl Into<SharedString>, th: Theme) -> crate::proto_controls::Action {
     selectable_button(id, label, false, th)
@@ -403,11 +402,14 @@ impl Editor {
                 .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
         let _ = top_menu_btn;
+        let corners = crate::window_chrome::corner_radii(chrome);
 
         div()
             .w_full()
             .min_w_0()
             .overflow_hidden()
+            .rounded_tl(corners.top_left)
+            .rounded_tr(corners.top_right)
             .h(px(bar_h))
             .flex_none()
             .flex()
@@ -587,6 +589,7 @@ impl Editor {
         let title = if self.session.selection.is_empty() && self.integrations.selected_clip.is_none() { "轨道" } else { "选择" };
         div()
             .id("inspector")
+            .rounded_bl(crate::window_chrome::corner_radii(self.window_chrome).bottom_left)
             .w(px(self.layout.inspector_width))
             .h_full()
             .flex_none()
@@ -672,6 +675,7 @@ impl Editor {
 
         div()
             .id("right-property-dock")
+            .rounded_br(crate::window_chrome::corner_radii(self.window_chrome).bottom_right)
             .w(px(self.layout.right_dock_width))
             .h_full()
             .flex_none()
@@ -1925,7 +1929,6 @@ impl Render for Editor {
         // touch targets; px-sized canvases keep their musical geometry.
         let rem = px(crate::ui_controls::rem_size(self.touch_ui));
         if window.rem_size() != rem { window.set_rem_size(rem); }
-        let frame = crate::window_chrome::client_frame(chrome, th_for_frame(self), window);
         let class = WidthClass::of(window.viewport_size().width.as_f32());
         if class != self.width_class {
             // Drawers belong to narrow layouts; docked panels keep their prefs.
@@ -1940,7 +1943,7 @@ impl Render for Editor {
         let text_prompt = crate::lyric_view::prompt_overlay(self, &entity, cx);
         let menu = self.menu.as_ref().filter(|menu| menu.window == window.window_handle())
             .map(|menu| crate::menu::context_menu_layer(self, menu, window, cx).into_any_element());
-        crate::window_chrome::track_title_drag(div().id("verdant"), cx)
+        let root = crate::window_chrome::track_title_drag(div().id("verdant"), cx)
             .relative()
             .size_full()
             .flex()
@@ -2097,10 +2100,10 @@ impl Render for Editor {
             }))
             .child(self.playback.driver.clone())
             .child(static_content)
-            .children(frame)
             .children(modal)
             .children(menu)
-            .children(text_prompt)
+            .children(text_prompt);
+        crate::window_chrome::frame_window(root, chrome, th, window)
     }
 }
 

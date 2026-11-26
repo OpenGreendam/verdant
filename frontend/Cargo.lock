@@ -6824,6 +6824,7 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "proto-ui-gpui-native",
+ "raw-window-handle",
  "semver",
  "serde",
  "serde_json",
@@ -6839,6 +6840,7 @@ dependencies = [
  "verdant-service",
  "verdant-session",
  "verdant-ui-protocol",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
