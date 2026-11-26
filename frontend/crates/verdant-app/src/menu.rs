@@ -1176,11 +1176,13 @@ mod native_menu_tests {
     }
     fn revision(source:&CollectionControlHandle)->String {source.owner.borrow().props["revision"].as_str().unwrap().into()}
     fn click(window: WindowHandle<Harness>, cx: &mut TestAppContext, position: Point<Pixels>, button: MouseButton) {
-        window.update(cx, |_, window, cx| {
-            window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { position, button, click_count: 1, ..Default::default() }), cx);
-            window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { position, button, click_count: 1, ..Default::default() }), cx);
-        }).unwrap();
+        window.update(cx, |_, window, cx| dispatch_click(window, cx, position, button)).unwrap();
         crate::native_test_support::frames(window, cx);
+    }
+
+    fn dispatch_click(window: &mut Window, cx: &mut App, position: Point<Pixels>, button: MouseButton) {
+        window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { position, button, click_count: 1, ..Default::default() }), cx);
+        window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { position, button, click_count: 1, ..Default::default() }), cx);
     }
 
     fn row_geometry(menu: &OpenMenu, index: usize) -> Bounds<Pixels> {
@@ -1211,7 +1213,7 @@ mod native_menu_tests {
     fn move_pointer(window: WindowHandle<Harness>, cx: &mut TestAppContext, positions: &[Point<Pixels>]) {
         window.update(cx, |_, window, cx| {
             for &position in positions {
-                window.dispatch_event(PlatformInput::MouseMove(gpui::MouseMoveEvent { position, ..Default::default() }), cx);
+                dispatch_motion(window, cx, position);
             }
         }).unwrap();
         crate::native_test_support::frames(window, cx);
@@ -1307,29 +1309,42 @@ mod native_menu_tests {
         }).unwrap();
     }
 
-    fn move_without_repaint(window: WindowHandle<Harness>, cx: &mut TestAppContext, position: Point<Pixels>) {
-        window.update(cx, |_, window, cx| {
-            window.dispatch_event(PlatformInput::MouseMove(gpui::MouseMoveEvent { position, ..Default::default() }), cx);
-        }).unwrap();
-        cx.run_until_parked();
+    fn dispatch_motion(window: &mut Window, cx: &mut App, position: Point<Pixels>) {
+        window.dispatch_event(PlatformInput::MouseMove(gpui::MouseMoveEvent { position, ..Default::default() }), cx);
     }
 
-    fn open_sibling_before_repaint(cx: &mut TestAppContext) -> (WindowHandle<Harness>, [Point<Pixels>; 4]) {
+    fn after_sibling_delivery(cx: &mut TestAppContext,
+        next: impl FnOnce(Entity<Editor>, [Point<Pixels>; 4], &mut Window, &mut App) + 'static,
+    ) -> WindowHandle<Harness> {
         let (window, rows) = hover_menu(cx);
         move_pointer(window, cx, &[rows[0]]);
-        move_without_repaint(window, cx, rows[1]);
-        window.update(cx, |host, _, cx| {
-            let child = host.editor.read(cx).menu.as_ref().unwrap().panel(&[1]).expect("Second's expansion was delivered");
-            assert_eq!(child.viewport.bounds().size.width, px(0.), "Second has not been laid out yet");
+        let observed = Rc::new(Cell::new(false));
+        let delivered = observed.clone();
+        let _observer = window.update(cx, |host, window, cx| {
+            let painted = source(window);
+            let painted_revision = revision(&painted);
+            assert!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some());
+            let mut next = Some(next);
+            // GPUI Test mode draws dirty windows as soon as the effect queue drains.
+            // This editor notification follows the genuine expand sink, before that draw.
+            window.observe(&host.editor, cx, move |editor, window, cx| {
+                if editor.read(cx).menu.as_ref().and_then(|menu| menu.panel(&[1])).is_none() { return; }
+                let Some(next) = next.take() else { return; };
+                let mounted = source(window);
+                assert!(Rc::ptr_eq(&painted.owner, &mounted.owner));
+                assert_eq!(revision(&mounted), painted_revision, "pointer input still belongs to First's rendered revision");
+                delivered.set(true);
+                next(editor, rows, window, cx);
+            })
         }).unwrap();
-        (window, rows)
+        move_pointer(window, cx, &[rows[1]]);
+        assert!(observed.get(), "the editor accepted Second before the next pointer input");
+        window
     }
 
     #[gpui::test]
     fn native_menu_between_frames_hover_selects_leaf_after_delivered_sibling_expansion(cx: &mut TestAppContext) {
-        let (window, [_, _, leaf, _]) = open_sibling_before_repaint(cx);
-        move_without_repaint(window, cx, leaf);
-        crate::native_test_support::frames(window, cx);
+        let window = after_sibling_delivery(cx, |_, rows, window, cx| dispatch_motion(window, cx, rows[2]));
         window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
         cx.simulate_keystrokes(window.into(), "enter");
         crate::native_test_support::frames(window, cx);
@@ -1342,9 +1357,7 @@ mod native_menu_tests {
 
     #[gpui::test]
     fn native_menu_between_frames_disabled_hover_closes_child_and_keeps_invoking_row(cx: &mut TestAppContext) {
-        let (window, [_, _, _, disabled]) = open_sibling_before_repaint(cx);
-        move_without_repaint(window, cx, disabled);
-        crate::native_test_support::frames(window, cx);
+        let window = after_sibling_delivery(cx, |_, rows, window, cx| dispatch_motion(window, cx, rows[3]));
         window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
         cx.simulate_keystrokes(window.into(), "enter");
         crate::native_test_support::frames(window, cx);
@@ -1357,11 +1370,11 @@ mod native_menu_tests {
 
     #[gpui::test]
     fn native_menu_between_frames_click_cannot_activate_a_stale_leaf(cx: &mut TestAppContext) {
-        let (window, [first, _, leaf, _]) = open_sibling_before_repaint(cx);
-        // Return to the painted row. Its retired buttons must not regain
-        // command authority just because that same submenu is open again.
-        move_without_repaint(window, cx, first);
-        click(window, cx, leaf, MouseButton::Left);
+        let window = after_sibling_delivery(cx, |editor, [first, _, leaf, _], window, cx| {
+            dispatch_motion(window, cx, first);
+            assert!(editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some());
+            dispatch_click(window, cx, leaf, MouseButton::Left);
+        });
         window.update(cx, |host, _, cx| {
             let ed = host.editor.read(cx);
             assert!(ed.menu.as_ref().unwrap().panel(&[0]).is_some());
@@ -1371,13 +1384,14 @@ mod native_menu_tests {
 
     #[gpui::test]
     fn native_menu_between_frames_hover_cannot_expand_replacement(cx: &mut TestAppContext) {
-        let (window, [_, second, _, _]) = open_sibling_before_repaint(cx);
-        window.update(cx, |host, window, cx| host.editor.update(cx, |ed, cx| {
-            let items = ed.menu.as_ref().unwrap().items.clone();
-            ed.show_menu(point(px(80.), px(40.)), items, window, cx);
-        })).unwrap();
-        move_without_repaint(window, cx, second);
-        crate::native_test_support::frames(window, cx);
+        let window = after_sibling_delivery(cx, |editor, rows, window, cx| {
+            editor.update(cx, |ed, cx| {
+                let items = ed.menu.as_ref().unwrap().items.clone();
+                ed.show_menu(point(px(80.), px(40.)), items, window, cx);
+            });
+            dispatch_motion(window, cx, rows[0]);
+        });
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
         cx.simulate_keystrokes(window.into(), "enter");
         crate::native_test_support::frames(window, cx);
         window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some())).unwrap();
@@ -1388,7 +1402,7 @@ mod native_menu_tests {
         let window = open(cx);
         window.update(cx, |host, window, cx| {
             let position = row_geometry(host.editor.read(cx).menu.as_ref().unwrap(), 2).center();
-            window.dispatch_event(PlatformInput::MouseMove(gpui::MouseMoveEvent { position, ..Default::default() }), cx);
+            dispatch_motion(window, cx, position);
             host.editor.update(cx, |ed, cx| ed.show_menu(point(px(80.), px(40.)), items(), window, cx));
         }).unwrap();
         crate::native_test_support::frames(window, cx);
