@@ -107,8 +107,12 @@ pub(crate) fn manifest(workspace: &Path, folder: &Path, corrupt: bool) -> Result
         } else {
             hex::encode(digest.finalize())
         };
+        let relative = path.strip_prefix(workspace).map_err(|error| error.to_string())?;
+        // Artifact paths on the worker protocol use '/' on every host.
+        #[cfg(windows)]
+        let relative = relative.to_string_lossy().replace('\\', "/");
         artifacts.push(json!({
-            "path": path.strip_prefix(workspace).map_err(|error| error.to_string())?,
+            "path": relative,
             "bytes": file.metadata()?.len(),
             "sha256": sha256,
         }));
