@@ -299,7 +299,7 @@ impl CommandTarget for Editor {
             (C::OpenTransformPoints, A::None) => { self.open_transform_points_dialog(window, cx); return; }
             (C::OpenScaleDialog, A::None) => { self.open_scale_dialog(window, cx); return; }
             (C::OpenVibratoDialog, A::None) => { self.open_vibrato_dialog(window, cx); return; }
-            (C::ToggleLeftPanel, A::None) => { self.toggle_left_panel(cx); return; }
+            (C::ToggleLeftPanel, A::None) => { self.toggle_properties_panel(cx); return; }
             (C::ToggleRightDock, A::None) => { self.toggle_right_dock(cx); return; }
             (C::TogglePhonemeLane, A::None) => MenuAction::TogglePhonemeLane,
             (C::ToggleTempoLane, A::None) => MenuAction::ToggleTempoLane,
@@ -653,37 +653,10 @@ mod timing_control_tests {
 #[cfg(test)]
 mod history_native_tests {
     use super::*;
+    use crate::native_test_support::{transport_diagnostics, wait_for_transport_ready};
     use gpui::{Entity, TestAppContext};
     use std::rc::Rc;
     use verdant_collection_control::native::gpui_native_owner::{all_owners, resolved};
-
-    fn transport_diagnostics(ed: &mut Editor) -> String {
-        format!("revision={}, loading={}, callback_budget={}, retired_chain={}, applied_timeline={}, notices={:?}",
-            ed.revision().get(), ed.inserts_loading, ed.audio.callback_budget(),
-            ed.audio.retired_chain_revision(), ed.audio.applied_timeline_revision(),
-            ed.notices.iter().map(|notice| notice.text.as_str()).collect::<Vec<_>>())
-    }
-
-    fn wait_for_transport_ready(window: gpui::WindowHandle<HistoryPanel>, cx: &mut TestAppContext) {
-        // SilentClock uses a real callback thread. Rendering additional frames
-        // alone cannot acknowledge the exact installed chain/timeline receipts.
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        loop {
-            crate::native_test_support::frames(window, cx);
-            let (ready, diagnostics) = window.update(cx, |panel, _, cx| {
-                panel.editor.upgrade().expect("history editor stays alive").update(cx, |ed, cx| {
-                    let ready = ed.native_insert_transport_ready(cx);
-                    (ready, transport_diagnostics(ed))
-                })
-            }).unwrap();
-            if ready { return; }
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            assert!(!remaining.is_zero(), "history fixture transport did not become ready: {diagnostics}");
-            // Yield only between checks of the actual production readiness
-            // predicate; neither a fixed frame count nor clearing its guard.
-            std::thread::park_timeout(remaining.min(std::time::Duration::from_millis(1)));
-        }
-    }
 
     #[gpui::test]
     fn history_window_uses_compiled_selection_before_domain_jump(cx: &mut TestAppContext) {
@@ -702,7 +675,7 @@ mod history_native_tests {
             HistoryPanel { editor:editor.downgrade(), scroll:UniformListScrollHandle::new(), selected:0, displayed:None }
         });
         window.update(cx, |_, window, _| window.activate_window()).unwrap();
-        wait_for_transport_ready(window, cx);
+        wait_for_transport_ready(window, cx, kept.borrow().as_ref().expect("history editor stays alive"));
         cx.simulate_keystrokes(window.into(), "up");
         crate::native_test_support::frames(window, cx);
         window.update(cx, |panel, window, cx| {

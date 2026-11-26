@@ -215,7 +215,7 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
             let start = onset - prefix;
             if start < -EPSILON {
                 errors.push(diagnostic(note, "E_PHONEME_TIMING_PREROLL",
-                    format!("「{}」辅音需提前 {:.1} ms；请在首音前保留足够空间", note.lyric, prefix*1000.0),
+                    format!("「{}」的辅音要比拍点早 {:.0} ms 开始，但离曲首太近，前面没有空间", note.lyric, prefix*1000.0),
                     format!("note_onset={onset:.12}; prefix={prefix:.12}; scheduled_start={start:.12}; negative timeline is not silently delayed")));
             }
             scheduled.push(Scheduled { note, note_index, segments, continuation_anchor, nuclei, nucleus, prefix,

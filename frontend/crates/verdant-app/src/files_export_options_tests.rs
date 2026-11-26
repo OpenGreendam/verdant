@@ -118,20 +118,15 @@ fn export_dialog_rejects_invalid_midi_division_without_clamping() {
 }
 
 #[test]
-fn export_dialog_cannot_discard_its_only_real_vsqx_voice_table() {
+fn vsqx_options_can_discard_source_before_singer_entry_but_writer_requires_a_voice() {
+    let imported = verdant_exchange::import(Format::Vsqx,
+        include_bytes!("../../verdant-exchange/tests/fixtures/score.vsqx"), &Default::default()).unwrap();
     let without_table = ExportOptions { preserve_extensions: false, ..Default::default() };
-    assert!(resolve_score_options(Format::Vsqx, without_table, "").unwrap_err().contains("真实歌手元数据"));
-    // The outer VSQX gate already requires an imported table for this path.
-    assert!(resolve_score_options(Format::Vsqx, ExportOptions::default(), "").is_ok());
-    let explicit = ExportOptions {
-        preserve_extensions: false,
-        vocaloid_voice: Some(verdant_exchange::VocaloidVoice {
-            // Public fixture identity, never a production default.
-            comp_id: "BNGW7FG7E5TRSNC3".into(), name: "KAITO_V3_English".into(), language_id: 1, program: 0,
-        }),
-        ..Default::default()
-    };
-    assert!(resolve_score_options(Format::Vsqx, explicit, "").is_ok());
+    let selected = resolve_score_options(Format::Vsqx, without_table, "").unwrap();
+    assert!(!selected.preserve_extensions && selected.vocaloid_voice.is_none());
+    let error = verdant_exchange::export(Format::Vsqx, &imported.project, &selected).err().unwrap();
+    assert!(error.to_string().contains("actual vocaloid_voice metadata"));
+    assert!(verdant_exchange::export(Format::Vsqx, &imported.project, &ExportOptions::default()).is_ok());
 }
 
 #[gpui::test]

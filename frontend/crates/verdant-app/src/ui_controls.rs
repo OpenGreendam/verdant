@@ -79,7 +79,7 @@ impl WidthClass {
 
 /// A side panel shown as an overlay in narrow windows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Drawer { Left, Right }
+pub enum Drawer { Right }
 
 /// Toolbar control size: 28 px for a pointer, 36 px once touch input is seen
 /// (close to the 44 pt / 48 dp platform guidance within a dense toolbar).
@@ -87,19 +87,57 @@ pub fn bar_button_size(touch: bool) -> f32 { if touch { 36.0 } else { TOP_BTN_H 
 pub fn bar_height(touch: bool) -> f32 { if touch { 56.0 } else { 48.0 } }
 pub fn rem_size(touch: bool) -> f32 { if touch { 18.0 } else { 16.0 } }
 
-/// Synthesizer V Studio-style right property dock tabs.
+/// Panels of the right dock. Like Synthesizer V's panels, any number of them
+/// can be open at once, in the order they were opened.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RightDockTab {
-    /// Note properties now live in the left inspector; layouts saved with the
-    /// retired note tab open on the voice tab.
+    /// Selection properties (notes or an audio clip). Layouts saved with the
+    /// retired note tab open here.
     #[default]
     #[serde(alias = "note_phoneme")]
     VoiceTimbre,
     Dictionary,
+    /// Render queue and pre-render diagnostics.
     RenderInserts,
     HistorySystem,
+    /// Project-wide synthesis settings.
+    Synthesis,
 }
+
+impl RightDockTab {
+    /// Button order in the rail, also used for older saved layouts.
+    pub const ORDER: [RightDockTab; 5] =
+        [Self::VoiceTimbre, Self::Synthesis, Self::RenderInserts, Self::Dictionary, Self::HistorySystem];
+
+    pub fn bit(self) -> u8 { 1 << self as u8 }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::VoiceTimbre => "属性",
+            Self::Synthesis => "合成",
+            Self::RenderInserts => "渲染",
+            Self::Dictionary => "词典",
+            Self::HistorySystem => "历史",
+        }
+    }
+
+    pub fn icon(self) -> &'static str {
+        match self {
+            Self::VoiceTimbre => "sliders-horizontal",
+            Self::Synthesis => "sparkles",
+            Self::RenderInserts => "audio-waveform",
+            Self::Dictionary => "languages",
+            Self::HistorySystem => "history",
+        }
+    }
+}
+
+/// The properties panel is open by default; others open beside it.
+const DEFAULT_RIGHT_PANELS: u8 = 1 << RightDockTab::VoiceTimbre as u8;
+/// Width of the right dock's vertical panel bar.
+pub const PANEL_RAIL_WIDTH: f32 = 52.0;
+const MAX_PANEL_WIDTH: f32 = 480.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -108,6 +146,10 @@ pub struct LayoutPrefs {
     pub right_dock_width: f32,
     pub show_right_dock: bool,
     pub right_dock_tab: RightDockTab,
+    /// Open right-dock panels, one bit per `RightDockTab`.
+    pub right_panels: u8,
+    /// Closest to the rail first. Closed entries keep the permutation complete.
+    pub right_panel_order: [RightDockTab; 5],
     pub arrange_height: f32,
     pub lane_height: f32,
     pub inspector_tab: InspectorTab,
@@ -122,6 +164,8 @@ impl Default for LayoutPrefs {
             right_dock_width: 340.0,
             show_right_dock: true,
             right_dock_tab: RightDockTab::VoiceTimbre,
+            right_panels: DEFAULT_RIGHT_PANELS,
+            right_panel_order: RightDockTab::ORDER,
             arrange_height: 160.0,
             lane_height: 184.0,
             inspector_tab: InspectorTab::TrackNote,
@@ -135,14 +179,45 @@ impl LayoutPrefs {
     pub fn clamped(self) -> Self {
         Self {
             inspector_width: if self.inspector_width.is_finite() { self.inspector_width.clamp(260.0, 440.0) } else { 300.0 },
-            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, 480.0) } else { 340.0 },
+            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, MAX_PANEL_WIDTH) } else { 340.0 },
             show_right_dock: self.show_right_dock,
             right_dock_tab: self.right_dock_tab,
+            right_panels: self.right_panels & RightDockTab::ORDER.iter().fold(0, |mask, tab| mask | tab.bit()),
+            right_panel_order: if RightDockTab::ORDER.iter().all(|tab| self.right_panel_order.contains(tab)) {
+                self.right_panel_order
+            } else { RightDockTab::ORDER },
             arrange_height: if self.arrange_height.is_finite() { self.arrange_height.clamp(92.0, 460.0) } else { 160.0 },
             lane_height: if self.lane_height.is_finite() { self.lane_height.clamp(112.0, 420.0) } else { 184.0 },
             inspector_tab: self.inspector_tab,
             show_tempo_lane: self.show_tempo_lane,
             show_phoneme_lane: self.show_phoneme_lane,
+        }
+    }
+
+    pub fn panel_open(&self, tab: RightDockTab) -> bool { self.right_panels & tab.bit() != 0 }
+
+    /// The right dock's width: the panel bar plus one column per open panel.
+    pub fn right_dock_total_width(&self) -> f32 {
+        PANEL_RAIL_WIDTH + self.right_panels.count_ones() as f32 * self.right_dock_width
+    }
+
+    /// Reserve a third of the window width for the editor, while
+    /// always allowing one complete column in docked windows. A fractional
+    /// column shows that more content can be scrolled into view. Use the maximum
+    /// column width so this factor stays constant throughout a splitter drag.
+    pub fn visible_dock_columns(&self, window_width: f32) -> f32 {
+        let budget = window_width * (2.0 / 3.0) - PANEL_RAIL_WIDTH;
+        (budget / MAX_PANEL_WIDTH).max(1.0).min(self.right_panels.count_ones() as f32)
+    }
+
+    pub fn set_panel_open(&mut self, tab: RightDockTab, open: bool) {
+        if open && !self.panel_open(tab) {
+            if let Some(i) = self.right_panel_order.iter().position(|entry| *entry == tab) {
+                self.right_panel_order[i..].rotate_left(1);
+            }
+            self.right_panels |= tab.bit();
+        } else if !open {
+            self.right_panels &= !tab.bit();
         }
     }
 
@@ -256,6 +331,35 @@ pub fn icon_selectable_button(
 }
 
 /// Native-style `<Select>` dropdown trigger with optional leading Lucide icon and trailing chevron.
+/// An AdwComboRow: a full-width row of a boxed list that opens a menu. Its
+/// icon and label sit at the row padding, aligned with neighbouring rows.
+pub fn combo_row(
+    id: impl Into<SharedString>,
+    leading_icon: Option<&'static str>,
+    label: impl Into<SharedString>,
+    aria_name: impl Into<SharedString>,
+    th: Theme,
+) -> crate::proto_controls::Action {
+    let label = label.into();
+    crate::proto_controls::action(id.into(), label.clone())
+        .role(Role::ComboBox)
+        .aria_label(aria_name.into())
+        .w_full()
+        .min_h(px(50.0))
+        .px(px(12.0))
+        .gap(px(10.0))
+        .flex()
+        .items_center()
+        .flat_states(th, false)
+        .text_sm()
+        .text_color(th.text)
+        .when_some(leading_icon, |d, ic| {
+            d.child(svg().path(icon(ic)).size(px(16.0)).flex_none().text_color(th.text_secondary))
+        })
+        .child(div().flex_1().min_w_0().truncate().child(label))
+        .child(svg().path(icon("chevron-down")).size(px(14.0)).flex_none().text_color(th.text_secondary))
+}
+
 pub fn select_button(
     id: impl Into<SharedString>,
     leading_icon: Option<&'static str>,
@@ -377,10 +481,13 @@ pub fn icon_command_button(
     let label = label.into();
     let th = ed.theme;
     let fg = th.text;
+    // The command surface starts with an empty text child; a flex gap would
+    // also open space before the icon and push the content off centre, so
+    // the icon carries the spacing itself.
     selectable_command_button(ed, cmd, arg, "", key, active, cx)
         .aria_label(label.clone())
-        .gap(px(5.0))
-        .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
+        .gap(px(0.0))
+        .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().mr(px(5.0)).text_color(fg))
         .child(label)
 }
 
@@ -400,9 +507,9 @@ pub fn flat_icon_command_button(
     flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
         .aria_label(label.clone())
         .px(px(9.0))
-        .gap(px(6.0))
+        .gap(px(0.0))
         .text_sm()
-        .child(svg().path(icon(icon_name)).size(px(15.0)).flex_none().text_color(fg))
+        .child(svg().path(icon(icon_name)).size(px(15.0)).flex_none().mr(px(6.0)).text_color(fg))
         .child(label)
 }
 
@@ -706,7 +813,6 @@ pub fn show_grid_preset_menu(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SplitterKind {
-    InspectorWidth,
     RightDockWidth,
     ArrangeHeight,
     LaneHeight,
@@ -721,25 +827,28 @@ pub fn splitter_bar(editor: Entity<Editor>, kind: SplitterKind, th: Theme) -> im
     Splitter { editor, kind, theme: th }
 }
 impl gpui::RenderOnce for Splitter {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
         let kind = self.kind;
         let th = self.theme;
         let ed = self.editor.read(cx);
         let defaults = LayoutPrefs::default();
         let (id, label, value, default, min, max, vertical, sign) = match kind {
-            SplitterKind::InspectorWidth => ("splitter-inspector", "左侧面板宽度", ed.layout.inspector_width, defaults.inspector_width, 260.0, 440.0, true, 1.0),
-            SplitterKind::RightDockWidth => ("splitter-right-dock", "右侧面板宽度", ed.layout.right_dock_width, defaults.right_dock_width, 280.0, 480.0, true, -1.0),
+            SplitterKind::RightDockWidth => ("splitter-right-dock", "右侧面板宽度", ed.layout.right_dock_width, defaults.right_dock_width, 280.0, f64::from(MAX_PANEL_WIDTH), true, -1.0),
             SplitterKind::ArrangeHeight => ("splitter-arrange", "编曲区高度", ed.layout.arrange_height, defaults.arrange_height, 92.0, 460.0, false, 1.0),
             SplitterKind::LaneHeight => ("splitter-lane", "参数轨高度", ed.layout.lane_height, defaults.lane_height, 112.0, 420.0, false, -1.0),
         };
+        let scale = if kind == SplitterKind::RightDockWidth {
+            ed.layout.visible_dock_columns(window.viewport_size().width.as_f32())
+        } else { 1.0 };
+        let scale = f64::from(scale.max(1.0));
         let mut spec = Spec::slider(value as f64, min, max, label);
         spec.role = "separator";
-        spec.step = 8.0; spec.fine_step = 1.0; spec.default_value = default as f64;
+        spec.step = 8.0 / scale; spec.fine_step = 1.0 / scale; spec.default_value = default as f64;
         spec.preview_echo = true;
         let control = scalar(self.editor, id, spec,
             move |sample, _, initial| {
-                let delta = if vertical { sample.total_delta.x } else { sample.total_delta.y } * sign;
+                let delta = (if vertical { sample.total_delta.x } else { sample.total_delta.y }) * sign / scale;
                 // LayoutPrefs stores f32. Propose that same representation so
                 // its preview echo remains exact across a native repaint.
                 Sample {
@@ -764,7 +873,6 @@ impl gpui::RenderOnce for Splitter {
                 if matches!(event.kind, EventKind::Preview | EventKind::Commit | EventKind::Cancel) {
                     let value = event.value as f32;
                     match kind {
-                        SplitterKind::InspectorWidth => ed.layout.inspector_width = value,
                         SplitterKind::RightDockWidth => ed.layout.right_dock_width = value,
                         SplitterKind::ArrangeHeight => ed.layout.arrange_height = value,
                         SplitterKind::LaneHeight => ed.layout.lane_height = value,
@@ -794,7 +902,6 @@ mod splitter_precision_tests {
     }
     fn value(layout: LayoutPrefs, kind: SplitterKind) -> f32 {
         match kind {
-            SplitterKind::InspectorWidth => layout.inspector_width,
             SplitterKind::RightDockWidth => layout.right_dock_width,
             SplitterKind::ArrangeHeight => layout.arrange_height,
             SplitterKind::LaneHeight => layout.lane_height,
@@ -803,11 +910,17 @@ mod splitter_precision_tests {
 
     #[gpui::test]
     fn native_splitters_keep_f32_previews_through_repaint_and_release(cx: &mut TestAppContext) {
-        for kind in [SplitterKind::InspectorWidth, SplitterKind::RightDockWidth,
+        for kind in [SplitterKind::RightDockWidth,
             SplitterKind::ArrangeHeight, SplitterKind::LaneHeight] {
             for fine in [false, true] {
-                let window = cx.open_window(size(px(400.0), px(240.0)), |window, cx| {
-                    let editor = cx.new(|cx| Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx));
+                let multi_column = kind == SplitterKind::RightDockWidth;
+                let width = if multi_column { 2000.0 } else { 400.0 };
+                let window = cx.open_window(size(px(width), px(240.0)), |window, cx| {
+                    let editor = cx.new(|cx| {
+                        let mut ed = Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx);
+                        if multi_column { ed.layout.set_panel_open(RightDockTab::Synthesis, true); }
+                        ed
+                    });
                     let changed = cx.observe(&editor, |_, _, cx| cx.notify());
                     Harness { editor, kind, _changed: changed }
                 });
@@ -834,14 +947,15 @@ mod splitter_precision_tests {
                     }), cx);
                 }).unwrap();
                 crate::native_test_support::frames(window, cx);
-                let vertical = matches!(kind, SplitterKind::InspectorWidth | SplitterKind::RightDockWidth);
+                let vertical = matches!(kind, SplitterKind::RightDockWidth);
                 let sign = if matches!(kind, SplitterKind::RightDockWidth | SplitterKind::LaneHeight) { -1.0 } else { 1.0 };
                 let mut last = start;
                 let mut expected = initial as f32;
                 for delta in [13.37, 27.19] {
                     last = if vertical { point(start.x + px(delta), start.y) } else { point(start.x, start.y + px(delta)) };
                     let distance = if vertical { f64::from(last.x) - f64::from(start.x) } else { f64::from(last.y) - f64::from(start.y) };
-                    expected = (initial + distance * sign * if fine { 0.1 } else { 1.0 }) as f32;
+                    let scale = if multi_column { 2.0 } else { 1.0 };
+                    expected = (initial + distance * sign / scale * if fine { 0.1 } else { 1.0 }) as f32;
                     cx.update_window(window.into(), |_, window, cx| {
                         window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
                             position: last, pressed_button: Some(MouseButton::Left),
@@ -1039,6 +1153,8 @@ mod tests {
             right_dock_width: 100.0,
             show_right_dock: false,
             right_dock_tab: RightDockTab::Dictionary,
+            right_panels: RightDockTab::Dictionary.bit() | RightDockTab::HistorySystem.bit(),
+            right_panel_order: RightDockTab::ORDER,
             arrange_height: 10.0,
             lane_height: 240.0,
             inspector_tab: InspectorTab::Synthesis,
@@ -1051,6 +1167,8 @@ mod tests {
         assert_eq!(loaded.right_dock_width, 280.0);
         assert!(!loaded.show_right_dock);
         assert_eq!(loaded.right_dock_tab, RightDockTab::Dictionary);
+        assert!(loaded.panel_open(RightDockTab::Dictionary) && loaded.panel_open(RightDockTab::HistorySystem));
+        assert!(!loaded.panel_open(RightDockTab::VoiceTimbre));
         assert_eq!(loaded.arrange_height, 92.0);
         assert_eq!(loaded.lane_height, 240.0);
         assert_eq!(loaded.inspector_tab, InspectorTab::Synthesis);
@@ -1186,6 +1304,28 @@ mod width_class_tests {
         let layout: LayoutPrefs = serde_json::from_value(serde_json::json!({"right_dock_tab": "note_phoneme", "inspector_width": 300.0})).unwrap();
         assert_eq!(layout.right_dock_tab, RightDockTab::VoiceTimbre);
         assert_eq!(layout.inspector_width, 300.0);
+        // Layouts from before stackable panels open the default set.
+        assert!(layout.panel_open(RightDockTab::VoiceTimbre) && !layout.panel_open(RightDockTab::Synthesis));
+        assert_eq!(layout.right_dock_total_width(), PANEL_RAIL_WIDTH + layout.right_dock_width);
+    }
+
+    #[test]
+    fn panel_opening_order_round_trips_and_older_layouts_keep_their_order() {
+        use RightDockTab::{Dictionary, HistorySystem, VoiceTimbre};
+        let mut prefs = crate::files::Prefs::default();
+        prefs.extra.insert(LAYOUT_PREFS_KEY.into(), serde_json::json!({
+            "right_panels": VoiceTimbre.bit() | Dictionary.bit() | HistorySystem.bit(),
+        }));
+        let mut layout = LayoutPrefs::from_prefs(&prefs);
+        let open = |layout: LayoutPrefs| layout.right_panel_order.into_iter()
+            .filter(|tab| layout.panel_open(*tab)).collect::<Vec<_>>();
+        assert_eq!(open(layout), [VoiceTimbre, Dictionary, HistorySystem]);
+        layout.set_panel_open(Dictionary, true);
+        assert_eq!(open(layout), [VoiceTimbre, Dictionary, HistorySystem]);
+        layout.set_panel_open(Dictionary, false);
+        layout.set_panel_open(Dictionary, true);
+        layout.store(&mut prefs);
+        assert_eq!(open(LayoutPrefs::from_prefs(&prefs)), [VoiceTimbre, HistorySystem, Dictionary]);
     }
 }
 

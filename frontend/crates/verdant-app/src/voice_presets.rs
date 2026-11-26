@@ -55,7 +55,7 @@ impl Editor {
     pub fn singer_language_controls(&self, cx: &mut Context<Self>) -> Div {
         let th = self.theme;
         let track_id = self.session.track.clone();
-        let mut controls = div().flex().flex_col().gap(px(6.0));
+        let mut controls = div().flex().flex_col();
         let Some(track) = self.project().track(&track_id) else { return controls; };
         let selected = self.scheduler.capabilities.as_ref().and_then(|caps| verdant_backend::adapter::desktop_voice(self.project(), track, caps).ok().flatten());
         let singer_name = selected
@@ -68,7 +68,7 @@ impl Editor {
             }
         };
         controls = controls.child(
-            crate::ui_controls::select_button("track-singer-picker", Some("mic-vocal"), singer_name, "选择轨道歌手", th)
+            crate::ui_controls::combo_row("track-singer-picker", Some("mic-vocal"), singer_name, "选择轨道歌手", th)
                 .authority(crate::proto_controls::editor_authority(self))
                 .on_click(cx.listener(move |ed, _, window, cx| open_singers(ed, window, cx)))
                 .on_a11y_action(AccessibleAction::Click, crate::view::a11y_listener(cx, move |ed, _, window, cx| open_singers(ed, window, cx))),
@@ -119,13 +119,13 @@ impl Editor {
         };
         let open_lang_a11y = open_lang_menu.clone();
         controls = controls.child(
-            crate::ui_controls::select_button("track-language-picker", Some("globe"), lang_display, "选择演唱语言", th)
+            crate::ui_controls::combo_row("track-language-picker", Some("globe"), lang_display, "选择演唱语言", th).border_t_1().border_color(th.shade)
                 .authority(crate::proto_controls::editor_authority(self))
                 .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, window, cx| open_lang_menu(ed, ev.position(), window, cx)))
                 .on_a11y_action(AccessibleAction::Click, crate::view::a11y_listener(cx, move |ed, _, window, cx| open_lang_a11y(ed, window.mouse_position(), window, cx))),
         );
         controls.when(segmented, |c| {
-            c.child(div().text_size(px(10.5)).text_color(th.text_secondary).child("本轨已配置多语言时间分段，分段内音符优先使用分段读音器"))
+            c.child(div().px(px(12.0)).pb(px(10.0)).text_size(px(10.5)).text_color(th.text_secondary).child("本轨已配置多语言时间分段，分段内音符优先使用分段读音器"))
         })
     }
 }

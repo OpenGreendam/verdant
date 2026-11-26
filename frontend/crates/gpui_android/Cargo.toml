@@ -1,0 +1,36 @@
+[package]
+name = "gpui_android"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lib]
+path = "src/gpui_android.rs"
+doctest = false
+
+[[example]]
+name = "gpui_android_example"
+path = "examples/android.rs"
+crate-type = ["cdylib"]
+test = false
+bench = false
+
+[dependencies]
+gpui.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
+anyhow.workspace = true
+futures = "0.3"
+gpui_wgpu.workspace = true
+libc = "0.2"
+log = "0.4"
+ndk = { version = "0.9", features = ["rwh_06"] }
+parking_lot = "0.12"
+raw-window-handle = "0.6"
+uuid.workspace = true
+
+[target.'cfg(target_os = "android")'.dev-dependencies]
+android_logger = "0.15"

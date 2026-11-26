@@ -25,8 +25,9 @@ use crate::generated::controls::{
 };
 use crate::phoneme_lane::{PHONEME_LANE_H, timeline_phoneme_lane};
 use crate::theme::{Theme, mix};
+use crate::ui_controls::AdwStates;
 use crate::ui_controls::{
-    BAR_BTN_H, Drawer, PANEL_BTN_H, RightDockTab, SplitterKind, WidthClass,
+    BAR_BTN_H, PANEL_BTN_H, RightDockTab, SplitterKind, WidthClass,
     generated_select_button, horizontal_timeline_bar, icon_command_button, icon_selectable_button,
     numeric_pill, route_short_name, select_button, selectable_button, selectable_command_button,
     splitter_bar,
@@ -102,7 +103,6 @@ impl Render for StaticEditor {
 #[derive(Clone, Copy)]
 enum ChromePane {
     ControlBar,
-    Inspector,
     PropertyDock,
     Arrangement,
 }
@@ -117,7 +117,6 @@ impl Render for ChromeView {
         let Some(editor) = self.editor.upgrade() else { return div().into_any_element() };
         editor.update(cx, |ed, cx| match self.pane {
             ChromePane::ControlBar => ed.control_bar(cx).into_any_element(),
-            ChromePane::Inspector => ed.left_track_panel(cx).into_any_element(),
             ChromePane::PropertyDock => ed.right_synthv_dock(cx).into_any_element(),
             ChromePane::Arrangement => ed.arrangement_content(cx),
         })
@@ -126,7 +125,6 @@ impl Render for ChromeView {
 
 pub(crate) struct ChromeViews {
     control_bar: Entity<ChromeView>,
-    inspector: Entity<ChromeView>,
     property_dock: Entity<ChromeView>,
     arrangement: Entity<ChromeView>,
 }
@@ -141,7 +139,6 @@ impl ChromeViews {
         });
         Self {
             control_bar: view(ChromePane::ControlBar),
-            inspector: view(ChromePane::Inspector),
             property_dock: view(ChromePane::PropertyDock),
             arrangement: view(ChromePane::Arrangement),
         }
@@ -156,7 +153,6 @@ fn cached_view<V: Render>(view: &Entity<V>, style: StyleRefinement, a11y: bool) 
     if a11y { view.clone().into_any_element() } else { view.clone().cached(style).into_any_element() }
 }
 
-fn th_for_frame(ed: &Editor) -> Theme { ed.theme }
 
 fn button(id: impl Into<SharedString>, label: impl Into<SharedString>, th: Theme) -> crate::proto_controls::Action {
     selectable_button(id, label, false, th)
@@ -234,7 +230,9 @@ pub(crate) fn pane_header(th: Theme) -> Div {
 /// between rows. Builder methods mirror `Div`, so call sites read the same.
 pub(crate) struct Group {
     title: SharedString,
-    rows: Vec<AnyElement>,
+    /// Each row and whether it is flush (draws its own full-width padding,
+    /// like an AdwComboRow) instead of being padded by the card.
+    rows: Vec<(AnyElement, bool)>,
     th: Theme,
 }
 
@@ -244,11 +242,17 @@ pub(crate) fn section(title: &str, th: Theme) -> Group {
 
 impl Group {
     pub(crate) fn child(mut self, row: impl IntoElement) -> Self {
-        self.rows.push(row.into_any_element());
+        self.rows.push((row.into_any_element(), false));
         self
     }
     pub(crate) fn children(mut self, rows: impl IntoIterator<Item = impl IntoElement>) -> Self {
-        self.rows.extend(rows.into_iter().map(IntoElement::into_any_element));
+        self.rows.extend(rows.into_iter().map(|row| (row.into_any_element(), false)));
+        self
+    }
+    /// A full-width row that pads itself, so its leading icon lines up with
+    /// the content of the padded rows around it.
+    pub(crate) fn flush_child(mut self, row: impl IntoElement) -> Self {
+        self.rows.push((row.into_any_element(), true));
         self
     }
 }
@@ -263,10 +267,12 @@ impl IntoElement for Group {
             .gap(px(8.0))
             .mx(px(12.0))
             .mt(px(18.0))
-            .child(div().px(px(2.0)).text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
+            // The heading starts on the card's edge (AdwPreferencesGroup).
+            .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
             .child(div().flex().flex_col().rounded(px(12.0)).bg(th.card).overflow_hidden()
-                .children(self.rows.into_iter().enumerate().map(|(i, row)| {
-                    div().min_h(px(50.0)).px(px(12.0)).py(px(8.0)).flex().flex_col().justify_center().gap(px(8.0))
+                .children(self.rows.into_iter().enumerate().map(|(i, (row, flush))| {
+                    div().min_h(px(50.0)).flex().flex_col().justify_center().gap(px(8.0))
+                        .when(!flush, |d| d.px(px(12.0)).py(px(8.0)))
                         .when(i > 0, |d| d.border_t_1().border_color(th.shade))
                         .child(row)
                 })))
@@ -403,11 +409,14 @@ impl Editor {
                 .on_a11y_action(gpui::AccessibleAction::Click, a11y_listener(cx, |ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx)))
                 .on_click(cx.listener(|ed, _, w, cx| ed.show_bottom(Bottom::Devices, w, cx))));
         let _ = top_menu_btn;
+        let corners = crate::window_chrome::corner_radii(chrome);
 
         div()
             .w_full()
             .min_w_0()
             .overflow_hidden()
+            .rounded_tl(corners.top_left)
+            .rounded_tr(corners.top_right)
             .h(px(bar_h))
             .flex_none()
             .flex()
@@ -419,8 +428,7 @@ impl Editor {
             .bg(th.headerbar)
             .border_b_1()
             .border_color(th.shade)
-            // Start: sidebar, views, history, title.
-            .child(command_icon(self, Cmd::ToggleLeftPanel, "panel-left", "侧边栏 (I)", "inspector-toggle", self.left_panel_visible(), cx))
+            // Start: views, history, title.
             .when(!phone, |bar| bar.child(view_switcher))
             .when(!phone, |bar| bar
                 .child(command_icon(self, Cmd::Undo, "undo-2", "撤销 (Ctrl+Z)", "undo", false, cx))
@@ -488,18 +496,11 @@ impl Editor {
 
     /// Left Track & Voice Panel: sleek track setup, Singer/Language/Engine `<Select>` dropdowns,
     /// track mix & automation controls, and quick track list switcher.
-    fn left_track_panel(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    /// The current track's voice, language and mix: shown in the 属性 panel
+    /// below the selection, as Synthesizer V shows track properties.
+    fn track_sections(&self, project: &verdant_domain::Project, track: &verdant_domain::Track, cx: &mut Context<Self>) -> Div {
         let th = self.theme;
-        let project = self.store().snapshot();
-        let Some(track) = project.track(&self.session.track) else {
-            return div().into_any_element();
-        };
         let caps = self.scheduler.capabilities.as_ref();
-        // Like Synthesizer V, selection properties live in the right inspector
-        // whenever it shows the 属性 page; the left panel only carries them
-        // while that page is hidden, so they are never out of reach.
-        let props_in_dock = self.right_dock_visible() && self.layout.right_dock_tab == RightDockTab::VoiceTimbre;
-        let selection = if props_in_dock { None } else { self.selection_inspector(track, cx.entity(), cx) };
         let rename_id = track.id.clone();
         let auto_open = self.automation_ui.expanded_tracks.contains(&track.id);
 
@@ -533,10 +534,10 @@ impl Editor {
                         ed.open_builtin_instrument_editor(&track, cx);
                     })));
         } else {
-            track_section = track_section.child(self.singer_language_controls(cx));
+            track_section = track_section.flush_child(self.singer_language_controls(cx));
         }
 
-        if let Some((_, voice)) = caps.filter(|_| instrument.is_none()).and_then(|c| verdant_backend::adapter::desktop_voice(&project, track, c).ok().flatten()) {
+        if let Some((_, voice)) = caps.filter(|_| instrument.is_none()).and_then(|c| verdant_backend::adapter::desktop_voice(project, track, c).ok().flatten()) {
             track_section = track_section.child(row("当前声源", voice.display_name.clone(), th));
         }
 
@@ -584,102 +585,77 @@ impl Editor {
                     ),
             );
 
-        let title = if self.session.selection.is_empty() && self.integrations.selected_clip.is_none() { "轨道" } else { "选择" };
-        div()
-            .id("inspector")
-            .w(px(self.layout.inspector_width))
-            .h_full()
-            .flex_none()
-            .flex()
-            .flex_col()
-            .bg(th.surface)
-            .child(pane_header(th).px(px(16.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
-            .child(
-                crate::proto_scroll::viewport("left-panel-scroll", "轨道与选择检查器", "vertical")
-                    .flex_1()
-                    .min_h_0()
-                    .child(div().flex().flex_col().pb(px(18.0)).children(selection).child(track_section).child(mix_section)),
-            )
-            .into_any_element()
+        div().flex().flex_col().child(track_section).child(mix_section)
     }
 
-    /// Synthesizer V Studio-style Right Property Dock.
+    /// Synthesizer V Studio-style right dock: a vertical bar of panel buttons
+    /// at the window edge; each open panel becomes a column, and panels opened
+    /// later stack further to the left.
     fn right_synthv_dock(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let project = self.store().snapshot();
         let Some(track) = project.track(&self.session.track) else {
             return div().into_any_element();
         };
-        let tab = self.layout.right_dock_tab;
         let errors = self.plans.iter().flat_map(|p| &p.diagnostics).filter(|d| d.severity == Severity::Error).count();
-        // A view switcher in the pane's own header (AdwViewSwitcher), so the
-        // pane needs no separate icon column.
-        let tabs = [
-            (RightDockTab::VoiceTimbre, "sliders-horizontal", "属性"),
-            (RightDockTab::Dictionary, "languages", "词典"),
-            (RightDockTab::RenderInserts, "cpu", "诊断"),
-            (RightDockTab::HistorySystem, "history", "历史"),
-        ];
-        let header = div()
-            .h(px(46.0))
-            .flex_none()
-            .px(px(8.0))
-            .flex()
-            .items_center()
-            .gap(px(6.0))
-            .bg(th.surface)
-            .border_b_1()
-            .border_color(th.shade)
+        let rail = div()
+            .id("dock-panels").role(Role::Toolbar).aria_label("面板")
+            .w(px(crate::ui_controls::PANEL_RAIL_WIDTH)).h_full().flex_none()
+            .flex().flex_col().items_center().gap(px(4.0)).py(px(8.0))
+            .border_l_1().border_color(th.shade)
             .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
-            .child(div().id("dock-switcher").role(Role::TabList).flex_1().min_w_0().flex().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
-                .children(tabs.into_iter().map(|(t, ic, label)| {
-                    let active = t == tab;
-                    let editor = cx.entity();
-                    crate::proto_controls::action(SharedString::from(format!("dock-tab-{t:?}")), label).role(Role::Tab).aria_selected(active)
-                        .navigation(tabs.iter().position(|(value, _, _)| *value == t).unwrap_or(0), tabs.len(), move |index, _, cx| {
-                            if let Some((tab, _, _)) = tabs.get(index) { editor.update(cx, |ed, cx| ed.open_right_dock(*tab, cx)); }
-                        })
-                        .relative().flex_1().h(px(28.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
-                        .when(active, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
-                        .hover(move |s| s.bg(if active { th.checked } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if active { th.checked } else { th.hover })))
-                        .child(svg().path(icon(ic)).size(px(14.0)).text_color(th.text))
-                        .child(label)
-                        .when(t == RightDockTab::RenderInserts && errors > 0, |d| d.child(
-                            div().absolute().top(px(3.0)).right(px(5.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
-                        .on_click(cx.listener(move |ed, _, _, cx| ed.open_right_dock(t, cx)))
-                })))
-            .child(
-                crate::proto_controls::action("close-right-dock", "收起右侧面板")
-                    .size(px(28.0))
-                    .flex_none()
-                    .rounded(px(6.0))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
-                    .child(svg().path(icon("x")).size(px(13.0)).text_color(th.text_secondary))
-                    .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
-            );
+            .children(RightDockTab::ORDER.into_iter().map(|tab| {
+                let open = self.layout.panel_open(tab);
+                crate::proto_controls::action(SharedString::from(format!("dock-panel-{tab:?}")), tab.label())
+                    .role(Role::Switch).aria_selected(open)
+                    .aria_label(format!("{}面板", tab.label()))
+                    .relative().w(px(44.0)).py(px(6.0)).flex().flex_col().items_center().gap(px(3.0)).rounded(px(8.0))
+                    .flat_states(th, open)
+                    .child(svg().path(icon(tab.icon())).size(px(16.0)).text_color(if open { th.text } else { th.text_secondary }))
+                    .child(div().text_size(px(10.5)).text_color(if open { th.text } else { th.text_secondary })
+                        .when(open, |d| d.font_weight(FontWeight::SEMIBOLD)).child(tab.label()))
+                    .when(tab == RightDockTab::RenderInserts && errors > 0, |d| d.child(
+                        div().absolute().top(px(4.0)).right(px(8.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
+                    .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))
+            }));
 
-        let body = match tab {
-            RightDockTab::VoiceTimbre => self.right_dock_voice_tab(&project, cx),
-            RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
-            RightDockTab::RenderInserts => self.right_dock_render_inserts_tab(track, cx),
-            RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
-        };
+        let open = self.layout.right_panel_order.into_iter().rev().filter(|tab| self.layout.panel_open(*tab));
+        let mut viewport = crate::proto_scroll::viewport("right-dock-scroll", "右侧面板", "horizontal")
+            .flex().flex_1().min_w_0().h_full();
+        if let Some(index) = open.clone().position(|tab| tab == self.layout.right_dock_tab) {
+            viewport = viewport.reveal_item(index, format!("{:?}", self.layout.right_dock_tab));
+        }
+        let columns = open.map(|tab| {
+            let content = match tab {
+                RightDockTab::VoiceTimbre => self.right_dock_properties_panel(&project, cx),
+                RightDockTab::Synthesis => self.right_dock_synthesis_panel(&project, cx),
+                RightDockTab::RenderInserts => self.right_dock_render_inserts_tab(track, cx),
+                RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
+                RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
+            };
+            div().w(px(self.layout.right_dock_width)).h_full().flex_none().flex().flex_col().border_l_1().border_color(th.shade)
+                .child(div().h(px(46.0)).flex_none().pl(px(12.0)).pr(px(4.0)).flex().items_center().gap(px(8.0))
+                    .border_b_1().border_color(th.shade)
+                    .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).child(tab.label()))
+                    .child(crate::proto_controls::action(SharedString::from(format!("close-panel-{tab:?}")), format!("关闭{}面板", tab.label()))
+                        .size(px(28.0)).flex_none().rounded(px(6.0)).flex().items_center().justify_center()
+                        .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
+                        .child(svg().path(icon("x")).size(px(13.0)).text_color(th.text_secondary))
+                        .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))))
+                .child(crate::proto_scroll::viewport(SharedString::from(format!("right-panel-scroll-{tab:?}")), format!("{}面板", tab.label()), "vertical")
+                    .flex_1().min_h_0().child(div().pb(px(18.0)).child(content)))
+        });
 
         div()
             .id("right-property-dock")
-            .w(px(self.layout.right_dock_width))
-            .h_full()
-            .flex_none()
+            .rounded_br(crate::window_chrome::corner_radii(self.window_chrome).bottom_right)
+            .size_full()
             .flex()
-            .flex_col()
             .bg(th.surface)
-            .child(header)
-            .child(crate::proto_scroll::viewport("right-dock-scroll", "属性面板", "vertical").flex_1().min_h_0().child(body))
+            .when(self.layout.right_panels != 0, |d| d.child(viewport.children(columns)))
+            .child(rail)
             .into_any_element()
     }
 
@@ -868,34 +844,30 @@ impl Editor {
         }
     }
 
-    fn right_dock_voice_tab(
-        &self,
-        project: &verdant_domain::Project,
-        cx: &mut Context<Self>,
-    ) -> Div {
+    /// Selection properties, as in Synthesizer V's note properties panel.
+    fn right_dock_properties_panel(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
+        let Some(track) = project.track(&self.session.track) else { return div() };
+        // Selection first while there is one, then the track it belongs to.
+        div().flex().flex_col()
+            .children(self.selection_inspector(track, cx.entity(), cx))
+            .child(self.track_sections(project, track, cx))
+    }
+
+    /// Project-wide synthesis settings.
+    fn right_dock_synthesis_panel(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
         let th = self.theme;
         let route = self.route();
-        let phoneme_timing = project.render_preferences.phoneme_timing.as_ref();
         let output_transients = project.render_preferences.output_transients.as_ref();
-        let engine_sec = section("合成设置", th)
+        div().child(section("引擎与速度", th)
             .child(row("合成引擎", route_short_name(route), th))
             .child(numeric_field(self, Num::TempoBpm, Arg::None, "tempo", cx))
-            .child(switch_row(self, Cmd::TogglePhonemeTiming, "phoneme-timing", "元音对拍", Some("辅音先行，元音落在拍点上".into()), phoneme_timing.is_some(), cx))
             .child(switch_row(self, Cmd::ToggleOutputTransients, "output-transients", "尾辅音瞬态约束",
                 Some(match output_transients {
                     None => "关闭".to_string(),
                     Some(d) if d.strength == 0. || d.max_attenuation_db == 0. => "旁路".to_string(),
                     Some(d) => format!("最多衰减 {:.0} dB", d.max_attenuation_db),
                 }),
-                output_transients.is_some(), cx));
-
-
-        // Selection first (SV's Note Properties), then project-wide synthesis.
-        let selection = project.track(&self.session.track).and_then(|track| self.selection_inspector(track, cx.entity(), cx));
-        let selection = selection.unwrap_or_else(|| div().child(section("选区", th).child(
-            div().py(px(6.0)).text_sm().text_color(th.text_secondary)
-                .child("选中音符或音频片段后，在这里编辑歌词、读音、音高、时值、颤音与音素。"))));
-        div().flex().flex_col().child(selection).child(engine_sec)
+                output_transients.is_some(), cx)))
     }
 
     fn right_dock_dictionary_tab(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
@@ -1041,13 +1013,26 @@ impl Editor {
         let total = self.scheduler.wanted().len();
         let ready = self.scheduler.summary().get("ready").copied().unwrap_or(0);
 
-        let mut diagnostics = section("合成渲染与预检诊断", th)
+        let mut diagnostics = section("队列与预检", th)
             .child(row("渲染队列", format!("{ready} / {total} 乐句已就绪"), th))
             .child(
                 icon_command_button(self, Cmd::RenderNow, Arg::None, "audio-waveform", "立即重新渲染全部乐句", "dock-render-now", false, cx)
                     .h(px(PANEL_BTN_H)),
             );
 
+        // A consonant that has to start before the song does is fixed by
+        // giving the song a bar of lead-in, offered here instead of a dead end.
+        let needs_lead_in = self.plans.iter().flat_map(|plan| &plan.diagnostics)
+            .any(|d| d.code == "E_PHONEME_TIMING_PREROLL");
+        if needs_lead_in {
+            diagnostics = diagnostics.child(
+                div().flex().flex_col().gap(px(6.0)).p(px(10.0)).rounded(px(8.0)).bg(th.control)
+                    .child(div().text_sm().child("开头的辅音没有起唱空间"))
+                    .child(div().text_xs().text_color(th.text_secondary)
+                        .child("元音对齐拍点时，辅音要提前开始；第一个音符离曲首太近。把所有音符后移一小节即可。"))
+                    .child(button("shift-one-bar", "所有音符后移一小节", th).h(px(PANEL_BTN_H))
+                        .on_click(cx.listener(|ed, _, _, cx| ed.shift_notes_one_bar(cx)))));
+        }
         let (all_diags, omitted_diags) = prioritized_diagnostics(&self.plans, 14);
         if all_diags.is_empty() {
             diagnostics = diagnostics.child(div().text_xs().text_color(th.success).child("✓ 当前全部轨道预检通过，无阻断问题"));
@@ -1274,11 +1259,7 @@ impl Editor {
             }
         }
 
-        let help = section("帮助与声明", th)
-            .child(command_button(self, Cmd::OpenShortcuts, Arg::None, "键盘快捷键总览 (F1)…", "help-shortcuts", cx).h(px(PANEL_BTN_H)))
-            .child(command_button(self, Cmd::OpenDisclosures, Arg::None, "开源软件与研究引用…", "help-disclosures", cx).h(px(PANEL_BTN_H)));
-
-        div().flex().flex_col().child(history).child(appearance).child(audio).child(backend).child(help)
+        div().flex().flex_col().child(history).child(appearance).child(audio).child(backend)
     }
 
     fn editor_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1398,8 +1379,8 @@ impl Editor {
                 ].into_iter().map(|(cmd, tool, ic, label, key)| {
                     let on = self.lane_tool == tool;
                     crate::ui_controls::flat_command_button(self, cmd, Arg::None, "", key, on, cx)
-                        .aria_label(label).h(px(24.0)).px(px(8.0)).gap(px(5.0)).text_sm()
-                        .children(ic.map(|ic| svg().path(icon(ic)).size(px(14.0)).text_color(th.text)))
+                        .aria_label(label).h(px(24.0)).px(px(8.0)).text_sm()
+                        .children(ic.map(|ic| svg().path(icon(ic)).size(px(14.0)).mr(px(5.0)).text_color(th.text)))
                         .child(label)
                 })))
             .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenTransformPoints, "sliders-horizontal", "点集变换…", "transform-points", false, cx).h(px(28.0)).flex_none())
@@ -1523,7 +1504,10 @@ impl Editor {
             .size_full()
             // Pane header (AdwToolbarView top bar): its bottom line meets the
             // inspector's and the dock's.
-            .child(pane_header(th)
+            // Flat buttons show no edge at rest, so their icons, not their
+            // boxes, line up with the toolbars below; the boxes hang into the
+            // margin.
+            .child(pane_header(th).pl(px(1.0))
                 .child(crate::ui_controls::flat_icon_command_button(self, Cmd::AddTrack, "plus", "人声轨", "add-track", false, cx).h(px(32.0)))
                 .child(crate::proto_controls::action("add-instrument-track", "添加乐器轨").h(px(32.0)).px(px(9.0)).flex().items_center().gap(px(6.0))
                     .rounded(px(6.0)).text_sm().cursor_pointer().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed))
@@ -1767,6 +1751,8 @@ impl Editor {
                                     .items_center()
                                     .justify_between()
                                     .bg(if active_slot { mix(th.surface, th.accent, 0.16) } else { th.surface })
+                                    // The last lane's label sits in the window's bottom-left corner.
+                                    .when(slot + 1 == slot_count, |d| d.rounded_bl(crate::window_chrome::corner_radii(self.window_chrome).bottom_left))
                                     .border_r_1()
                                     .border_color(th.shade)
                                     .text_xs()
@@ -1819,7 +1805,6 @@ impl Editor {
         let a11y = window.is_a11y_active();
         let has_track = self.active_track().is_some();
         let docked = self.width_class.docks_panels();
-        let column = |width| StyleRefinement::default().w(px(width)).h_full().flex_none();
         let fixed_arrangement = self.bottom != Bottom::Hidden;
         let arrange_height = px(self.arrange_pane_height());
         if !fixed_arrangement {
@@ -1861,10 +1846,6 @@ impl Editor {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .when(docked && self.show_inspector, |d| {
-                        d.when(has_track, |d| d.child(cached_view(&self.chrome.inspector, column(self.layout.inspector_width), a11y)))
-                            .child(splitter_bar(entity.clone(), SplitterKind::InspectorWidth, th))
-                    })
                     .child(
                         // All playback anchors are laid out by the control bar
                         // and center above. Paint playback/lyrics before drawers,
@@ -1875,19 +1856,21 @@ impl Editor {
                                 .child(div().id("drawer-scrim").absolute().inset_0().bg(gpui::rgba(0x0000_0066)).occlude()
                                     .on_click(cx.listener(|ed, _, _, cx| { ed.drawer = None; cx.notify(); })))
                                 .child({
-                                    let left = self.drawer == Some(Drawer::Left);
-                                    let width = if left { self.layout.inspector_width } else { self.layout.right_dock_width };
-                                    let pane = if left { &self.chrome.inspector } else { &self.chrome.property_dock };
-                                    div().id("side-drawer").absolute().top_0().bottom_0().when(left, |d| d.left_0()).when(!left, |d| d.right_0())
+                                    // Budget the drawer border outside the panel viewport and rail.
+                                    let width = self.layout.right_dock_total_width() + 1.0;
+                                    div().id("side-drawer").absolute().top_0().bottom_0().right_0()
                                         .w(px(width)).max_w(gpui::relative(0.92)).flex().occlude()
-                                        .when(left, |d| d.border_r_1()).when(!left, |d| d.border_l_1()).border_color(th.shade)
+                                        .border_l_1().border_color(th.shade)
                                         .shadow_lg()
-                                        .child(cached_view(pane, StyleRefinement::default().size_full(), a11y))
+                                        .child(cached_view(&self.chrome.property_dock, StyleRefinement::default().size_full(), a11y))
                                 })),
                     )
-                    .when(docked && self.layout.show_right_dock, |d| {
-                        d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th))
-                            .when(has_track, |d| d.child(cached_view(&self.chrome.property_dock, column(self.layout.right_dock_width), a11y)))
+                    .when(docked && has_track && self.layout.show_right_dock, |d| {
+                        let columns = self.layout.visible_dock_columns(window.viewport_size().width.as_f32());
+                        let width = crate::ui_controls::PANEL_RAIL_WIDTH + columns * self.layout.right_dock_width;
+                        d.when(columns > 0.0, |d| d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th)))
+                            .child(div().w(px(width)).h_full().flex_none()
+                                .child(cached_view(&self.chrome.property_dock, StyleRefinement::default().size_full(), a11y)))
                     })
 
             )
@@ -1923,9 +1906,10 @@ impl Render for Editor {
         }
         // Touch layout scales every rem-sized control (≈ +12 %) toward 44 px
         // touch targets; px-sized canvases keep their musical geometry.
+        crate::proto_controls::set_popup_owner(self.menu.as_ref()
+            .filter(|menu| menu.window == window.window_handle()).and_then(|menu| menu.anchor_owner()));
         let rem = px(crate::ui_controls::rem_size(self.touch_ui));
         if window.rem_size() != rem { window.set_rem_size(rem); }
-        let frame = crate::window_chrome::client_frame(chrome, th_for_frame(self), window);
         let class = WidthClass::of(window.viewport_size().width.as_f32());
         if class != self.width_class {
             // Drawers belong to narrow layouts; docked panels keep their prefs.
@@ -1940,7 +1924,7 @@ impl Render for Editor {
         let text_prompt = crate::lyric_view::prompt_overlay(self, &entity, cx);
         let menu = self.menu.as_ref().filter(|menu| menu.window == window.window_handle())
             .map(|menu| crate::menu::context_menu_layer(self, menu, window, cx).into_any_element());
-        crate::window_chrome::track_title_drag(div().id("verdant"), cx)
+        let root = crate::window_chrome::track_title_drag(div().id("verdant"), cx)
             .relative()
             .size_full()
             .flex()
@@ -1949,7 +1933,6 @@ impl Render for Editor {
             .text_color(th.text)
             .font(crate::theme::ui_font(self.ui_font.clone()))
             .key_context("Verdant")
-            .on_action(cx.listener(|ed, _: &WorkflowMenu, w, cx| ed.workflow_menu(w, cx)))
             .on_action(cx.listener(|ed, action: &crate::shortcuts::WorkflowShortcut, w, cx| crate::shortcuts::dispatch(ed, action, w, cx)))
             .on_action(cx.listener(|ed, _: &crate::commands::ShowHistory, w, cx| ed.show_history_panel(w, cx)))
             .on_action(cx.listener(|ed, _: &NewProject, w, cx| ed.run_workflow(crate::editor::WorkflowAction::New, w, cx)))
@@ -2007,7 +1990,7 @@ impl Render for Editor {
             }))
             .on_action(cx.listener(|ed, _: &BackBar, _, cx| seek_bar(ed, false, cx)))
             .on_action(cx.listener(|ed, _: &ForwardBar, _, cx| seek_bar(ed, true, cx)))
-            .on_action(cx.listener(|ed, _: &ToggleInspector, _, cx| ed.toggle_left_panel(cx)))
+            .on_action(cx.listener(|ed, _: &ToggleInspector, _, cx| ed.toggle_properties_panel(cx)))
             .on_action(cx.listener(|ed, _: &ToggleEditor, w, cx| ed.show_bottom(Bottom::Editor, w, cx)))
             .on_action(cx.listener(|ed, _: &ToggleMixer, w, cx| ed.show_bottom(Bottom::Mixer, w, cx)))
             .on_action(cx.listener(|ed, _: &ToggleTable, w, cx| ed.show_bottom(Bottom::Table, w, cx)))
@@ -2097,10 +2080,10 @@ impl Render for Editor {
             }))
             .child(self.playback.driver.clone())
             .child(static_content)
-            .children(frame)
             .children(modal)
             .children(menu)
-            .children(text_prompt)
+            .children(text_prompt);
+        crate::window_chrome::frame_window(root, chrome, th, window)
     }
 }
 
@@ -2132,6 +2115,131 @@ fn nudge(ed: &mut Editor, tick: i64, pitch: i32, window: &mut Window, cx: &mut C
     let project = ed.store().snapshot();
     let effects = ed.session.nudge_selection(&project, ed.revision(), tick, pitch);
     ed.apply_effects(effects, window, cx);
+}
+
+#[cfg(test)]
+mod right_dock_tests {
+    use super::*;
+    use gpui::{AppContext, Bounds, MouseButton, MouseDownEvent, MouseUpEvent, Pixels, ScrollDelta, ScrollEvent, ScrollHandle, TestAppContext, point, size};
+    use crate::native_test_support::{frames, instrument_project};
+
+    fn action_bounds(window: &Window, role: &str, label: &str) -> Bounds<Pixels> {
+        use verdant_action_control::native::gpui_native_owner::{all_owners, resolved};
+        all_owners().into_iter().find_map(|owner| {
+            let owner = owner.borrow();
+            (owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.props.get("role").and_then(serde_json::Value::as_str) == Some(role)
+                && owner.modules.accessible_text.get("name")
+                    .is_some_and(|value| resolved(value).text() == label))
+                .then_some(owner.bounds).flatten()
+        }).unwrap_or_else(|| panic!("missing painted action {label}"))
+    }
+
+    fn dock_engine(window: &Window) -> Option<ScrollHandle> {
+        use verdant_scroll_region::native::gpui_native_owner::{all_owners, resolved};
+        all_owners().into_iter().find_map(|owner| {
+            let owner = owner.borrow();
+            (owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name")
+                    .is_some_and(|value| resolved(value).text() == "右侧面板"))
+                .then(|| owner.modules.scroll.handle.clone()).flatten()
+        })
+    }
+
+    fn has_splitter(window: &Window) -> bool {
+        use verdant_continuous_control::native::gpui_native_owner::{all_owners, resolved};
+        all_owners().into_iter().any(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name")
+                    .is_some_and(|value| resolved(value).text() == "右侧面板宽度")
+        })
+    }
+
+    #[gpui::test]
+    fn native_dock_and_drawer_keep_rail_visible_and_panels_reachable(cx: &mut TestAppContext) {
+        for (width, count) in [(640.0, 2), (1100.0, 5)] {
+            let window = cx.open_window(size(px(width), px(600.0)), |window, cx| {
+                Editor::for_native_test(instrument_project(), window, cx)
+            });
+            window.update(cx, |_, window, _| window.activate_window()).unwrap();
+            frames(window, cx);
+            window.update(cx, |ed, _, cx| {
+                for tab in RightDockTab::ORDER.into_iter().take(count).skip(1) {
+                    ed.open_right_dock(tab, cx);
+                }
+            }).unwrap();
+            frames(window, cx);
+            let rail = |window: &Window| action_bounds(window, "switch", "合成面板");
+            let reopen = |window: &Window| action_bounds(window, "switch", "属性面板");
+            let latest_label = format!("关闭{}面板", RightDockTab::ORDER[count - 1].label());
+            let oldest_label = "关闭属性面板";
+            let (viewport_bounds, rail_bounds, reopen_bounds, oldest_before) = window.update(cx, |_, window, _| {
+                let engine = dock_engine(window).expect("retained horizontal dock engine");
+                let bounds = engine.bounds();
+                let rail = rail(window);
+                assert!(bounds.right() <= rail.left() && rail.right() <= px(width));
+                if count == 5 {
+                    assert!(bounds.left() >= px(500.0), "keep room for the editor");
+                    assert!(bounds.size.width > px(450.0), "without the old left inspector, more than one column fits");
+                }
+                assert_eq!(has_splitter(window), count == 5);
+                assert!(engine.max_offset().x > px(0.0));
+                assert_eq!(engine.offset().x, px(0.0), "latest panel opens at the left of the viewport");
+                let latest = action_bounds(window, "button", &latest_label);
+                let oldest = action_bounds(window, "button", oldest_label);
+                assert!(latest.left() >= bounds.left() && latest.right() <= bounds.right());
+                assert!(oldest.left() >= bounds.right(), "oldest panel starts beyond the scroll viewport");
+                (bounds, rail, reopen(window), oldest)
+            }).unwrap();
+            cx.update_window(window.into(), |_, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::Scroll(ScrollEvent {
+                    position: point(viewport_bounds.center().x, viewport_bounds.top() + px(20.0)),
+                    delta: ScrollDelta::Pixels(point(-px(width * 3.0), px(0.0))),
+                    ..Default::default()
+                }), cx);
+            }).unwrap();
+            // GPUI adds the wheel delta immediately and clamps it during
+            // prepaint, before applying the offset to the panel hitboxes.
+            frames(window, cx);
+            window.update(cx, |ed, window, cx| {
+                let engine = dock_engine(window).expect("retained horizontal dock engine after wheel");
+                assert_eq!(engine.bounds(), viewport_bounds, "scrolling keeps the viewport fixed");
+                assert_eq!(engine.offset().x, -engine.max_offset().x, "wheel reaches the last column");
+                assert_eq!(rail(window), rail_bounds, "scrolling leaves the rail fixed");
+                let oldest = action_bounds(window, "button", oldest_label);
+                assert!(oldest.left() >= viewport_bounds.left() && oldest.right() <= viewport_bounds.right());
+                assert!((oldest.left() - oldest_before.left() + engine.max_offset().x).as_f32().abs() <= 1.0);
+                for tab in RightDockTab::ORDER.into_iter().take(count) {
+                    ed.toggle_right_panel(tab, cx);
+                }
+            }).unwrap();
+            frames(window, cx);
+            window.update(cx, |_, window, _| {
+                assert_eq!(rail(window), rail_bounds, "rail stays at the window edge when every column closes");
+                assert!(dock_engine(window).is_none(), "rail-only layout has no panel viewport");
+                assert!(!has_splitter(window), "rail-only layout has no resize handle");
+                assert_eq!(reopen(window), reopen_bounds);
+            }).unwrap();
+            cx.update_window(window.into(), |_, window, cx| {
+                let position = reopen_bounds.center();
+                window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                    position, button: MouseButton::Left, ..Default::default()
+                }), cx);
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position, button: MouseButton::Left, ..Default::default()
+                }), cx);
+            }).unwrap();
+            frames(window, cx);
+            window.update(cx, |ed, window, _| {
+                assert!(ed.layout.panel_open(RightDockTab::VoiceTimbre), "rail button reopens its panel");
+                assert!(!ed.layout.panel_open(RightDockTab::Synthesis), "the other rail button remains closed");
+                assert!(dock_engine(window).is_some(), "reopening restores the panel viewport");
+                assert_eq!(rail(window), rail_bounds, "reopening keeps the rail fixed");
+                assert_eq!(reopen(window), reopen_bounds);
+            }).unwrap();
+        }
+    }
 }
 
 #[cfg(test)]

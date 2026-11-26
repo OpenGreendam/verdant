@@ -271,11 +271,11 @@ pub(crate) fn recovery_prompt_detail(path: &Path, report: &verdant_domain::Recov
 }
 
 pub fn prompt_recovery(ed: &mut Editor, window: &mut Window, cx: &mut Context<Editor>) {
-    let Some(report) = ed.persistence.pending_recovery().cloned() else { return };
+    let Some(report) = ed.persistence.pending_recovery() else { return };
     let path = ed.persistence.project_path().to_path_buf();
-    let project_id = ed.project().project_id.clone();
+    let generation = ed.document_generation;
     let revision = ed.revision();
-    let detail = recovery_prompt_detail(&path, &report, chrono::Utc::now().timestamp_millis());
+    let detail = recovery_prompt_detail(&path, report, chrono::Utc::now().timestamp_millis());
     let answer = window.prompt(
         gpui::PromptLevel::Warning,
         "发现较新的自动保存，是否恢复？",
@@ -286,7 +286,7 @@ pub fn prompt_recovery(ed: &mut Editor, window: &mut Window, cx: &mut Context<Ed
     cx.spawn_in(window, async move |this, cx| {
         let answer = answer.await;
         let _ = cx.update(|window, cx| this.update(cx, |ed, cx| {
-            if ed.persistence.project_path() != path.as_path() || ed.project().project_id != project_id || ed.revision() != revision {
+            if ed.persistence.project_path() != path.as_path() || ed.document_generation != generation || ed.revision() != revision || ed.persistence.pending_recovery().is_none() {
                 ed.notice("工程已改变，未应用恢复选择；恢复日志仍保留");
                 cx.notify();
                 return;
@@ -296,24 +296,9 @@ pub fn prompt_recovery(ed: &mut Editor, window: &mut Window, cx: &mut Context<Ed
                     ed.persistence.accept_recovery();
                     ed.recovered = None;
                     ed.notice("已恢复自动保存和撤销历史；手动保存的工程文件未被覆盖");
+                    ed.ensure_vowel_onset_alignment(cx);
                 }
-                Ok(1) => {
-                    let result = ed.persistence.discard_recovery().and_then(|_| {
-                        verdant_domain::ProjectPersistence::open(&path)
-                    });
-                    match result {
-                        Ok((persistence, report)) => {
-                            let project_path = ed.project_path.clone();
-                            ed.replace_project_opened(persistence, report, window, cx);
-                            // Untitled sessions use an internal working path;
-                            // choosing the saved version must not turn that
-                            // internal recovery file into a user Save target.
-                            ed.project_path = project_path;
-                            ed.notice("已放弃恢复，打开最后手动保存的版本；工程文件未被覆盖");
-                        }
-                        Err(error) => ed.notice(format!("无法放弃恢复：{error}")),
-                    }
-                }
+                Ok(1) => ed.discard_project_recovery(window, cx),
                 _ => ed.notice("尚未选择恢复方式；自动保存和手动保存的工程文件均已保留"),
             }
             cx.notify();
@@ -425,12 +410,9 @@ pub fn export_score_with(ed:&mut Editor,format:verdant_exchange::Format,track:Op
     if let Some(index)=track{options.track=Some(index);}
     if format==verdant_exchange::Format::Ust&&options.track.is_none(){options.track=ed.track_index(&ed.session.track);}
     if let Some(value)=project.extensions.get("vocaloid_voice"){match serde_json::from_value(value.clone()){Ok(voice)=>options.vocaloid_voice=Some(voice),Err(error)=>{ed.notice(format!("Vocaloid 元数据无效：{error}"));cx.notify();return;}}}
-    if format==verdant_exchange::Format::Vsqx&&options.vocaloid_voice.is_none()&&!has_vsqx_voice_table(&project){
-        ed.notice("VSQX 需要真实歌手元数据：请先填写 Vocaloid 歌手元数据后再导出");
-        ed.prompt_text("Vocaloid 歌手元数据：真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",crate::editor::PromptPurpose::Integration(crate::editor::integrations::IntegrationPrompt::Vocaloid),"",window,cx);cx.notify();return;
-    }
     // Keep the selected UST lane and admitted voice metadata across the options
     // window. The snapshot also prevents a later track reorder changing its meaning.
+    let generation=ed.document_generation;
     let tracks=project.tracks.iter().map(|t|t.name.clone()).collect();
     let (send,receive)=async_channel::bounded(1);
     let bounds=Bounds::centered(None,gpui::size(px(580.),px(620.)),cx);
@@ -441,22 +423,63 @@ pub fn export_score_with(ed:&mut Editor,format:verdant_exchange::Format,track:Op
     if let Err(error)=opened{ed.notice(format!("无法打开导出选项：{error}"));cx.notify();return;}
     cx.spawn_in(window,async move|this,cx|{
         if let Ok(options)=receive.recv().await{
-            let _=cx.update(|window,cx|this.update(cx,|ed,cx|pick_score_export(ed,format,project,options,window,cx)));
+            let _=cx.update(|window,cx|this.update(cx,|ed,cx|continue_score_export(ed,format,project,options,generation,window,cx)));
         }
     }).detach();
 }
 
-fn pick_score_export(ed:&mut Editor,format:verdant_exchange::Format,project:std::sync::Arc<verdant_domain::Project>,options:verdant_exchange::ExportOptions,window:&mut Window,cx:&mut Context<Editor>){
+fn continue_score_export(ed:&mut Editor,format:verdant_exchange::Format,project:std::sync::Arc<verdant_domain::Project>,mut options:verdant_exchange::ExportOptions,generation:u64,window:&mut Window,cx:&mut Context<Editor>){
+    if format==verdant_exchange::Format::Vsqx && options.vocaloid_voice.is_none()
+        && !(options.preserve_extensions && has_vsqx_voice_table(&project))
+    {
+        if ed.document_generation!=generation { return; }
+        let (send,receive)=async_channel::bounded(1);
+        let purpose=crate::editor::integrations::IntegrationPrompt::VsqxExportSinger(send);
+        ed.prompt_text("VSQX 导出 · 真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",crate::editor::PromptPurpose::Integration(purpose),"",window,cx);
+        cx.spawn_in(window,async move |this,cx| {
+            // Closing or cancelling the prompt drops its sender and the pending export.
+            let Ok(voice)=receive.recv().await else { return; };
+            options.vocaloid_voice=Some(voice);
+            let _=cx.update(|window,cx|this.update(cx,|ed,cx| {
+                if ed.document_generation==generation { pick_score_export(ed,format,project,options,generation,window,cx); }
+            }));
+        }).detach();
+        return;
+    }
+    pick_score_export(ed,format,project,options,generation,window,cx);
+}
+
+fn pick_score_export(ed:&mut Editor,format:verdant_exchange::Format,project:std::sync::Arc<verdant_domain::Project>,options:verdant_exchange::ExportOptions,generation:u64,window:&mut Window,cx:&mut Context<Editor>){
     let directory=ed.prefs.last_export_dir.as_ref().map(PathBuf::from).unwrap_or_else(||PathBuf::from("."));let name=format!("score.{}",format.extension());let rx=cx.prompt_for_new_path(&directory,Some(&name));
     let executor=cx.background_executor().clone();
     cx.spawn_in(window,async move|this,cx|{
         let picked=rx.await.map_err(|e|e.to_string()).and_then(|r|r.map_err(|e|e.to_string()));
-        if let Ok(Some(mut path))=picked{if path.extension().is_none(){path.set_extension(format.extension());}let output=path.clone();let result=executor.spawn(async move{let exported=verdant_exchange::export(format,&project,&options).map_err(|e|e.to_string())?;atomic_bytes(&output,&exported.bytes)?;Ok::<_,String>(exported.report)}).await;
-            let _=cx.update(|_window,cx|this.update(cx,|ed,cx|match result{
-                Ok(report)=>{ed.integrations.report=remember_export_report(&mut ed.prefs,&report);ed.prefs.last_export_dir=path.parent().map(|p|p.display().to_string());ed.prefs_dirty=true;ed.notice(format!("已导出 {} · {} 项格式报告（右侧只读面板）",path.display(),report.issues.len()));ed.show_integration_report(cx);}
-                Err(error)=>{ed.notice(format!("乐谱导出失败：{error}"));cx.notify();}
+        if let Ok(Some(mut path))=picked{
+            // An entered singer replaces a discarded source table for this export only.
+            let remember_singer=if format==verdant_exchange::Format::Vsqx && !has_vsqx_voice_table(&project)
+                && !project.extensions.contains_key("vocaloid_voice") {
+                options.vocaloid_voice.clone()
+            } else { None };
+            if path.extension().is_none(){path.set_extension(format.extension());}let output=path.clone();let result=executor.spawn(async move{export_score_file(format,&project,&options,&output)}).await;
+            let _=cx.update(|_window,cx|this.update(cx,|ed,cx|{
+                if format==verdant_exchange::Format::Vsqx && ed.document_generation!=generation { return; }
+                match result {
+                    Ok(report)=>{
+                        if let Some(voice)=remember_singer {
+                            if !has_vsqx_voice_table(ed.project()) && !ed.project().extensions.contains_key("vocaloid_voice") {
+                                use verdant_domain::{Command,CommandBatch};
+                                let value=serde_json::to_value(voice).expect("serializable Vocaloid singer");
+                                ed.commit(ed.revision(),CommandBatch::single("Vocaloid 歌手元数据",Command::SetProjectExtension{key:"vocaloid_voice".into(),value:Some(value)}),cx);
+                            }
+                        }
+                        ed.integrations.report=remember_export_report(&mut ed.prefs,&report);ed.prefs.last_export_dir=path.parent().map(|p|p.display().to_string());ed.prefs_dirty=true;ed.notice(format!("已导出 {} · {} 项格式报告（右侧只读面板）",path.display(),report.issues.len()));ed.show_integration_report(cx);
+                    }
+                    Err(error)=>{ed.notice(format!("乐谱导出失败：{error}"));cx.notify();}
+                }
             }));
-        }else if let Err(error)=picked{let _=this.update(cx,|ed,cx|{ed.notice(error);cx.notify();});}
+        }else if let Err(error)=picked{let _=this.update(cx,|ed,cx|{
+            if format!=verdant_exchange::Format::Vsqx || ed.document_generation==generation { ed.notice(error);cx.notify(); }
+        });}
     }).detach();
 }
 
@@ -483,9 +506,6 @@ fn score_format_name(format:verdant_exchange::Format)->&'static str{
 /// Blank MIDI PPQ keeps the exporter's source-resolution policy. An explicit
 /// value must fit SMF's metrical division; zero/SMPTE values are never clamped.
 fn resolve_score_options(format:verdant_exchange::Format,mut options:verdant_exchange::ExportOptions,ppq:&str)->Result<verdant_exchange::ExportOptions,String>{
-    if format==verdant_exchange::Format::Vsqx&&!options.preserve_extensions&&options.vocaloid_voice.is_none(){
-        return Err("VSQX 需要真实歌手元数据：请保留来源扩展中的歌手表，或取消后填写 Vocaloid 歌手元数据".into());
-    }
     if format==verdant_exchange::Format::Midi{
         options.midi_ppq=if ppq.trim().is_empty(){None}else{
             Some(ppq.trim().parse::<u16>().ok().filter(|v|(1..=32767).contains(v)).ok_or("MIDI PPQ 须为 1–32767 的整数；留空使用来源分辨率")?)

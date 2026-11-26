@@ -39,7 +39,7 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
     let selection=ed.audio_selection();
     let detail=if ed.integrations.audio_edit.busy{"正在准备音频编辑…".into()}
         else if let Some(range)=&ed.integrations.audio_edit.range{
-            let tempo=ed.tempo();format!("{:.3}–{:.3} s · {} 轨 · {} 个片段",tempo.seconds_at(range.start_tick),tempo.seconds_at(range.end_tick),range.tracks.len(),selection.len())
+            let tempo=ed.tempo();format!("{:.3}–{:.3} s · {} 轨 · {} 个音频片段",tempo.seconds_at(range.start_tick),tempo.seconds_at(range.end_tick),range.tracks.len(),selection.len())
         }else if let Ok(clip)=ed.selected_audio_clip(){
             let name=if clip.name.is_empty(){std::path::Path::new(&clip.source.path).file_name().unwrap_or_default().to_string_lossy().into_owned()}else{clip.name.clone()};
             format!("{} · {:.3} s · {:+.1} dB · {:.3}×{}{}",name,clip.duration_seconds(),20.0*clip.gain.max(1e-6).log10(),clip.playback_rate,if clip.preserve_pitch{" · 保持音高"}else{""},if clip.reversed{" · 反向"}else{""})
@@ -50,7 +50,7 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
             ("选择","音频选择工具 · Shift 点击多选",AudioUiAction::SelectTool,!ed.integrations.audio_edit.range_tool),
             ("范围","拖动选择时间与轨道范围",AudioUiAction::RangeTool,ed.integrations.audio_edit.range_tool),
             ("分割","在播放头或选区边界切分",AudioUiAction::Split,false),
-            ("片段 ▾","剪切、淡化、变速与合并",AudioUiAction::Menu,false),
+            ("音频片段 ▾","剪切、淡化、变速与合并",AudioUiAction::Menu,false),
         ].into_iter().map(|(label,description,action,selected)|crate::proto_controls::action(SharedString::from(format!("audio-tool-{label}")),description)
             .authority(format!("{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision()))
             .when(matches!(action,AudioUiAction::SelectTool|AudioUiAction::RangeTool),|button|button.aria_selected(selected))
@@ -171,9 +171,9 @@ impl Editor{
         let count=self.audio_selection().len();
         let mut items=vec![I::header(format!("音频片段 · 已选 {count} 个")),
             item("复制 · Ctrl/Cmd+C",A::Copy),item("剪切 · Ctrl/Cmd+X",A::Cut),item("粘贴到播放头 · Ctrl/Cmd+V",A::Paste),item("复制到播放头",A::Duplicate),
-            I::separator(),item("在播放头 / 选区两端分割 · Ctrl/Cmd+I",A::Split),item("按选区裁剪",A::TrimRange),item("连接选中相邻片段 · Ctrl/Cmd+J",A::Join),item("交叉渐变（等功率）",A::Crossfade),
+            I::separator(),item("在播放头 / 选区两端分割 · Ctrl/Cmd+I",A::Split),item("按选区裁剪",A::TrimRange),item("连接选中相邻音频片段 · Ctrl/Cmd+J",A::Join),item("交叉渐变（等功率）",A::Crossfade),
             item("选区起止时间…",A::Range),item("无损源范围 / 位置…",A::TrimSource),item("滑移源内容…",A::Slip),I::separator(),
-            item("片段名称…",A::Rename),item("增益（dB）…",A::Gain),item("声像…",A::Pan),item("淡入 / 淡出时长…",A::Fades),item("速度 / 时长…",A::Speed),
+            item("音频片段名称…",A::Rename),item("增益（dB）…",A::Gain),item("声像…",A::Pan),item("淡入 / 淡出时长…",A::Fades),item("速度 / 时长…",A::Speed),
             item("切换保持音高",A::TogglePreservePitch),item("反向播放",A::ToggleReverse),item("切换静音",A::ToggleMute),I::separator(),
             item("按静音切片…",A::SplitSilence),item("在播放头附近过零点分割",A::SplitZeroCrossing),item("峰值标准化…",A::Normalize),item("合并为新音频文件…",A::Bounce),I::separator(),
             item("删除（保留空隙） · Delete",A::Delete),item("波纹删除（关闭空隙） · Shift+Delete",A::RippleDelete),item("选择全部音频片段",A::SelectAll)];
@@ -211,10 +211,10 @@ impl Editor{
                 let refs=selected()?;let clip=self.selected_audio_clip()?;
                 let(title,prompt,value)=match action{
                     A::Rename=>("音频片段名称",AudioPrompt::Rename(refs),clip.name.clone()),
-                    A::Gain=>("片段增益（dB，-120 至 +36）",AudioPrompt::Gain(refs),format!("{:.2}",20.0*clip.gain.max(1e-6).log10())),
-                    A::Pan=>("片段声像（-1 左，0 中，+1 右）",AudioPrompt::Pan(refs),format!("{:.3}",clip.pan)),
+                    A::Gain=>("音频片段增益（dB，-120 至 +36）",AudioPrompt::Gain(refs),format!("{:.2}",20.0*clip.gain.max(1e-6).log10())),
+                    A::Pan=>("音频片段声像（-1 左，0 中，+1 右）",AudioPrompt::Pan(refs),format!("{:.3}",clip.pan)),
                     A::Fades=>("淡入毫秒, 淡出毫秒",AudioPrompt::Fades(refs),format!("{:.3}, {:.3}",clip.fade_in_frames as f64/clip.source.sample_rate as f64/clip.playback_rate*1000.0,clip.fade_out_frames as f64/clip.source.sample_rate as f64/clip.playback_rate*1000.0)),
-                    A::Speed=>("播放速度（0.0625–16×；保持音高由片段菜单切换）",AudioPrompt::Speed(refs),format!("{:.6}",clip.playback_rate)),
+                    A::Speed=>("播放速度（0.0625–16×；保持音高由音频片段菜单切换）",AudioPrompt::Speed(refs),format!("{:.6}",clip.playback_rate)),
                     A::TrimSource=>("源起始帧, 源时长帧, 放置 tick（可恢复隐藏源内容）",AudioPrompt::Trim(AudioClipRef::from(&clip)),format!("{}, {}, {:.6}",clip.source_offset_frames,clip.duration_frames,clip.tick())),
                     A::Slip=>("滑移源内容的帧数（正数向后，负数向前）",AudioPrompt::Slip(refs),"0".into()),
                     A::SplitSilence=>("静音阈值 dB, 最短静音毫秒",AudioPrompt::Silence(refs),"-48, 150".into()),

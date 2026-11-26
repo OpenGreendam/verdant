@@ -1370,7 +1370,7 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window
     let th = ed.theme;
     let track = ed.session.track.clone();
     let Some(name) = ed.project().track(&track).map(|t| t.name.clone()) else {
-        return div().size_full().bg(th.view).into_any_element();
+        return div().size_full().bg(th.view).rounded_bl(crate::window_chrome::corner_radii(ed.window_chrome).bottom_left).into_any_element();
     };
     let count = ed.insert_specs(&track).len();
     for slot in 0..count { ed.fetch_track_insert_params(&track, slot, cx); }
@@ -1389,7 +1389,7 @@ pub fn device_view(ed: &mut Editor, editor: &Entity<Editor>, window: &mut Window
     let empty = cards.is_empty();
     div().id("device-view").role(Role::Group).aria_label(format!("{name} 的效果器链"))
         .track_focus(&ed.focus_devices)
-        .size_full().flex().flex_col().bg(th.view)
+        .size_full().flex().flex_col().bg(th.view).rounded_bl(crate::window_chrome::corner_radii(ed.window_chrome).bottom_left)
         .child(div().h(gpui::rems(40.0/16.)).flex_none().px(gpui::rems(16.0/16.)).flex().items_center().gap(gpui::rems(8.0/16.))
             .child(svg().path(icon("sliders-horizontal")).size(gpui::rems(15.0/16.)).text_color(th.text_secondary))
             .child(div().text_sm().font_weight(FontWeight::BOLD).child(name))

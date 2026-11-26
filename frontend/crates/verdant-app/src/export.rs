@@ -26,6 +26,7 @@ impl Editor {
         for (scope, label) in [(AudioScope::Mix, "完整混音"), (AudioScope::ActiveTrack, "当前轨道"), (AudioScope::Stems, "逐轨文件（同一工程时钟）")] { items.push(item(label.into(), ExportSetting::Scope(scope))); }
         for (range, label) in [(ExportRange::Full, "工程、各轨与主总线限定尾音"), (ExportRange::Loop, "循环范围"), (ExportRange::Selection, "选中音符的时间范围")] { items.push(item(label.into(), ExportSetting::Range(range))); }
         items.push(item(format!("{}插入效果", if self.export_options.effects { "关闭" } else { "启用" }), ExportSetting::Effects));
+        items.push(I::boolean("包含节拍器", crate::menu::MenuBoolean::ExportClick, self.playback_settings().export_click));
         items.push(item("选择路径并导出 WAV…".into(), ExportSetting::Start));
         self.show_menu(window.mouse_position(), items, window, cx);
     }

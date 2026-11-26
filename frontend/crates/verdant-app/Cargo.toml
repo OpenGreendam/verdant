@@ -50,3 +50,7 @@ env_logger = { version = "0.11", default-features = false, features = ["auto-col
 gpui = { workspace = true, features = ["test-support"] }
 # Native input inspection is available only to the compiled consumer regressions.
 proto-ui-gpui-native = { version = "=0.2.0", path = "../../proto-ui/generated/pitch-gesture-surface/.proto-ui/gpui-native", features = ["test-support"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+raw-window-handle = "0.6"
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }

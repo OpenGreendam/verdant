@@ -6,13 +6,13 @@ use verdant_session::{PointerId, TextEditState};
 
 #[derive(Clone, Debug)]
 pub enum WorkflowAction {
-    Menu, New, Recent, Recovery, Revert, OpenRecent(PathBuf),
+    New, Recent, Recovery, Revert, OpenRecent(PathBuf),
     RenameTrack(TrackId), MoveTrack(TrackId,isize), DuplicateTrack(TrackId),
     EditTempo(i64), DeleteTempo(i64), EditMeter(i64), DeleteMeter(i64),
     Split(i64), Join, Quantize, CloseGaps, RemoveOverlaps, MuteNotes,
     BatchLyrics(bool), ShiftLyrics(bool), ContinueSyllable,
     VibratoShape, SelectPoints, ClearPoints, TransformPoints, Interpolation(Interpolation),
-    CreatePart, SelectPart(String), RenamePart, MovePart, TrimPart, SplitPart(i64), JoinPart,
+    CreatePart, SelectPart(String), RenamePart, MovePart, TrimPart, SplitPart(i64), JoinPart, DissolvePart,
     DuplicatePart(bool), UnlinkPart, MutePart, DeletePart,
     GoToBar, CreatePartAt(TrackId,i64),
     RepeatSelection, ToggleLoop, LoopStart(i64), LoopEnd(i64), ToggleMetronome, CountIn(u32), ToggleExportClick,
@@ -113,9 +113,12 @@ impl Editor {
         let Some(prompt)=self.text_prompt.take()else{return;};
         if !confirm{window.focus(&self.focus_roll,cx);cx.notify();return;}
         if prompt.state.is_composing(){self.text_prompt=Some(prompt);return;}
-        if prompt.base!=self.revision(){self.notice("工程已改变，请重新打开编辑窗口");window.focus(&self.focus_roll,cx);cx.notify();return;}
+        // The singer prompt supplies the frozen export, with live document
+        // side effects separately checked after the file is written.
+        let frozen_export=matches!(&prompt.purpose,PromptPurpose::Integration(super::integrations::IntegrationPrompt::VsqxExportSinger(_)));
+        if prompt.base!=self.revision()&&!frozen_export{self.notice("工程已改变，请重新打开编辑窗口");window.focus(&self.focus_roll,cx);cx.notify();return;}
         let result=self.apply_prompt(&prompt,cx);
-        if let Err(error)=result{self.notice(error);self.text_prompt=Some(prompt);window.focus(&self.focus_lyric,cx);}else{window.focus(&self.focus_roll,cx);}cx.notify();
+        if let Err(error)=result{self.notice(error);self.text_prompt=Some(prompt);}else{window.focus(&self.focus_roll,cx);}cx.notify();
     }
     fn apply_prompt(&mut self,prompt:&TextPrompt,cx:&mut Context<Self>)->Result<(),String>{
         let text=prompt.state.text.trim();
@@ -134,9 +137,9 @@ impl Editor {
                 let scales=parse_values(&fields[1..].join(","),3)?;
                 self.transform_selected_points(offset,scales[0]/100.,scales[1],scales[2]/100.,cx)?;
             }
-            PromptPurpose::RenamePart(id)=>{if text.is_empty(){return Err("片段名称不能为空".into());}self.edit_part(id,"片段名称",cx,|p|{p.name=text.into();Ok(())})?;}
-            PromptPurpose::MovePart(id)=>{let v=parse_values(text,1)?;self.edit_part(id,"移动片段",cx,|p|{p.start_tick=v[0].round()as i64;Ok(())})?;}
-            PromptPurpose::TrimPart(id)=>{let v=parse_values(text,2)?;self.edit_part(id,"裁剪片段",cx,|p|{p.source_offset_tick=v[0].round()as i64;p.duration_tick=v[1].round()as i64;Ok(())})?;}
+            PromptPurpose::RenamePart(id)=>{if text.is_empty(){return Err("音符组名称不能为空".into());}self.edit_part(id,"音符组名称",cx,|p|{p.name=text.into();Ok(())})?;}
+            PromptPurpose::MovePart(id)=>{let v=parse_values(text,1)?;self.edit_part(id,"移动音符组",cx,|p|{p.start_tick=v[0].round()as i64;Ok(())})?;}
+            PromptPurpose::TrimPart(id)=>{let v=parse_values(text,2)?;self.edit_part(id,"裁剪音符组",cx,|p|{p.source_offset_tick=v[0].round()as i64;p.duration_tick=v[1].round()as i64;Ok(())})?;}
             PromptPurpose::NumericValue(id, arg) => {
                 use crate::generated::controls::{NumericPhase, NumericTarget};
                 let v = parse_values(text, 1)?[0];
@@ -161,7 +164,6 @@ impl Editor {
         use WorkflowAction as A;
         let result:Result<(),String>=(||{
             match action{
-                A::Menu=>{self.workflow_menu(window,cx);}
                 A::New=>self.new_document(window,cx)?,A::Recent=>self.recent_menu(false,window,cx),A::Recovery=>self.recent_menu(true,window,cx),A::Revert=>self.revert_document(window,cx)?,A::OpenRecent(path)=>self.open_project_path(path,window,cx),
                 A::RenameTrack(id)=>{let name=self.project().track(&id).ok_or("轨道已不存在")?.name.clone();self.prompt_text("轨道名称",PromptPurpose::RenameTrack(id),&name,window,cx);}
                 A::MoveTrack(id,direction)=>{let index=self.track_index(&id).ok_or("轨道已不存在")?;let destination=(index as isize+direction).clamp(0,self.project().tracks.len()as isize-1)as usize;self.commit(self.revision(),CommandBatch::single("调整轨道顺序",Command::MoveTrack{track:id,index:destination}),cx);}
@@ -184,15 +186,25 @@ impl Editor {
                 A::Interpolation(mode)=>{let mut notes=self.selected_notes();for n in &mut notes{n.curves.set_interpolation(self.param.short(),mode);}self.replace_selected_notes("曲线插值",notes,cx);}
                 A::CreatePartAt(track,tick)=>crate::arrange::create_part_at(self,&track,tick as f64,window,cx),
                 A::GoToBar=>self.prompt_text("跳转到小节（从 1 开始）",PromptPurpose::GoToBar,"",window,cx),
-                A::CreatePart=>{let mut parts=Parts::load(self.project())?;let name=parts.next_name("片段");let id=parts.create(self.project(),&self.session.track,&self.session.selection_in_order(self.project()),name)?;if self.commit(self.revision(),CommandBatch::single("创建声部片段",parts.command()),cx){self.selected_part=Some(id);}}
-                A::SelectPart(id)=>{let parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("片段已不存在")?;if !self.select_track(p.track.clone(),cx){return Err("先完成当前歌词编辑".into());}self.session.selection=p.bindings.values().filter(|id|self.project().track(&p.track).is_some_and(|t|t.note(id).is_some())).cloned().collect();self.selected_part=Some(id);self.sync_index();cx.notify();}
-                A::RenamePart|A::MovePart|A::TrimPart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let p=Parts::load(self.project())?.instance(&id).cloned().ok_or("片段已不存在")?;let(title,purpose,current)=match action{A::RenamePart=>("片段名称",PromptPurpose::RenamePart(id),p.name),A::MovePart=>("片段开始 tick",PromptPurpose::MovePart(id),p.start_tick.to_string()),_=>("源偏移 tick、片段长度 tick",PromptPurpose::TrimPart(id),format!("{}, {}",p.source_offset_tick,p.duration_tick))};self.prompt_text(title,purpose,&current,window,cx);}
-                A::DuplicatePart(linked)=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let mut parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("片段已不存在")?;let at=p.start_tick+p.duration_tick;let id=parts.duplicate(&id,at,linked)?;if self.commit(self.revision(),CommandBatch::single(if linked{"链接重复片段"}else{"独立复制片段"},parts.command()),cx){self.selected_part=Some(id);}}
-                A::UnlinkPart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let mut parts=Parts::load(self.project())?;parts.unlink(&id)?;self.commit(self.revision(),CommandBatch::single("取消片段链接",parts.command()),cx);}
-                A::SplitPart(tick)=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let mut parts=Parts::load(self.project())?;parts.split(&id,tick)?;self.commit(self.revision(),CommandBatch::single("分割片段",parts.command()),cx);}
-                A::JoinPart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let mut parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("片段已不存在")?;let next=parts.instances.iter().find(|n|n.id!=id&&n.track==p.track&&n.start_tick==p.start_tick+p.duration_tick).map(|p|p.id.clone()).ok_or("右侧没有相邻片段")?;parts.join(&id,&next)?;self.commit(self.revision(),CommandBatch::single("连接片段",parts.command()),cx);}
-                A::MutePart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;self.edit_part(&id,"片段静音",cx,|p|{p.muted=!p.muted;Ok(())})?;}
-                A::DeletePart=>{let id=self.selected_part.clone().ok_or("先选择片段")?;let mut parts=Parts::load(self.project())?;parts.instances.retain(|p|p.id!=id);self.commit(self.revision(),CommandBatch::single("删除片段",parts.command()),cx);self.selected_part=None;}
+                A::CreatePart=>{let mut parts=Parts::load(self.project())?;let name=parts.next_name("音符组");let id=parts.create(self.project(),&self.session.track,&self.session.selection_in_order(self.project()),name)?;if self.commit(self.revision(),CommandBatch::single("创建声部音符组",parts.command()),cx){self.selected_part=Some(id);}}
+                A::SelectPart(id)=>{let parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("音符组已不存在")?;if !self.select_track(p.track.clone(),cx){return Err("先完成当前歌词编辑".into());}self.session.selection=p.bindings.values().filter(|id|self.project().track(&p.track).is_some_and(|t|t.note(id).is_some())).cloned().collect();self.selected_part=Some(id);self.sync_index();cx.notify();}
+                A::RenamePart|A::MovePart|A::TrimPart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let p=Parts::load(self.project())?.instance(&id).cloned().ok_or("音符组已不存在")?;let(title,purpose,current)=match action{A::RenamePart=>("音符组名称",PromptPurpose::RenamePart(id),p.name),A::MovePart=>("音符组开始 tick",PromptPurpose::MovePart(id),p.start_tick.to_string()),_=>("源偏移 tick、音符组长度 tick",PromptPurpose::TrimPart(id),format!("{}, {}",p.source_offset_tick,p.duration_tick))};self.prompt_text(title,purpose,&current,window,cx);}
+                A::DuplicatePart(linked)=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("音符组已不存在")?;let at=p.start_tick+p.duration_tick;let id=parts.duplicate(&id,at,linked)?;if self.commit(self.revision(),CommandBatch::single(if linked{"链接重复音符组"}else{"独立复制音符组"},parts.command()),cx){self.selected_part=Some(id);}}
+                A::UnlinkPart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;parts.unlink(&id)?;self.commit(self.revision(),CommandBatch::single("取消音符组链接",parts.command()),cx);}
+                A::SplitPart(tick)=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;parts.split(&id,tick)?;self.commit(self.revision(),CommandBatch::single("分割音符组",parts.command()),cx);}
+                A::JoinPart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("音符组已不存在")?;let next=parts.instances.iter().find(|n|n.id!=id&&n.track==p.track&&n.start_tick==p.start_tick+p.duration_tick).map(|p|p.id.clone()).ok_or("右侧没有相邻音符组")?;parts.join(&id,&next)?;self.commit(self.revision(),CommandBatch::single("连接音符组",parts.command()),cx);}
+                A::MutePart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;self.edit_part(&id,"音符组静音",cx,|p|{p.muted=!p.muted;Ok(())})?;}
+                A::DissolvePart => {
+                    let id = self.selected_part.as_deref().ok_or("先选择音符组")?;
+                    let mut parts = Parts::load(self.project())?;
+                    parts.instance(id).filter(|part| part.track == self.session.track).ok_or("先选择当前轨道的音符组")?;
+                    let (track, notes) = parts.dissolve(self.project(), id)?;
+                    let commands = vec![parts.command(), Command::InsertNotes { track, notes }];
+                    if self.commit(self.revision(), CommandBatch { label: "解散音符组".into(), commands }, cx) {
+                        self.selected_part = None;
+                    }
+                }
+                                A::DeletePart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;parts.instances.retain(|p|p.id!=id);self.commit(self.revision(),CommandBatch::single("删除音符组",parts.command()),cx);self.selected_part=None;}
                 A::RepeatSelection=>{let notes=self.selected_notes();let start=notes.iter().map(|n|n.start_tick).min().ok_or("先选择音符")?;let end=notes.iter().map(|n|n.end_tick()).max().expect("selection");self.edit_playback("循环选择范围",cx,|s|{s.loop_start=start;s.loop_end=end;s.looping=true;});}
                 A::ToggleLoop=>{let anchor=self.playback_settings().loop_start.max(0);let length=self.meter().bar_ticks_at(anchor);self.edit_playback("循环播放",cx,|s|{if s.loop_end<=s.loop_start{s.loop_end=s.loop_start+length;}s.looping=!s.looping;});}
                 A::LoopStart(tick)=>self.edit_playback("循环起点",cx,|s|{s.loop_start=tick;if s.loop_end<=tick{s.loop_end=tick+1;}}),A::LoopEnd(tick)=>self.edit_playback("循环终点",cx,|s|s.loop_end=tick),
@@ -205,7 +217,7 @@ impl Editor {
         })();if let Err(error)=result{self.notice(error);cx.notify();}
     }
     fn replace_selected_notes(&mut self,label:&str,notes:Vec<Note>,cx:&mut Context<Self>){if notes.is_empty(){self.notice("先选择音符");cx.notify();return;}self.commit(self.revision(),CommandBatch::single(label,Command::ReplaceNotes{track:self.session.track.clone(),notes}),cx);}
-    pub(crate) fn edit_part(&mut self,id:&str,label:&str,cx:&mut Context<Self>,f:impl FnOnce(&mut verdant_domain::parts::PartInstance)->Result<(),String>)->Result<(),String>{let mut parts=Parts::load(self.project())?;f(parts.instances.iter_mut().find(|p|p.id==id).ok_or("片段已不存在")?)?;parts.validate(self.project())?;if self.commit(self.revision(),CommandBatch::single(label,parts.command()),cx){Ok(())}else{Err("片段修改未提交".into())}}
+    pub(crate) fn edit_part(&mut self,id:&str,label:&str,cx:&mut Context<Self>,f:impl FnOnce(&mut verdant_domain::parts::PartInstance)->Result<(),String>)->Result<(),String>{let mut parts=Parts::load(self.project())?;f(parts.instances.iter_mut().find(|p|p.id==id).ok_or("音符组已不存在")?)?;parts.validate(self.project())?;if self.commit(self.revision(),CommandBatch::single(label,parts.command()),cx){Ok(())}else{Err("音符组修改未提交".into())}}
     fn duplicate_track(&mut self,id:&TrackId,cx:&mut Context<Self>)->Result<(),String>{
         if self.project().tracks.len()>=verdant_audio::MAX_TRACKS{return Err("已达到轨道数上限".into());}let index=self.track_index(id).ok_or("轨道已不存在")?;
         let mut track=self.project().track(id).cloned().ok_or("轨道已不存在")?;let new_id=TrackId::generate();track.id=new_id.clone();track.name=format!("{} 副本",track.name);track.solo=false;
@@ -218,7 +230,7 @@ impl Editor {
         let copied=automation.lanes.iter().filter_map(|lane|{use verdant_domain::automation::{AutomationTarget as T,AutomationOwner as O};let mut copy=lane.clone();copy.target=match &lane.target{T::TrackGain{track_id}if track_id==id=>T::TrackGain{track_id:new_id.clone()},T::TrackPan{track_id}if track_id==id=>T::TrackPan{track_id:new_id.clone()},T::PluginParameter{owner:O::Track{track_id},instance_id,parameter_id}if track_id==id=>T::PluginParameter{owner:O::Track{track_id:new_id.clone()},instance_id:plugin_ids.get(instance_id)?.clone(),parameter_id:parameter_id.clone()},_=>return None};Some(copy)}).collect::<Vec<_>>();
         for lane in copied{automation.set_lane(lane);}
         let mut parts=Parts::load(self.project())?;let original=parts.instances.iter().filter(|p|&p.track==id).cloned().collect::<Vec<_>>();
-        for mut part in original{let mut content=parts.contents.get(&part.content_id).cloned().ok_or("片段内容不存在")?;content.id=NoteId::generate().to_string();part.id=NoteId::generate().to_string();part.content_id=content.id.clone();part.track=new_id.clone();for note in part.bindings.values_mut(){*note=mapping.get(note).cloned().unwrap_or_else(NoteId::generate);}parts.contents.insert(content.id.clone(),content);parts.instances.push(part);}
+        for mut part in original{let mut content=parts.contents.get(&part.content_id).cloned().ok_or("音符组内容不存在")?;content.id=NoteId::generate().to_string();part.id=NoteId::generate().to_string();part.content_id=content.id.clone();part.track=new_id.clone();for note in part.bindings.values_mut(){*note=mapping.get(note).cloned().unwrap_or_else(NoteId::generate);}parts.contents.insert(content.id.clone(),content);parts.instances.push(part);}
         let mut commands=vec![Command::AddTrack{index:index+1,track},Command::SetProjectExtension{key:verdant_domain::automation::AUTOMATION_KEY.into(),value:automation.extension_value().map_err(|e|e.to_string())?}];if !parts.instances.is_empty(){commands.push(parts.command());}
         if self.commit(self.revision(),CommandBatch{label:"复制轨道".into(),commands},cx){self.select_track(new_id,cx);}Ok(())
     }
@@ -289,36 +301,6 @@ impl Editor {
             }));
         }).detach();
         Ok(())
-    }
-    /// The workflow palette, grouped like the toolbar menus so it stays short.
-    pub fn workflow_menu(&mut self,window:&mut Window,cx:&mut Context<Self>){
-        use crate::menu::MenuItem as I;use WorkflowAction as A;
-        let tick=self.session.snap.snap(self.tempo().tick_at(self.playhead_seconds())).max(0);let track=self.session.track.clone();
-        let pb=self.playback_settings();let w=|label:&'static str,action|I::action(label,MenuAction::Workflow(action));
-        let mut parts=vec![
-            w("从选中音符创建片段",A::CreatePart),w("片段名称…",A::RenamePart),w("精确位置…",A::MovePart),w("精确裁剪…",A::TrimPart),
-            w("在播放头分割片段",A::SplitPart(tick)),w("连接右侧片段",A::JoinPart),w("链接复制片段",A::DuplicatePart(true)),w("独立复制片段",A::DuplicatePart(false)),
-            w("取消片段链接",A::UnlinkPart),w("片段静音 / 取消",A::MutePart),w("删除片段",A::DeletePart)];
-        if let Ok(all)=Parts::load(self.project()){if !all.instances.is_empty(){parts.push(I::separator());parts.push(I::header("定位片段"));
-            for p in all.instances{parts.push(I::action(p.name,MenuAction::Workflow(A::SelectPart(p.id))));}}}
-        let items=vec![
-            I::submenu("工程",vec![w("新建工程",A::New),w("最近工程…",A::Recent),w("恢复工程…",A::Recovery),w("还原到手动保存版本",A::Revert)]),
-            I::submenu("轨道",vec![w("重命名轨道…",A::RenameTrack(track.clone())),w("轨道上移",A::MoveTrack(track.clone(),-1)),w("轨道下移",A::MoveTrack(track.clone(),1)),w("复制轨道",A::DuplicateTrack(track))]),
-            I::submenu("音符",vec![w("在播放头分割",A::Split(tick)),w("连接选中音符",A::Join),w("量化到网格",A::Quantize),w("闭合一格内间隙",A::CloseGaps),w("消除重叠",A::RemoveOverlaps),w("静音 / 取消静音",A::MuteNotes)]),
-            I::submenu("歌词与颤音",vec![w("批量填写歌词…",A::BatchLyrics(false)),w("逐字填写歌词…",A::BatchLyrics(true)),w("歌词循环左移",A::ShiftLyrics(false)),w("歌词循环右移",A::ShiftLyrics(true)),w("设为同音节延音",A::ContinueSyllable),w("颤音淡入淡出和相位…",A::VibratoShape)]),
-            I::submenu("片段 (Part)",parts),
-            I::submenu("速度与拍号",vec![w("当前位置速度…",A::EditTempo(tick)),w("当前位置拍号…",A::EditMeter(tick))]),
-            I::submenu("循环与节拍器",vec![
-                I::boolean_command("循环播放",crate::generated::controls::CommandId::ToggleLoop,crate::generated::controls::CommandArg::None,pb.looping),w("以选中音符设为循环",A::RepeatSelection),w("在播放头设循环起点",A::LoopStart(tick)),w("在播放头设循环终点",A::LoopEnd(tick)),
-                I::separator(),I::boolean_command("节拍器",crate::generated::controls::CommandId::ToggleMetronome,crate::generated::controls::CommandArg::None,pb.metronome),I::boolean("离线导出包含节拍器",crate::menu::MenuBoolean::ExportClick,pb.export_click),
-                I::separator(),I::header("预备拍"),
-                w("无",A::CountIn(0)).checked(pb.count_in_bars==0),w("1 小节",A::CountIn(1)).checked(pb.count_in_bars==1),w("2 小节",A::CountIn(2)).checked(pb.count_in_bars==2),
-                w("4 小节",A::CountIn(4)).checked(pb.count_in_bars==4),w("8 小节",A::CountIn(8)).checked(pb.count_in_bars==8)]),
-            I::separator(),
-            w("音频导出选项…",A::ExportSettings),
-            w("歌手 / 词典 / MIDI / 音频 / 自动化 / 交换格式…",A::Integration(super::integrations::IntegrationAction::Menu)),
-        ];
-        self.show_menu(window.mouse_position(),items,window,cx);
     }
 }
 pub(super) fn parse_values(text:&str,count:usize)->Result<Vec<f64>,String>{let values=text.split(|c:char|c==','||c=='，'||c.is_whitespace()).filter(|s|!s.is_empty()).map(|s|s.parse::<f64>().map_err(|_|format!("无法读取数值 {s}"))).collect::<Result<Vec<_>,_>>()?;if values.len()!=count||values.iter().any(|v|!v.is_finite()){return Err(format!("需要 {count} 个有限数值"));}Ok(values)}

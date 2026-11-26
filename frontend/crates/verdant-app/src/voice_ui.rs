@@ -48,8 +48,11 @@ pub fn selected_voice_assets(paths: &[PathBuf]) -> Result<VoiceImportDraft, Stri
 }
 
 /// New editor documents use the shared current render defaults.
+/// Vowels land on the beat from the first note.
 pub fn new_project() -> Project {
-    Project::new_empty()
+    let mut project = Project::new_empty();
+    project.render_preferences.phoneme_timing = Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1());
+    project
 }
 
 impl Editor {

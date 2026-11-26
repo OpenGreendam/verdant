@@ -1188,7 +1188,7 @@ fn roll_context_menu(ed: &mut Editor, position: gpui::Point<Pixels>, x: f64, y: 
                     MenuItem::action("设为同音节延音 (+)", A::Workflow(W::ContinueSyllable)).enabled(count >= 2),
                 ]),
                 MenuItem::action("颤音包络与滑音曲率…", A::Workflow(W::VibratoShape)),
-                MenuItem::action("从选中音符创建片段", A::Workflow(W::CreatePart)),
+                MenuItem::action("从选中音符创建音符组", A::Workflow(W::CreatePart)).with_hint("Ctrl+G"),
             ]
         }
         Hit::Background => {

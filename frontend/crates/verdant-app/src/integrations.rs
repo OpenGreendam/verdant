@@ -8,14 +8,14 @@ use verdant_midi::{CaptureOrigin,MidiCapture,MidiInputService,MidiPort,MidiTake}
 
 #[derive(Clone,Debug)]
 pub enum IntegrationAction {
-    AudioEdit(audio_edit_ui::AudioUiAction),Menu,Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
+    AudioEdit(audio_edit_ui::AudioUiAction),Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
     MonitorPorts,Monitor(MidiPort),StopMonitoring,
     MidiPorts,MidiChannels(MidiPort),Record(MidiPort,Option<u8>),FinishRecording,CancelRecording,ImportAudio,AuthorizeAudio,Clips,SelectClip(TrackId,String),EditClip,DuplicateClip,DeleteClip,RelinkClip,
-    Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),VocaloidMetadata,
+    Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),
     Scale,OtherTracks,ThreeLanes,AuditionSelection,Report,
 }
 #[derive(Clone,Debug)]
-pub enum IntegrationPrompt { AudioEdit(audio_edit_ui::AudioPrompt),InstallVoice(super::voice_ui::VoiceImportDraft),Dictionary(Option<(String,bool)>),Segment(Option<String>),Clip(TrackId,String),Automation(AutomationTarget),Vocaloid,Scale }
+pub enum IntegrationPrompt { AudioEdit(audio_edit_ui::AudioPrompt),InstallVoice(super::voice_ui::VoiceImportDraft),Dictionary(Option<(String,bool)>),Segment(Option<String>),Clip(TrackId,String),Automation(AutomationTarget),VsqxExportSinger(async_channel::Sender<verdant_exchange::VocaloidVoice>),Scale }
 
 pub struct Recording {
     capture:MidiCapture,take:Option<MidiTake>,track:TrackId,base:Revision,tempo:TempoMap,origin_micros:u64,origin_tick:i64,
@@ -36,20 +36,10 @@ fn action(label:impl Into<gpui::SharedString>,command:IntegrationAction)->crate:
     crate::menu::MenuItem::action(label,MenuAction::Workflow(WorkflowAction::Integration(command)))
 }
 impl Editor {
-    pub fn integrations_menu(&mut self,window:&mut Window,cx:&mut Context<Self>){
-        use IntegrationAction as A;
-        let items=vec![action("轨道歌手…",A::Singers),action("导入 verdant-voice 声库…",A::InstallVoice),action("读音器…",A::Phonemizers),action("用户读音词典…",A::Dictionary),action("导入词典…",A::ImportDictionary),action("导出词典…",A::ExportDictionary),
-            action("MIDI 实时监听…",A::MonitorPorts),action("MIDI 输入录音…",A::MidiPorts),action("完成 MIDI 录音",A::FinishRecording),action("取消 MIDI 录音",A::CancelRecording),
-            action("导入音频伴奏 / 参考音…",A::ImportAudio),action("授权重新打开已保存音频…",A::AuthorizeAudio),action("音频片段…",A::Clips),action("编辑音频片段位置 / 裁剪 / 音量…",A::EditClip),action("复制音频片段",A::DuplicateClip),action("删除音频片段",A::DeleteClip),action("重新定位音源…",A::RelinkClip),action("自动化曲线…",A::Automation),
-            action("导出 MIDI…",A::ScoreExport(verdant_exchange::Format::Midi)),action("导出 UST…",A::ScoreExport(verdant_exchange::Format::Ust)),action("导出 USTX…",A::ScoreExport(verdant_exchange::Format::Ustx)),action("导出 SVP…",A::ScoreExport(verdant_exchange::Format::Svp)),action("导出 VSQX…",A::ScoreExport(verdant_exchange::Format::Vsqx)),action("导出 VPR…",A::ScoreExport(verdant_exchange::Format::Vpr)),action("导出 UtaFormatix Data (.ufdata)…",A::ScoreExport(verdant_exchange::Format::Ufdata)),action("Vocaloid 歌手元数据…",A::VocaloidMetadata),action("查看导入 / 导出报告…",A::Report),
-            action("音阶高亮设置…",A::Scale),action("其他轨道音符叠加开关",A::OtherTracks),action("三个参数面板开关",A::ThreeLanes),action("试听所选音高（参考正弦音）",A::AuditionSelection)];
-        self.show_menu(window.mouse_position(),items,window,cx);
-    }
     pub fn run_integration(&mut self,command:IntegrationAction,window:&mut Window,cx:&mut Context<Self>)->Result<(),String>{
         use IntegrationAction as A;
         match command{
             A::AudioEdit(action)=>self.run_audio_ui(action,window,cx)?,
-            A::Menu=>self.integrations_menu(window,cx),
             A::Singers=>{
                 let items=self.singer_menu_items()?;
                 self.show_menu(window.mouse_position(),items,window,cx);
@@ -108,7 +98,6 @@ impl Editor {
             A::RemoveAutomation(target)=>{let mut document=AutomationDocument::from_project(self.project()).map_err(|e|e.to_string())?;document.remove_lane(&target);self.commit_automation(document,cx)?;}
             A::ScoreExport(format)=>crate::files::export_score_dialog(self,format,window,cx),
             A::ExportScoreTrack(format,index)=>crate::files::export_score_with(self,format,Some(index),window,cx),
-            A::VocaloidMetadata=>{let voice=self.project().extensions.get("vocaloid_voice").map(|v|serde_json::from_value::<verdant_exchange::VocaloidVoice>(v.clone())).transpose().map_err(|e|e.to_string())?;let text=voice.map(|v|format!("{} | {} | {} | {}",v.comp_id,v.name,v.language_id,v.program)).unwrap_or_default();self.prompt_integration("Vocaloid：真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",IntegrationPrompt::Vocaloid,&text,window,cx);}
             A::Scale=>self.open_scale_dialog(window,cx),
             A::OtherTracks=>{self.integrations.other_tracks=!self.integrations.other_tracks;cx.notify();},A::ThreeLanes=>{self.add_lane(None,cx);},
             A::AuditionSelection=>{let pitch=self.selected_notes().first().map(|n|n.midi_note).ok_or("先选择音符")?;self.audition_pitch(pitch);}
@@ -158,7 +147,7 @@ impl Editor {
                 let pan=fields[4].parse::<f32>().map_err(|_|"声像须为 -1..1 的有限数值")?;
                 let muted=match fields[5]{"0"=>false,"1"=>true,_=>return Err("静音须为 0 或 1".into())};
                 let mut clips=verdant_media::read_clips(self.project().track(track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;
-                let clip=clips.iter_mut().find(|c|c.id.to_string()==*id).ok_or("片段已不存在")?;
+                let clip=clips.iter_mut().find(|c|c.id.to_string()==*id).ok_or("音频片段已不存在")?;
                 *clip=clip.trim_source(offset_frames,duration_frames,start_tick as f64,&self.tempo()).map_err(|e|e.to_string())?;
                 clip.gain=gain;clip.pan=pan;clip.muted=muted;
                 clip.validate().map_err(|e|e.to_string())?;
@@ -166,7 +155,7 @@ impl Editor {
                 self.rebuild_timeline(cx);
             }
             IntegrationPrompt::Automation(target)=>{let mut document=AutomationDocument::from_project(self.project()).map_err(|e|e.to_string())?;let mut lane=document.lane(target).cloned().unwrap_or_else(||AutomationLane::new(target.clone()));edit_automation_points(&mut lane,text)?;self.validate_plugin_lane(&lane)?;document.set_lane(lane);self.commit_automation(document,cx)?;}
-            IntegrationPrompt::Vocaloid=>{let voice=parse_vocaloid_voice(text)?;if !self.commit(self.revision(),CommandBatch::single("Vocaloid 歌手元数据",Command::SetProjectExtension{key:"vocaloid_voice".into(),value:Some(serde_json::to_value(voice).map_err(|e|e.to_string())?)}),cx){return Err("元数据未提交".into());}}
+            IntegrationPrompt::VsqxExportSinger(send)=>{send.try_send(parse_vocaloid_voice(text)?).map_err(|_|"此 VSQX 导出已结束")?;}
             IntegrationPrompt::Scale=>{let(root,intervals)=text.split_once(';').ok_or("使用 根音;级数 格式")?;let root=root.trim().parse::<u8>().map_err(|_|"根音需要 0..11")?;let mut intervals=intervals.split(',').map(str::trim).filter(|v|!v.is_empty()).map(|v|v.parse::<u8>().map_err(|_|"级数需要 0..11")).collect::<Result<Vec<_>,_>>()?;if root>11||intervals.iter().any(|v|*v>11){return Err("根音与级数需要 0..11".into());}intervals.sort();intervals.dedup();self.integrations.scale_root=root;self.integrations.scale_intervals=intervals;cx.notify();}
         }Ok(())
     }
@@ -314,7 +303,16 @@ fn edit_automation_points(lane:&mut AutomationLane,text:&str)->Result<(),String>
     lane.points=points;Ok(())
 }
 fn parse_vocaloid_voice(text:&str)->Result<verdant_exchange::VocaloidVoice,String>{
-    let fields=text.split('|').map(str::trim).collect::<Vec<_>>();if fields.len()!=4{return Err("使用 compID | 歌手名称 | 语言 | 程序 格式".into());}let language_id=fields[2].parse::<u8>().map_err(|_|"语言需要 0..127")?;let program=fields[3].parse::<u8>().map_err(|_|"程序需要 0..127")?;if fields[0].len()!=16||!fields[0].is_ascii()||fields[0].chars().any(char::is_control)||fields[1].is_empty()||language_id>127||program>127{return Err("compID 须为真实的 16 个 ASCII 字符，名称非空，语言和程序 0..127".into());}Ok(verdant_exchange::VocaloidVoice{comp_id:fields[0].into(),name:fields[1].into(),language_id,program})
+    let mut fields=text.split('|').map(str::trim);
+    let (Some(comp_id),Some(name),Some(language),Some(program),None)=(fields.next(),fields.next(),fields.next(),fields.next(),fields.next()) else {
+        return Err("使用 compID | 歌手名称 | 语言 | 程序 格式".into());
+    };
+    let language_id=language.parse::<u8>().map_err(|_|"语言需要 0..127")?;
+    let program=program.parse::<u8>().map_err(|_|"程序需要 0..127")?;
+    if comp_id.len()!=16 || !comp_id.bytes().all(|b|b.is_ascii_graphic()) || name.is_empty() || language_id>127 || program>127 {
+        return Err("compID 须为真实的 16 个可见 ASCII 字符，名称非空，语言和程序 0..127".into());
+    }
+    Ok(verdant_exchange::VocaloidVoice{comp_id:comp_id.into(),name:name.into(),language_id,program})
 }
 
 #[cfg(test)]

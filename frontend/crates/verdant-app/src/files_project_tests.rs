@@ -94,6 +94,85 @@ fn native_startup_checks_content_and_preserves_builtin_and_external_destinations
     }
 }
 
+#[gpui::test]
+fn file_open_migrates_the_branch_chosen_in_recovery(cx: &mut gpui::TestAppContext) {
+    use crate::native_test_support::wait_for_transport_ready;
+
+    struct Harness(gpui::Entity<Editor>);
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement { div() }
+    }
+
+    let temp = Temp::new();
+    let window = cx.open_window(gpui::size(px(800.), px(600.)), |window, cx| {
+        Harness(cx.new(|cx| Editor::for_native_test(score(), window, cx)))
+    });
+    let editor = window.update(cx, |harness, window, cx| {
+        window.activate_window();
+        // The service-free constructor leaves insert restoration to the test.
+        harness.0.update(cx, |ed, cx| ed.restore_inserts(cx));
+        harness.0.clone()
+    }).unwrap();
+    for (answer, expected_tick, expected_undo_depth) in [("恢复", 360, 2), ("放弃", 240, 1)] {
+        let path = temp.0.join(format!("{expected_tick}.verp"));
+        let mut saved = ProjectPersistence::create(&path, score()).unwrap();
+        let saved_revision = saved.revision();
+        let saved_bytes = std::fs::read(&path).unwrap();
+        let track = &saved.project().tracks[0];
+        let edit = CommandBatch::single("move", Command::MoveNotes {
+            track: track.id.clone(), note_ids: vec![track.notes[0].id.clone()], delta_tick: 120, delta_semitones: 0,
+        });
+        assert!(saved.commit(saved_revision, edit).unwrap().is_some());
+        let recovered_revision = saved.revision();
+        let saved_path = saved.project_path().to_path_buf();
+        let project_id = saved.project().project_id.clone();
+        drop(saved);
+
+        wait_for_transport_ready(window, cx, &editor);
+        window.update(cx, |harness, window, cx| harness.0.update(cx, |ed, cx| {
+            assert_ne!(ed.persistence.project_path(), saved_path.as_path());
+            open_project_dialog(ed, window, cx);
+        })).unwrap();
+        assert!(cx.did_prompt_for_paths());
+        cx.simulate_path_prompt_response(|_| Some(vec![path.clone()]));
+        cx.run_until_parked();
+        window.update(cx, |harness, _, cx| harness.0.update(cx, |ed, _| {
+            assert_eq!(ed.persistence.project_path(), saved_path.as_path(), "chooser did not open {}: {:?}",
+                saved_path.display(), ed.notices.iter().map(|notice| notice.text.as_str()).collect::<Vec<_>>());
+            assert_eq!(ed.project().project_id, project_id);
+            assert_eq!(ed.revision(), recovered_revision);
+            assert_eq!(ed.project().tracks[0].notes[0].start_tick, 360);
+            assert!(ed.persistence.pending_recovery().is_some());
+            assert!(ed.project().render_preferences.phoneme_timing.is_none());
+            assert_eq!(ed.store().undo_depth(), 1);
+        })).unwrap();
+
+        assert!(cx.has_pending_prompt());
+        cx.simulate_prompt_answer(answer);
+        cx.run_until_parked();
+        wait_for_transport_ready(window, cx, &editor);
+        window.update(cx, |harness, _, cx| harness.0.update(cx, |ed, cx| {
+            let selected_revision = if answer == "恢复" { recovered_revision } else { saved_revision };
+            assert_eq!(ed.revision(), selected_revision.next().unwrap());
+            assert!(ed.persistence.pending_recovery().is_none());
+            assert_eq!(ed.project().tracks[0].notes[0].start_tick, expected_tick);
+            assert_eq!(ed.project().render_preferences.phoneme_timing,
+                Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1()));
+            assert_eq!(ed.store().undo_depth(), expected_undo_depth);
+            assert_eq!(ed.persistence.project_path(), saved_path.as_path());
+            assert_eq!(ed.project_path.as_deref(), Some(saved_path.as_path()));
+
+            let migrated_revision = ed.revision();
+            ed.undo(cx);
+            assert_eq!(ed.revision(), migrated_revision.next().unwrap());
+            assert!(ed.project().render_preferences.phoneme_timing.is_none());
+            assert_eq!(ed.project().tracks[0].notes[0].start_tick, expected_tick);
+            assert_eq!(ed.store().undo_depth(), expected_undo_depth - 1);
+        })).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), saved_bytes);
+    }
+}
+
 #[test]
 fn ufdata_menu_and_cli_entry_save_reopen_and_export_native_verp() {
     let temp = Temp::new();
@@ -122,6 +201,280 @@ fn ufdata_menu_and_cli_entry_save_reopen_and_export_native_verp() {
     assert!(open_startup_document(Some(&input), &temp.0.join("cli-state"), &[], None).is_err());
     assert_eq!(creator_version(reopened.project()).as_deref(), Some(CREATOR_VERSION));
     assert_eq!(std::fs::read(input).unwrap(), source.bytes);
+}
+
+const VSQX_FIXTURE: &[u8] = include_bytes!("../../verdant-exchange/tests/fixtures/score.vsqx");
+// The public fixture's singer identity, supplied as user input in these tests.
+const VSQX_SINGER: &str = "BNGW7FG7E5TRSNC3 | KAITO_V3_English | 1 | 0";
+
+struct VsqxExportHarness(gpui::Entity<Editor>);
+
+impl Render for VsqxExportHarness {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let prompt = self.0.update(cx, |ed, cx| crate::lyric_view::prompt_overlay(ed, &cx.entity(), cx));
+        div().size_full().children(prompt)
+    }
+}
+
+fn vsqx_editor(project: Project, cx: &mut gpui::TestAppContext) -> gpui::WindowHandle<VsqxExportHarness> {
+    let window = cx.open_window(gpui::size(px(800.), px(600.)), |window, cx| {
+        let editor = cx.new(|cx| Editor::for_native_test(project, window, cx));
+        cx.observe(&editor, |_: &mut VsqxExportHarness, _, cx| cx.notify()).detach();
+        VsqxExportHarness(editor)
+    });
+    let editor = window.update(cx, |harness, window, cx| {
+        window.activate_window();
+        harness.0.update(cx, |ed, cx| ed.restore_inserts(cx));
+        harness.0.clone()
+    }).unwrap();
+    crate::native_test_support::wait_for_transport_ready(window, cx, &editor);
+    window
+}
+
+fn submit_vsqx_options(
+    window: gpui::WindowHandle<VsqxExportHarness>,
+    preserve: bool,
+    track: Option<String>,
+    cx: &mut gpui::TestAppContext,
+) {
+    use crate::native_test_support::frames;
+    use verdant_action_control::native::gpui_native_owner::{all_owners, dispatch_accessibility_action, drive_owners, resolved};
+
+    window.update(cx, |harness, window, cx| harness.0.update(cx, |ed, cx| {
+        export_score_dialog(ed, verdant_exchange::Format::Vsqx, window, cx);
+    })).unwrap();
+    let dialog = cx.update(|cx| cx.windows().into_iter().find_map(|w| w.downcast::<ScoreExportDialog>())).expect("VSQX options window");
+    dialog.update(cx, |_, window, _| window.activate_window()).unwrap();
+    frames(dialog, cx);
+    let activate = |label: &str, cx: &mut gpui::TestAppContext| {
+        cx.update_window(dialog.into(), |_, window, cx| {
+            let owner = all_owners().into_iter().find(|owner| {
+                let owner = owner.borrow();
+                owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                    && owner.modules.accessible_text.get("name").is_some_and(|name| resolved(name).text().contains(label))
+            }).unwrap_or_else(|| panic!("compiled VSQX option {label}"));
+            dispatch_accessibility_action(&owner, "activate", None);
+            drive_owners(window, cx);
+        }).unwrap();
+    };
+    if !preserve {
+        activate("保留来源扩展", cx);
+        frames(dialog, cx);
+    }
+    if let Some(track) = track {
+        activate(&track, cx);
+        frames(dialog, cx);
+    }
+    activate("选择保存位置", cx);
+    cx.run_until_parked();
+    assert!(dialog.update(cx, |_, _, _| ()).is_err(), "accepted options close the form");
+    window.update(cx, |_, window, _| window.activate_window()).unwrap();
+    frames(window, cx);
+}
+
+fn has_vsqx_prompt(window: gpui::WindowHandle<VsqxExportHarness>, cx: &mut gpui::TestAppContext) -> bool {
+    window.update(cx, |harness, _, cx| harness.0.read(cx).text_prompt.as_ref().is_some_and(|prompt| {
+        matches!(&prompt.purpose, crate::editor::PromptPurpose::Integration(crate::editor::integrations::IntegrationPrompt::VsqxExportSinger(_)))
+    })).unwrap()
+}
+
+#[gpui::test]
+fn native_vsqx_export_discarded_voice_table_accepts_retry_and_keeps_selected_track(cx: &mut gpui::TestAppContext) {
+    use crate::native_test_support::frames;
+    use verdant_exchange::Format;
+    use verdant_text_field::{TextFieldHandle, native::gpui_native_owner::all_owners};
+
+    let invalid = "BNGW7FG7E5T SNC3 | KAITO_V3_English | 1 | 0";
+    let text_owner = |window: &Window| {
+        let owner = all_owners().into_iter().find(|owner| {
+            let owner = owner.borrow();
+            owner.present && owner.mounted && !owner.disposed
+                && owner.window_id == Some(window.window_handle().window_id()) && owner.exposes.contains_key("viewEpoch")
+        }).expect("compiled singer text field");
+        TextFieldHandle { owner }
+    };
+
+    let temp = Temp::new();
+    let source = temp.0.join("source.vsqx");
+    std::fs::write(&source, VSQX_FIXTURE).unwrap();
+    let (imported, _, _) = import_project_document(&source, &temp.0.join("documents")).unwrap();
+    let mut project = imported.project_for_save();
+    assert!(has_vsqx_voice_table(&project));
+    assert!(!project.extensions.contains_key("vocaloid_voice"));
+    let mut other = verdant_domain::Track::new("Omitted track", "teal");
+    other.notes.push(Note::new(240, 480, 67));
+    other.refresh_index();
+    project.tracks.push(other);
+    let window = vsqx_editor(project, cx);
+    submit_vsqx_options(window, false, Some("Lead & harmony".into()), cx);
+    assert!(has_vsqx_prompt(window, cx));
+    assert!(!cx.did_prompt_for_new_path());
+
+    let (instance, field, epoch) = window.update(cx, |harness, window, cx| {
+        let field = text_owner(window);
+        let epoch = field.state("viewEpoch").unwrap();
+        let instance = harness.0.read(cx).text_prompt.as_ref().unwrap().instance.clone();
+        (instance, field, epoch)
+    }).unwrap();
+    cx.simulate_input(window.into(), invalid);
+    cx.simulate_keystrokes(window.into(), "enter");
+    frames(window, cx);
+    assert!(has_vsqx_prompt(window, cx), "invalid singer data retains the pending export");
+    assert!(!cx.did_prompt_for_new_path());
+    window.update(cx, |harness, window, cx| {
+        let ed = harness.0.read(cx);
+        assert!(ed.notices.iter().any(|notice| notice.text.contains("可见 ASCII")));
+        let prompt = ed.text_prompt.as_ref().unwrap();
+        assert_eq!(prompt.instance, instance);
+        assert_eq!(prompt.state.text, invalid);
+        assert!(std::rc::Rc::ptr_eq(&text_owner(window).owner, &field.owner));
+        assert_eq!(field.state("viewEpoch").unwrap(), epoch);
+        assert_eq!(field.state("focused").unwrap(), serde_json::json!(true), "validation keeps keyboard focus in the surviving singer field");
+    }).unwrap();
+
+    // An ordinary edit while the singer prompt is open belongs only to the
+    // live document. The export continues from the originally chosen score.
+    let edited = window.update(cx, |harness, _, cx| harness.0.update(cx, |ed, cx| {
+        let track = &ed.project().tracks[0];
+        let command = Command::MoveNotes {
+            track: track.id.clone(), note_ids: vec![track.notes[0].id.clone()], delta_tick: 0, delta_semitones: 2,
+        };
+        assert!(ed.commit(ed.revision(), CommandBatch::single("transpose during export", command), cx));
+        ed.persistence.project_for_save()
+    })).unwrap();
+    assert_eq!(edited.tracks[0].notes[0].midi_note, 62);
+    frames(window, cx);
+    cx.simulate_keystrokes(window.into(), "secondary-a");
+    cx.simulate_input(window.into(), VSQX_SINGER);
+    window.update(cx, |harness, window, cx| {
+        let ed = harness.0.read(cx);
+        let prompt = ed.text_prompt.as_ref().unwrap();
+        assert_eq!(prompt.instance, instance);
+        assert_ne!(prompt.base, ed.revision());
+        assert!(std::rc::Rc::ptr_eq(&text_owner(window).owner, &field.owner));
+        assert_eq!(field.state("viewEpoch").unwrap(), epoch);
+        assert_eq!(field.state("value").unwrap(), serde_json::json!(VSQX_SINGER), "native select-all and typing replace the whole draft");
+        assert_eq!(prompt.state.text, VSQX_SINGER);
+    }).unwrap();
+    cx.simulate_keystrokes(window.into(), "enter");
+    cx.run_until_parked();
+    assert!(!has_vsqx_prompt(window, cx));
+    assert!(cx.did_prompt_for_new_path());
+    let output = temp.0.join("export.vsqx");
+    cx.simulate_new_path_selection(|_| Some(output.clone()));
+    cx.run_until_parked();
+    let exported = std::fs::read_to_string(output).unwrap();
+    assert!(exported.contains("BNGW7FG7E5TRSNC3"));
+    assert!(!exported.contains("source-extension"));
+    let roundtrip = verdant_exchange::import(Format::Vsqx, exported.as_bytes(), &Default::default()).unwrap();
+    assert_eq!(roundtrip.project.tracks.len(), 1, "only the selected track is written");
+    let track = &roundtrip.project.tracks[0];
+    assert_eq!(track.name, "Lead & harmony");
+    assert_eq!(track.notes[0].midi_note, 60);
+    assert_eq!(std::fs::read(source).unwrap(), VSQX_FIXTURE);
+    window.update(cx, |harness, _, cx| assert_eq!(harness.0.read(cx).persistence.project_for_save(), edited)).unwrap();
+}
+
+#[gpui::test]
+fn native_vsqx_export_new_score_remembers_singer_only_after_success_and_reuses_it(cx: &mut gpui::TestAppContext) {
+    use crate::native_test_support::frames;
+
+    let temp = Temp::new();
+    let window = vsqx_editor(score(), cx);
+    let before = window.update(cx, |harness, _, cx| harness.0.read(cx).persistence.project_for_save()).unwrap();
+    for (accept_singer, destination) in [(false, None), (true, None), (true, Some(temp.0.join("missing/out.vsqx")))] {
+        submit_vsqx_options(window, true, None, cx);
+        assert!(has_vsqx_prompt(window, cx), "new scores need an explicit singer even with preservation enabled");
+        cx.simulate_input(window.into(), VSQX_SINGER);
+        cx.simulate_keystrokes(window.into(), if accept_singer { "enter" } else { "escape" });
+        frames(window, cx);
+        assert!(!has_vsqx_prompt(window, cx));
+        assert_eq!(cx.did_prompt_for_new_path(), accept_singer);
+        if accept_singer {
+            cx.simulate_new_path_selection(|_| destination);
+            cx.run_until_parked();
+        }
+        window.update(cx, |harness, _, cx| {
+            let ed = harness.0.read(cx);
+            assert_eq!(ed.persistence.project_for_save(), before);
+            assert!(ed.prefs.last_export_dir.is_none());
+            assert!(!ed.prefs.extra.contains_key("last_exchange_report"));
+        }).unwrap();
+    }
+
+    submit_vsqx_options(window, true, None, cx);
+    cx.simulate_input(window.into(), VSQX_SINGER);
+    cx.simulate_keystrokes(window.into(), "enter");
+    cx.run_until_parked();
+    let output = temp.0.join("new-score.vsqx");
+    cx.simulate_new_path_selection(|_| Some(output.clone()));
+    cx.run_until_parked();
+    assert!(std::fs::read_to_string(output).unwrap().contains("BNGW7FG7E5TRSNC3"));
+    window.update(cx, |harness, _, cx| {
+        let ed = harness.0.read(cx);
+        assert_eq!(ed.project().extensions["vocaloid_voice"]["comp_id"], "BNGW7FG7E5TRSNC3");
+        assert_eq!(ed.store().undo_depth(), 1, "remembering a singer is an undoable edit");
+    }).unwrap();
+
+    submit_vsqx_options(window, false, None, cx);
+    assert!(!has_vsqx_prompt(window, cx));
+    let reused = temp.0.join("reused.vsqx");
+    cx.simulate_new_path_selection(|_| Some(reused.clone()));
+    cx.run_until_parked();
+    assert!(std::fs::read_to_string(reused).unwrap().contains("BNGW7FG7E5TRSNC3"));
+    window.update(cx, |harness, _, cx| assert_eq!(harness.0.read(cx).store().undo_depth(), 1)).unwrap();
+}
+
+#[gpui::test]
+fn native_vsqx_export_uses_retained_source_voice_without_prompt(cx: &mut gpui::TestAppContext) {
+    use verdant_exchange::Format;
+
+    let temp = Temp::new();
+    let imported = verdant_exchange::import(Format::Vsqx, VSQX_FIXTURE, &Default::default()).unwrap();
+    let window = vsqx_editor(imported.project, cx);
+    submit_vsqx_options(window, true, None, cx);
+    assert!(!has_vsqx_prompt(window, cx));
+    assert!(cx.did_prompt_for_new_path());
+    let retained = temp.0.join("retained.vsqx");
+    cx.simulate_new_path_selection(|_| Some(retained.clone()));
+    cx.run_until_parked();
+    let retained = std::fs::read_to_string(retained).unwrap();
+    assert!(retained.contains("source-extension"));
+    assert!(retained.contains("BNGW7FG7E5TRSNC3"));
+}
+
+#[gpui::test]
+fn native_vsqx_export_finishes_frozen_write_without_touching_replacement_document(cx: &mut gpui::TestAppContext) {
+    use verdant_exchange::Format;
+
+    let temp = Temp::new();
+    let window = vsqx_editor(score(), cx);
+    submit_vsqx_options(window, true, None, cx);
+    cx.simulate_input(window.into(), VSQX_SINGER);
+    cx.simulate_keystrokes(window.into(), "enter");
+    cx.run_until_parked();
+    assert!(cx.did_prompt_for_new_path());
+
+    let mut replacement = score();
+    replacement.tracks[0].notes[0].midi_note = 72;
+    replacement.tracks[0].refresh_index();
+    let document = ProjectPersistence::create(&temp.0.join("replacement.verp"), replacement).unwrap();
+    let (expected, undo_depth) = window.update(cx, |harness, window, cx| harness.0.update(cx, |ed, cx| {
+        ed.replace_project_opened(document, Default::default(), window, cx);
+        (ed.persistence.project_for_save(), ed.store().undo_depth())
+    })).unwrap();
+    let output = temp.0.join("original.vsqx");
+    cx.simulate_new_path_selection(|_| Some(output.clone()));
+    cx.run_until_parked();
+    let exported = verdant_exchange::import(Format::Vsqx, &std::fs::read(output).unwrap(), &Default::default()).unwrap();
+    assert_eq!(exported.project.tracks[0].notes[0].midi_note, 64);
+    window.update(cx, |harness, _, cx| {
+        let ed = harness.0.read(cx);
+        assert_eq!(ed.persistence.project_for_save(), expected);
+        assert_eq!(ed.store().undo_depth(), undo_depth);
+        assert!(ed.prefs.last_export_dir.is_none());
+        assert!(!ed.prefs.extra.contains_key("last_exchange_report"));
+    }).unwrap();
 }
 
 #[test]

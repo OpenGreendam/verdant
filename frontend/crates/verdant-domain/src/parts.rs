@@ -28,12 +28,49 @@ impl Parts {
         let selected:Vec<_>=t.notes.iter().filter(|n|ids.contains(&n.id)).collect();
         let start=selected.iter().map(|n|n.start_tick).min().ok_or("select notes for a part")?;
         let end=selected.iter().map(|n|n.end_tick()).max().expect("selected notes");
-        if self.instances.iter().any(|p|p.track==*track&&p.bindings.values().any(|id|ids.contains(id))){return Err("selected notes already belong to a part".into());}
+        // Like grouping notes in Synthesizer V, selected notes move out of the
+        // part that holds them into the new one. Linked copies share content,
+        // so taking notes out of one would change the others too.
+        let affected = |part: &PartInstance| {
+            part.track == *track && part.bindings.values().any(|id| ids.contains(id))
+        };
+        for part in self.instances.iter().filter(|part| affected(part)) {
+            if self.instances.iter().filter(|p| p.content_id == part.content_id).count() > 1 {
+                return Err("these notes belong to a linked part; unlink it first".into());
+            }
+        }
+        self.instances.retain_mut(|part| {
+            if !affected(part) { return true; }
+            let emptied = self.contents.get_mut(&part.content_id).is_some_and(|content| {
+                let was_populated = !content.notes.is_empty();
+                content.notes.retain(|note| !part.bindings.get(&note.id).is_some_and(|id| ids.contains(id)));
+                was_populated && content.notes.is_empty()
+            });
+            if emptied {
+                // The preflight established this was the sole instance of its content.
+                self.contents.remove(&part.content_id);
+                return false;
+            }
+            part.bindings.retain(|_, id| !ids.contains(id));
+            true
+        });
         let content_id=NoteId::generate().to_string();let id=NoteId::generate().to_string();
         let notes=selected.iter().map(|n|{let mut n=(**n).clone();n.start_tick-=start;n}).collect();
         let bindings=selected.iter().map(|n|(n.id.clone(),n.id.clone())).collect();
         self.contents.insert(content_id.clone(),PartContent{id:content_id.clone(),notes});
         self.instances.push(PartInstance{id:id.clone(),content_id,name,track:track.clone(),start_tick:start,duration_tick:end-start,source_offset_tick:0,muted:false,bindings});Ok(id)
+    }
+    /// Removes a part but keeps its notes on the track as ungrouped notes.
+    /// Returns the track and the notes to insert (with fresh identities, so the
+    /// projection that owned the old ones can drop them).
+    pub fn dissolve(&mut self,project:&Project,id:&str)->Result<(TrackId,Vec<Note>),String>{
+        let index=self.instances.iter().position(|p|p.id==id).ok_or("part no longer exists")?;
+        let part=self.instances.remove(index);
+        let track=project.track(&part.track).ok_or("track no longer exists")?;
+        let owned:BTreeSet<&NoteId>=part.bindings.values().collect();
+        let notes=track.notes.iter().filter(|n|owned.contains(&n.id)).map(|n|{let mut n=n.clone();n.id=NoteId::generate();n}).collect();
+        if !self.instances.iter().any(|p|p.content_id==part.content_id){self.contents.remove(&part.content_id);}
+        Ok((part.track,notes))
     }
     /// An empty part over `[start, start+duration)`. Notes later inserted
     /// wholly inside it join its content (see `synchronize`).
@@ -82,11 +119,37 @@ impl Parts {
     }
 }
 
+/// Shift instance windows and loose notes together. Moving a projected note
+/// directly would edit its source and all other instances of that source.
+pub fn lead_in_commands(project: &Project, ticks: i64) -> Result<Vec<Command>, String> {
+    if ticks <= 0 { return Err("lead-in must have a positive length".into()); }
+    let mut parts = Parts::load(project)?;
+    let mut owned = BTreeSet::new();
+    for part in &mut parts.instances {
+        let start = part.start_tick.checked_add(ticks).ok_or("part start exceeds the native tick range")?;
+        if start.checked_add(part.duration_tick).is_none_or(|end| end > crate::Revision::MAX as i64) {
+            return Err("part end exceeds the exact native tick range".into());
+        }
+        part.start_tick = start;
+        owned.extend(part.bindings.values().map(|id| (&part.track, id)));
+    }
+    let mut commands = Vec::new();
+    for track in &project.tracks {
+        let note_ids: Vec<_> = track.notes.iter().filter(|n| !owned.contains(&(&track.id, &n.id)))
+            .map(|n| n.id.clone()).collect();
+        if !note_ids.is_empty() {
+            commands.push(Command::MoveNotes { track: track.id.clone(), note_ids, delta_tick: ticks, delta_semitones: 0 });
+        }
+    }
+    if !parts.instances.is_empty() { commands.push(parts.command()); }
+    Ok(commands)
+}
+
 fn projection(source:&Note,part:&PartInstance)->Option<Note>{
     let from=part.source_offset_tick.max(source.start_tick);let to=(part.source_offset_tick+part.duration_tick).min(source.end_tick());if to<=from{return None;}
     let id=part.bindings.get(&source.id).cloned().unwrap_or_else(||NoteId(format!("part:{}:{}",part.id,source.id)));
     let mut n=crate::editing::crop_note(source,from-source.start_tick,to-source.start_tick,id);
-    n.start_tick=part.start_tick+from-part.source_offset_tick;if part.muted{n.set_muted(true);}
+    n.start_tick=part.start_tick+(from-part.source_offset_tick);if part.muted{n.set_muted(true);}
     // Source point IDs survive moves and linked edits. Crop endpoints use
     // stable edge IDs rather than allocating during journal replay.
     for p in &mut n.curves.pitch_millicent_points{let absolute=p.tick+from-source.start_tick;let source_id=source.curves.pitch_millicent_points.iter().find(|q|q.tick==absolute).map(|q|q.id.to_string()).unwrap_or_else(||format!("edge:{absolute}"));p.id=PointId(format!("{}:PIT:{source_id}",n.id));}
@@ -165,6 +228,120 @@ pub(crate) fn synchronize(before:&Project,project:&mut Project,commands:&[Comman
 mod tests {
     use super::*;
     use crate::{CommandBatch, ProjectStore};
+
+    #[test]
+    fn grouping_moves_notes_between_parts_and_dissolving_keeps_them() {
+        let mut project=Project::new_empty();let track=project.tracks[0].id.clone();
+        for start in [0,480,960]{let mut n=Note::new(start,480,60);n.id=NoteId::generate();project.tracks[0].notes.push(n);}
+        let ids:Vec<NoteId>=project.tracks[0].notes.iter().map(|n|n.id.clone()).collect();
+        let mut store=ProjectStore::new(project);
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        let first=parts.create(&store.snapshot(),&track,&ids,"片段 1".into()).unwrap();
+        store.apply(store.revision(),CommandBatch::single("group",parts.command())).unwrap().unwrap();
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        let second=parts.create(&store.snapshot(),&track,&ids[1..],"片段 2".into()).unwrap();
+        store.apply(store.revision(),CommandBatch::single("regroup",parts.command())).unwrap().unwrap();
+        let parts=Parts::load(&store.snapshot()).unwrap();
+        assert_eq!(parts.instance(&first).unwrap().bindings.len(),1);
+        assert_eq!(parts.instance(&second).unwrap().bindings.len(),2);
+        assert_eq!(store.snapshot().tracks[0].notes.len(),3);
+        let mut parts=Parts::load(&store.snapshot()).unwrap();
+        let (track,notes)=parts.dissolve(&store.snapshot(),&second).unwrap();
+        assert_eq!(notes.len(),2);
+        store.apply(store.revision(),CommandBatch{label:"dissolve".into(),commands:vec![parts.command(),Command::InsertNotes{track,notes}]}).unwrap().unwrap();
+        assert_eq!(store.snapshot().tracks[0].notes.len(),3);
+        assert!(Parts::load(&store.snapshot()).unwrap().instance(&second).is_none());
+    }
+
+    #[test]
+    fn regroup_replaces_the_emptied_owner_and_new_notes_join_the_replacement() {
+        let mut project = Project::new_empty();
+        let track = project.tracks[0].id.clone();
+        let first = Note::new(0, 240, 60);
+        let deleted = Note::new(240, 240, 61);
+        let last = Note::new(720, 240, 64);
+        let ids = [first.id.clone(), last.id.clone()];
+        let deleted_id = deleted.id.clone();
+        project.tracks[0].notes = vec![first, deleted, last];
+        let mut parts = Parts::default();
+        let original_ids = [ids[0].clone(), deleted_id.clone(), ids[1].clone()];
+        let owner = parts.create(&project, &track, &original_ids, "Original".into()).unwrap();
+        let original_content = parts.instance(&owner).unwrap().content_id.clone();
+        let empty = parts.create_empty(&project, &track, 1920, 960, "Intentional empty".into()).unwrap();
+        let mut store = ProjectStore::new(project);
+        store.apply(store.revision(), CommandBatch::single("group", parts.command())).unwrap().unwrap();
+        store.apply(store.revision(), CommandBatch::single("delete note", Command::DeleteNotes {
+            track: track.clone(), note_ids: vec![deleted_id],
+        })).unwrap().unwrap();
+        let before = Parts::load(store.project()).unwrap();
+        let mut parts = before.clone();
+        let replacement = parts.create(store.project(), &track, &ids, "Replacement".into()).unwrap();
+        store.apply(store.revision(), CommandBatch::single("regroup", parts.command())).unwrap().unwrap();
+        let after = Parts::load(store.project()).unwrap();
+        assert!(after.instance(&owner).is_none());
+        assert!(!after.contents.contains_key(&original_content));
+        assert_eq!(after.instance(&empty), before.instance(&empty));
+        let part = after.instance(&replacement).unwrap();
+        assert_eq!((part.start_tick, part.duration_tick), (0, 960));
+        assert_eq!(store.project().tracks[0].notes.iter().map(|n| (&n.id, n.start_tick)).collect::<Vec<_>>(),
+            vec![(&ids[0], 0), (&ids[1], 720)]);
+
+        store.undo().unwrap().unwrap();
+        assert_eq!(Parts::load(store.project()).unwrap(), before);
+        store.redo().unwrap().unwrap();
+        assert_eq!(Parts::load(store.project()).unwrap(), after);
+
+        let drawn = Note::new(480, 120, 62);
+        let drawn_id = drawn.id.clone();
+        store.apply(store.revision(), CommandBatch::single("draw note", Command::InsertNotes { track, notes: vec![drawn] })).unwrap().unwrap();
+        let parts = Parts::load(store.project()).unwrap();
+        let owner = parts.instance(&replacement).unwrap();
+        assert_eq!(owner.bindings.get(&drawn_id), Some(&drawn_id));
+        assert_eq!(parts.contents[&owner.content_id].notes.iter().find(|n| n.id == drawn_id).unwrap().start_tick, 480);
+        assert_eq!(parts.instance(&empty), before.instance(&empty));
+    }
+
+    #[test]
+    fn regroup_rejects_linked_notes_before_changing_any_former_owner() {
+        let mut project = Project::new_empty();
+        let track = project.tracks[0].id.clone();
+        let ids = [0, 480].map(|start| {
+            let note = Note::new(start, 480, 60);
+            let id = note.id.clone();
+            project.tracks[0].notes.push(note);
+            id
+        });
+        let mut parts = Parts::default();
+        parts.create(&project, &track, &ids[..1], "Independent".into()).unwrap();
+        let linked = parts.create(&project, &track, &ids[1..], "Linked".into()).unwrap();
+        parts.duplicate(&linked, 960, true).unwrap();
+        let before = parts.clone();
+
+        assert!(parts.create(&project, &track, &ids, "Rejected".into()).is_err());
+        assert_eq!(parts, before);
+    }
+
+    #[test]
+    fn lead_in_rejects_out_of_range_part_bounds_and_loose_notes() {
+        let limit = crate::Revision::MAX as i64;
+        let mut project = Project::new_empty();
+        let track = project.tracks[0].id.clone();
+        let mut parts = Parts::default();
+        parts.create_empty(&project, &track, limit - 480, 480, "At end".into()).unwrap();
+        project.extensions.insert(KEY.into(), serde_json::to_value(parts).unwrap());
+        assert!(lead_in_commands(&project, 1).is_err());
+
+        project.extensions.remove(KEY);
+        project.tracks[0].notes.push(Note::new(limit - 480, 480, 60));
+        let mut store = ProjectStore::new(project);
+        let before = store.snapshot();
+        let revision = store.revision();
+        let commands = lead_in_commands(&before, 1).unwrap();
+        assert!(store.apply(revision, CommandBatch { label: "lead-in".into(), commands }).is_err());
+        assert_eq!(store.revision(), revision);
+        assert_eq!(store.undo_depth(), 0);
+        assert_eq!(store.project().tracks, before.tracks);
+    }
 
     #[test]
     fn empty_part_absorbs_notes_drawn_inside_it() {

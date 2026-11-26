@@ -2,8 +2,10 @@
 //! plugin process, preference persistence or hardware audio is started.
 
 use std::path::PathBuf;
-use gpui::{AppContext, Render, TestAppContext, WindowHandle};
+use gpui::{AppContext, Entity, Render, TestAppContext, WindowHandle};
 use verdant_domain::{Project, ProjectPersistence, Track, TrackId, TRACK_COLORS};
+
+use crate::editor::Editor;
 
 pub(crate) struct TestDocument { pub path: PathBuf }
 
@@ -44,5 +46,35 @@ pub(crate) fn frames<T: Render + 'static>(window: WindowHandle<T>, cx: &mut Test
             window.draw(cx).clear(cx);
         }).unwrap();
         cx.run_until_parked();
+    }
+}
+
+pub(crate) fn transport_diagnostics(ed: &mut Editor) -> String {
+    format!("revision={}, loading={}, callback_budget={}, retired_chain={}, applied_timeline={}, {}, notices={:?}",
+        ed.revision().get(), ed.inserts_loading, ed.audio.callback_budget(),
+        ed.audio.retired_chain_revision(), ed.audio.applied_timeline_revision(), ed.native_insert_receipt_diagnostics(),
+        ed.notices.iter().map(|notice| notice.text.as_str()).collect::<Vec<_>>())
+}
+
+pub(crate) fn wait_for_transport_ready<T: Render + 'static>(
+    window: WindowHandle<T>, cx: &mut TestAppContext, editor: &Entity<Editor>,
+) {
+    // SilentClock uses a real callback thread. Rendering additional frames
+    // alone cannot acknowledge the exact installed chain/timeline receipts.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        frames(window, cx);
+        let (ready, diagnostics) = window.update(cx, |_, _, cx| {
+            editor.update(cx, |ed, cx| {
+                let ready = ed.native_insert_transport_ready(cx);
+                (ready, transport_diagnostics(ed))
+            })
+        }).unwrap();
+        if ready { return; }
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        assert!(!remaining.is_zero(), "fixture transport did not become ready: {diagnostics}");
+        // Yield only between checks of the actual production readiness
+        // predicate; neither a fixed frame count nor clearing its guard.
+        std::thread::park_timeout(remaining.min(std::time::Duration::from_millis(1)));
     }
 }

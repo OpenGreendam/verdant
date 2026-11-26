@@ -61,7 +61,7 @@ impl MenuBoolean {
             Self::FollowPlayhead => crate::clock::set_follow(ed, selected, cx),
             Self::ExportClick => ed.edit_playback("导出节拍器", cx, |settings| settings.export_click = selected),
             Self::PartMuted(id) => {
-                if let Err(error) = ed.edit_part(id, "片段静音", cx, |part| { part.muted = selected; Ok(()) }) { ed.notice(error); }
+                if let Err(error) = ed.edit_part(id, "音符组静音", cx, |part| { part.muted = selected; Ok(()) }) { ed.notice(error); }
             },
             Self::DeviceParameter { target, slot, parameter, .. } => {
                 ed.set_device_params(target.clone(), *slot, vec![(parameter.clone(), if selected { 1.0 } else { 0.0 })], cx);
@@ -196,7 +196,6 @@ pub(crate) fn file_menu_items(prefs: &crate::files::Prefs) -> Vec<MenuItem> {
             MenuItem::file(format!("导出成 {name}…"), FileAction::Export(format))).collect()),
         MenuItem::action("导出 WAV（含插件）…", MenuAction::Workflow(W::ExportSettings)).with_hint("Ctrl+Alt+E"),
         MenuItem::action("导出 Verdant 工程副本 (.verp)…", MenuAction::ExportProject).with_hint("Ctrl+Shift+E"),
-        MenuItem::action("Vocaloid 歌手元数据…", MenuAction::Workflow(W::Integration(I::VocaloidMetadata))),
         MenuItem::action("导入 / 导出报告…", MenuAction::Workflow(W::Integration(I::Report))),
     ]
 }
@@ -243,9 +242,9 @@ impl MenuItem {
         use crate::editor::{WorkflowAction as W, integrations::IntegrationAction as I};
         match &self.command {
             Some(MenuCommand::Submenu(_) | MenuCommand::Editor(MenuAction::OpenMenu(_) | MenuAction::ChooseExample | MenuAction::Run(CommandId::AuditionProjects))) => true,
-            Some(MenuCommand::Editor(MenuAction::Workflow(W::Menu | W::Recent | W::Recovery | W::ExportSettings))) => true,
+            Some(MenuCommand::Editor(MenuAction::Workflow(W::Recent | W::Recovery | W::ExportSettings))) => true,
             Some(MenuCommand::Editor(MenuAction::Workflow(W::Integration(
-                I::Menu | I::Singers | I::Phonemizers | I::Segments | I::Dictionary | I::MonitorPorts | I::MidiPorts | I::MidiChannels(_) | I::Clips | I::Automation,
+                I::Singers | I::Phonemizers | I::Segments | I::Dictionary | I::MonitorPorts | I::MidiPorts | I::MidiChannels(_) | I::Clips | I::Automation,
             )))) => true,
             Some(MenuCommand::File(FileAction::Export(Format::Ust)) | MenuCommand::Editor(MenuAction::Workflow(W::Integration(I::ScoreExport(Format::Ust))))) => ed.project().tracks.len() > 1,
             _ => false,
@@ -265,6 +264,16 @@ enum MenuAnchor {
     Bounds(Bounds<Pixels>),
     Control { owner: verdant_action_control::native::gpui_native_owner::OwnerWeak, accepted: Bounds<Pixels> },
     Item { viewport: gpui::ScrollHandle, index: usize },
+}
+
+impl OpenMenu {
+    /// The address of the Action this menu drops down from, if any.
+    pub(crate) fn anchor_owner(&self) -> Option<usize> {
+        match &self.origin {
+            MenuAnchor::Control { owner, .. } => Some(owner.as_ptr() as *const () as usize),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Debug for MenuAnchor {
@@ -301,6 +310,7 @@ pub struct OpenMenu {
     pub selected: usize,
     pub previous_focus: Option<FocusHandle>,
     expanded: Option<usize>,
+    branch_revision: u64,
     child: Option<Box<OpenMenu>>,
     origin: MenuAnchor,
     viewport: gpui::ScrollHandle,
@@ -333,11 +343,18 @@ impl OpenMenu {
         let viewport = gpui::ScrollHandle::new();
         let scroll_engine = cx.new(|_| viewport.clone());
         Self { instance: verdant_domain::TrackId::generate().to_string(), window: window.window_handle(), origin,
-            items, selected, previous_focus: None, expanded: None, child: None, viewport, scroll_engine, focus_pending: true, label }
+            items, selected, previous_focus: None, expanded: None, branch_revision: 0, child: None, viewport, scroll_engine, focus_pending: true, label }
+    }
+
+    fn open_child(&mut self, row: usize, child: OpenMenu) {
+        self.branch_revision += 1;
+        self.selected = row;
+        self.expanded = Some(row);
+        self.child = Some(Box::new(child));
     }
 
     fn collapse(&mut self) {
-        self.child = None;
+        if self.child.take().is_some() { self.branch_revision += 1; }
         self.expanded = None;
     }
 }
@@ -385,8 +402,8 @@ impl Editor {
         if self.menu.as_ref().is_some_and(|menu| menu.window == retained.window) {
             let mut opened = self.menu.take().expect("newly opened menu");
             let parent = retained.panel_mut(path).expect("retained invoking panel");
-            parent.selected = row;
             if refresh {
+                parent.selected = row;
                 parent.items = opened.items;
                 parent.collapse();
                 parent.focus_pending = true;
@@ -394,8 +411,7 @@ impl Editor {
                 opened.origin = MenuAnchor::Item { viewport: parent.viewport.clone(), index: row };
                 opened.label = parent.items[row].label.clone();
                 opened.previous_focus = None;
-                parent.expanded = Some(row);
-                parent.child = Some(Box::new(opened));
+                parent.open_child(row, opened);
             }
             self.menu = Some(retained);
             cx.notify();
@@ -406,7 +422,7 @@ impl Editor {
         }
     }
 
-    fn expand_menu_item(&mut self, path: &[usize], index: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+    fn expand_menu_item(&mut self, path: &[usize], index: Option<usize>, cursor: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(panel) = self.menu.as_ref().and_then(|root| root.panel(path)) else { return; };
         let child = index.and_then(|index| {
             let item = panel.items.get(index)?;
@@ -430,11 +446,9 @@ impl Editor {
         }
         let panel = self.menu.as_mut().and_then(|root| root.panel_mut(path)).expect("admitted menu panel");
         if let Some(child) = child {
-            panel.selected = index.expect("submenu index");
-            panel.expanded = index;
-            panel.child = Some(Box::new(child));
+            panel.open_child(index.expect("submenu index"), child);
         } else if index.is_none() {
-            if let Some(index) = panel.expanded { panel.selected = index; }
+            if let Some(cursor) = cursor { panel.selected = cursor; }
             panel.collapse();
             panel.focus_pending = true;
         }
@@ -543,6 +557,7 @@ impl Editor {
 
     pub(crate) fn edit_menu_items(&self) -> Vec<MenuItem> {
         use crate::editor::WorkflowAction as A;
+        use crate::editor::integrations::IntegrationAction as I;
         let tick = self.session.snap.snap(self.tempo().tick_at(self.playhead_seconds())).max(0);
         let has_sel = !self.session.selection.is_empty();
         vec![
@@ -564,6 +579,7 @@ impl Editor {
             MenuItem::action("闭合一格内间隙", MenuAction::Workflow(A::CloseGaps)).with_hint("Alt+Q").enabled(has_sel),
             MenuItem::action("消除重叠", MenuAction::Workflow(A::RemoveOverlaps)).with_hint("Shift+Q").enabled(has_sel),
             MenuItem::action("静音 / 取消静音", MenuAction::Workflow(A::MuteNotes)).enabled(has_sel),
+            MenuItem::action("试听所选音高", MenuAction::Workflow(A::Integration(I::AuditionSelection))).enabled(has_sel),
             MenuItem::separator(),
             MenuItem::submenu("参数曲线", vec![
                 MenuItem::action("选择当前音符全部曲线点", MenuAction::Workflow(A::SelectPoints)).enabled(has_sel),
@@ -595,28 +611,35 @@ impl Editor {
             MenuItem::header("自动化"),
             MenuItem::boolean_command("当前轨道自动化泳道", CommandId::ToggleTrackAutomation, CommandArg::Track(track), auto_on).with_hint("A"),
             MenuItem::boolean_command("主总线自动化泳道", CommandId::ToggleMasterAutomation, CommandArg::None, self.automation_ui.show_master),
+            MenuItem::action("自动化曲线", MenuAction::Workflow(A::Integration(I::Automation))),
             MenuItem::separator(),
-            MenuItem::submenu("片段 (Part)", vec![
-                MenuItem::action("从选中音符创建片段", MenuAction::Workflow(A::CreatePart)).enabled(!self.session.selection.is_empty()),
-                MenuItem::action("片段名称…", MenuAction::Workflow(A::RenamePart)).enabled(part),
-                MenuItem::action("在播放头分割片段", MenuAction::Workflow(A::SplitPart(tick))).enabled(part),
-                MenuItem::action("连接右侧片段", MenuAction::Workflow(A::JoinPart)).enabled(part),
-                MenuItem::action("链接复制片段", MenuAction::Workflow(A::DuplicatePart(true))).enabled(part),
-                MenuItem::action("独立复制片段", MenuAction::Workflow(A::DuplicatePart(false))).enabled(part),
-                MenuItem::action("取消片段链接", MenuAction::Workflow(A::UnlinkPart)).enabled(part),
-                MenuItem::action("删除片段", MenuAction::Workflow(A::DeletePart)).enabled(part),
+            MenuItem::submenu("音符组", vec![
+                MenuItem::action("从选中音符创建音符组", MenuAction::Workflow(A::CreatePart)).with_hint("Ctrl+G").enabled(!self.session.selection.is_empty()),
+                MenuItem::action("音符组名称…", MenuAction::Workflow(A::RenamePart)).enabled(part),
+                MenuItem::action("精确位置…", MenuAction::Workflow(A::MovePart)).enabled(part),
+                MenuItem::action("精确裁剪…", MenuAction::Workflow(A::TrimPart)).enabled(part),
+                MenuItem::action("音符组静音 / 取消静音", MenuAction::Workflow(A::MutePart)).enabled(part),
+                MenuItem::action("在播放头分割音符组", MenuAction::Workflow(A::SplitPart(tick))).enabled(part),
+                MenuItem::action("连接右侧音符组", MenuAction::Workflow(A::JoinPart)).enabled(part),
+                MenuItem::action("链接复制音符组", MenuAction::Workflow(A::DuplicatePart(true))).enabled(part),
+                MenuItem::action("独立复制音符组", MenuAction::Workflow(A::DuplicatePart(false))).enabled(part),
+                MenuItem::action("取消音符组链接", MenuAction::Workflow(A::UnlinkPart)).enabled(part),
+                MenuItem::action("解散音符组（保留音符）", MenuAction::Workflow(A::DissolvePart)).with_hint("Ctrl+Shift+G").enabled(part),
+                MenuItem::action("删除音符组", MenuAction::Workflow(A::DeletePart)).enabled(part),
             ]),
             MenuItem::submenu("音频片段", vec![
                 MenuItem::action("导入音频伴奏 / 参考音…", MenuAction::Workflow(A::Integration(I::ImportAudio))),
                 MenuItem::action("音频片段列表…", MenuAction::Workflow(A::Integration(I::Clips))),
                 MenuItem::action("精确编辑所选音频片段…", MenuAction::Workflow(A::Integration(I::EditClip))).enabled(clip),
+                MenuItem::action("复制所选音频片段", MenuAction::Workflow(A::Integration(I::DuplicateClip))).enabled(clip),
+                MenuItem::action("删除所选音频片段", MenuAction::Workflow(A::Integration(I::DeleteClip))).enabled(clip),
                 MenuItem::action("重新定位丢失音源…", MenuAction::Workflow(A::Integration(I::RelinkClip))).enabled(clip),
                 MenuItem::action("授权重新打开已保存音频…", MenuAction::Workflow(A::Integration(I::AuthorizeAudio))),
             ]),
         ]);
         if let Ok(parts) = verdant_domain::parts::Parts::load(self.project()) {
             if !parts.instances.is_empty() {
-                items.push(MenuItem::submenu("定位片段", parts.instances.into_iter()
+                items.push(MenuItem::submenu("定位音符组", parts.instances.into_iter()
                     .map(|p| MenuItem::action(p.name, MenuAction::Workflow(A::SelectPart(p.id)))).collect()));
             }
         }
@@ -684,20 +707,18 @@ impl Editor {
             MenuItem::header("走带"),
             MenuItem::boolean_command("循环播放", CommandId::ToggleLoop, CommandArg::None, pb.looping),
             MenuItem::action("以选中音符设为循环范围", MenuAction::Workflow(A::RepeatSelection)).enabled(!self.session.selection.is_empty()),
+            MenuItem::action("在播放头设循环起点", MenuAction::Workflow(A::LoopStart(tick))).with_hint("Ctrl+K ["),
+            MenuItem::action("在播放头设循环终点", MenuAction::Workflow(A::LoopEnd(tick))).with_hint("Ctrl+K ]"),
             MenuItem::boolean_command("节拍器", CommandId::ToggleMetronome, CommandArg::None, pb.metronome),
-            MenuItem::boolean("离线导出包含节拍器", MenuBoolean::ExportClick, pb.export_click),
             MenuItem::action("当前位置速度 (BPM)…", MenuAction::Workflow(A::EditTempo(tick))),
             MenuItem::action("当前位置拍号…", MenuAction::Workflow(A::EditMeter(tick))),
             MenuItem::separator(),
-            MenuItem::submenu("MIDI 录音", vec![
+            MenuItem::submenu("MIDI 输入", vec![
+                MenuItem::action("实时监听…", MenuAction::Workflow(A::Integration(I::MonitorPorts))),
                 MenuItem::action("选择输入设备并开始录音…", MenuAction::Workflow(A::Integration(I::MidiPorts))).enabled(!recording),
                 MenuItem::action("完成并写入录音", MenuAction::Workflow(A::Integration(I::FinishRecording))).enabled(recording),
                 MenuItem::action("取消录音", MenuAction::Workflow(A::Integration(I::CancelRecording))).enabled(recording),
             ]),
-            MenuItem::separator(),
-            MenuItem::header("帮助"),
-            MenuItem::action("键盘快捷键…", MenuAction::ShowShortcutsWindow).with_hint("F1"),
-            MenuItem::action("开源软件与研究引用…", MenuAction::ShowDisclosuresWindow).with_hint("Shift+F1"),
         ]
     }
 }
@@ -743,9 +764,9 @@ pub(crate) fn track_menu_items(project: &verdant_domain::Project, track: &verdan
     ]
 }
 
-fn collection_revision(ed: &Editor, menu: &OpenMenu) -> String {
+fn collection_revision(ed: &Editor, menu: &OpenMenu, branch_revision: u64) -> String {
     let states = menu.items.iter().map(|item| item.state(ed)).collect::<Vec<_>>();
-    format!("{}:{}:{}:{:?}:{:?}:{states:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.expanded, menu.items)
+    format!("{}:{}:{}:{branch_revision}:{:?}:{states:?}", menu.instance, ed.document_generation, ed.revision().get(), menu.items)
 }
 
 pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx: &mut Context<Editor>) -> impl IntoElement {
@@ -753,8 +774,9 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
     let mut branch = Some(menu);
     let mut path = Vec::new();
     let mut parent_source = None;
+    let leaf_source: CollectionSource = Rc::new(RefCell::new(None));
     while let Some(panel) = branch {
-        let (element, source) = menu_panel(ed, menu, panel, path.clone(), parent_source, window, cx);
+        let (element, source) = menu_panel(ed, menu, panel, path.clone(), parent_source, leaf_source.clone(), window, cx);
         layer = layer.child(gpui::deferred(element).with_priority(path.len()));
         parent_source = Some(source);
         branch = panel.child.as_deref();
@@ -765,9 +787,13 @@ pub fn context_menu_layer(ed: &Editor, menu: &OpenMenu, window: &mut Window, cx:
 
 type CollectionSource = Rc<RefCell<Option<(verdant_collection_control::CollectionControlHandle, crate::proto_scroll::EngineBinding)>>>;
 
+fn collection_index(handle: &verdant_collection_control::CollectionControlHandle, state: &str) -> Option<usize> {
+    handle.state(state).ok().and_then(|value| crate::proto_controls::source_index(Some(&value)))
+}
+
 fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, parent: Option<CollectionSource>,
-    _window: &mut Window, cx: &mut Context<Editor>) -> (impl IntoElement, CollectionSource) {
-    let revision = collection_revision(ed, menu);
+    leaf_source: CollectionSource, _window: &mut Window, cx: &mut Context<Editor>) -> (impl IntoElement, CollectionSource) {
+    let revision = collection_revision(ed, menu, menu.branch_revision);
     let viewport = menu.scroll_engine.clone();
     let items = menu.items.iter().map(|item| {
         let (enabled, checked) = item.state(ed);
@@ -781,7 +807,7 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
     let props = serde_json::json!({"mode":"menu", "label":menu.label.as_ref(), "cursor":menu.selected,
         "expanded": expanded, "revision":revision, "autoFocus":true, "disabled":false});
     let draw_editor = cx.entity(); let snapshot = menu.clone(); let basis = revision.clone();
-    let source: CollectionSource = Rc::new(RefCell::new(None));
+    let source: CollectionSource = if menu.child.is_none() { leaf_source.clone() } else { Rc::new(RefCell::new(None)) };
     let source_draw = source.clone();
     let source_sink = source.clone();
     let draw_path = path.clone();
@@ -811,14 +837,14 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
                     });
                 }
             }
-            native_context_menu_layer(ed, &snapshot, outside.as_ref(), handle.clone(), basis.clone(), engine, window, cx).into_any_element()
+            native_context_menu_layer(ed, &snapshot, &draw_path, outside.as_ref(), handle.clone(), &leaf_source, basis.clone(), engine, window, cx).into_any_element()
         })
     });
     let editor = cx.entity().downgrade();
     let sink = std::rc::Rc::new(move |name: &str, payload: &serde_json::Value, window: &mut Window, cx: &mut gpui::App| {
         let _ = editor.update(cx, |ed, cx| {
             let Some(menu) = ed.menu.as_ref().filter(|menu| menu.window == window.window_handle()).and_then(|root| root.panel(&path)) else { return };
-            let revision = collection_revision(ed, menu);
+            let revision = collection_revision(ed, menu, menu.branch_revision);
             if payload.get("revision").and_then(serde_json::Value::as_str) != Some(revision.as_str()) { return; }
             let index = crate::proto_controls::source_integer(payload.get("index")).unwrap_or(-1);
             match name {
@@ -836,7 +862,17 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
                     }
                     cx.notify();
                 },
-                "expand" => ed.expand_menu_item(&path, usize::try_from(index).ok(), window, cx),
+                "expand" => {
+                    let binding = source_sink.borrow();
+                    let Some((handle, _)) = binding.as_ref() else { return; };
+                    let expanded = usize::try_from(index).ok();
+                    if collection_index(handle, "expanded") == expanded {
+                        // Input can advance again before delivery. Left restores the invoking
+                        // row, whereas a pointer crossing onto a leaf selects its destination.
+                        let cursor = collection_index(handle, "cursor");
+                        ed.expand_menu_item(&path, expanded, cursor, window, cx);
+                    }
+                },
                 _ => {},
             }
         });
@@ -852,8 +888,8 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
     (collection, source)
 }
 
-fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, outside: Option<&OpenMenu>, handle: verdant_collection_control::CollectionControlHandle,
-    revision: String, engine: crate::proto_scroll::EngineBinding, window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
+fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, path: &[usize], outside: Option<&OpenMenu>, handle: verdant_collection_control::CollectionControlHandle,
+    leaf_source: &CollectionSource, revision: String, engine: crate::proto_scroll::EngineBinding, window: &Window, cx: &mut Context<Editor>) -> impl IntoElement {
 
     let th = ed.theme;
     let win = window.viewport_size();
@@ -868,7 +904,44 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, outside: Option<&Open
     let height = px(menu.items.iter().map(MenuItem::row_height).sum::<f32>() + 14.0).min(available_height).max(px(0.0));
     // Reserve a check column only in menus that contain toggles.
     let checks = menu.items.iter().any(|item| item.checked.is_some());
-    let selected = handle.state("cursor").ok().and_then(|v| crate::proto_controls::source_index(Some(&v))).unwrap_or(menu.selected);
+    let selected = collection_index(&handle, "cursor").unwrap_or(menu.selected);
+    // Native motion may hit the previous layout after the editor has already
+    // accepted a sibling expansion. Only the pointer that moved on that layout
+    // may reconcile its navigation result across this one kind of revision change.
+    let hover = {
+        let editor = cx.weak_entity();
+        let path = path.to_vec();
+        let painted = menu.branch_revision;
+        let basis = revision.clone();
+        let handle = handle.clone();
+        Rc::new(move |row: usize, enabled: bool, submenu: bool, window: &mut Window, cx: &mut App| {
+            let open = collection_index(&handle, "expanded");
+            let target = (enabled && submenu).then_some(row);
+            if open != target && let Some(index) = target.or(open) {
+                crate::proto_collection::call(&handle, "choose", vec![index.into(), false.into(), basis.clone().into()], window, cx);
+            }
+            if enabled && !submenu && collection_index(&handle, "cursor") != Some(row) {
+                crate::proto_collection::call(&handle, "selectIndex", vec![row.into(), false.into(), basis.clone().into()], window, cx);
+            }
+            let _ = editor.update(cx, |ed, cx| {
+                let Some(panel) = ed.menu.as_ref().filter(|root| root.window == window.window_handle()).and_then(|root| root.panel(&path)) else { return };
+                if panel.branch_revision == painted || collection_revision(ed, panel, painted) != basis { return; }
+                {
+                    let owner = handle.owner.borrow();
+                    if !owner.present || !owner.mounted || owner.disposed || owner.window_id != Some(window.window_handle().window_id())
+                        || owner.props.get("revision").and_then(serde_json::Value::as_str) != Some(basis.as_str()) { return; }
+                }
+                let cursor = collection_index(&handle, "cursor");
+                if collection_index(&handle, "expanded") != target || (enabled && cursor != Some(row)) { return; }
+                if panel.expanded != target {
+                    ed.expand_menu_item(&path, target, cursor, window, cx);
+                } else if let Some(cursor) = cursor && panel.selected != cursor {
+                    ed.menu.as_mut().and_then(|root| root.panel_mut(&path)).expect("admitted panel").selected = cursor;
+                    cx.notify();
+                }
+            });
+        })
+    };
     let list = div().id("context-menu")
         .key_context("ContextMenu").occlude()
         .w_full().max_h(height).overflow_y_scroll().track_scroll(&engine.handle(cx))
@@ -888,8 +961,9 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, outside: Option<&Open
             let (enabled, checked) = item.state(ed);
             let expanded = menu.expanded == Some(i);
             let submenu = expanded || item.is_submenu(ed);
+            let child_focus = expanded.then(|| (leaf_source.clone(), cx.weak_entity(), path.to_vec()));
             let choose = handle.clone(); let choose_revision = revision.clone();
-            let hover = handle.clone(); let hover_revision = revision.clone();
+            let hover = hover.clone();
             let role = if matches!(&item.command, Some(MenuCommand::Boolean(_))) { gpui::Role::MenuItemCheckBox }
                 else if checked.is_some() { gpui::Role::MenuItemRadio } else { gpui::Role::MenuItem };
             crate::proto_controls::action(SharedString::from(format!("menu-item-{i}")), item.label.clone()).role(role)
@@ -901,17 +975,27 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, outside: Option<&Open
                 .when(submenu, |action| action.aria_expanded(expanded))
                 .when(i == selected && enabled, |d| d.aria_active_descendant().bg(th.hover))
                 .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0))
+                .when(enabled, |d| d.active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover))))
                 .text_color(if enabled { th.text } else { th.text_tertiary })
                 .when(checks, |d| d.child(div().w(px(18.0)).flex_none().text_color(th.accent).child(if checked == Some(true) { "✓" } else { "" })))
                 .child(div().flex_1().truncate().child(item.label.clone()))
                 .when(submenu || !item.hint.is_empty(), |d| d.child(div().ml(px(12.0)).flex_none().text_xs().text_color(th.text_secondary)
                     .child(if submenu && item.hint.is_empty() { "›".into() } else { item.hint.clone() })))
-                .on_mouse_move(move |_, window, cx| {
-                    crate::proto_collection::call(&hover, "selectIndex", vec![i.into(), false.into(), hover_revision.clone().into()], window, cx);
-                })
+                .on_mouse_move(move |_, window, cx| hover(i, enabled, submenu, window, cx))
                 .on_click(move |event, window, cx| {
-                    let (method, value) = if checked.is_some() { ("chooseSelection", event.selected()) } else { ("choose", false) };
-                    crate::proto_collection::call(&choose, method, vec![i.into(), value.into(), choose_revision.clone().into()], window, cx);
+                    if submenu && event.is_mouse() && collection_index(&choose, "expanded") == Some(i) {
+                        if let Some((leaf, editor, path)) = &child_focus && let Some(editor) = editor.upgrade() {
+                            let ed = editor.read(cx);
+                            let current = ed.menu.as_ref().filter(|root| root.window == window.window_handle()).and_then(|root| root.panel(path));
+                            if current.is_some_and(|panel| collection_revision(ed, panel, panel.branch_revision) == choose_revision)
+                                && let Some((child, _)) = leaf.borrow().as_ref() {
+                                crate::proto_collection::call(child, "focusSelf", vec![], window, cx);
+                            }
+                        }
+                    } else {
+                        let (method, value) = if checked.is_some() { ("chooseSelection", event.selected()) } else { ("choose", false) };
+                        crate::proto_collection::call(&choose, method, vec![i.into(), value.into(), choose_revision.clone().into()], window, cx);
+                    }
                     cx.stop_propagation();
                 }).into_any_element()
         }))
@@ -1092,17 +1176,240 @@ mod native_menu_tests {
     }
     fn revision(source:&CollectionControlHandle)->String {source.owner.borrow().props["revision"].as_str().unwrap().into()}
     fn click(window: WindowHandle<Harness>, cx: &mut TestAppContext, position: Point<Pixels>, button: MouseButton) {
-        window.update(cx, |_, window, cx| {
-            window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { position, button, click_count: 1, ..Default::default() }), cx);
-            window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { position, button, click_count: 1, ..Default::default() }), cx);
-        }).unwrap();
+        window.update(cx, |_, window, cx| dispatch_click(window, cx, position, button)).unwrap();
         crate::native_test_support::frames(window, cx);
+    }
+
+    fn dispatch_click(window: &mut Window, cx: &mut App, position: Point<Pixels>, button: MouseButton) {
+        window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { position, button, click_count: 1, ..Default::default() }), cx);
+        window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { position, button, click_count: 1, ..Default::default() }), cx);
     }
 
     fn row_geometry(menu: &OpenMenu, index: usize) -> Bounds<Pixels> {
         let mut row = menu.viewport.bounds_for_item(index).unwrap();
         row.origin = row.origin + menu.viewport.offset();
         row
+    }
+
+    fn hover_menu(cx: &mut TestAppContext) -> (WindowHandle<Harness>, [Point<Pixels>; 4]) {
+        use crate::editor::Tool;
+        let window = open(cx);
+        window.update(cx, |host, window, cx| host.editor.update(cx, |ed, cx| {
+            let tool = |name, value| MenuItem::action(name, MenuAction::SetTool(value));
+            ed.show_menu(point(px(80.), px(40.)), vec![
+                MenuItem::submenu("First", vec![tool("Pencil", Tool::Pencil)]),
+                MenuItem::submenu("Second", vec![tool("Pointer", Tool::Pointer), tool("Eraser", Tool::Eraser)]),
+                tool("Pitch", Tool::Pitch), tool("Unavailable", Tool::Pencil).enabled(false),
+            ], window, cx);
+        })).unwrap();
+        crate::native_test_support::frames(window, cx);
+        let rows = window.update(cx, |host, _, cx| {
+            let menu = host.editor.read(cx).menu.as_ref().unwrap();
+            std::array::from_fn(|index| row_geometry(menu, index).center())
+        }).unwrap();
+        (window, rows)
+    }
+
+    fn move_pointer(window: WindowHandle<Harness>, cx: &mut TestAppContext, positions: &[Point<Pixels>]) {
+        window.update(cx, |_, window, cx| {
+            for &position in positions {
+                dispatch_motion(window, cx, position);
+            }
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+    }
+
+    #[gpui::test]
+    fn native_menu_hover_switches_siblings_and_click_keeps_child_selection(cx: &mut TestAppContext) {
+        let (window, [first, second, _, _]) = hover_menu(cx);
+        move_pointer(window, cx, &[first]);
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some())).unwrap();
+        move_pointer(window, cx, &[second]);
+        window.update(cx, |host, _, cx| {
+            let menu = host.editor.read(cx).menu.as_ref().unwrap();
+            assert!(menu.panel(&[0]).is_none());
+            assert!(menu.panel(&[1]).is_some());
+        }).unwrap();
+        cx.simulate_keystrokes(window.into(), "down");
+        crate::native_test_support::frames(window, cx);
+        click(window, cx, second, MouseButton::Left);
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.is_none());
+            assert_eq!(ed.tool, crate::editor::Tool::Eraser);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_hover_leaf_closes_child_and_enter_activates_destination(cx: &mut TestAppContext) {
+        let (window, [first, _, leaf, _]) = hover_menu(cx);
+        move_pointer(window, cx, &[first]);
+        move_pointer(window, cx, &[leaf]);
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.is_none());
+            assert_eq!(ed.tool, crate::editor::Tool::Pitch);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_hover_open_child_remains_clickable_after_clicking_parent(cx: &mut TestAppContext) {
+        let (window, [_, second, _, _]) = hover_menu(cx);
+        move_pointer(window, cx, &[second]);
+        click(window, cx, second, MouseButton::Left);
+        let eraser = window.update(cx, |host, _, cx| {
+            let menu = host.editor.read(cx).menu.as_ref().unwrap();
+            row_geometry(menu.panel(&[1]).expect("Second remains open"), 1).center()
+        }).unwrap();
+        move_pointer(window, cx, &[eraser]);
+        click(window, cx, eraser, MouseButton::Left);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.is_none());
+            assert_eq!(ed.tool, crate::editor::Tool::Eraser);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_hover_disabled_closes_child_and_keeps_parent_keyboard_navigation(cx: &mut TestAppContext) {
+        let (window, [_, second, _, disabled]) = hover_menu(cx);
+        move_pointer(window, cx, &[second]);
+        move_pointer(window, cx, &[disabled]);
+        click(window, cx, disabled, MouseButton::Left);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.as_ref().unwrap().child.is_none());
+            assert_eq!(ed.tool, crate::editor::Tool::Pointer);
+        }).unwrap();
+        for key in ["enter", "left", "right"] {
+            cx.simulate_keystrokes(window.into(), key);
+            crate::native_test_support::frames(window, cx);
+            window.update(cx, |host, _, cx| {
+                assert_eq!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[1]).is_some(), key != "left");
+            }).unwrap();
+        }
+    }
+
+    #[gpui::test]
+    fn native_menu_queued_hover_uses_the_last_row_before_repaint(cx: &mut TestAppContext) {
+        let (window, [first, second, leaf, _]) = hover_menu(cx);
+        move_pointer(window, cx, &[first]);
+        move_pointer(window, cx, &[second, leaf]);
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.is_none());
+            assert_eq!(ed.tool, crate::editor::Tool::Pitch);
+        }).unwrap();
+    }
+
+    fn dispatch_motion(window: &mut Window, cx: &mut App, position: Point<Pixels>) {
+        window.dispatch_event(PlatformInput::MouseMove(gpui::MouseMoveEvent { position, ..Default::default() }), cx);
+    }
+
+    fn after_sibling_delivery(cx: &mut TestAppContext,
+        next: impl FnOnce(Entity<Editor>, [Point<Pixels>; 4], &mut Window, &mut App) + 'static,
+    ) -> WindowHandle<Harness> {
+        let (window, rows) = hover_menu(cx);
+        move_pointer(window, cx, &[rows[0]]);
+        let observed = Rc::new(Cell::new(false));
+        let delivered = observed.clone();
+        let _observer = window.update(cx, |host, window, cx| {
+            let painted = source(window);
+            let painted_revision = revision(&painted);
+            assert!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some());
+            let mut next = Some(next);
+            // GPUI Test mode draws dirty windows as soon as the effect queue drains.
+            // This editor notification follows the genuine expand sink, before that draw.
+            window.observe(&host.editor, cx, move |editor, window, cx| {
+                if editor.read(cx).menu.as_ref().and_then(|menu| menu.panel(&[1])).is_none() { return; }
+                let Some(next) = next.take() else { return; };
+                let mounted = source(window);
+                assert!(Rc::ptr_eq(&painted.owner, &mounted.owner));
+                assert_eq!(revision(&mounted), painted_revision, "pointer input still belongs to First's rendered revision");
+                delivered.set(true);
+                next(editor, rows, window, cx);
+            })
+        }).unwrap();
+        move_pointer(window, cx, &[rows[1]]);
+        assert!(observed.get(), "the editor accepted Second before the next pointer input");
+        window
+    }
+
+    #[gpui::test]
+    fn native_menu_between_frames_hover_selects_leaf_after_delivered_sibling_expansion(cx: &mut TestAppContext) {
+        let window = after_sibling_delivery(cx, |_, rows, window, cx| dispatch_motion(window, cx, rows[2]));
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.is_none());
+            assert_eq!(ed.tool, crate::editor::Tool::Pitch);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_between_frames_disabled_hover_closes_child_and_keeps_invoking_row(cx: &mut TestAppContext) {
+        let window = after_sibling_delivery(cx, |_, rows, window, cx| dispatch_motion(window, cx, rows[3]));
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.as_ref().unwrap().panel(&[1]).is_some());
+            assert_eq!(ed.tool, crate::editor::Tool::Pointer);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_between_frames_click_cannot_activate_a_stale_leaf(cx: &mut TestAppContext) {
+        let window = after_sibling_delivery(cx, |editor, [first, _, leaf, _], window, cx| {
+            dispatch_motion(window, cx, first);
+            assert!(editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some());
+            dispatch_click(window, cx, leaf, MouseButton::Left);
+        });
+        window.update(cx, |host, _, cx| {
+            let ed = host.editor.read(cx);
+            assert!(ed.menu.as_ref().unwrap().panel(&[0]).is_some());
+            assert_eq!(ed.tool, crate::editor::Tool::Pointer);
+        }).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_between_frames_hover_cannot_expand_replacement(cx: &mut TestAppContext) {
+        let window = after_sibling_delivery(cx, |editor, rows, window, cx| {
+            editor.update(cx, |ed, cx| {
+                let items = ed.menu.as_ref().unwrap().items.clone();
+                ed.show_menu(point(px(80.), px(40.)), items, window, cx);
+            });
+            dispatch_motion(window, cx, rows[0]);
+        });
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some())).unwrap();
+    }
+
+    #[gpui::test]
+    fn native_menu_queued_hover_cannot_expand_a_replacement_at_the_same_anchor(cx: &mut TestAppContext) {
+        let window = open(cx);
+        window.update(cx, |host, window, cx| {
+            let position = row_geometry(host.editor.read(cx).menu.as_ref().unwrap(), 2).center();
+            dispatch_motion(window, cx, position);
+            host.editor.update(cx, |ed, cx| ed.show_menu(point(px(80.), px(40.)), items(), window, cx));
+        }).unwrap();
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().child.is_none())).unwrap();
+        cx.simulate_keystrokes(window.into(), "enter");
+        crate::native_test_support::frames(window, cx);
+        window.update(cx, |host, _, cx| assert!(host.editor.read(cx).menu.as_ref().unwrap().panel(&[0]).is_some())).unwrap();
     }
 
     #[gpui::test]

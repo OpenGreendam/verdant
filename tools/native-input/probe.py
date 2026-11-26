@@ -138,8 +138,11 @@ def fixture():
                                               "decay": 300.0, "sustain": 70.0, "release": 250.0,
                                               "cutoff": 4000.0, "resonance": 0.9,
                                               "env_amount": 30.0, "width": 50.0, "gain": -8.0}}}],
+        # Vowel-onset alignment is always on; without it the app migrates the
+        # document on open, which commits an edit before the probe starts.
         "render_preferences": {"protocol": "ogd-worker/1", "route": "verdant-voice",
-                               "native_seed": 10008},
+                               "native_seed": 10008,
+                               "phoneme_timing": {"method": "vowel-anchor-v1"}},
         "extensions": {},
     }
 

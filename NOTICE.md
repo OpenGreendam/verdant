@@ -29,6 +29,7 @@ Verdant 源码采用 AGPL-3.0-or-later。下列依赖、资料和研究引用保
 
 `frontend/crates/verdant-app/assets/examples/hexie-title-excerpt.verp`
 引用《绿坝绿坝★河蟹你全家feveR.》的一个八字短句，整理成约 2.625 秒的可编辑谱例。
+谱例从第二小节开始，预留一小节供首字辅音提前进入，元音仍落在拍点。
 原曲为 **《ルカルカ★ナイトフィーバー》**，原曲词曲 **samfree（SAM）**；
 中文填词、原版调声 **荼荼丸**。
 
