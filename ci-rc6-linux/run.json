@@ -1,8 +1,5 @@
 {
-  "run_id": "run-4fdcd984e08e-s4of6dy6",
-  "commit": "4fdcd984e08e845ac24a36f6d0763c805e4202b1",
-  "tree": "de6bb95e900aa161b1d9e179664a9d08f06d4a39",
-  "epoch": 1795698295,
+  "prior_archive_sha256": "964118f22c7789b22a97e631c0853dfc713e083216d2490fdcfe7d63a3a8883a",
   "version": "0.1.0",
   "programs": [
     "verdant",
