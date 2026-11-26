@@ -176,7 +176,19 @@ try {
     if ($hwnd -eq [IntPtr]::Zero) { throw 'No visible main window within 30 seconds' }
     if (![string]::Equals($gui.Path, $actualExe, [StringComparison]::OrdinalIgnoreCase)) { throw 'Window executable differs from Exe' }
     if ([VerdantMenuInput]::IsIconic($hwnd)) { [void][VerdantMenuInput]::ShowWindow($hwnd, 9) }
-    [void][VerdantMenuInput]::SetForegroundWindow($hwnd)
+    $receipt.session = $gui.SessionId
+    $receipt.interactive = [Environment]::UserInteractive
+    $receipt.explorer_sessions = @(Get-Process explorer -ErrorAction SilentlyContinue | Select-Object -ExpandProperty SessionId)
+    $shell = New-Object -ComObject WScript.Shell
+    for ($attempt = 0; $attempt -lt 8; $attempt++) {
+        if ([VerdantMenuInput]::GetForegroundWindow() -eq $hwnd) { break }
+        $shell.SendKeys('%')
+        [void]$shell.AppActivate($gui.Id)
+        [void][VerdantMenuInput]::ShowWindow($hwnd, 3)
+        [void][VerdantMenuInput]::SetForegroundWindow($hwnd)
+        Start-Sleep -Milliseconds 500
+    }
+    $receipt.foreground_hwnd = [VerdantMenuInput]::GetForegroundWindow().ToInt64()
     Wait-Frame
     $initial = [VerdantMenuInput]::Client($hwnd)
     $receipt.pid = $gui.Id
