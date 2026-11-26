@@ -100,7 +100,7 @@ catalogue! {
     Dialog => ("编辑器对话框", "Editor dialog"),
     DialogHelp => ("编辑器输入与确认操作。", "Editor input and confirmation controls."),
     Arrangement => ("轨道编排", "Track arrangement"),
-    ArrangementHelp => ("项目轨道与片段的时间排列。", "Tracks and clips arranged on the project timeline."),
+    ArrangementHelp => ("项目轨道、音符组与音频片段的时间排列。", "Tracks and clips arranged on the project timeline."),
     NoteTable => ("键盘音符表", "Keyboard note table"),
     NoteTableHelp => ("用键盘浏览和编辑音符、歌词与读音。", "Browse and edit notes, lyrics and readings with the keyboard."),
     Inspector => ("检查器", "Inspector"),

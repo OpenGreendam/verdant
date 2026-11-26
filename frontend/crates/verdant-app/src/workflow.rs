@@ -134,9 +134,9 @@ impl Editor {
                 let scales=parse_values(&fields[1..].join(","),3)?;
                 self.transform_selected_points(offset,scales[0]/100.,scales[1],scales[2]/100.,cx)?;
             }
-            PromptPurpose::RenamePart(id)=>{if text.is_empty(){return Err("片段名称不能为空".into());}self.edit_part(id,"片段名称",cx,|p|{p.name=text.into();Ok(())})?;}
-            PromptPurpose::MovePart(id)=>{let v=parse_values(text,1)?;self.edit_part(id,"移动片段",cx,|p|{p.start_tick=v[0].round()as i64;Ok(())})?;}
-            PromptPurpose::TrimPart(id)=>{let v=parse_values(text,2)?;self.edit_part(id,"裁剪片段",cx,|p|{p.source_offset_tick=v[0].round()as i64;p.duration_tick=v[1].round()as i64;Ok(())})?;}
+            PromptPurpose::RenamePart(id)=>{if text.is_empty(){return Err("音符组名称不能为空".into());}self.edit_part(id,"音符组名称",cx,|p|{p.name=text.into();Ok(())})?;}
+            PromptPurpose::MovePart(id)=>{let v=parse_values(text,1)?;self.edit_part(id,"移动音符组",cx,|p|{p.start_tick=v[0].round()as i64;Ok(())})?;}
+            PromptPurpose::TrimPart(id)=>{let v=parse_values(text,2)?;self.edit_part(id,"裁剪音符组",cx,|p|{p.source_offset_tick=v[0].round()as i64;p.duration_tick=v[1].round()as i64;Ok(())})?;}
             PromptPurpose::NumericValue(id, arg) => {
                 use crate::generated::controls::{NumericPhase, NumericTarget};
                 let v = parse_values(text, 1)?[0];
@@ -221,7 +221,7 @@ impl Editor {
         let copied=automation.lanes.iter().filter_map(|lane|{use verdant_domain::automation::{AutomationTarget as T,AutomationOwner as O};let mut copy=lane.clone();copy.target=match &lane.target{T::TrackGain{track_id}if track_id==id=>T::TrackGain{track_id:new_id.clone()},T::TrackPan{track_id}if track_id==id=>T::TrackPan{track_id:new_id.clone()},T::PluginParameter{owner:O::Track{track_id},instance_id,parameter_id}if track_id==id=>T::PluginParameter{owner:O::Track{track_id:new_id.clone()},instance_id:plugin_ids.get(instance_id)?.clone(),parameter_id:parameter_id.clone()},_=>return None};Some(copy)}).collect::<Vec<_>>();
         for lane in copied{automation.set_lane(lane);}
         let mut parts=Parts::load(self.project())?;let original=parts.instances.iter().filter(|p|&p.track==id).cloned().collect::<Vec<_>>();
-        for mut part in original{let mut content=parts.contents.get(&part.content_id).cloned().ok_or("片段内容不存在")?;content.id=NoteId::generate().to_string();part.id=NoteId::generate().to_string();part.content_id=content.id.clone();part.track=new_id.clone();for note in part.bindings.values_mut(){*note=mapping.get(note).cloned().unwrap_or_else(NoteId::generate);}parts.contents.insert(content.id.clone(),content);parts.instances.push(part);}
+        for mut part in original{let mut content=parts.contents.get(&part.content_id).cloned().ok_or("音符组内容不存在")?;content.id=NoteId::generate().to_string();part.id=NoteId::generate().to_string();part.content_id=content.id.clone();part.track=new_id.clone();for note in part.bindings.values_mut(){*note=mapping.get(note).cloned().unwrap_or_else(NoteId::generate);}parts.contents.insert(content.id.clone(),content);parts.instances.push(part);}
         let mut commands=vec![Command::AddTrack{index:index+1,track},Command::SetProjectExtension{key:verdant_domain::automation::AUTOMATION_KEY.into(),value:automation.extension_value().map_err(|e|e.to_string())?}];if !parts.instances.is_empty(){commands.push(parts.command());}
         if self.commit(self.revision(),CommandBatch{label:"复制轨道".into(),commands},cx){self.select_track(new_id,cx);}Ok(())
     }
@@ -309,7 +309,7 @@ impl Editor {
             I::submenu("轨道",vec![w("重命名轨道…",A::RenameTrack(track.clone())),w("轨道上移",A::MoveTrack(track.clone(),-1)),w("轨道下移",A::MoveTrack(track.clone(),1)),w("复制轨道",A::DuplicateTrack(track))]),
             I::submenu("音符",vec![w("在播放头分割",A::Split(tick)),w("连接选中音符",A::Join),w("量化到网格",A::Quantize),w("闭合一格内间隙",A::CloseGaps),w("消除重叠",A::RemoveOverlaps),w("静音 / 取消静音",A::MuteNotes)]),
             I::submenu("歌词与颤音",vec![w("批量填写歌词…",A::BatchLyrics(false)),w("逐字填写歌词…",A::BatchLyrics(true)),w("歌词循环左移",A::ShiftLyrics(false)),w("歌词循环右移",A::ShiftLyrics(true)),w("设为同音节延音",A::ContinueSyllable),w("颤音淡入淡出和相位…",A::VibratoShape)]),
-            I::submenu("片段 (Part)",parts),
+            I::submenu("音符组",parts),
             I::submenu("速度与拍号",vec![w("当前位置速度…",A::EditTempo(tick)),w("当前位置拍号…",A::EditMeter(tick))]),
             I::submenu("循环与节拍器",vec![
                 I::boolean_command("循环播放",crate::generated::controls::CommandId::ToggleLoop,crate::generated::controls::CommandArg::None,pb.looping),w("以选中音符设为循环",A::RepeatSelection),w("在播放头设循环起点",A::LoopStart(tick)),w("在播放头设循环终点",A::LoopEnd(tick)),

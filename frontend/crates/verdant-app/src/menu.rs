@@ -627,7 +627,7 @@ impl Editor {
         ]);
         if let Ok(parts) = verdant_domain::parts::Parts::load(self.project()) {
             if !parts.instances.is_empty() {
-                items.push(MenuItem::submenu("定位片段", parts.instances.into_iter()
+                items.push(MenuItem::submenu("定位音符组", parts.instances.into_iter()
                     .map(|p| MenuItem::action(p.name, MenuAction::Workflow(A::SelectPart(p.id)))).collect()));
             }
         }

@@ -133,9 +133,10 @@ impl RightDockTab {
     }
 }
 
-/// Properties, synthesis and render are open by default.
-const DEFAULT_RIGHT_PANELS: u8 = 1 << RightDockTab::VoiceTimbre as u8
-    | 1 << RightDockTab::Synthesis as u8 | 1 << RightDockTab::RenderInserts as u8;
+/// The properties panel is open by default; others open beside it.
+const DEFAULT_RIGHT_PANELS: u8 = 1 << RightDockTab::VoiceTimbre as u8;
+/// Width of the right dock's vertical panel bar.
+pub const PANEL_RAIL_WIDTH: f32 = 52.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -187,6 +188,12 @@ impl LayoutPrefs {
     }
 
     pub fn panel_open(&self, tab: RightDockTab) -> bool { self.right_panels & tab.bit() != 0 }
+
+    /// The right dock's width: the panel bar plus one column per open panel.
+    pub fn right_dock_total_width(&self) -> f32 {
+        let open = RightDockTab::ORDER.iter().filter(|tab| self.panel_open(**tab)).count();
+        PANEL_RAIL_WIDTH + open as f32 * self.right_dock_width
+    }
 
     pub fn set_panel_open(&mut self, tab: RightDockTab, open: bool) {
         if open { self.right_panels |= tab.bit() } else { self.right_panels &= !tab.bit() }
@@ -1236,7 +1243,8 @@ mod width_class_tests {
         assert_eq!(layout.right_dock_tab, RightDockTab::VoiceTimbre);
         assert_eq!(layout.inspector_width, 300.0);
         // Layouts from before stackable panels open the default set.
-        assert!(layout.panel_open(RightDockTab::VoiceTimbre) && layout.panel_open(RightDockTab::Synthesis));
+        assert!(layout.panel_open(RightDockTab::VoiceTimbre) && !layout.panel_open(RightDockTab::Synthesis));
+        assert_eq!(layout.right_dock_total_width(), PANEL_RAIL_WIDTH + layout.right_dock_width);
     }
 }
 

@@ -158,7 +158,7 @@ impl Editor {
                 let pan=fields[4].parse::<f32>().map_err(|_|"声像须为 -1..1 的有限数值")?;
                 let muted=match fields[5]{"0"=>false,"1"=>true,_=>return Err("静音须为 0 或 1".into())};
                 let mut clips=verdant_media::read_clips(self.project().track(track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;
-                let clip=clips.iter_mut().find(|c|c.id.to_string()==*id).ok_or("片段已不存在")?;
+                let clip=clips.iter_mut().find(|c|c.id.to_string()==*id).ok_or("音频片段已不存在")?;
                 *clip=clip.trim_source(offset_frames,duration_frames,start_tick as f64,&self.tempo()).map_err(|e|e.to_string())?;
                 clip.gain=gain;clip.pan=pan;clip.muted=muted;
                 clip.validate().map_err(|e|e.to_string())?;

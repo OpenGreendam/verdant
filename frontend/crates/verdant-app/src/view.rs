@@ -607,9 +607,9 @@ impl Editor {
             .into_any_element()
     }
 
-    /// Synthesizer V Studio-style right dock: any number of panels open at
-    /// once, stacked top to bottom. The header toggles each panel; each panel
-    /// has its own title bar with a close button.
+    /// Synthesizer V Studio-style right dock: a vertical bar of panel buttons
+    /// at the window edge; each open panel becomes a column, and panels opened
+    /// later stack further to the left.
     fn right_synthv_dock(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let project = self.store().snapshot();
@@ -617,53 +617,46 @@ impl Editor {
             return div().into_any_element();
         };
         let errors = self.plans.iter().flat_map(|p| &p.diagnostics).filter(|d| d.severity == Severity::Error).count();
-        let header = div()
-            .h(px(46.0))
-            .flex_none()
-            .px(px(8.0))
-            .flex()
-            .items_center()
-            .gap(px(4.0))
-            .bg(th.surface)
-            .border_b_1()
-            .border_color(th.shade)
+        let rail = div()
+            .id("dock-panels").role(Role::Toolbar).aria_label("面板")
+            .w(px(crate::ui_controls::PANEL_RAIL_WIDTH)).h_full().flex_none()
+            .flex().flex_col().items_center().gap(px(4.0)).py(px(8.0))
+            .border_l_1().border_color(th.shade)
             .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
-            .child(div().id("dock-panels").role(Role::Toolbar).aria_label("面板").flex_1().min_w_0().flex().gap(px(2.0))
-                .children(RightDockTab::ORDER.into_iter().map(|tab| {
-                    let open = self.layout.panel_open(tab);
-                    crate::proto_controls::action(SharedString::from(format!("dock-panel-{tab:?}")), tab.label())
-                        .role(Role::Switch).aria_toggled(if open { gpui::Toggled::True } else { gpui::Toggled::False }).aria_label(format!("{}面板", tab.label()))
-                        .relative().h(px(30.0)).px(px(8.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
-                        .flat_states(th, open)
-                        .when(open, |d| d.font_weight(FontWeight::SEMIBOLD))
-                        .child(svg().path(icon(tab.icon())).size(px(14.0)).text_color(th.text))
-                        .child(tab.label())
-                        .when(tab == RightDockTab::RenderInserts && errors > 0, |d| d.child(
-                            div().absolute().top(px(4.0)).right(px(4.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
-                        .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))
-                })))
+            .children(RightDockTab::ORDER.into_iter().map(|tab| {
+                let open = self.layout.panel_open(tab);
+                crate::proto_controls::action(SharedString::from(format!("dock-panel-{tab:?}")), tab.label())
+                    .role(Role::Switch).aria_toggled(if open { gpui::Toggled::True } else { gpui::Toggled::False })
+                    .aria_label(format!("{}面板", tab.label()))
+                    .relative().w(px(44.0)).py(px(6.0)).flex().flex_col().items_center().gap(px(3.0)).rounded(px(8.0))
+                    .flat_states(th, open)
+                    .child(svg().path(icon(tab.icon())).size(px(16.0)).text_color(if open { th.text } else { th.text_secondary }))
+                    .child(div().text_size(px(10.5)).text_color(if open { th.text } else { th.text_secondary })
+                        .when(open, |d| d.font_weight(FontWeight::SEMIBOLD)).child(tab.label()))
+                    .when(tab == RightDockTab::RenderInserts && errors > 0, |d| d.child(
+                        div().absolute().top(px(4.0)).right(px(8.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
+                    .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))
+            }))
+            .child(div().flex_1())
             .child(
                 crate::proto_controls::action("close-right-dock", "收起右侧面板")
-                    .size(px(28.0))
+                    .size(px(32.0))
                     .flex_none()
-                    .rounded(px(6.0))
+                    .rounded(px(8.0))
                     .flex()
                     .items_center()
                     .justify_center()
                     .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
-                    .child(svg().path(icon("x")).size(px(13.0)).text_color(th.text_secondary))
+                    .child(svg().path(icon("panel-right")).size(px(15.0)).text_color(th.text_secondary))
                     .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
             );
 
+        // Rightmost first: ORDER runs outward from the bar, so later panels
+        // sit further left.
         let open: Vec<RightDockTab> = RightDockTab::ORDER.into_iter().filter(|tab| self.layout.panel_open(*tab)).collect();
-        let mut body = div().flex().flex_col().pb(px(18.0));
-        if open.is_empty() {
-            body = body.child(div().p(px(16.0)).text_sm().text_color(th.text_secondary)
-                .child("用上方的按钮打开需要的面板，可以同时打开多个。"));
-        }
-        for tab in open {
+        let columns = open.into_iter().rev().map(|tab| {
             let content = match tab {
                 RightDockTab::VoiceTimbre => self.right_dock_properties_panel(&project, cx),
                 RightDockTab::Synthesis => self.right_dock_synthesis_panel(&project, cx),
@@ -671,30 +664,30 @@ impl Editor {
                 RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
                 RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
             };
-            body = body.child(
-                div().flex().flex_col().border_b_1().border_color(th.shade)
-                    .child(div().h(px(34.0)).pl(px(14.0)).pr(px(6.0)).flex().items_center().gap(px(6.0))
-                        .child(svg().path(icon(tab.icon())).size(px(14.0)).text_color(th.text_secondary))
-                        .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).child(tab.label()))
-                        .child(crate::proto_controls::action(SharedString::from(format!("close-panel-{tab:?}")), format!("关闭{}面板", tab.label()))
-                            .size(px(24.0)).flex_none().rounded(px(6.0)).flex().items_center().justify_center()
-                            .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
-                            .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
-                            .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))))
-                    .child(content));
-        }
+            div().w(px(self.layout.right_dock_width)).h_full().flex_none().flex().flex_col().border_l_1().border_color(th.shade)
+                .child(div().h(px(46.0)).flex_none().pl(px(16.0)).pr(px(8.0)).flex().items_center().gap(px(8.0))
+                    .border_b_1().border_color(th.shade)
+                    .child(svg().path(icon(tab.icon())).size(px(15.0)).text_color(th.text_secondary))
+                    .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).child(tab.label()))
+                    .child(crate::proto_controls::action(SharedString::from(format!("close-panel-{tab:?}")), format!("关闭{}面板", tab.label()))
+                        .size(px(28.0)).flex_none().rounded(px(6.0)).flex().items_center().justify_center()
+                        .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
+                        .child(svg().path(icon("x")).size(px(13.0)).text_color(th.text_secondary))
+                        .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))))
+                .child(crate::proto_scroll::viewport(SharedString::from(format!("right-panel-scroll-{tab:?}")), format!("{}面板", tab.label()), "vertical")
+                    .flex_1().min_h_0().child(div().pb(px(18.0)).child(content)))
+        });
 
         div()
             .id("right-property-dock")
             .rounded_br(crate::window_chrome::corner_radii(self.window_chrome).bottom_right)
-            .w(px(self.layout.right_dock_width))
+            .w(px(self.layout.right_dock_total_width()))
             .h_full()
             .flex_none()
             .flex()
-            .flex_col()
             .bg(th.surface)
-            .child(header)
-            .child(crate::proto_scroll::viewport("right-dock-scroll", "属性面板", "vertical").flex_1().min_h_0().child(body))
+            .children(columns)
+            .child(rail)
             .into_any_element()
     }
 
@@ -1900,7 +1893,7 @@ impl Editor {
                                     .on_click(cx.listener(|ed, _, _, cx| { ed.drawer = None; cx.notify(); })))
                                 .child({
                                     let left = self.drawer == Some(Drawer::Left);
-                                    let width = if left { self.layout.inspector_width } else { self.layout.right_dock_width };
+                                    let width = if left { self.layout.inspector_width } else { self.layout.right_dock_total_width() };
                                     let pane = if left { &self.chrome.inspector } else { &self.chrome.property_dock };
                                     div().id("side-drawer").absolute().top_0().bottom_0().when(left, |d| d.left_0()).when(!left, |d| d.right_0())
                                         .w(px(width)).max_w(gpui::relative(0.92)).flex().occlude()
@@ -1911,7 +1904,7 @@ impl Editor {
                     )
                     .when(docked && self.layout.show_right_dock, |d| {
                         d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th))
-                            .when(has_track, |d| d.child(cached_view(&self.chrome.property_dock, column(self.layout.right_dock_width), a11y)))
+                            .when(has_track, |d| d.child(cached_view(&self.chrome.property_dock, column(self.layout.right_dock_total_width()), a11y)))
                     })
 
             )

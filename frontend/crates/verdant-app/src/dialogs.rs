@@ -286,7 +286,7 @@ impl Editor {
                 let gain = if *gain_changed { clip_dialog_gain(*gain_db) } else { clip.gain };
                 let pan = if *pan_changed { (*pan_percent as f32 / 100.0).clamp(-1.0, 1.0) } else { clip.pan };
                 (
-                    "精确片段：起点 tick, 源起点帧, 时长帧, 线性增益, 声像 (-1..1), 静音 (0/1)",
+                    "精确音频片段：起点 tick, 源起点帧, 时长帧, 线性增益, 声像 (-1..1), 静音 (0/1)",
                     PromptPurpose::Integration(IntegrationPrompt::Clip(track.clone(), clip_id.clone())),
                     format!("{start_tick}, {offset_frames}, {duration_frames}, {gain}, {pan}, {}", u8::from(*muted)),
                     *base,
@@ -491,7 +491,7 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
                     .items_center()
                     .justify_between()
                     .text_xs()
-                    .child(div().text_color(th.text_secondary).child("片段增益"))
+                    .child(div().text_color(th.text_secondary).child("音频片段增益"))
                     .child(format_gain_db(gain_db)),
             )
             .child(horizontal_slider(
@@ -525,7 +525,7 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
                     .items_center()
                     .justify_between()
                     .text_xs()
-                    .child(div().text_color(th.text_secondary).child("片段声像"))
+                    .child(div().text_color(th.text_secondary).child("音频片段声像"))
                     .child(format_pan_percent(pan_pct)),
             )
             .child(horizontal_slider(
@@ -558,7 +558,7 @@ pub fn audio_clip_inspector_section(ed: &Editor, entity: Entity<Editor>, cx: &mu
                     .flex()
                     .gap(px(5.0))
                     .child(
-                        selectable_button("clip-mute-btn", if was_muted { "已静音" } else { "静音片段" }, was_muted, th)
+                        selectable_button("clip-mute-btn", if was_muted { "已静音" } else { "静音音频片段" }, was_muted, th)
                             .role(Role::Switch).authority(mute_basis.clone()).flex_1()
                             .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, _, cx| {
                                 if crate::proto_controls::editor_authority(ed) != mute_basis { return; }
@@ -1228,7 +1228,7 @@ fn render_clip_body(
                 .items_center()
                 .gap(px(6.0))
                 .text_xs()
-                .child(div().w(px(90.0)).text_color(th.text_secondary).child("片段持续时长"))
+                .child(div().w(px(90.0)).text_color(th.text_secondary).child("音频片段时长"))
                 .child(div().flex_1().child(format!("{duration_seconds:.3} 秒 ({duration_frames} 帧)")))
                 .children([("-1.0s", -1.0), ("-0.1s", -0.1), ("+0.1s", 0.1), ("+1.0s", 1.0)].into_iter().map(|(lbl, d)| {
                     selectable_button(SharedString::from(format!("clip-dur-{lbl}")), lbl, false, th).on_click(cx.listener(

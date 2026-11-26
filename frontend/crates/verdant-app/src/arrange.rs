@@ -307,14 +307,14 @@ enum AudioRegionEdit { SplitPlayhead, Split(i64), Join, Duplicate, Mute }
 fn edit_audio_region(ed:&mut Editor,edit:AudioRegionEdit,cx:&mut Context<Editor>){
     use verdant_service::audio_edit::{AudioEdit,AudioClipRef,AudioClipProperties};
     let result=(||->Result<(),String>{
-        if ed.arrange_drag.is_some(){return Err("先完成当前片段拖动".into());}
+        if ed.arrange_drag.is_some(){return Err("先完成当前拖动".into());}
         let clip=ed.selected_audio_clip()?;let clips=ed.audio_selection();let tick=ed.tempo().tick_at(ed.playhead_seconds());
         let operation=match edit{
             AudioRegionEdit::SplitPlayhead=>if let Some(range)=ed.integrations.audio_edit.range.clone(){AudioEdit::SplitRange{tracks:range.tracks,start_tick:range.start_tick,end_tick:range.end_tick}}else{AudioEdit::Split{clips,tick}},
             AudioRegionEdit::Split(tick)=>AudioEdit::Split{clips:vec![AudioClipRef::from(&clip)],tick:tick as f64},
             AudioRegionEdit::Join=>{
                 let mut selected=clips;
-                if selected.len()==1{let others=verdant_media::read_clips(ed.project().track(&clip.track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;let right=others.iter().filter(|other|other.id!=clip.id&&other.tick()>=clip.tick()).min_by(|a,b|a.tick().total_cmp(&b.tick())).ok_or("右侧没有片段")?;selected.push(AudioClipRef::from(right));}
+                if selected.len()==1{let others=verdant_media::read_clips(ed.project().track(&clip.track).ok_or("轨道不存在")?).map_err(|e|e.to_string())?;let right=others.iter().filter(|other|other.id!=clip.id&&other.tick()>=clip.tick()).min_by(|a,b|a.tick().total_cmp(&b.tick())).ok_or("右侧没有音频片段")?;selected.push(AudioClipRef::from(right));}
                 AudioEdit::Join{clips:selected}
             },
             AudioRegionEdit::Duplicate=>AudioEdit::Duplicate{clips,at_tick:tick,target_track:None},
@@ -492,7 +492,7 @@ fn lane_menu(ed:&mut Editor,track:TrackId,tick:f64,position:gpui::Point<Pixels>,
     use crate::editor::{MenuAction as M,WorkflowAction as A};use crate::menu::MenuItem as I;
     let free=verdant_domain::parts::Parts::load(ed.project()).ok().and_then(|parts|new_part_span(&ed.meter(),&parts,&track,tick)).is_some();
     let mut items=vec![
-        I::action("在此新建片段",M::Workflow(A::CreatePartAt(track.clone(),tick.max(0.).floor()as i64))).with_hint("双击").enabled(free),
+        I::action("在此新建音符组",M::Workflow(A::CreatePartAt(track.clone(),tick.max(0.).floor()as i64))).with_hint("双击").enabled(free),
         I::action("播放头移到此处",M::SeekTick(tick.max(0.).floor()as i64)),
         I::action("导入音频到此轨…",M::Workflow(A::Integration(crate::editor::integrations::IntegrationAction::ImportAudio))),
         I::separator(),I::header("轨道"),
