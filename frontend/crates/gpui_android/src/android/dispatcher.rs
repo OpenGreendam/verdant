@@ -11,12 +11,19 @@ use gpui::{PlatformDispatcher, Priority, RunnableVariant, profiler};
 use parking_lot::{Condvar, Mutex};
 
 const MIN_THREADS: usize = 2;
+const MAIN_TASKS_PER_TURN: usize = 64;
 
 /// A FIFO per priority level; higher levels are always drained first.
 #[derive(Default)]
 pub(crate) struct TaskQueue {
-    lanes: Mutex<[VecDeque<RunnableVariant>; 3]>,
+    state: Mutex<TaskQueueState>,
     available: Condvar,
+}
+
+#[derive(Default)]
+struct TaskQueueState {
+    lanes: [VecDeque<RunnableVariant>; 3],
+    closed: bool,
 }
 
 impl TaskQueue {
@@ -29,28 +36,51 @@ impl TaskQueue {
     }
 
     fn push(&self, priority: Priority, runnable: RunnableVariant) {
-        self.lanes.lock()[Self::lane(priority)].push_back(runnable);
+        let mut state = self.state.lock();
+        if state.closed {
+            return;
+        }
+        state.lanes[Self::lane(priority)].push_back(runnable);
         self.available.notify_one();
     }
 
     fn try_pop(&self) -> Option<RunnableVariant> {
-        self.lanes.lock().iter_mut().find_map(VecDeque::pop_front)
+        self.state.lock().lanes.iter_mut().find_map(VecDeque::pop_front)
     }
 
-    fn pop_blocking(&self) -> RunnableVariant {
-        let mut lanes = self.lanes.lock();
-        loop {
-            if let Some(runnable) = lanes.iter_mut().find_map(VecDeque::pop_front) {
-                return runnable;
+    pub(crate) fn has_pending(&self) -> bool {
+        self.state.lock().lanes.iter().any(|lane| !lane.is_empty())
+    }
+
+    fn pop_blocking(&self) -> Option<RunnableVariant> {
+        let mut state = self.state.lock();
+        while !state.closed {
+            if let Some(runnable) = state.lanes.iter_mut().find_map(VecDeque::pop_front) {
+                return Some(runnable);
             }
-            self.available.wait(&mut lanes);
+            self.available.wait(&mut state);
         }
+        None
+    }
+
+    fn close(&self) {
+        let mut state = self.state.lock();
+        state.closed = true;
+        let pending = std::mem::take(&mut state.lanes);
+        self.available.notify_all();
+        drop(state);
+        // Cancelling a runnable may wake tasks that dispatch again.
+        drop(pending);
+    }
+
+    fn take_pending(&self) -> [VecDeque<RunnableVariant>; 3] {
+        std::mem::take(&mut self.state.lock().lanes)
     }
 }
 
 pub(crate) struct AndroidDispatcher {
     main_queue: Arc<TaskQueue>,
-    waker: AndroidAppWaker,
+    waker: Mutex<Option<AndroidAppWaker>>,
     background_queue: Arc<TaskQueue>,
     timers: Arc<TimerQueue>,
     main_thread_id: thread::ThreadId,
@@ -66,8 +96,8 @@ impl AndroidDispatcher {
         for index in 0..thread_count {
             let queue = background_queue.clone();
             let spawned = thread::Builder::new().name(format!("Worker-{index}")).spawn(move || {
-                loop {
-                    run(queue.pop_blocking());
+                while let Some(runnable) = queue.pop_blocking() {
+                    run(runnable);
                 }
             });
             if let Err(error) = spawned {
@@ -84,7 +114,20 @@ impl AndroidDispatcher {
             log::error!("failed to spawn GPUI timer thread: {error}");
         }
 
-        (Self { main_queue: main_queue.clone(), waker, background_queue, timers, main_thread_id: thread::current().id() }, main_queue)
+        (Self { main_queue: main_queue.clone(), waker: Mutex::new(Some(waker)), background_queue, timers, main_thread_id: thread::current().id() }, main_queue)
+    }
+
+    pub(crate) fn shutdown(&self) {
+        assert!(self.is_main_thread());
+        // In-flight work may still need the activity thread. Let it finish without joining here.
+        self.background_queue.close();
+        self.timers.close();
+        let pending = {
+            let mut waker = self.waker.lock();
+            waker.take();
+            self.main_queue.take_pending()
+        };
+        drop(pending);
     }
 }
 
@@ -98,8 +141,17 @@ impl PlatformDispatcher for AndroidDispatcher {
     }
 
     fn dispatch_on_main_thread(&self, runnable: RunnableVariant, priority: Priority) {
+        let waker = self.waker.lock();
+        if waker.is_none() && self.is_main_thread() {
+            return;
+        }
+        // The pinned dispatcher API cannot distinguish Send tasks from thread-affine
+        // ones. Preserve enqueueing for foreign wakes; dropping their runnable here
+        // may drop a local future on the wrong thread.
         self.main_queue.push(priority, runnable);
-        self.waker.wake();
+        if let Some(waker) = &*waker {
+            waker.wake();
+        }
     }
 
     fn dispatch_after(&self, duration: Duration, runnable: RunnableVariant) {
@@ -131,14 +183,17 @@ fn run(runnable: RunnableVariant) {
     profiler::save_task_timing();
 }
 
-/// Runs every main-thread runnable that is queued right now. Returns whether any ran.
-pub(crate) fn run_main_thread_tasks(queue: &TaskQueue) -> bool {
-    let mut ran = false;
-    while let Some(runnable) = queue.try_pop() {
+/// Limits consecutive foreground work so tasks that reschedule cannot starve Android events.
+pub(crate) fn run_main_thread_tasks(queue: &TaskQueue, should_quit: impl Fn() -> bool) {
+    for _ in 0..MAIN_TASKS_PER_TURN {
+        if should_quit() {
+            break;
+        }
+        let Some(runnable) = queue.try_pop() else {
+            break;
+        };
         run(runnable);
-        ran = true;
     }
-    ran
 }
 
 struct TimerEntry {
@@ -179,11 +234,15 @@ struct TimerQueue {
 struct TimerState {
     heap: BinaryHeap<TimerEntry>,
     next_sequence: u64,
+    closed: bool,
 }
 
 impl TimerQueue {
     fn schedule(&self, deadline: Instant, runnable: RunnableVariant) {
         let mut state = self.state.lock();
+        if state.closed {
+            return;
+        }
         let sequence = state.next_sequence;
         state.next_sequence += 1;
         state.heap.push(TimerEntry { deadline, sequence, runnable });
@@ -192,7 +251,7 @@ impl TimerQueue {
 
     fn run(&self) {
         let mut state = self.state.lock();
-        loop {
+        while !state.closed {
             let now = Instant::now();
             match state.heap.peek().map(|entry| entry.deadline) {
                 Some(deadline) if deadline <= now => {
@@ -208,5 +267,14 @@ impl TimerQueue {
                 None => self.condvar.wait(&mut state),
             }
         }
+    }
+
+    fn close(&self) {
+        let mut state = self.state.lock();
+        state.closed = true;
+        let pending = std::mem::take(&mut state.heap);
+        self.condvar.notify_one();
+        drop(state);
+        drop(pending);
     }
 }

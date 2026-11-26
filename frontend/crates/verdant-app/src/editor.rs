@@ -293,6 +293,7 @@ pub struct Editor {
     pub auto_render: bool,
     pub render_armed: bool,
     replan_gen: u64,
+    vocal_replan_pending: bool,
     pub malformed: Vec<String>,
 
     pub audio: Control,
@@ -451,7 +452,7 @@ impl Editor {
 
     #[allow(clippy::too_many_arguments)]
     fn new_with_services(
-        persistence: ProjectPersistence,
+        mut persistence: ProjectPersistence,
         recovery: verdant_domain::RecoveryReport,
         opts: EditorOpts,
         worker_cfg: WorkerConfig,
@@ -481,6 +482,7 @@ impl Editor {
         .detach();
         let recovered = recovery_text(&recovery);
         for key in recovery.load.preserved_unknown_keys { eprintln!("verdant: preserving unknown field {key}"); }
+        let alignment = if start_services { migrate_vowel_onset_alignment(&mut persistence) } else { Ok(false) };
         let project = persistence.project();
         let project_path = opts.project_path;
         let track = project.tracks.first().map(|t| t.id.clone()).unwrap_or_else(TrackId::generate);
@@ -553,6 +555,7 @@ impl Editor {
             auto_render: true,
             render_armed: true,
             replan_gen: 0,
+            vocal_replan_pending: false,
             malformed: Vec::new(),
             audio,
             engine,
@@ -663,6 +666,7 @@ impl Editor {
         ed.sync_arrange_cache(false);
         ed.sync_mixer();
         if start_services {
+            if let Err(error) = alignment { ed.notice(format!("未提交元音对齐拍点：{error}")); }
             ed.start_plugins(opts.plughost_path.as_deref(), cx);
             ed.restore_inserts(cx);
             ed.start_worker(cx);
@@ -884,8 +888,10 @@ impl Editor {
         self.compiled_pitch_move.cancel_deferred(cx);
         self.prepare_insert_topology(cx);
         self.sync_mixer();
-        self.restore_inserts(cx);
+        // Invalidate the old timeline before insert restoration can prepare a
+        // replacement for the held transport, even without worker capabilities.
         self.schedule_replan(cx);
+        self.restore_inserts(cx);
         cx.notify();
     }
 
@@ -1152,6 +1158,20 @@ impl Editor {
         self.finish_project_opened(report, window, cx);
     }
 
+    pub(crate) fn discard_project_recovery(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.persistence.discard_recovery() {
+            Ok(true) => {
+                // The lease and restored saved state already belong to this editor.
+                let project_path = self.project_path.clone();
+                self.notice("已放弃恢复，打开最后手动保存的版本；工程文件未被覆盖");
+                self.finish_project_opened(Default::default(), window, cx);
+                self.project_path = project_path;
+            }
+            Ok(false) => {}
+            Err(error) => self.notice(format!("无法放弃恢复：{error}")),
+        }
+    }
+
     fn finish_project_opened(&mut self, report: verdant_domain::RecoveryReport, window: &mut Window, cx: &mut Context<Self>) {
         self.document_generation = self.document_generation.wrapping_add(1);
         self.menu = None;
@@ -1162,11 +1182,14 @@ impl Editor {
         });
         let track = self.persistence.project().tracks.first().map(|t| t.id.clone()).unwrap_or_else(TrackId::generate);
         self.cancel_edits(verdant_session::CancelReason::ProjectChanged, window, cx);
+        self.stop_insert_transport();
         self.audio.stop();
         self.audio.set_timeline(Timeline::new(self.audio_info.sample_rate, Vec::new()));
         self.timeline_gen += 1;
         self.timeline_phrases = 0;
         self.render_armed = self.auto_render;
+        self.replan_gen += 1;
+        self.vocal_replan_pending = false;
         self.scheduler = RenderScheduler::new();
         self.roll_pitch = crate::roll::RenderedPitchCache::default();
         self.plans.clear();
@@ -1224,13 +1247,10 @@ impl Editor {
     /// every note on every track moves one bar later, as one undoable edit.
     pub(crate) fn shift_notes_one_bar(&mut self, cx: &mut Context<Self>) {
         let bar = self.meter().bar_ticks_at(0).max(1);
-        let commands: Vec<Command> = self.project().tracks.iter().filter(|track| !track.notes.is_empty())
-            .map(|track| Command::MoveNotes {
-                track: track.id.clone(),
-                note_ids: track.notes.iter().map(|note| note.id.clone()).collect(),
-                delta_tick: bar,
-                delta_semitones: 0,
-            }).collect();
+        let commands = match verdant_domain::parts::lead_in_commands(self.project(), bar) {
+            Ok(commands) => commands,
+            Err(error) => { self.notice(format!("无法后移音符：{error}")); cx.notify(); return; }
+        };
         if commands.is_empty() { return; }
         let batch = CommandBatch { label: "所有音符后移一小节".into(), commands };
         if self.commit(self.revision(), batch, cx) {
@@ -1238,13 +1258,13 @@ impl Editor {
         }
     }
 
-    /// Singing lands the vowel on the beat with the consonant before it, so
-    /// vowel-onset alignment is not an option: documents from before it was
-    /// the rule are moved onto it as one undoable edit when they open.
+    /// Apply the migration to an already-mounted editor and refresh its plan.
     pub(crate) fn ensure_vowel_onset_alignment(&mut self, cx: &mut Context<Self>) {
-        if self.project().render_preferences.phoneme_timing.is_some() { return; }
-        let settings = Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1());
-        self.commit(self.revision(), CommandBatch::single("元音对齐拍点", Command::SetPhonemeTiming { settings }), cx);
+        match migrate_vowel_onset_alignment(&mut self.persistence) {
+            Ok(true) => self.after_change(cx),
+            Ok(false) => {}
+            Err(error) => { self.notice(format!("未提交元音对齐拍点：{error}")); cx.notify(); }
+        }
     }
 
     /// File → export a native `.verp` project copy.
@@ -1808,6 +1828,7 @@ impl Editor {
     fn change_active_track(&mut self, id: TrackId) {
         self.session.track = id;
         self.session.selection.clear();
+        self.selected_part = None;
         self.lyric = None;
         self.lyric_line = None;
         self.lyric_bounds = None;
@@ -2457,6 +2478,8 @@ impl Editor {
         // An edit withdraws playable bindings immediately. The debounced plan
         // may reuse only digest-matched content once it has been recomputed.
         self.render_armed |= self.auto_render;
+        self.vocal_replan_pending = self.scheduler.capabilities.is_some()
+            && self.project().tracks.iter().any(|track| !track.is_instrument() && !track.notes.is_empty());
         self.timeline_gen += 1;
         self.timeline_phrases = 0;
         self.ready_notes.clear();
@@ -2549,10 +2572,14 @@ impl Editor {
     }
 
     pub fn replan(&mut self, cx: &mut Context<Self>) {
+        let pending = std::mem::take(&mut self.vocal_replan_pending);
         self.phone_budgets.get_mut().clear();
         let Some(caps) = self.scheduler.capabilities.clone() else {
             self.plans.clear();
             self.scheduled_phonemes.clear();
+            // The worker can exit during the debounce. Let insert restoration
+            // publish the available local timeline in that case.
+            if pending { self.restore_inserts(cx); }
             return;
         };
         let plans = adapter::plan_all_desktop(self.project(), &self.session.track, &caps);
@@ -2610,6 +2637,9 @@ impl Editor {
     /// Assemble the playable binding into a device-rate timeline off the UI
     /// thread, then hand it to the audio engine.
     pub fn rebuild_timeline(&mut self,cx:&mut Context<Self>){
+        // A withdrawn vocal plan describes neither the active transport's
+        // end nor its valid resume position. The replan publishes both.
+        if self.held_for_vocal_replan() { return; }
         self.roll_pitch.rebuild(&self.scheduler);
         self.ready_notes=self.scheduler.playable_phrases().into_iter().flat_map(|(phrase,_)|phrase.note_ids.iter().cloned()).collect();
         self.render_audio=self.scheduler.playable_phrases().into_iter().map(|(phrase,entry)|((phrase.track.clone(),phrase.index),entry.audio.clone())).collect();
@@ -2652,7 +2682,7 @@ impl Editor {
                 project_audio::extend_realtime_timeline(&mut prepared.timeline,&bindings)?;
                 Ok::<_,String>((prepared,media_previews,media_cache))
             }).await;
-            let _=this.update(cx,|ed,cx|{if !ed.integrations.timeline_preparation.finish(generation)||ed.timeline_gen!=generation||ed.audio.callback_budget()!=callback_budget{return;}match result{
+            let _=this.update(cx,|ed,cx|{if !ed.integrations.timeline_preparation.finish(generation)||ed.timeline_gen!=generation||ed.audio.callback_budget()!=callback_budget||ed.held_for_vocal_replan(){return;}match result{
                 Ok((prepared,media_previews,media_cache))=>{ed.integrations.media_cache=media_cache;ed.integrations.media_previews=media_previews;ed.phrase_pcm=prepared.phrase_pcm;ed.timeline_phrases=prepared.phrase_count;ed.timeline_instruments=prepared.instrument_count;ed.integrations.media_ready=prepared.media_count>0;let revision=ed.audio.set_timeline_for_callback_budget(prepared.timeline,callback_budget);ed.insert_timeline_ready(revision,cx);}
                 Err(error)=>{ed.audio.pause();ed.stop_insert_transport();let revision=ed.audio.set_timeline_for_callback_budget(Timeline::new(rate,Vec::new()),callback_budget);ed.timeline_phrases=0;ed.timeline_instruments=0;ed.integrations.media_ready=false;ed.integrations.media_previews.clear();ed.insert_timeline_ready(revision,cx);ed.notice(format!("音频时序 / 资产校验失败：{error}"));}
             }cx.notify();});
@@ -3017,6 +3047,17 @@ impl Editor {
         self.prefs_dirty = true;
     }
 
+}
+
+// Wait for recovery consent before committing the normal undoable edit to
+// whichever document the user keeps.
+fn migrate_vowel_onset_alignment(persistence: &mut ProjectPersistence) -> Result<bool, verdant_domain::PersistenceError> {
+    if persistence.pending_recovery().is_some() || persistence.project().render_preferences.phoneme_timing.is_some() {
+        return Ok(false);
+    }
+    let settings = Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1());
+    let batch = CommandBatch::single("元音对齐拍点", Command::SetPhonemeTiming { settings });
+    persistence.commit(persistence.revision(), batch).map(|commit| commit.is_some())
 }
 
 fn recovery_text(report: &verdant_domain::RecoveryReport) -> Option<String> {

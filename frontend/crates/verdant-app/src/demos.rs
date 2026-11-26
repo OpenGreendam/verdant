@@ -254,6 +254,7 @@ mod foundation_tests {
             "native_score":{"inventory":verdant_backend::pinyin::recovered_syllables(),
                 "sub_syllable_timing":true,"phoneme_duration_control":true,"continuous_f0_control":true,
                 "explicit_f0_hz_range":[35,2000],
+                "phoneme_timing":{"methods":["vowel-anchor-v1"],"routes":["verdant-voice"],"timing_resolution_seconds":0.005},
                 "expression":{"methods":["vocaloid-controls-v1"],"parameters":["BRE","BRI","CLE","GEN","OPE","GWL"],
                     "routes":["verdant-voice"],"maximum_compiled_curve_points":32768}}})).unwrap()
     }
@@ -340,13 +341,17 @@ mod foundation_tests {
 
     #[test]
     fn native_short_excerpt_retains_the_provided_score_and_credit() {
-        let project = project(HEXIE_EXAMPLE_ID).unwrap();
+        let project = default_project();
         assert_eq!(project.ppq, 480);
         assert_eq!(project.tempo_map[0].micro_bpm, 160_000_000);
         assert_eq!((project.time_signatures[0].numerator, project.time_signatures[0].denominator), (4, 4));
         assert_eq!(project.render_preferences.route, "verdant-voice");
+        assert_eq!(project.render_preferences.phoneme_timing,
+            Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1()));
         assert_eq!(project.tracks.len(), 1);
-        let notes = &project.tracks[0].notes;
+        let track = &project.tracks[0];
+        let notes = &track.notes;
+        let lead_in = 4 * i64::from(project.ppq);
         let expected = [
             (0,480,65,"绿","lv4"), (480,480,72,"坝","ba4"),
             (960,480,65,"绿","lv4"), (1440,480,72,"坝","ba4"),
@@ -355,12 +360,21 @@ mod foundation_tests {
         ];
         assert_eq!(notes.len(), expected.len());
         for (note, (start, duration, midi, lyric, pinyin)) in notes.iter().zip(expected) {
-            assert_eq!((note.start_tick, note.duration_tick, note.midi_note), (start, duration, midi));
+            assert_eq!((note.start_tick, note.duration_tick, note.midi_note), (lead_in + start, duration, midi));
             assert_eq!((&*note.lyric, &*note.pronunciation.pinyin), (lyric, pinyin));
             assert_eq!(note.pronunciation.source, PronunciationSource::Manual);
         }
         let tempo = TempoMap::new(&project.tempo_map, project.ppq).unwrap();
-        assert_eq!(tempo.seconds_at(notes.last().unwrap().end_tick() as f64), 2.625);
+        let first_onset = tempo.seconds_at(notes[0].start_tick as f64);
+        assert_eq!(first_onset, 1.5);
+        assert_eq!(tempo.seconds_at(notes.last().unwrap().end_tick() as f64) - first_onset, 2.625);
+        let plan = verdant_backend::adapter::plan_desktop(&project, &track.id, &capabilities());
+        assert!(!plan.has_errors(), "{:?}", plan.diagnostics);
+        let phrase = &plan.phrases[0];
+        let timing = phrase.score.phoneme_timing.as_ref().unwrap();
+        let vowel_onset = phrase.start_seconds + timing.notes[0].note_onset_seconds;
+        assert!((vowel_onset - first_onset).abs() < 1e-9);
+        assert!(phrase.start_seconds >= 0.0 && phrase.start_seconds < first_onset);
         let credit = credit_text(&project).unwrap();
         for text in ["samfree", "荼荼丸", "非官方谱", "仅含8字短节选", "软件代码许可不扩及引用歌曲", "BV1xx411c7BF", "20090624/p1"] {
             assert!(credit.contains(text), "missing credit: {text}");

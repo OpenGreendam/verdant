@@ -347,10 +347,16 @@ struct InsertTimelineReceipt {
     project_revision: Revision,
 }
 
+impl InsertTimelineReceipt {
+    fn is_current(&self, generation: u64, project_revision: Revision) -> bool {
+        self.generation == generation && self.project_revision == project_revision
+    }
+}
+
 impl TransportHold {
     fn ready(&self, retired_chain: u64, applied_timeline: u64, generation: u64, project_revision: Revision) -> bool {
         self.chain_revision <= retired_chain && self.timeline.as_ref().is_some_and(|timeline|
-            timeline.generation == generation && timeline.project_revision == project_revision && timeline.revision <= applied_timeline)
+            timeline.is_current(generation, project_revision) && timeline.revision <= applied_timeline)
     }
 
     fn resume(self, audio: &Control) {
@@ -382,12 +388,11 @@ impl InsertRuntime {
         fresh
     }
 
-    /// An armed hold whose matching timeline receipt was dropped while a
-    /// build was still loading needs one fresh timeline to release. When the
-    /// document is already back on the installed topology the unchanged
-    /// restore path is the only remaining trigger for that rebuild.
-    fn needs_timeline_receipt(&self) -> bool {
-        self.hold.as_ref().is_some_and(|hold| hold.timeline.is_none())
+    /// An edit can invalidate a receipt without changing the installed chain.
+    /// A current receipt only needs a callback acknowledgment.
+    fn needs_timeline_receipt(&self, generation: u64, project_revision: Revision) -> bool {
+        self.hold.as_ref().is_some_and(|hold| hold.timeline.as_ref().is_none_or(|timeline|
+            !timeline.is_current(generation, project_revision)))
     }
 }
 
@@ -605,9 +610,8 @@ impl Editor {
         if unchanged && padding_unchanged && !retry_needed {
             self.insert_runtime.retry_missing = false;
             self.mark_inserts_applied();
-            if self.insert_runtime.needs_timeline_receipt() && self.integrations.timeline_preparation.needs_receipt_prepare(self.timeline_gen) {
-                // The matching receipt was dropped while a stale build was
-                // still loading; republish a timeline for the held transport.
+            if self.insert_runtime.needs_timeline_receipt(self.timeline_gen, self.revision())
+                && self.integrations.timeline_preparation.needs_receipt_prepare(self.timeline_gen) {
                 self.rebuild_timeline(cx);
             }
             return;
@@ -896,12 +900,16 @@ impl Editor {
         if let Some(client) = self.plugins.clone() {
             if !handles.is_empty() { cx.background_spawn(async move { retire(&client, handles); }).detach(); }
         }
-        let ready = !self.inserts_loading && self.audio.callback_budget()==self.insert_runtime.callback_budget && self.insert_runtime.hold.as_ref().is_some_and(|hold|
+        let ready = !self.vocal_replan_pending && !self.inserts_loading && self.audio.callback_budget()==self.insert_runtime.callback_budget && self.insert_runtime.hold.as_ref().is_some_and(|hold|
             hold.ready(revision, self.audio.applied_timeline_revision(), self.timeline_gen, self.revision())
                 && self.insert_runtime.matches_project(self.project()));
         if ready {
             self.insert_runtime.hold.take().expect("ready transport").resume(&self.audio);
         }
+    }
+
+    pub(super) fn held_for_vocal_replan(&self) -> bool {
+        self.vocal_replan_pending && self.insert_runtime.hold.is_some()
     }
 
     /// Track channel settings are published before restoration, so track-ID
@@ -934,6 +942,17 @@ impl Editor {
     #[cfg(test)]
     pub(crate) fn native_insert_transport_ready(&mut self, cx: &mut Context<Self>) -> bool {
         self.insert_transport_ready(cx)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn native_insert_receipt_diagnostics(&self) -> String {
+        let runtime = &self.insert_runtime;
+        let chain = runtime.hold.as_ref().map(|hold| hold.chain_revision);
+        let timeline = runtime.hold.as_ref().and_then(|hold| hold.timeline.as_ref())
+            .map(|receipt| (receipt.revision, receipt.generation, receipt.project_revision.get()));
+        format!("timeline_generation={}, installed_budget={}, topology_matches={}, held_chain={chain:?}, held_timeline(callback_revision,generation,project_revision)={timeline:?}, preparation_pending={}",
+            self.timeline_gen, runtime.callback_budget, runtime.matches_project(self.project()),
+            !self.integrations.timeline_preparation.needs_receipt_prepare(self.timeline_gen))
     }
 
     pub(super) fn insert_transport_ready(&mut self, cx: &mut Context<Self>) -> bool {
@@ -1497,6 +1516,98 @@ mod topology_tests {
     use verdant_audio::automation_clock::{NativeParameterLane, NativePluginSchedule};
     use verdant_audio::engine::{channel, GainProcessor};
 
+    #[gpui::test]
+    fn playing_vocal_edit_waits_for_the_replanned_timeline(cx: &mut gpui::TestAppContext) {
+        use crate::native_test_support::wait_for_transport_ready;
+
+        struct Harness(gpui::Entity<Editor>);
+        impl gpui::Render for Harness {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl gpui::IntoElement { gpui::div() }
+        }
+
+        let window = cx.open_window(gpui::size(gpui::px(640.), gpui::px(400.)), |window, cx| {
+            Harness(cx.new(|cx| Editor::for_native_test(crate::demos::default_project(), window, cx)))
+        });
+        let editor = window.update(cx, |harness, window, cx| {
+            window.activate_window();
+            harness.0.update(cx, |ed, cx| {
+                ed.scheduler.capabilities = Some(serde_json::from_value(serde_json::json!({
+                    "protocol":"ogd-worker/1", "test_double":true, "routes":["verdant-voice"],
+                    "max_phrase_seconds":30,
+                    "native_score":{"inventory":verdant_backend::pinyin::recovered_syllables(),
+                        "sub_syllable_timing":true,"phoneme_duration_control":true,"continuous_f0_control":true,
+                        "phoneme_timing":{"methods":["vowel-anchor-v1"],"routes":["verdant-voice"],"timing_resolution_seconds":0.005}}
+                })).unwrap());
+                ed.restore_inserts(cx);
+                ed.replan(cx);
+            });
+            harness.0.clone()
+        }).unwrap();
+        wait_for_transport_ready(window, cx, &editor);
+
+        for stop_during_debounce in [false, true] {
+            window.update(cx, |_, _, cx| editor.update(cx, |ed, cx| {
+                assert!(!ed.scheduler.wanted().is_empty(), "the vocal plan must occupy the timeline");
+                assert!(ed.audio.shared.timeline_len.load(Ordering::Acquire) > 0);
+                ed.audio.seek(1024);
+                ed.audio.play();
+                ed.hold_insert_transport(cx);
+                ed.rebuild_timeline(cx); // Simulate a preparation already in flight from insert restoration.
+
+                let track = ed.project().tracks[0].id.clone();
+                let mut header = ed.project().tracks[0].header();
+                header.name.push('!');
+                assert!(ed.commit(ed.revision(), CommandBatch::single("edit during remap", Command::SetTrackHeader { track, header }), cx));
+                assert!(ed.scheduler.wanted().is_empty());
+                ed.rebuild_timeline(cx); // Another publisher races the debounced edit.
+                assert!(ed.integrations.timeline_preparation.needs_receipt_prepare(ed.timeline_gen),
+                    "the withdrawn vocal plan must not prepare a replacement");
+            })).unwrap();
+            cx.run_until_parked();
+            window.update(cx, |_, _, cx| editor.update(cx, |ed, cx| {
+                assert!(!ed.native_insert_transport_ready(cx));
+                let hold = ed.insert_runtime.hold.as_ref().unwrap();
+                assert!(hold.playing);
+                assert!(hold.timeline.is_none());
+                assert!(!ed.audio.shared.playback_requested(), "the empty timeline must stay paused");
+                if stop_during_debounce { ed.stop(cx); }
+            })).unwrap();
+
+            cx.executor().advance_clock(super::super::REPLAN_DEBOUNCE);
+            cx.run_until_parked();
+            wait_for_transport_ready(window, cx, &editor);
+            window.update(cx, |_, _, cx| editor.update(cx, |ed, _| {
+                let length = ed.audio.shared.timeline_len.load(Ordering::Acquire);
+                assert!(!ed.scheduler.wanted().is_empty());
+                assert!(ed.audio.position() < length, "the acknowledged timeline must not resume at EOF");
+                assert_eq!(ed.audio.shared.playback_requested(), !stop_during_debounce);
+                if stop_during_debounce { assert_eq!(ed.audio.position(), 0); }
+            })).unwrap();
+        }
+    }
+
+    #[test]
+    fn held_transport_replaces_stale_receipts_but_waits_for_current_acknowledgments() {
+        let project_revision = Revision::new(2).unwrap();
+        let runtime = InsertRuntime {
+            hold: Some(TransportHold {
+                position: 0,
+                playing: false,
+                chain_revision: 3,
+                timeline: Some(InsertTimelineReceipt { revision: 10, generation: 8, project_revision }),
+            }),
+            ..Default::default()
+        };
+        let hold = runtime.hold.as_ref().unwrap();
+        assert!(runtime.needs_timeline_receipt(9, project_revision));
+        assert!(runtime.needs_timeline_receipt(8, project_revision.next().unwrap()));
+        assert!(!hold.ready(3, 10, 9, project_revision));
+        assert!(!runtime.needs_timeline_receipt(8, project_revision));
+        assert!(!hold.ready(2, 10, 8, project_revision));
+        assert!(!hold.ready(3, 9, 8, project_revision));
+        assert!(hold.ready(3, 10, 8, project_revision));
+    }
+
     struct EventProbe { id: u32, observed: Arc<AtomicUsize> }
     impl verdant_audio::Processor for EventProbe {
         fn name(&self) -> &str { "automation ownership probe" }
@@ -1643,20 +1754,21 @@ mod topology_tests {
         // abandoned build still holds `inserts_loading`, so its receipt is
         // discarded by `insert_timeline_ready`.
         let _dropped_receipt = audio.set_timeline(timeline(0, &[]));
+        let revision = Revision::new(1).unwrap();
         assert!(runtime.hold.as_ref().unwrap().timeline.is_none());
-        assert!(runtime.needs_timeline_receipt());
+        assert!(runtime.needs_timeline_receipt(generation, revision));
         // The stale build's completion hits the unchanged restore path; the
         // kept topology never republishes a receipt on its own.
         callback.process(&mut [0.0; 128], 2);
         assert!(!runtime.hold.as_ref().unwrap().ready(
-            audio.retired_chain_revision(), audio.applied_timeline_revision(), generation, Revision::new(1).unwrap()),
+            audio.retired_chain_revision(), audio.applied_timeline_revision(), generation, revision),
             "the dropped receipt can never release the hold");
         // The restored path's fresh rebuild arrives after loading cleared and
         // is stamped with the current generation.
-        publish(&mut runtime, &mut audio, timeline(0, &[]), generation, Revision::new(1).unwrap());
-        assert!(!runtime.needs_timeline_receipt());
+        publish(&mut runtime, &mut audio, timeline(0, &[]), generation, revision);
+        assert!(!runtime.needs_timeline_receipt(generation, revision));
         callback.process(&mut [0.0; 128], 2);
-        assert!(ready(&runtime, &mut audio, generation, Revision::new(1).unwrap()));
+        assert!(ready(&runtime, &mut audio, generation, revision));
     }
 
     #[test]

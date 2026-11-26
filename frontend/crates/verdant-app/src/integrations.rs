@@ -15,7 +15,7 @@ pub enum IntegrationAction {
     Scale,OtherTracks,ThreeLanes,AuditionSelection,Report,
 }
 #[derive(Clone,Debug)]
-pub enum IntegrationPrompt { AudioEdit(audio_edit_ui::AudioPrompt),InstallVoice(super::voice_ui::VoiceImportDraft),Dictionary(Option<(String,bool)>),Segment(Option<String>),Clip(TrackId,String),Automation(AutomationTarget),Vocaloid,Scale }
+pub enum IntegrationPrompt { AudioEdit(audio_edit_ui::AudioPrompt),InstallVoice(super::voice_ui::VoiceImportDraft),Dictionary(Option<(String,bool)>),Segment(Option<String>),Clip(TrackId,String),Automation(AutomationTarget),VsqxExportSinger(async_channel::Sender<verdant_exchange::VocaloidVoice>),Scale }
 
 pub struct Recording {
     capture:MidiCapture,take:Option<MidiTake>,track:TrackId,base:Revision,tempo:TempoMap,origin_micros:u64,origin_tick:i64,
@@ -155,7 +155,7 @@ impl Editor {
                 self.rebuild_timeline(cx);
             }
             IntegrationPrompt::Automation(target)=>{let mut document=AutomationDocument::from_project(self.project()).map_err(|e|e.to_string())?;let mut lane=document.lane(target).cloned().unwrap_or_else(||AutomationLane::new(target.clone()));edit_automation_points(&mut lane,text)?;self.validate_plugin_lane(&lane)?;document.set_lane(lane);self.commit_automation(document,cx)?;}
-            IntegrationPrompt::Vocaloid=>{let voice=parse_vocaloid_voice(text)?;if !self.commit(self.revision(),CommandBatch::single("Vocaloid 歌手元数据",Command::SetProjectExtension{key:"vocaloid_voice".into(),value:Some(serde_json::to_value(voice).map_err(|e|e.to_string())?)}),cx){return Err("元数据未提交".into());}}
+            IntegrationPrompt::VsqxExportSinger(send)=>{send.try_send(parse_vocaloid_voice(text)?).map_err(|_|"此 VSQX 导出已结束")?;}
             IntegrationPrompt::Scale=>{let(root,intervals)=text.split_once(';').ok_or("使用 根音;级数 格式")?;let root=root.trim().parse::<u8>().map_err(|_|"根音需要 0..11")?;let mut intervals=intervals.split(',').map(str::trim).filter(|v|!v.is_empty()).map(|v|v.parse::<u8>().map_err(|_|"级数需要 0..11")).collect::<Result<Vec<_>,_>>()?;if root>11||intervals.iter().any(|v|*v>11){return Err("根音与级数需要 0..11".into());}intervals.sort();intervals.dedup();self.integrations.scale_root=root;self.integrations.scale_intervals=intervals;cx.notify();}
         }Ok(())
     }
@@ -303,7 +303,16 @@ fn edit_automation_points(lane:&mut AutomationLane,text:&str)->Result<(),String>
     lane.points=points;Ok(())
 }
 fn parse_vocaloid_voice(text:&str)->Result<verdant_exchange::VocaloidVoice,String>{
-    let fields=text.split('|').map(str::trim).collect::<Vec<_>>();if fields.len()!=4{return Err("使用 compID | 歌手名称 | 语言 | 程序 格式".into());}let language_id=fields[2].parse::<u8>().map_err(|_|"语言需要 0..127")?;let program=fields[3].parse::<u8>().map_err(|_|"程序需要 0..127")?;if fields[0].len()!=16||!fields[0].is_ascii()||fields[0].chars().any(char::is_control)||fields[1].is_empty()||language_id>127||program>127{return Err("compID 须为真实的 16 个 ASCII 字符，名称非空，语言和程序 0..127".into());}Ok(verdant_exchange::VocaloidVoice{comp_id:fields[0].into(),name:fields[1].into(),language_id,program})
+    let mut fields=text.split('|').map(str::trim);
+    let (Some(comp_id),Some(name),Some(language),Some(program),None)=(fields.next(),fields.next(),fields.next(),fields.next(),fields.next()) else {
+        return Err("使用 compID | 歌手名称 | 语言 | 程序 格式".into());
+    };
+    let language_id=language.parse::<u8>().map_err(|_|"语言需要 0..127")?;
+    let program=program.parse::<u8>().map_err(|_|"程序需要 0..127")?;
+    if comp_id.len()!=16 || !comp_id.bytes().all(|b|b.is_ascii_graphic()) || name.is_empty() || language_id>127 || program>127 {
+        return Err("compID 须为真实的 16 个可见 ASCII 字符，名称非空，语言和程序 0..127".into());
+    }
+    Ok(verdant_exchange::VocaloidVoice{comp_id:comp_id.into(),name:name.into(),language_id,program})
 }
 
 #[cfg(test)]

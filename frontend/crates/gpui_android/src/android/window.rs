@@ -108,6 +108,7 @@ pub(crate) struct AndroidWindowState {
     gpu_context: GpuContext,
     renderer: RefCell<WgpuRenderer>,
     surface: RefCell<Option<NativeSurface>>,
+    presentation_pending: Cell<bool>,
     display: Rc<AndroidDisplay>,
     size: Cell<Size<Pixels>>,
     scale_factor: Cell<f32>,
@@ -126,15 +127,6 @@ pub(crate) struct AndroidWindowState {
 }
 
 impl AndroidWindowState {
-    fn surface_config(&self, size: Size<DevicePixels>) -> WgpuSurfaceConfig {
-        WgpuSurfaceConfig {
-            size,
-            transparent: false,
-            // Mailbox keeps `get_current_texture` from blocking while the activity pauses.
-            preferred_present_mode: Some(wgpu::PresentMode::Mailbox),
-        }
-    }
-
     fn logical_size(&self, size: Size<DevicePixels>) -> Size<Pixels> {
         let scale = self.scale_factor.get();
         Size { width: px(size.width.0 as f32 / scale), height: px(size.height.0 as f32 / scale) }
@@ -149,10 +141,13 @@ impl AndroidWindowState {
             log::error!("cannot restore the Android surface: the GPU context is gone");
             return;
         };
-        let replaced = self.renderer.borrow_mut().replace_surface(&surface, self.surface_config(size), &instance);
+        // replace_surface applies its mode without querying the new surface. FIFO is always supported.
+        let config = WgpuSurfaceConfig { size, transparent: false, preferred_present_mode: Some(wgpu::PresentMode::Fifo) };
+        let replaced = self.renderer.borrow_mut().replace_surface(&surface, config, &instance);
         match replaced {
             Ok(()) => {
                 *self.surface.borrow_mut() = Some(surface);
+                self.presentation_pending.set(true);
                 self.configuration_changed();
                 self.set_visibility(WindowVisibility::Visible);
             }
@@ -224,12 +219,25 @@ impl AndroidWindowState {
         self.surface.borrow().is_some() && self.visibility.get() == WindowVisibility::Visible
     }
 
+    pub(crate) fn redraw_needed(&self) {
+        self.presentation_pending.set(true);
+        self.request_frame();
+    }
+
     pub(crate) fn request_frame(&self) {
         if !self.is_drawable() {
             return;
         }
-        let require_presentation = self.renderer.borrow_mut().needs_redraw();
-        with_callback!(self, request_frame, |callback| callback(RequestFrameOptions { require_presentation, ..Default::default() }));
+        let force_render = self.renderer.borrow_mut().needs_redraw();
+        if force_render {
+            self.presentation_pending.set(true);
+        }
+        let require_presentation = self.presentation_pending.get();
+        with_callback!(self, request_frame, |callback| callback(RequestFrameOptions {
+            require_presentation,
+            force_render,
+            ..Default::default()
+        }));
     }
 
     fn dispatch(&self, input: PlatformInput) -> Option<DispatchEventResult> {
@@ -351,6 +359,7 @@ impl AndroidWindow {
             gpu_context,
             renderer: RefCell::new(renderer),
             surface: RefCell::new(Some(surface)),
+            presentation_pending: Cell::new(false),
             display,
             size: Cell::new(size),
             scale_factor: Cell::new(scale),
@@ -533,8 +542,8 @@ impl PlatformWindow for AndroidWindow {
     }
 
     fn draw(&self, scene: &Scene) {
-        if self.state.surface.borrow().is_some() {
-            self.state.renderer.borrow_mut().draw(scene);
+        if self.state.surface.borrow().is_some() && self.state.renderer.borrow_mut().draw(scene) {
+            self.state.presentation_pending.set(false);
         }
     }
 

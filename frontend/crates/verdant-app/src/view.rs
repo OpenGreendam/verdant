@@ -609,7 +609,7 @@ impl Editor {
             .children(RightDockTab::ORDER.into_iter().map(|tab| {
                 let open = self.layout.panel_open(tab);
                 crate::proto_controls::action(SharedString::from(format!("dock-panel-{tab:?}")), tab.label())
-                    .role(Role::Switch).aria_toggled(if open { gpui::Toggled::True } else { gpui::Toggled::False })
+                    .role(Role::Switch).aria_selected(open)
                     .aria_label(format!("{}面板", tab.label()))
                     .relative().w(px(44.0)).py(px(6.0)).flex().flex_col().items_center().gap(px(3.0)).rounded(px(8.0))
                     .flat_states(th, open)
@@ -621,10 +621,13 @@ impl Editor {
                     .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))
             }));
 
-        // Rightmost first: ORDER runs outward from the bar, so later panels
-        // sit further left.
-        let open: Vec<RightDockTab> = RightDockTab::ORDER.into_iter().filter(|tab| self.layout.panel_open(*tab)).collect();
-        let columns = open.into_iter().rev().map(|tab| {
+        let open = self.layout.right_panel_order.into_iter().rev().filter(|tab| self.layout.panel_open(*tab));
+        let mut viewport = crate::proto_scroll::viewport("right-dock-scroll", "右侧面板", "horizontal")
+            .flex().flex_1().min_w_0().h_full();
+        if let Some(index) = open.clone().position(|tab| tab == self.layout.right_dock_tab) {
+            viewport = viewport.reveal_item(index, format!("{:?}", self.layout.right_dock_tab));
+        }
+        let columns = open.map(|tab| {
             let content = match tab {
                 RightDockTab::VoiceTimbre => self.right_dock_properties_panel(&project, cx),
                 RightDockTab::Synthesis => self.right_dock_synthesis_panel(&project, cx),
@@ -648,12 +651,10 @@ impl Editor {
         div()
             .id("right-property-dock")
             .rounded_br(crate::window_chrome::corner_radii(self.window_chrome).bottom_right)
-            .w(px(self.layout.right_dock_total_width()))
-            .h_full()
-            .flex_none()
+            .size_full()
             .flex()
             .bg(th.surface)
-            .children(columns)
+            .when(self.layout.right_panels != 0, |d| d.child(viewport.children(columns)))
             .child(rail)
             .into_any_element()
     }
@@ -1804,7 +1805,6 @@ impl Editor {
         let a11y = window.is_a11y_active();
         let has_track = self.active_track().is_some();
         let docked = self.width_class.docks_panels();
-        let column = |width| StyleRefinement::default().w(px(width)).h_full().flex_none();
         let fixed_arrangement = self.bottom != Bottom::Hidden;
         let arrange_height = px(self.arrange_pane_height());
         if !fixed_arrangement {
@@ -1856,16 +1856,21 @@ impl Editor {
                                 .child(div().id("drawer-scrim").absolute().inset_0().bg(gpui::rgba(0x0000_0066)).occlude()
                                     .on_click(cx.listener(|ed, _, _, cx| { ed.drawer = None; cx.notify(); })))
                                 .child({
+                                    // Budget the drawer border outside the panel viewport and rail.
+                                    let width = self.layout.right_dock_total_width() + 1.0;
                                     div().id("side-drawer").absolute().top_0().bottom_0().right_0()
-                                        .w(px(self.layout.right_dock_total_width())).max_w(gpui::relative(0.92)).flex().occlude()
+                                        .w(px(width)).max_w(gpui::relative(0.92)).flex().occlude()
                                         .border_l_1().border_color(th.shade)
                                         .shadow_lg()
                                         .child(cached_view(&self.chrome.property_dock, StyleRefinement::default().size_full(), a11y))
                                 })),
                     )
-                    .when(docked && self.layout.show_right_dock, |d| {
-                        d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th))
-                            .when(has_track, |d| d.child(cached_view(&self.chrome.property_dock, column(self.layout.right_dock_total_width()), a11y)))
+                    .when(docked && has_track && self.layout.show_right_dock, |d| {
+                        let columns = self.layout.visible_dock_columns(window.viewport_size().width.as_f32());
+                        let width = crate::ui_controls::PANEL_RAIL_WIDTH + columns * self.layout.right_dock_width;
+                        d.when(columns > 0.0, |d| d.child(splitter_bar(entity, SplitterKind::RightDockWidth, th)))
+                            .child(div().w(px(width)).h_full().flex_none()
+                                .child(cached_view(&self.chrome.property_dock, StyleRefinement::default().size_full(), a11y)))
                     })
 
             )
@@ -2110,6 +2115,131 @@ fn nudge(ed: &mut Editor, tick: i64, pitch: i32, window: &mut Window, cx: &mut C
     let project = ed.store().snapshot();
     let effects = ed.session.nudge_selection(&project, ed.revision(), tick, pitch);
     ed.apply_effects(effects, window, cx);
+}
+
+#[cfg(test)]
+mod right_dock_tests {
+    use super::*;
+    use gpui::{AppContext, Bounds, MouseButton, MouseDownEvent, MouseUpEvent, Pixels, ScrollDelta, ScrollEvent, ScrollHandle, TestAppContext, point, size};
+    use crate::native_test_support::{frames, instrument_project};
+
+    fn action_bounds(window: &Window, role: &str, label: &str) -> Bounds<Pixels> {
+        use verdant_action_control::native::gpui_native_owner::{all_owners, resolved};
+        all_owners().into_iter().find_map(|owner| {
+            let owner = owner.borrow();
+            (owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.props.get("role").and_then(serde_json::Value::as_str) == Some(role)
+                && owner.modules.accessible_text.get("name")
+                    .is_some_and(|value| resolved(value).text() == label))
+                .then_some(owner.bounds).flatten()
+        }).unwrap_or_else(|| panic!("missing painted action {label}"))
+    }
+
+    fn dock_engine(window: &Window) -> Option<ScrollHandle> {
+        use verdant_scroll_region::native::gpui_native_owner::{all_owners, resolved};
+        all_owners().into_iter().find_map(|owner| {
+            let owner = owner.borrow();
+            (owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name")
+                    .is_some_and(|value| resolved(value).text() == "右侧面板"))
+                .then(|| owner.modules.scroll.handle.clone()).flatten()
+        })
+    }
+
+    fn has_splitter(window: &Window) -> bool {
+        use verdant_continuous_control::native::gpui_native_owner::{all_owners, resolved};
+        all_owners().into_iter().any(|owner| {
+            let owner = owner.borrow();
+            owner.mounted && owner.window_id == Some(window.window_handle().window_id())
+                && owner.modules.accessible_text.get("name")
+                    .is_some_and(|value| resolved(value).text() == "右侧面板宽度")
+        })
+    }
+
+    #[gpui::test]
+    fn native_dock_and_drawer_keep_rail_visible_and_panels_reachable(cx: &mut TestAppContext) {
+        for (width, count) in [(640.0, 2), (1100.0, 5)] {
+            let window = cx.open_window(size(px(width), px(600.0)), |window, cx| {
+                Editor::for_native_test(instrument_project(), window, cx)
+            });
+            window.update(cx, |_, window, _| window.activate_window()).unwrap();
+            frames(window, cx);
+            window.update(cx, |ed, _, cx| {
+                for tab in RightDockTab::ORDER.into_iter().take(count).skip(1) {
+                    ed.open_right_dock(tab, cx);
+                }
+            }).unwrap();
+            frames(window, cx);
+            let rail = |window: &Window| action_bounds(window, "switch", "合成面板");
+            let reopen = |window: &Window| action_bounds(window, "switch", "属性面板");
+            let latest_label = format!("关闭{}面板", RightDockTab::ORDER[count - 1].label());
+            let oldest_label = "关闭属性面板";
+            let (viewport_bounds, rail_bounds, reopen_bounds, oldest_before) = window.update(cx, |_, window, _| {
+                let engine = dock_engine(window).expect("retained horizontal dock engine");
+                let bounds = engine.bounds();
+                let rail = rail(window);
+                assert!(bounds.right() <= rail.left() && rail.right() <= px(width));
+                if count == 5 {
+                    assert!(bounds.left() >= px(500.0), "keep room for the editor");
+                    assert!(bounds.size.width > px(450.0), "without the old left inspector, more than one column fits");
+                }
+                assert_eq!(has_splitter(window), count == 5);
+                assert!(engine.max_offset().x > px(0.0));
+                assert_eq!(engine.offset().x, px(0.0), "latest panel opens at the left of the viewport");
+                let latest = action_bounds(window, "button", &latest_label);
+                let oldest = action_bounds(window, "button", oldest_label);
+                assert!(latest.left() >= bounds.left() && latest.right() <= bounds.right());
+                assert!(oldest.left() >= bounds.right(), "oldest panel starts beyond the scroll viewport");
+                (bounds, rail, reopen(window), oldest)
+            }).unwrap();
+            cx.update_window(window.into(), |_, window, cx| {
+                window.dispatch_event(gpui::PlatformInput::Scroll(ScrollEvent {
+                    position: point(viewport_bounds.center().x, viewport_bounds.top() + px(20.0)),
+                    delta: ScrollDelta::Pixels(point(-px(width * 3.0), px(0.0))),
+                    ..Default::default()
+                }), cx);
+            }).unwrap();
+            // GPUI adds the wheel delta immediately and clamps it during
+            // prepaint, before applying the offset to the panel hitboxes.
+            frames(window, cx);
+            window.update(cx, |ed, window, cx| {
+                let engine = dock_engine(window).expect("retained horizontal dock engine after wheel");
+                assert_eq!(engine.bounds(), viewport_bounds, "scrolling keeps the viewport fixed");
+                assert_eq!(engine.offset().x, -engine.max_offset().x, "wheel reaches the last column");
+                assert_eq!(rail(window), rail_bounds, "scrolling leaves the rail fixed");
+                let oldest = action_bounds(window, "button", oldest_label);
+                assert!(oldest.left() >= viewport_bounds.left() && oldest.right() <= viewport_bounds.right());
+                assert!((oldest.left() - oldest_before.left() + engine.max_offset().x).as_f32().abs() <= 1.0);
+                for tab in RightDockTab::ORDER.into_iter().take(count) {
+                    ed.toggle_right_panel(tab, cx);
+                }
+            }).unwrap();
+            frames(window, cx);
+            window.update(cx, |_, window, _| {
+                assert_eq!(rail(window), rail_bounds, "rail stays at the window edge when every column closes");
+                assert!(dock_engine(window).is_none(), "rail-only layout has no panel viewport");
+                assert!(!has_splitter(window), "rail-only layout has no resize handle");
+                assert_eq!(reopen(window), reopen_bounds);
+            }).unwrap();
+            cx.update_window(window.into(), |_, window, cx| {
+                let position = reopen_bounds.center();
+                window.dispatch_event(gpui::PlatformInput::MouseDown(MouseDownEvent {
+                    position, button: MouseButton::Left, ..Default::default()
+                }), cx);
+                window.dispatch_event(gpui::PlatformInput::MouseUp(MouseUpEvent {
+                    position, button: MouseButton::Left, ..Default::default()
+                }), cx);
+            }).unwrap();
+            frames(window, cx);
+            window.update(cx, |ed, window, _| {
+                assert!(ed.layout.panel_open(RightDockTab::VoiceTimbre), "rail button reopens its panel");
+                assert!(!ed.layout.panel_open(RightDockTab::Synthesis), "the other rail button remains closed");
+                assert!(dock_engine(window).is_some(), "reopening restores the panel viewport");
+                assert_eq!(rail(window), rail_bounds, "reopening keeps the rail fixed");
+                assert_eq!(reopen(window), reopen_bounds);
+            }).unwrap();
+        }
+    }
 }
 
 #[cfg(test)]

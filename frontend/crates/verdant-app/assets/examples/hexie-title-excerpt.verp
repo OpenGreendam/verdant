@@ -34,7 +34,7 @@
       "notes": [
         {
           "id": "hexie-excerpt-note-1",
-          "start_tick": 0,
+          "start_tick": 1920,
           "duration_tick": 480,
           "midi_note": 65,
           "detune_millicents": 0,
@@ -52,7 +52,7 @@
         },
         {
           "id": "hexie-excerpt-note-2",
-          "start_tick": 480,
+          "start_tick": 2400,
           "duration_tick": 480,
           "midi_note": 72,
           "detune_millicents": 0,
@@ -70,7 +70,7 @@
         },
         {
           "id": "hexie-excerpt-note-3",
-          "start_tick": 960,
+          "start_tick": 2880,
           "duration_tick": 480,
           "midi_note": 65,
           "detune_millicents": 0,
@@ -88,7 +88,7 @@
         },
         {
           "id": "hexie-excerpt-note-4",
-          "start_tick": 1440,
+          "start_tick": 3360,
           "duration_tick": 480,
           "midi_note": 72,
           "detune_millicents": 0,
@@ -106,7 +106,7 @@
         },
         {
           "id": "hexie-excerpt-note-5",
-          "start_tick": 1920,
+          "start_tick": 3840,
           "duration_tick": 240,
           "midi_note": 67,
           "detune_millicents": 0,
@@ -124,7 +124,7 @@
         },
         {
           "id": "hexie-excerpt-note-6",
-          "start_tick": 2160,
+          "start_tick": 4080,
           "duration_tick": 240,
           "midi_note": 68,
           "detune_millicents": 0,
@@ -142,7 +142,7 @@
         },
         {
           "id": "hexie-excerpt-note-7",
-          "start_tick": 2400,
+          "start_tick": 4320,
           "duration_tick": 480,
           "midi_note": 70,
           "detune_millicents": 0,
@@ -160,7 +160,7 @@
         },
         {
           "id": "hexie-excerpt-note-8",
-          "start_tick": 2880,
+          "start_tick": 4800,
           "duration_tick": 480,
           "midi_note": 68,
           "detune_millicents": 0,
@@ -183,7 +183,10 @@
   "render_preferences": {
     "protocol": "ogd-worker/1",
     "route": "verdant-voice",
-    "native_seed": 10008
+    "native_seed": 10008,
+    "phoneme_timing": {
+      "method": "vowel-anchor-v1"
+    }
   },
   "extensions": {
     "verdant_builtin_example": {

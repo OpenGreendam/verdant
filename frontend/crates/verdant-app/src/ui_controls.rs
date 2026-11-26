@@ -88,7 +88,7 @@ pub fn bar_height(touch: bool) -> f32 { if touch { 56.0 } else { 48.0 } }
 pub fn rem_size(touch: bool) -> f32 { if touch { 18.0 } else { 16.0 } }
 
 /// Panels of the right dock. Like Synthesizer V's panels, any number of them
-/// can be open at once; they stack in `RightDockTab::ORDER`.
+/// can be open at once, in the order they were opened.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RightDockTab {
@@ -106,7 +106,7 @@ pub enum RightDockTab {
 }
 
 impl RightDockTab {
-    /// Stacking order of open panels, top to bottom.
+    /// Button order in the rail, also used for older saved layouts.
     pub const ORDER: [RightDockTab; 5] =
         [Self::VoiceTimbre, Self::Synthesis, Self::RenderInserts, Self::Dictionary, Self::HistorySystem];
 
@@ -137,6 +137,7 @@ impl RightDockTab {
 const DEFAULT_RIGHT_PANELS: u8 = 1 << RightDockTab::VoiceTimbre as u8;
 /// Width of the right dock's vertical panel bar.
 pub const PANEL_RAIL_WIDTH: f32 = 52.0;
+const MAX_PANEL_WIDTH: f32 = 480.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -147,6 +148,8 @@ pub struct LayoutPrefs {
     pub right_dock_tab: RightDockTab,
     /// Open right-dock panels, one bit per `RightDockTab`.
     pub right_panels: u8,
+    /// Closest to the rail first. Closed entries keep the permutation complete.
+    pub right_panel_order: [RightDockTab; 5],
     pub arrange_height: f32,
     pub lane_height: f32,
     pub inspector_tab: InspectorTab,
@@ -162,6 +165,7 @@ impl Default for LayoutPrefs {
             show_right_dock: true,
             right_dock_tab: RightDockTab::VoiceTimbre,
             right_panels: DEFAULT_RIGHT_PANELS,
+            right_panel_order: RightDockTab::ORDER,
             arrange_height: 160.0,
             lane_height: 184.0,
             inspector_tab: InspectorTab::TrackNote,
@@ -175,10 +179,13 @@ impl LayoutPrefs {
     pub fn clamped(self) -> Self {
         Self {
             inspector_width: if self.inspector_width.is_finite() { self.inspector_width.clamp(260.0, 440.0) } else { 300.0 },
-            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, 480.0) } else { 340.0 },
+            right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, MAX_PANEL_WIDTH) } else { 340.0 },
             show_right_dock: self.show_right_dock,
             right_dock_tab: self.right_dock_tab,
             right_panels: self.right_panels & RightDockTab::ORDER.iter().fold(0, |mask, tab| mask | tab.bit()),
+            right_panel_order: if RightDockTab::ORDER.iter().all(|tab| self.right_panel_order.contains(tab)) {
+                self.right_panel_order
+            } else { RightDockTab::ORDER },
             arrange_height: if self.arrange_height.is_finite() { self.arrange_height.clamp(92.0, 460.0) } else { 160.0 },
             lane_height: if self.lane_height.is_finite() { self.lane_height.clamp(112.0, 420.0) } else { 184.0 },
             inspector_tab: self.inspector_tab,
@@ -191,12 +198,27 @@ impl LayoutPrefs {
 
     /// The right dock's width: the panel bar plus one column per open panel.
     pub fn right_dock_total_width(&self) -> f32 {
-        let open = RightDockTab::ORDER.iter().filter(|tab| self.panel_open(**tab)).count();
-        PANEL_RAIL_WIDTH + open as f32 * self.right_dock_width
+        PANEL_RAIL_WIDTH + self.right_panels.count_ones() as f32 * self.right_dock_width
+    }
+
+    /// Reserve a third of the window width for the editor, while
+    /// always allowing one complete column in docked windows. A fractional
+    /// column shows that more content can be scrolled into view. Use the maximum
+    /// column width so this factor stays constant throughout a splitter drag.
+    pub fn visible_dock_columns(&self, window_width: f32) -> f32 {
+        let budget = window_width * (2.0 / 3.0) - PANEL_RAIL_WIDTH;
+        (budget / MAX_PANEL_WIDTH).max(1.0).min(self.right_panels.count_ones() as f32)
     }
 
     pub fn set_panel_open(&mut self, tab: RightDockTab, open: bool) {
-        if open { self.right_panels |= tab.bit() } else { self.right_panels &= !tab.bit() }
+        if open && !self.panel_open(tab) {
+            if let Some(i) = self.right_panel_order.iter().position(|entry| *entry == tab) {
+                self.right_panel_order[i..].rotate_left(1);
+            }
+            self.right_panels |= tab.bit();
+        } else if !open {
+            self.right_panels &= !tab.bit();
+        }
     }
 
     pub fn from_prefs(prefs: &crate::files::Prefs) -> Self {
@@ -805,24 +827,28 @@ pub fn splitter_bar(editor: Entity<Editor>, kind: SplitterKind, th: Theme) -> im
     Splitter { editor, kind, theme: th }
 }
 impl gpui::RenderOnce for Splitter {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use crate::proto_scalar::{EventKind, Sample, Spec, scalar};
         let kind = self.kind;
         let th = self.theme;
         let ed = self.editor.read(cx);
         let defaults = LayoutPrefs::default();
         let (id, label, value, default, min, max, vertical, sign) = match kind {
-            SplitterKind::RightDockWidth => ("splitter-right-dock", "右侧面板宽度", ed.layout.right_dock_width, defaults.right_dock_width, 280.0, 480.0, true, -1.0),
+            SplitterKind::RightDockWidth => ("splitter-right-dock", "右侧面板宽度", ed.layout.right_dock_width, defaults.right_dock_width, 280.0, f64::from(MAX_PANEL_WIDTH), true, -1.0),
             SplitterKind::ArrangeHeight => ("splitter-arrange", "编曲区高度", ed.layout.arrange_height, defaults.arrange_height, 92.0, 460.0, false, 1.0),
             SplitterKind::LaneHeight => ("splitter-lane", "参数轨高度", ed.layout.lane_height, defaults.lane_height, 112.0, 420.0, false, -1.0),
         };
+        let scale = if kind == SplitterKind::RightDockWidth {
+            ed.layout.visible_dock_columns(window.viewport_size().width.as_f32())
+        } else { 1.0 };
+        let scale = f64::from(scale.max(1.0));
         let mut spec = Spec::slider(value as f64, min, max, label);
         spec.role = "separator";
-        spec.step = 8.0; spec.fine_step = 1.0; spec.default_value = default as f64;
+        spec.step = 8.0 / scale; spec.fine_step = 1.0 / scale; spec.default_value = default as f64;
         spec.preview_echo = true;
         let control = scalar(self.editor, id, spec,
             move |sample, _, initial| {
-                let delta = if vertical { sample.total_delta.x } else { sample.total_delta.y } * sign;
+                let delta = (if vertical { sample.total_delta.x } else { sample.total_delta.y }) * sign / scale;
                 // LayoutPrefs stores f32. Propose that same representation so
                 // its preview echo remains exact across a native repaint.
                 Sample {
@@ -887,8 +913,14 @@ mod splitter_precision_tests {
         for kind in [SplitterKind::RightDockWidth,
             SplitterKind::ArrangeHeight, SplitterKind::LaneHeight] {
             for fine in [false, true] {
-                let window = cx.open_window(size(px(400.0), px(240.0)), |window, cx| {
-                    let editor = cx.new(|cx| Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx));
+                let multi_column = kind == SplitterKind::RightDockWidth;
+                let width = if multi_column { 2000.0 } else { 400.0 };
+                let window = cx.open_window(size(px(width), px(240.0)), |window, cx| {
+                    let editor = cx.new(|cx| {
+                        let mut ed = Editor::for_native_test(verdant_domain::Project::new_empty(), window, cx);
+                        if multi_column { ed.layout.set_panel_open(RightDockTab::Synthesis, true); }
+                        ed
+                    });
                     let changed = cx.observe(&editor, |_, _, cx| cx.notify());
                     Harness { editor, kind, _changed: changed }
                 });
@@ -922,7 +954,8 @@ mod splitter_precision_tests {
                 for delta in [13.37, 27.19] {
                     last = if vertical { point(start.x + px(delta), start.y) } else { point(start.x, start.y + px(delta)) };
                     let distance = if vertical { f64::from(last.x) - f64::from(start.x) } else { f64::from(last.y) - f64::from(start.y) };
-                    expected = (initial + distance * sign * if fine { 0.1 } else { 1.0 }) as f32;
+                    let scale = if multi_column { 2.0 } else { 1.0 };
+                    expected = (initial + distance * sign / scale * if fine { 0.1 } else { 1.0 }) as f32;
                     cx.update_window(window.into(), |_, window, cx| {
                         window.dispatch_event(gpui::PlatformInput::MouseMove(MouseMoveEvent {
                             position: last, pressed_button: Some(MouseButton::Left),
@@ -1121,6 +1154,7 @@ mod tests {
             show_right_dock: false,
             right_dock_tab: RightDockTab::Dictionary,
             right_panels: RightDockTab::Dictionary.bit() | RightDockTab::HistorySystem.bit(),
+            right_panel_order: RightDockTab::ORDER,
             arrange_height: 10.0,
             lane_height: 240.0,
             inspector_tab: InspectorTab::Synthesis,
@@ -1273,6 +1307,25 @@ mod width_class_tests {
         // Layouts from before stackable panels open the default set.
         assert!(layout.panel_open(RightDockTab::VoiceTimbre) && !layout.panel_open(RightDockTab::Synthesis));
         assert_eq!(layout.right_dock_total_width(), PANEL_RAIL_WIDTH + layout.right_dock_width);
+    }
+
+    #[test]
+    fn panel_opening_order_round_trips_and_older_layouts_keep_their_order() {
+        use RightDockTab::{Dictionary, HistorySystem, VoiceTimbre};
+        let mut prefs = crate::files::Prefs::default();
+        prefs.extra.insert(LAYOUT_PREFS_KEY.into(), serde_json::json!({
+            "right_panels": VoiceTimbre.bit() | Dictionary.bit() | HistorySystem.bit(),
+        }));
+        let mut layout = LayoutPrefs::from_prefs(&prefs);
+        let open = |layout: LayoutPrefs| layout.right_panel_order.into_iter()
+            .filter(|tab| layout.panel_open(*tab)).collect::<Vec<_>>();
+        assert_eq!(open(layout), [VoiceTimbre, Dictionary, HistorySystem]);
+        layout.set_panel_open(Dictionary, true);
+        assert_eq!(open(layout), [VoiceTimbre, Dictionary, HistorySystem]);
+        layout.set_panel_open(Dictionary, false);
+        layout.set_panel_open(Dictionary, true);
+        layout.store(&mut prefs);
+        assert_eq!(open(LayoutPrefs::from_prefs(&prefs)), [VoiceTimbre, HistorySystem, Dictionary]);
     }
 }
 

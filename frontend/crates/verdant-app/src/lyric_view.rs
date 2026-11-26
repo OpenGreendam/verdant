@@ -161,20 +161,39 @@ fn native_prompt_overlay(ed: &Editor, editor: &Entity<Editor>, commands: Command
     let instance = prompt.instance.clone();
     let key = SharedString::from(format!("prompt-text-{generation}-{instance}"));
     let owner = editor.downgrade();
+    let retry_focus = commands.clone();
     let field = proto_text::inline(key, "输入文字…", prompt.state.text.clone(), th,
         Options { auto_focus: true, select_all: true, submit_on_enter: true, cancel_on_escape: true,
             inline: true, ..Default::default() }, move |event, window, cx| {
-            let _ = owner.update(cx, |ed, cx| {
-                if ed.document_generation != generation || !ed.text_prompt.as_ref().is_some_and(|p| p.base == base && p.instance == instance) { return; }
+            let current = move |ed: &Editor, instance: &str| {
+                ed.document_generation == generation && ed.text_prompt.as_ref().is_some_and(|p| p.base == base && p.instance == instance)
+            };
+            let retry = owner.update(cx, |ed, cx| {
+                if !current(ed, &instance) { return false; }
                 match event {
                     Event::Changed { value, composing } => { if let Some(p) = &mut ed.text_prompt { mirror(&mut p.state, &value, composing); } cx.notify(); },
                     Event::Replaced { value } | Event::CompositionEnd { value } => { if let Some(p) = &mut ed.text_prompt { mirror(&mut p.state, &value, false); } cx.notify(); },
-                    Event::Submit { value } => { if let Some(p) = &mut ed.text_prompt { mirror(&mut p.state, &value, false); } ed.finish_prompt(true, window, cx); },
+                    Event::Submit { value } => {
+                        if let Some(p) = &mut ed.text_prompt { mirror(&mut p.state, &value, false); }
+                        ed.finish_prompt(true, window, cx);
+                        return current(ed, &instance);
+                    },
                     Event::Cancel => ed.finish_prompt(false, window, cx),
                     Event::Failure(error) => { ed.notice(error); cx.notify(); },
                     _ => {},
                 }
-            });
+                false
+            }).unwrap_or(false);
+            if retry {
+                // Restore focus to the input inside the overlay.
+                // Wait for the submitting field's callback to release its entity.
+                let (owner, instance, retry_focus) = (owner.clone(), instance.clone(), retry_focus.clone());
+                window.defer(cx, move |window, cx| {
+                    if owner.upgrade().is_some_and(|ed| current(ed.read(cx), &instance)) {
+                        retry_focus.invoke("focusSelf", vec![], window, cx);
+                    }
+                });
+            }
         }).commands(commands.clone());
     let cancel = commands.clone();
     let composing = prompt.state.is_composing();

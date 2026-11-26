@@ -23,9 +23,8 @@ use super::{
     window::{AndroidDisplay, AndroidWindow, AndroidWindowState, appearance},
 };
 
-/// How long the event loop sleeps between frames while a window is visible. Presenting
-/// with `Mailbox` does not block, so the loop paces itself; GPUI skips frames that have
-/// nothing to draw.
+/// How long the event loop sleeps between frame requests while a window is visible.
+/// GPUI skips frames that have nothing to draw.
 const FRAME_INTERVAL: Duration = Duration::from_micros(16_667);
 
 /// Android's system UI font; `CosmicTextSystem` falls back to it for missing glyphs.
@@ -72,6 +71,7 @@ struct PlatformCallbacks {
 /// window; an Android activity has exactly one.
 pub struct AndroidPlatform {
     app: AndroidApp,
+    dispatcher: Arc<AndroidDispatcher>,
     background_executor: BackgroundExecutor,
     foreground_executor: ForegroundExecutor,
     main_queue: Arc<TaskQueue>,
@@ -90,6 +90,7 @@ impl AndroidPlatform {
         let (dispatcher, main_queue) = AndroidDispatcher::new(app.create_waker());
         let dispatcher = Arc::new(dispatcher);
         Self {
+            dispatcher: dispatcher.clone(),
             background_executor: BackgroundExecutor::new(dispatcher.clone()),
             foreground_executor: ForegroundExecutor::new(dispatcher),
             main_queue,
@@ -138,9 +139,16 @@ impl AndroidPlatform {
                 }
                 self.native_window.borrow_mut().take();
             }
-            MainEvent::WindowResized { .. } | MainEvent::ConfigChanged { .. } | MainEvent::RedrawNeeded { .. } => {
+            MainEvent::WindowResized { .. } | MainEvent::ConfigChanged { .. } => {
                 if let Some(state) = self.window_state() {
                     state.configuration_changed();
+                }
+            }
+            MainEvent::RedrawNeeded { .. } => {
+                if let Some(state) = self.window_state() {
+                    state.configuration_changed();
+                    // Android expects the presentation before the poll callback returns.
+                    state.redraw_needed();
                 }
             }
             MainEvent::ContentRectChanged { .. } | MainEvent::InsetsChanged { .. } => {
@@ -187,6 +195,12 @@ impl AndroidPlatform {
     }
 }
 
+impl Drop for AndroidPlatform {
+    fn drop(&mut self) {
+        self.dispatcher.shutdown();
+    }
+}
+
 impl Platform for AndroidPlatform {
     fn platform_info(&self) -> PlatformInfo {
         PlatformInfo { os: gpui::OperatingSystem::Android, target: gpui::PlatformTarget::Native }
@@ -210,17 +224,26 @@ impl Platform for AndroidPlatform {
 
     fn run(&self, on_finish_launching: Box<dyn 'static + FnOnce()>) {
         let mut on_finish_launching = Some(on_finish_launching);
-        loop {
-            run_main_thread_tasks(&self.main_queue);
+        while !self.quit_requested.get() {
+            let drawable = self.window_state().is_some_and(|state| state.is_drawable());
+            // A prior batch may have left runnable work even with no surface.
+            let timeout = if self.main_queue.has_pending() {
+                Some(Duration::ZERO)
+            } else {
+                drawable.then_some(FRAME_INTERVAL)
+            };
+            self.app.poll_events(timeout, |event| {
+                if !self.quit_requested.get() {
+                    self.handle_event(event, &mut on_finish_launching);
+                }
+            });
             if self.quit_requested.get() {
                 break;
             }
-            let drawable = self.window_state().is_some_and(|state| state.is_drawable());
-            // Without a visible surface there is nothing to pace; sleep until the system
-            // or a main-thread task wakes the looper.
-            let timeout = drawable.then_some(FRAME_INTERVAL);
-            self.app.poll_events(timeout, |event| self.handle_event(event, &mut on_finish_launching));
-            run_main_thread_tasks(&self.main_queue);
+            run_main_thread_tasks(&self.main_queue, || self.quit_requested.get());
+            if self.quit_requested.get() {
+                break;
+            }
             if let Some(state) = self.window_state() {
                 state.request_frame();
             }
@@ -233,6 +256,7 @@ impl Platform for AndroidPlatform {
         if let Some(mut quit) = quit {
             quit();
         }
+        self.dispatcher.shutdown();
     }
 
     fn quit(&self) {

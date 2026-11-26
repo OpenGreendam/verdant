@@ -113,9 +113,12 @@ impl Editor {
         let Some(prompt)=self.text_prompt.take()else{return;};
         if !confirm{window.focus(&self.focus_roll,cx);cx.notify();return;}
         if prompt.state.is_composing(){self.text_prompt=Some(prompt);return;}
-        if prompt.base!=self.revision(){self.notice("工程已改变，请重新打开编辑窗口");window.focus(&self.focus_roll,cx);cx.notify();return;}
+        // The singer prompt supplies the frozen export, with live document
+        // side effects separately checked after the file is written.
+        let frozen_export=matches!(&prompt.purpose,PromptPurpose::Integration(super::integrations::IntegrationPrompt::VsqxExportSinger(_)));
+        if prompt.base!=self.revision()&&!frozen_export{self.notice("工程已改变，请重新打开编辑窗口");window.focus(&self.focus_roll,cx);cx.notify();return;}
         let result=self.apply_prompt(&prompt,cx);
-        if let Err(error)=result{self.notice(error);self.text_prompt=Some(prompt);window.focus(&self.focus_lyric,cx);}else{window.focus(&self.focus_roll,cx);}cx.notify();
+        if let Err(error)=result{self.notice(error);self.text_prompt=Some(prompt);}else{window.focus(&self.focus_roll,cx);}cx.notify();
     }
     fn apply_prompt(&mut self,prompt:&TextPrompt,cx:&mut Context<Self>)->Result<(),String>{
         let text=prompt.state.text.trim();
@@ -191,9 +194,16 @@ impl Editor {
                 A::SplitPart(tick)=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;parts.split(&id,tick)?;self.commit(self.revision(),CommandBatch::single("分割音符组",parts.command()),cx);}
                 A::JoinPart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;let p=parts.instance(&id).ok_or("音符组已不存在")?;let next=parts.instances.iter().find(|n|n.id!=id&&n.track==p.track&&n.start_tick==p.start_tick+p.duration_tick).map(|p|p.id.clone()).ok_or("右侧没有相邻音符组")?;parts.join(&id,&next)?;self.commit(self.revision(),CommandBatch::single("连接音符组",parts.command()),cx);}
                 A::MutePart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;self.edit_part(&id,"音符组静音",cx,|p|{p.muted=!p.muted;Ok(())})?;}
-                A::DissolvePart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;let(track,notes)=parts.dissolve(self.project(),&id)?;
-                    let commands=vec![parts.command(),verdant_domain::Command::InsertNotes{track,notes}];
-                    if self.commit(self.revision(),CommandBatch{label:"解散音符组".into(),commands},cx){self.selected_part=None;}}
+                A::DissolvePart => {
+                    let id = self.selected_part.as_deref().ok_or("先选择音符组")?;
+                    let mut parts = Parts::load(self.project())?;
+                    parts.instance(id).filter(|part| part.track == self.session.track).ok_or("先选择当前轨道的音符组")?;
+                    let (track, notes) = parts.dissolve(self.project(), id)?;
+                    let commands = vec![parts.command(), Command::InsertNotes { track, notes }];
+                    if self.commit(self.revision(), CommandBatch { label: "解散音符组".into(), commands }, cx) {
+                        self.selected_part = None;
+                    }
+                }
                                 A::DeletePart=>{let id=self.selected_part.clone().ok_or("先选择音符组")?;let mut parts=Parts::load(self.project())?;parts.instances.retain(|p|p.id!=id);self.commit(self.revision(),CommandBatch::single("删除音符组",parts.command()),cx);self.selected_part=None;}
                 A::RepeatSelection=>{let notes=self.selected_notes();let start=notes.iter().map(|n|n.start_tick).min().ok_or("先选择音符")?;let end=notes.iter().map(|n|n.end_tick()).max().expect("selection");self.edit_playback("循环选择范围",cx,|s|{s.loop_start=start;s.loop_end=end;s.looping=true;});}
                 A::ToggleLoop=>{let anchor=self.playback_settings().loop_start.max(0);let length=self.meter().bar_ticks_at(anchor);self.edit_playback("循环播放",cx,|s|{if s.loop_end<=s.loop_start{s.loop_end=s.loop_start+length;}s.looping=!s.looping;});}
