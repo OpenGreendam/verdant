@@ -56,3 +56,47 @@ VERDANT_TOUCH=1 target/debug/verdant-gui
 ```
 
 把窗口调到 1280×800（横屏平板）或 800×1280（竖屏，走 Compact 抽屉布局）即可检查触控尺寸和面板行为。
+
+## 迁移到官方 GPUI 仓库
+
+GPUI 的官方仓库发布后，Verdant 从 `cyjin-yl/z3rm@28f0728` 切换过去，按下面顺序进行。
+
+### 1. 切换依赖来源
+
+GPUI 的来源只在两处声明，其余检查都从这两处读取：
+
+- `frontend/Cargo.toml` 中的 `gpui`、`gpui_platform`、`gpui_wgpu` 三项必须使用同一个 `git` 和 `rev`；
+- `frontend/proto-ui/compiler.pin.json` 中的 `gpu.workspace.git`、`gpu.workspace.rev` 和 `gpu.workspaceGpuiRevision`。
+
+两处都改好后：
+
+```sh
+cd frontend
+cargo update -p gpui -p gpui_platform -p gpui_wgpu
+node proto-ui/tools/build-proto-ui.mjs --upstream ../Proto-UI          # 重新生成 14 个单元和 receipt
+node proto-ui/tools/build-proto-ui.mjs --check --upstream ../Proto-UI
+node proto-ui/tools/check-proto-ui-rules.mjs
+node proto-ui/tools/check-cargo-gpui.mjs
+cargo test --workspace
+```
+
+`check-proto-ui-rules.mjs` 里出现的 `cyjin-yl/z3rm` 只是固定的测试样例，不需要改。`P0-DECISIONS.md` 中锁定 GPUI 的那条记录需要更新为新的仓库和修订。
+
+### 2. 核对 fork 独有的接口
+
+官方仓库不一定包含这个 fork 新增的接口。`crates/gpui_android` 依赖下面这些接口，切换前应逐项确认：
+
+| 类别 | 接口 |
+| --- | --- |
+| 平台信息 | `PlatformInfo`、`OperatingSystem::Android`、`PlatformTarget` |
+| 触控与手势 | `PlatformInput::Touch`、`TouchEvent`、`TouchId`、`TouchPhase`、`PlatformGestures`、`GestureTuning`、`ScrollPhysics::android()` |
+| 移动端窗口 | `WindowInsets`、`on_insets_changed`、`set_back_handler`、`set_back_enabled`、`show_soft_keyboard`、`hide_soft_keyboard`、`WindowVisibility`、`on_visibility_change`、`on_memory_warning` |
+| 帧调度 | `RequestFrameOptions`、`frame_waker` |
+| 渲染（`gpui_wgpu`） | `WgpuRenderer::new`、`replace_surface`、`unconfigure_surface`、`needs_redraw`、`WgpuSurfaceConfig::preferred_present_mode`、`GpuContext`、`CosmicTextSystem` |
+
+Verdant 桌面端自身也依赖其中的触控接口（卷帘、曲线、旋钮的 touch arena），以及无障碍角色、客户端装饰和窗口按钮布局等 fork 接口。
+
+### 3. 安卓后端的去向
+
+- 如果官方仓库自带 Android 平台，就删掉 `crates/gpui_android`，改用官方的入口函数，示例和 `build-apk.sh` 跟着迁移。
+- 如果没有，可以继续保留在 Verdant 中，并按上表调整接口。也可以把它贡献到官方仓库，但这个 crate 目前沿用 Verdant 的 AGPL-3.0-or-later 许可，而 GPUI 是 Apache-2.0，提交上游前需要权利人决定是否以 Apache-2.0 授权。这个 crate 只依赖 `gpui`、`gpui_wgpu` 和 Android 相关的 crate，不引用任何 Verdant 代码，可以整体搬过去。
