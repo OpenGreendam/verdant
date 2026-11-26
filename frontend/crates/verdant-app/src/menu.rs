@@ -1120,7 +1120,8 @@ mod native_menu_tests {
             assert_eq!(named_source(window, "Group").state("focused").unwrap(), serde_json::json!(true));
             let source=source(window);let now=revision(&source);assert_ne!(now,before,"expanded row topology changes authority");
             assert_eq!(source.call("choose",vec![2.into(),false.into(),before.clone().into()],window,cx).unwrap(),serde_json::json!(false));
-            assert_eq!(named_source(window, "Group").state("cursor").unwrap(), serde_json::json!(1));
+            let cursor = named_source(window, "Group").state("cursor").unwrap();
+            assert_eq!(crate::proto_controls::source_index(Some(&cursor)), Some(1));
         }).unwrap();
         cx.simulate_keystrokes(window.into(), "right");
         crate::native_test_support::frames(window,cx);
