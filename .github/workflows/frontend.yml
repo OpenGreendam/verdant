@@ -1,68 +1,29 @@
-name: Windows native RC6 package
+name: Windows offline first use
 on: workflow_dispatch
 permissions:
   contents: read
+  actions: read
 jobs:
-  package:
+  offline:
     runs-on: windows-2025
-    timeout-minutes: 120
-    env:
-      RELEASE_COMMIT: '4fdcd984e08e845ac24a36f6d0763c805e4202b1'
-      RELEASE_RUN_ID: 'run-4fdcd984e08e-s4of6dy6'
-      RELEASE_TREE: 'de6bb95e900aa161b1d9e179664a9d08f06d4a39'
-      RELEASE_EPOCH: '1795698295' 
     steps:
-      - name: Preserve exact source bytes
-        run: git config --global core.autocrlf false
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
-          ref: 4fdcd984e08e845ac24a36f6d0763c805e4202b1
-          path: source
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: helpers
           sparse-checkout: ci-rc6
           persist-credentials: false
-      - name: Obtain approved preceding release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release download v0.1.0-rc.5 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc5"
-      - name: Build, guard and exercise bundled package
-        run: ./helpers/ci-rc6/package.ps1
-      - name: Retain Windows native diagnostic logs
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: native-test-diagnostics
-          path: evidence/*.log
-          if-no-files-found: warn
-      - name: Upload verified package and native receipts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-rc6-native
-          path: evidence/
-          if-no-files-found: error
-          compression-level: 0
-      - name: Exercise packaged desktop and retain durable cache evidence
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $exe = (Resolve-Path "$env:RUNNER_TEMP/expanded/verdant-0.1.0-windows-x86_64/bin/verdant-gui.exe").Path
-          $build = Get-Content -Raw evidence/windows-build.json | ConvertFrom-Json
-          if ((Get-FileHash $exe).Hash -ne $build.binaries.'verdant-gui') { throw 'Packaged GUI differs from build receipt' }
-          New-Item -ItemType Directory images | Out-Null
-          $cache = Join-Path $env:LOCALAPPDATA 'Verdant/cache'
-          if (Test-Path "$cache/render-cache") { throw 'Desktop cache must be fresh before launch' }
-          ./helpers/ci-rc6/native-menu-windows.ps1 -Exe $exe -OutputDir images/initial -CaptureOnly
-          $observed = Get-Content -Raw images/initial/observations.json | ConvertFrom-Json
-          ./helpers/ci-rc6/native-menu-windows.ps1 -Exe $exe -ProcessId $observed.pid -OutputDir images/full -Menu '822,23' -Row '699,158,314,26' -Outside '520,530'
-          python ./helpers/ci-rc6/check-desktop-cache.py $cache > images/windows-desktop-cache.json
-          if ($LASTEXITCODE -ne 0) { throw 'Persisted cache verification failed' }
-      - name: Upload actual desktop captures and cache receipts
+          github-token: ${{ github.token }}
+          artifact-ids: 15121876945
+          run-id: 45826238304
+          path: package
+          merge-multiple: true
+      - name: Verify real network isolation and first synthesis
+        run: ./ci-rc6/offline.ps1
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: native-menu-observations
-          path: images/
-          if-no-files-found: warn
+          name: windows-offline-first-use
+          path: offline-evidence/
+          if-no-files-found: error
