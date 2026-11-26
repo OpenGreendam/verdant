@@ -31,6 +31,13 @@ jobs:
         run: gh release download v0.1.0-rc.5 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc5"
       - name: Build, guard and exercise bundled package
         run: ./helpers/ci-rc6/package.ps1
+      - name: Retain Windows native diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-diagnostics
+          path: evidence/*.log
+          if-no-files-found: warn
       - name: Upload verified package and native receipts
         uses: actions/upload-artifact@v4
         with:

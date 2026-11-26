@@ -50,15 +50,16 @@ $env:VERDANT_BUNDLED_VOICE_POLICY_SHA256 = $pin
 $env:VERDANT_VOICE_BANK_SHA256 = $pins.voice_members['bank.safetensors']
 Set-Location "$source/frontend"
 Run cargo @('fetch','--locked')
+$backendTests = & cargo test --offline --locked --release -p verdant-backend --test backend --test f0_artifacts 2>&1
+$backendExit = $LASTEXITCODE
+$backendTests | Out-Host
+$backendTests | Set-Content "$root/windows-backend-tests.log"
+if ($backendExit -ne 0 -or ($backendTests -join "`n") -notmatch 'durable_cache_roundtrips_and_reports_corruption \.\.\. ok') { throw 'Native durable cache regression failed' }
 Run cargo @('build','--offline','--locked','--release','-p','verdant-app','-p','verdant-cli','-p','verdant-launcher','-p','verdant-worker','-p','verdant-plughost','-p','verdant-voice','-p','verdant-release')
 $tests = & cargo test --offline --locked --release -p verdant-cli windows_path_tests 2>&1
 $testExit = $LASTEXITCODE
 $tests | Set-Content "$root/windows-path-tests.log"
 if ($testExit -ne 0 -or ($tests -join "`n") -notmatch 'publishes_a_new_job_with_its_execution_lease_held \.\.\. ok') { throw 'Native Windows tests failed' }
-$backendTests = & cargo test --offline --locked --release -p verdant-backend --test backend --test f0_artifacts 2>&1
-$backendExit = $LASTEXITCODE
-$backendTests | Set-Content "$root/windows-backend-tests.log"
-if ($backendExit -ne 0 -or ($backendTests -join "`n") -notmatch 'durable_cache_roundtrips_and_reports_corruption \.\.\. ok') { throw 'Native durable cache regression failed' }
 $binaries = "$env:RUNNER_TEMP/binaries"
 New-Item -ItemType Directory $binaries | Out-Null
 $binaryHashes = @{}
