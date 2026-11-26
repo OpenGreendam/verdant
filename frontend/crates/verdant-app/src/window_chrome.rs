@@ -332,7 +332,7 @@ pub fn frame_window(root: gpui::Stateful<gpui::Div>, chrome: ChromeState, th: cr
 fn prefer_rounded_corners(window: &Window) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use windows_sys::Win32::Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute};
-    let Ok(handle) = window.window_handle() else { return };
+    let Ok(handle) = HasWindowHandle::window_handle(window) else { return };
     let RawWindowHandle::Win32(handle) = handle.as_raw() else { return };
     let preference = DWMWCP_ROUND;
     // SAFETY: the handle belongs to this live window and the attribute value
