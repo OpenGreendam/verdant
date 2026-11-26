@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     env:
-      SOURCE_SHA: a5813ec9cce12c72cb9e84ee92e388ca67ece75e
+      SOURCE_SHA: b4c64eaccaa4dd29ebe765ddc28d30d1dffab759
       LOCK_SHA256: 578a7d6d03ed38727ab1f7be68e76d2208ef0fe04b902a7552652b210fa426cb
-      BUILD_SCRIPT_SHA256: 3e4572b492ea498bccf1cf8a0f80f5dc6970fdb2d7b6156f88f5ad6027521228
+      BUILD_SCRIPT_SHA256: b7e141ca60cdcedc6228629d2c8795a33a81e91daab69c8b8b554f13d3ad4877
       ANDROID_API: '26'
       PROFILE: release
     steps:
@@ -71,10 +71,10 @@ jobs:
           cat > "$RUNNER_TEMP/locked-bin/cargo" <<'SCRIPT'
           #!/usr/bin/env bash
           set -eu
-          if [[ $1 == build ]]; then
+          if [[ $1 == rustc ]]; then
             shift
-            printf 'cargo build --locked %s\n' "$*"
-            exec "$ANDROID_REAL_CARGO" build --locked "$@"
+            printf 'cargo rustc --locked %s\n' "$*"
+            exec "$ANDROID_REAL_CARGO" rustc --locked "$@"
           fi
           exec "$ANDROID_REAL_CARGO" "$@"
           SCRIPT
