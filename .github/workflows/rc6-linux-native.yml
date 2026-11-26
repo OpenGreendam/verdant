@@ -1,0 +1,55 @@
+name: Linux native RC6 package
+on:
+  push:
+    branches: [ci/rc6-linux-9c43ff8]
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: driver
+          sparse-checkout: ci-rc6-linux
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9c43ff8aafcbb3fff206317a77cd92ec0a867c03
+          path: source
+          persist-credentials: false
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            .ci/cargo/registry
+            .ci/cargo/git
+            .ci/target
+          key: ${{ runner.os }}-verdant-${{ hashFiles('source/frontend/Cargo.lock', 'source/frontend/Dockerfile') }}
+      - name: Fetch the reviewed RC5 bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p previous .ci/cargo .ci/target evidence
+          gh release download v0.1.0-rc.5 --repo OpenGreendam/verdant --pattern 'verdant-0.1.0-linux-x86_64-with-voice.tar.gz' --dir previous
+          echo '775223cc0d3c481c54bf309b45c409096302c805a70450f22284afce3727b563  previous/verdant-0.1.0-linux-x86_64-with-voice.tar.gz' | sha256sum -c -
+          tar -xzf previous/verdant-0.1.0-linux-x86_64-with-voice.tar.gz -C previous
+      - name: Build the pinned Linux development image and fetch locked dependencies
+        run: |
+          docker build -t verdant-rc6-dev -f source/frontend/Dockerfile source/frontend
+          docker run --rm -v "$PWD/source:/workspace:ro" -v "$PWD/.ci/cargo:/cargo-cache" -e CARGO_HOME=/cargo-cache verdant-rc6-dev cargo fetch --locked
+      - name: Build, guard, and render with the bundled voice offline
+        run: |
+          docker run --rm --network none --shm-size=3g --tmpfs /fast:rw,exec,size=2g \
+            -v "$PWD/source:/workspace:ro" -v "$PWD/driver/ci-rc6-linux:/driver:ro" \
+            -v "$PWD/previous/verdant-0.1.0-linux-x86_64:/previous:ro" \
+            -v "$PWD/.ci/cargo:/cargo-cache" -v "$PWD/.ci/target:/build" -v "$PWD/evidence:/evidence" \
+            -e CARGO_HOME=/cargo-cache -e TMPDIR=/fast -e GITHUB_RUN_ID \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/workspace \
+            verdant-rc6-dev bash /driver/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc6-linux-9c43ff8
+          path: evidence/
+          if-no-files-found: error
+          compression-level: 0

@@ -1,0 +1,28 @@
+{
+  "run_id": "run-9c43ff8aafcb-xe1ve7i0",
+  "commit": "9c43ff8aafcbb3fff206317a77cd92ec0a867c03",
+  "tree": "629d09184221a55e5189fd539123e81e3fd6e496",
+  "epoch": 1795696246,
+  "version": "0.1.0",
+  "programs": [
+    "verdant",
+    "verdant-cli",
+    "verdant-gui",
+    "verdant-launcher",
+    "verdant-worker",
+    "verdant-plughost",
+    "verdant-voice",
+    "verdant-release"
+  ],
+  "policy_sha256": "0e94c67260a22a56ff2f38d41abadb60767ea8dccc81ad7737319b5b54bc9a15",
+  "bank_sha256": "e2415c3917dd102861ce8043b0c0daf497b18a0903f7255f314baf72cb73bbc1",
+  "linux_wav_sha256": "f5a591e46c3f7716fc121aebbea8e33c1f06065c74ca85d61d9eefa00c3b0970",
+  "files": {
+    "inputs/linux-singing.verp": "5bcd4b9df3223faaaa570c7410a30ce2caa72b637a82d05fb80862ab0f165c4c",
+    "inputs/ort/LICENSE": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "inputs/ort/ThirdPartyNotices.txt": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc",
+    "inputs/ort/libonnxruntime.so.1.23.2": "718c3fb0785d5ea06061b92c32ce4ad35be1bd4c71ae6192efe06f1ab21f0f8a",
+    "inputs/voice-policy.json": "0e94c67260a22a56ff2f38d41abadb60767ea8dccc81ad7737319b5b54bc9a15",
+    "scripts/verify-voice-networkless.py": "6319b219a0804c37bbe39c90eeed96e3e2de6c13fe8b3b51b61f1f12f05e34af"
+  }
+}
