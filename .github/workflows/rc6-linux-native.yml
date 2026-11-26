@@ -16,7 +16,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: 9c43ff8aafcbb3fff206317a77cd92ec0a867c03
+          ref: 4fdcd984e08e845ac24a36f6d0763c805e4202b1
           path: source
           persist-credentials: false
       - uses: actions/cache/restore@v4
@@ -49,7 +49,7 @@ jobs:
             verdant-rc6-dev bash /driver/package.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: rc6-linux-9c43ff8
+          name: rc6-linux-4fdcd98
           path: evidence/
           if-no-files-found: error
           compression-level: 0

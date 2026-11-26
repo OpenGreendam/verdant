@@ -21,7 +21,7 @@ release="$run/bin/verdant-release"
 selection_file="$out/linux-source-selection.json"
 selection=$("$release" select-source --repo "$repo" --output "$selection_file" | jq -er .sha256)
 test "$(sha256sum "$selection_file" | cut -d ' ' -f 1)" = "$selection"
-test "$selection" = 00706d5416959e83aa40f1c2875dca92a78bb321fe82ec8bebe1f7fbbcf50863
+test "$selection" = 417d9cd1c21bd57ca705cd4325a1862b0d7a8c5c5e1b045bd529c962b7e68774
 mkdir "$out/dist"
 policy="$run/inputs/voice-policy.json"
 "$release" package --repo "$repo" --binaries bin --target linux-x86_64 \
