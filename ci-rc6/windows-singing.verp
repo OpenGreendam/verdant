@@ -1,0 +1,71 @@
+{
+  "format": "greendam-project",
+  "version": "0.1",
+  "project_id": "eb66ded4-a5f7-4052-ab78-6ed4a5dd4e88",
+  "revision": 1,
+  "ppq": 960,
+  "tempo_map": [
+    {
+      "tick": 0,
+      "micro_bpm": 120000000
+    }
+  ],
+  "time_signatures": [
+    {
+      "tick": 0,
+      "numerator": 4,
+      "denominator": 4
+    }
+  ],
+  "voice_refs": {
+    "verdant-voice-0.1.0": {
+      "name": "sn",
+      "display_name": "童声01（楠楠）",
+      "vid": 10008,
+      "historical_identity_confirmed": true
+    },
+    "voice-sn": {
+      "name": "sn",
+      "display_name": "童声01（楠楠）",
+      "vid": 10008,
+      "historical_identity_confirmed": true
+    }
+  },
+  "tracks": [
+    {
+      "id": "85a65250-110b-4859-82b5-b92d963a7cc4",
+      "name": "主声部",
+      "voice_ref": "verdant-voice-0.1.0",
+      "monophonic": true,
+      "notes": [
+        {
+          "id": "sample",
+          "start_tick": 0,
+          "duration_tick": 480,
+          "midi_note": 64,
+          "detune_millicents": 0,
+          "lyric": "爱",
+          "pronunciation": {
+            "pinyin": "ai",
+            "phonemes": [],
+            "source": "manual",
+            "frontend_profile": ""
+          },
+          "curves": {
+            "pitch_millicent_points": [],
+            "gain_millidecibel_points": []
+          }
+        }
+      ],
+      "color": "teal"
+    }
+  ],
+  "render_preferences": {
+    "protocol": "ogd-worker/1",
+    "route": "verdant-voice",
+    "native_seed": 10008
+  },
+  "extensions": {
+    "verdant.created_with": "0.1.0"
+  }
+}

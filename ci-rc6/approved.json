@@ -1,0 +1,18 @@
+{
+  "voice_members": {
+    "AUTHORIZATION.json": "96b2b340b2f53fcce5c75108239730666463a30be99db9770a6537c5e16ee138",
+    "CONVERSION.txt": "f92246b8711934e23a339237d5ecee6f2cbbc92f5a24c1a66fcef09b0e6e1b32",
+    "LICENSE.txt": "6dcffdfc6cca9225c565bfd8aae2205f19552fc389a8c2942b5fbf81f7761f4a",
+    "NOTICE.txt": "92fa9c63f1453035848df3c5eea7dd2f4fbffbb9c4eb289a72737009151bb8de",
+    "SOURCE-USE-EVIDENCE.json": "9a4e1ccef118fc97b85a1a17fe3de242459d46e453bd0b187eabeff36653a4da",
+    "bank.safetensors": "e2415c3917dd102861ce8043b0c0daf497b18a0903f7255f314baf72cb73bbc1",
+    "context-controller.onnx": "fdc875f178a323a00949d12f7be4b045e31fe8b2aeef66a13589c6e53f8598b7",
+    "decoder-48k.onnx": "8b6b7c584d1d2b0cd8550e38e3d303c24614e9a60f3689aea9320ad671f38412",
+    "local-controller.onnx": "08342dcb3d0dd53fb5e07fa3ad00d6a395bc00cbf1101d893fa9b125490b7ae6",
+    "manifest.json": "de58a73fe3c1747c525078468751713f19e5875c2813b1654624bd3936aaf240"
+  },
+  "rc5_sha256": "4b07390563ef39d8d644620bbc719e532881a22836c52f1834d0553bdf97b4b7",
+  "policy": "0e94c67260a22a56ff2f38d41abadb60767ea8dccc81ad7737319b5b54bc9a15",
+  "wheel": "902c756d8b633ce0dedd889b7c08459433fbcf35e9c38d1c03ddc020f0648c6e",
+  "fixture": "5bcd4b9df3223faaaa570c7410a30ce2caa72b637a82d05fb80862ab0f165c4c"
+}
