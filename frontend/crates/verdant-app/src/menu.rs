@@ -806,6 +806,19 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
                         if current {
                             crate::proto_collection::call(&source, "focusSelf", vec![], window, cx);
                             window.focus(&focus, cx);
+                            // A collection mounted by a deferred draw can already
+                            // hold focus when its generated listener is installed.
+                            // Publish that observed native focus even when GPUI
+                            // has no new focus transition to deliver.
+                            let mounted = {
+                                let owner = source.owner.borrow();
+                                owner.present && owner.mounted && owner.bounds.is_some()
+                                    && owner.window_id == Some(window.window_handle().window_id())
+                                    && owner.modules.focus.native.as_ref() == Some(&focus)
+                            };
+                            if mounted && focus.is_focused(window) && !source.owner.borrow().focused {
+                                verdant_collection_control::native::gpui_native_owner::native_focus_fact(&source.owner, true);
+                            }
                         }
                     });
                 }
