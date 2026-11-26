@@ -2777,9 +2777,20 @@ impl Editor {
         cx.notify();
     }
 
+    /// Opens or closes one stacked panel of the right dock.
+    pub fn toggle_right_panel(&mut self, tab: crate::ui_controls::RightDockTab, cx: &mut Context<Self>) {
+        let open = !self.layout.panel_open(tab);
+        self.layout.set_panel_open(tab, open);
+        if open { self.layout.right_dock_tab = tab; }
+        self.layout.store(&mut self.prefs);
+        self.prefs_dirty = true;
+        cx.notify();
+    }
+
     /// Show `tab` in the right dock (as a drawer in narrow windows).
     pub fn open_right_dock(&mut self, tab: crate::ui_controls::RightDockTab, cx: &mut Context<Self>) {
         self.layout.right_dock_tab = tab;
+        self.layout.set_panel_open(tab, true);
         if self.width_class.docks_panels() {
             self.layout.show_right_dock = true;
         } else {

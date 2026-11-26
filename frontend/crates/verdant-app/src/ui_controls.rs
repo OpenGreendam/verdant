@@ -87,19 +87,55 @@ pub fn bar_button_size(touch: bool) -> f32 { if touch { 36.0 } else { TOP_BTN_H 
 pub fn bar_height(touch: bool) -> f32 { if touch { 56.0 } else { 48.0 } }
 pub fn rem_size(touch: bool) -> f32 { if touch { 18.0 } else { 16.0 } }
 
-/// Synthesizer V Studio-style right property dock tabs.
+/// Panels of the right dock. Like Synthesizer V's panels, any number of them
+/// can be open at once; they stack in `RightDockTab::ORDER`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RightDockTab {
-    /// Note properties now live in the left inspector; layouts saved with the
-    /// retired note tab open on the voice tab.
+    /// Selection properties (notes or an audio clip). Layouts saved with the
+    /// retired note tab open here.
     #[default]
     #[serde(alias = "note_phoneme")]
     VoiceTimbre,
     Dictionary,
+    /// Render queue and pre-render diagnostics.
     RenderInserts,
     HistorySystem,
+    /// Project-wide synthesis settings.
+    Synthesis,
 }
+
+impl RightDockTab {
+    /// Stacking order of open panels, top to bottom.
+    pub const ORDER: [RightDockTab; 5] =
+        [Self::VoiceTimbre, Self::Synthesis, Self::RenderInserts, Self::Dictionary, Self::HistorySystem];
+
+    pub fn bit(self) -> u8 { 1 << self as u8 }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::VoiceTimbre => "属性",
+            Self::Synthesis => "合成",
+            Self::RenderInserts => "渲染",
+            Self::Dictionary => "词典",
+            Self::HistorySystem => "历史",
+        }
+    }
+
+    pub fn icon(self) -> &'static str {
+        match self {
+            Self::VoiceTimbre => "sliders-horizontal",
+            Self::Synthesis => "sparkles",
+            Self::RenderInserts => "audio-waveform",
+            Self::Dictionary => "languages",
+            Self::HistorySystem => "history",
+        }
+    }
+}
+
+/// Properties, synthesis and render are open by default.
+const DEFAULT_RIGHT_PANELS: u8 = 1 << RightDockTab::VoiceTimbre as u8
+    | 1 << RightDockTab::Synthesis as u8 | 1 << RightDockTab::RenderInserts as u8;
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -108,6 +144,8 @@ pub struct LayoutPrefs {
     pub right_dock_width: f32,
     pub show_right_dock: bool,
     pub right_dock_tab: RightDockTab,
+    /// Open right-dock panels, one bit per `RightDockTab`.
+    pub right_panels: u8,
     pub arrange_height: f32,
     pub lane_height: f32,
     pub inspector_tab: InspectorTab,
@@ -122,6 +160,7 @@ impl Default for LayoutPrefs {
             right_dock_width: 340.0,
             show_right_dock: true,
             right_dock_tab: RightDockTab::VoiceTimbre,
+            right_panels: DEFAULT_RIGHT_PANELS,
             arrange_height: 160.0,
             lane_height: 184.0,
             inspector_tab: InspectorTab::TrackNote,
@@ -138,12 +177,19 @@ impl LayoutPrefs {
             right_dock_width: if self.right_dock_width.is_finite() { self.right_dock_width.clamp(280.0, 480.0) } else { 340.0 },
             show_right_dock: self.show_right_dock,
             right_dock_tab: self.right_dock_tab,
+            right_panels: self.right_panels & RightDockTab::ORDER.iter().fold(0, |mask, tab| mask | tab.bit()),
             arrange_height: if self.arrange_height.is_finite() { self.arrange_height.clamp(92.0, 460.0) } else { 160.0 },
             lane_height: if self.lane_height.is_finite() { self.lane_height.clamp(112.0, 420.0) } else { 184.0 },
             inspector_tab: self.inspector_tab,
             show_tempo_lane: self.show_tempo_lane,
             show_phoneme_lane: self.show_phoneme_lane,
         }
+    }
+
+    pub fn panel_open(&self, tab: RightDockTab) -> bool { self.right_panels & tab.bit() != 0 }
+
+    pub fn set_panel_open(&mut self, tab: RightDockTab, open: bool) {
+        if open { self.right_panels |= tab.bit() } else { self.right_panels &= !tab.bit() }
     }
 
     pub fn from_prefs(prefs: &crate::files::Prefs) -> Self {
@@ -1039,6 +1085,7 @@ mod tests {
             right_dock_width: 100.0,
             show_right_dock: false,
             right_dock_tab: RightDockTab::Dictionary,
+            right_panels: RightDockTab::Dictionary.bit() | RightDockTab::HistorySystem.bit(),
             arrange_height: 10.0,
             lane_height: 240.0,
             inspector_tab: InspectorTab::Synthesis,
@@ -1051,6 +1098,8 @@ mod tests {
         assert_eq!(loaded.right_dock_width, 280.0);
         assert!(!loaded.show_right_dock);
         assert_eq!(loaded.right_dock_tab, RightDockTab::Dictionary);
+        assert!(loaded.panel_open(RightDockTab::Dictionary) && loaded.panel_open(RightDockTab::HistorySystem));
+        assert!(!loaded.panel_open(RightDockTab::VoiceTimbre));
         assert_eq!(loaded.arrange_height, 92.0);
         assert_eq!(loaded.lane_height, 240.0);
         assert_eq!(loaded.inspector_tab, InspectorTab::Synthesis);
@@ -1186,6 +1235,8 @@ mod width_class_tests {
         let layout: LayoutPrefs = serde_json::from_value(serde_json::json!({"right_dock_tab": "note_phoneme", "inspector_width": 300.0})).unwrap();
         assert_eq!(layout.right_dock_tab, RightDockTab::VoiceTimbre);
         assert_eq!(layout.inspector_width, 300.0);
+        // Layouts from before stackable panels open the default set.
+        assert!(layout.panel_open(RightDockTab::VoiceTimbre) && layout.panel_open(RightDockTab::Synthesis));
     }
 }
 

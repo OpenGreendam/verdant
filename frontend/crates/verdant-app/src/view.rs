@@ -25,6 +25,7 @@ use crate::generated::controls::{
 };
 use crate::phoneme_lane::{PHONEME_LANE_H, timeline_phoneme_lane};
 use crate::theme::{Theme, mix};
+use crate::ui_controls::AdwStates;
 use crate::ui_controls::{
     BAR_BTN_H, Drawer, PANEL_BTN_H, RightDockTab, SplitterKind, WidthClass,
     generated_select_button, horizontal_timeline_bar, icon_command_button, icon_selectable_button,
@@ -500,7 +501,7 @@ impl Editor {
         // Like Synthesizer V, selection properties live in the right inspector
         // whenever it shows the 属性 page; the left panel only carries them
         // while that page is hidden, so they are never out of reach.
-        let props_in_dock = self.right_dock_visible() && self.layout.right_dock_tab == RightDockTab::VoiceTimbre;
+        let props_in_dock = self.right_dock_visible() && self.layout.panel_open(RightDockTab::VoiceTimbre);
         let selection = if props_in_dock { None } else { self.selection_inspector(track, cx.entity(), cx) };
         let rename_id = track.id.clone();
         let auto_open = self.automation_ui.expanded_tracks.contains(&track.id);
@@ -606,52 +607,42 @@ impl Editor {
             .into_any_element()
     }
 
-    /// Synthesizer V Studio-style Right Property Dock.
+    /// Synthesizer V Studio-style right dock: any number of panels open at
+    /// once, stacked top to bottom. The header toggles each panel; each panel
+    /// has its own title bar with a close button.
     fn right_synthv_dock(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let th = self.theme;
         let project = self.store().snapshot();
         let Some(track) = project.track(&self.session.track) else {
             return div().into_any_element();
         };
-        let tab = self.layout.right_dock_tab;
         let errors = self.plans.iter().flat_map(|p| &p.diagnostics).filter(|d| d.severity == Severity::Error).count();
-        // A view switcher in the pane's own header (AdwViewSwitcher), so the
-        // pane needs no separate icon column.
-        let tabs = [
-            (RightDockTab::VoiceTimbre, "sliders-horizontal", "属性"),
-            (RightDockTab::Dictionary, "languages", "词典"),
-            (RightDockTab::RenderInserts, "cpu", "诊断"),
-            (RightDockTab::HistorySystem, "history", "历史"),
-        ];
         let header = div()
             .h(px(46.0))
             .flex_none()
             .px(px(8.0))
             .flex()
             .items_center()
-            .gap(px(6.0))
+            .gap(px(4.0))
             .bg(th.surface)
             .border_b_1()
             .border_color(th.shade)
             .on_mouse_down(gpui::MouseButton::Left, cx.listener(|ed, _, window, _| {
                 if ed.lyric.is_some() { window.prevent_default(); }
             }))
-            .child(div().id("dock-switcher").role(Role::TabList).flex_1().min_w_0().flex().p(px(2.0)).gap(px(2.0)).rounded(px(8.0)).bg(th.control)
-                .children(tabs.into_iter().map(|(t, ic, label)| {
-                    let active = t == tab;
-                    let editor = cx.entity();
-                    crate::proto_controls::action(SharedString::from(format!("dock-tab-{t:?}")), label).role(Role::Tab).aria_selected(active)
-                        .navigation(tabs.iter().position(|(value, _, _)| *value == t).unwrap_or(0), tabs.len(), move |index, _, cx| {
-                            if let Some((tab, _, _)) = tabs.get(index) { editor.update(cx, |ed, cx| ed.open_right_dock(*tab, cx)); }
-                        })
-                        .relative().flex_1().h(px(28.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
-                        .when(active, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
-                        .hover(move |s| s.bg(if active { th.checked } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if active { th.checked } else { th.hover })))
-                        .child(svg().path(icon(ic)).size(px(14.0)).text_color(th.text))
-                        .child(label)
-                        .when(t == RightDockTab::RenderInserts && errors > 0, |d| d.child(
-                            div().absolute().top(px(3.0)).right(px(5.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
-                        .on_click(cx.listener(move |ed, _, _, cx| ed.open_right_dock(t, cx)))
+            .child(div().id("dock-panels").role(Role::Toolbar).aria_label("面板").flex_1().min_w_0().flex().gap(px(2.0))
+                .children(RightDockTab::ORDER.into_iter().map(|tab| {
+                    let open = self.layout.panel_open(tab);
+                    crate::proto_controls::action(SharedString::from(format!("dock-panel-{tab:?}")), tab.label())
+                        .role(Role::Switch).aria_toggled(if open { gpui::Toggled::True } else { gpui::Toggled::False }).aria_label(format!("{}面板", tab.label()))
+                        .relative().h(px(30.0)).px(px(8.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
+                        .flat_states(th, open)
+                        .when(open, |d| d.font_weight(FontWeight::SEMIBOLD))
+                        .child(svg().path(icon(tab.icon())).size(px(14.0)).text_color(th.text))
+                        .child(tab.label())
+                        .when(tab == RightDockTab::RenderInserts && errors > 0, |d| d.child(
+                            div().absolute().top(px(4.0)).right(px(4.0)).size(px(6.0)).rounded(px(3.0)).bg(th.error)))
+                        .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))
                 })))
             .child(
                 crate::proto_controls::action("close-right-dock", "收起右侧面板")
@@ -666,12 +657,32 @@ impl Editor {
                     .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
             );
 
-        let body = match tab {
-            RightDockTab::VoiceTimbre => self.right_dock_voice_tab(&project, cx),
-            RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
-            RightDockTab::RenderInserts => self.right_dock_render_inserts_tab(track, cx),
-            RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
-        };
+        let open: Vec<RightDockTab> = RightDockTab::ORDER.into_iter().filter(|tab| self.layout.panel_open(*tab)).collect();
+        let mut body = div().flex().flex_col().pb(px(18.0));
+        if open.is_empty() {
+            body = body.child(div().p(px(16.0)).text_sm().text_color(th.text_secondary)
+                .child("用上方的按钮打开需要的面板，可以同时打开多个。"));
+        }
+        for tab in open {
+            let content = match tab {
+                RightDockTab::VoiceTimbre => self.right_dock_properties_panel(&project, cx),
+                RightDockTab::Synthesis => self.right_dock_synthesis_panel(&project, cx),
+                RightDockTab::RenderInserts => self.right_dock_render_inserts_tab(track, cx),
+                RightDockTab::Dictionary => self.right_dock_dictionary_tab(&project, cx),
+                RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
+            };
+            body = body.child(
+                div().flex().flex_col().border_b_1().border_color(th.shade)
+                    .child(div().h(px(34.0)).pl(px(14.0)).pr(px(6.0)).flex().items_center().gap(px(6.0))
+                        .child(svg().path(icon(tab.icon())).size(px(14.0)).text_color(th.text_secondary))
+                        .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).child(tab.label()))
+                        .child(crate::proto_controls::action(SharedString::from(format!("close-panel-{tab:?}")), format!("关闭{}面板", tab.label()))
+                            .size(px(24.0)).flex_none().rounded(px(6.0)).flex().items_center().justify_center()
+                            .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
+                            .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
+                            .on_click(cx.listener(move |ed, _, _, cx| ed.toggle_right_panel(tab, cx)))))
+                    .child(content));
+        }
 
         div()
             .id("right-property-dock")
@@ -872,15 +883,21 @@ impl Editor {
         }
     }
 
-    fn right_dock_voice_tab(
-        &self,
-        project: &verdant_domain::Project,
-        cx: &mut Context<Self>,
-    ) -> Div {
+    /// Selection properties, as in Synthesizer V's note properties panel.
+    fn right_dock_properties_panel(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
+        let th = self.theme;
+        project.track(&self.session.track).and_then(|track| self.selection_inspector(track, cx.entity(), cx))
+            .unwrap_or_else(|| div().child(section("选区", th).child(
+                div().py(px(6.0)).text_sm().text_color(th.text_secondary)
+                    .child("选中音符或音频片段后，在这里编辑歌词、读音、音高、时值、颤音与音素。"))))
+    }
+
+    /// Project-wide synthesis settings.
+    fn right_dock_synthesis_panel(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
         let th = self.theme;
         let route = self.route();
         let output_transients = project.render_preferences.output_transients.as_ref();
-        let engine_sec = section("合成设置", th)
+        div().child(section("引擎与速度", th)
             .child(row("合成引擎", route_short_name(route), th))
             .child(numeric_field(self, Num::TempoBpm, Arg::None, "tempo", cx))
             .child(switch_row(self, Cmd::ToggleOutputTransients, "output-transients", "尾辅音瞬态约束",
@@ -889,15 +906,7 @@ impl Editor {
                     Some(d) if d.strength == 0. || d.max_attenuation_db == 0. => "旁路".to_string(),
                     Some(d) => format!("最多衰减 {:.0} dB", d.max_attenuation_db),
                 }),
-                output_transients.is_some(), cx));
-
-
-        // Selection first (SV's Note Properties), then project-wide synthesis.
-        let selection = project.track(&self.session.track).and_then(|track| self.selection_inspector(track, cx.entity(), cx));
-        let selection = selection.unwrap_or_else(|| div().child(section("选区", th).child(
-            div().py(px(6.0)).text_sm().text_color(th.text_secondary)
-                .child("选中音符或音频片段后，在这里编辑歌词、读音、音高、时值、颤音与音素。"))));
-        div().flex().flex_col().child(selection).child(engine_sec)
+                output_transients.is_some(), cx)))
     }
 
     fn right_dock_dictionary_tab(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
@@ -1043,7 +1052,7 @@ impl Editor {
         let total = self.scheduler.wanted().len();
         let ready = self.scheduler.summary().get("ready").copied().unwrap_or(0);
 
-        let mut diagnostics = section("合成渲染与预检诊断", th)
+        let mut diagnostics = section("队列与预检", th)
             .child(row("渲染队列", format!("{ready} / {total} 乐句已就绪"), th))
             .child(
                 icon_command_button(self, Cmd::RenderNow, Arg::None, "audio-waveform", "立即重新渲染全部乐句", "dock-render-now", false, cx)
