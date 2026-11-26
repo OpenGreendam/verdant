@@ -879,12 +879,10 @@ impl Editor {
     ) -> Div {
         let th = self.theme;
         let route = self.route();
-        let phoneme_timing = project.render_preferences.phoneme_timing.as_ref();
         let output_transients = project.render_preferences.output_transients.as_ref();
         let engine_sec = section("合成设置", th)
             .child(row("合成引擎", route_short_name(route), th))
             .child(numeric_field(self, Num::TempoBpm, Arg::None, "tempo", cx))
-            .child(switch_row(self, Cmd::TogglePhonemeTiming, "phoneme-timing", "元音对拍", Some("辅音先行，元音落在拍点上".into()), phoneme_timing.is_some(), cx))
             .child(switch_row(self, Cmd::ToggleOutputTransients, "output-transients", "尾辅音瞬态约束",
                 Some(match output_transients {
                     None => "关闭".to_string(),
@@ -1052,6 +1050,19 @@ impl Editor {
                     .h(px(PANEL_BTN_H)),
             );
 
+        // A consonant that has to start before the song does is fixed by
+        // giving the song a bar of lead-in, offered here instead of a dead end.
+        let needs_lead_in = self.plans.iter().flat_map(|plan| &plan.diagnostics)
+            .any(|d| d.code == "E_PHONEME_TIMING_PREROLL");
+        if needs_lead_in {
+            diagnostics = diagnostics.child(
+                div().flex().flex_col().gap(px(6.0)).p(px(10.0)).rounded(px(8.0)).bg(th.control)
+                    .child(div().text_sm().child("开头的辅音没有起唱空间"))
+                    .child(div().text_xs().text_color(th.text_secondary)
+                        .child("元音对齐拍点时，辅音要提前开始；第一个音符离曲首太近。把所有音符后移一小节即可。"))
+                    .child(button("shift-one-bar", "所有音符后移一小节", th).h(px(PANEL_BTN_H))
+                        .on_click(cx.listener(|ed, _, _, cx| ed.shift_notes_one_bar(cx)))));
+        }
         let (all_diags, omitted_diags) = prioritized_diagnostics(&self.plans, 14);
         if all_diags.is_empty() {
             diagnostics = diagnostics.child(div().text_xs().text_color(th.success).child("✓ 当前全部轨道预检通过，无阻断问题"));

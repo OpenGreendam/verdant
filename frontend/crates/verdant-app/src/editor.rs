@@ -1215,10 +1215,38 @@ impl Editor {
         self.prepare_insert_topology(cx);
         self.restore_inserts(cx);
         self.sync_mixer();
+        self.ensure_vowel_onset_alignment(cx);
         self.start_worker(cx);
         window.focus(&self.focus_roll, cx);
         cx.notify();
         crate::files::prompt_recovery(self, window, cx);
+    }
+
+    /// Makes room for consonants that would start before the song does:
+    /// every note on every track moves one bar later, as one undoable edit.
+    pub(crate) fn shift_notes_one_bar(&mut self, cx: &mut Context<Self>) {
+        let bar = self.meter().bar_ticks_at(0).max(1);
+        let commands: Vec<Command> = self.project().tracks.iter().filter(|track| !track.notes.is_empty())
+            .map(|track| Command::MoveNotes {
+                track: track.id.clone(),
+                note_ids: track.notes.iter().map(|note| note.id.clone()).collect(),
+                delta_tick: bar,
+                delta_semitones: 0,
+            }).collect();
+        if commands.is_empty() { return; }
+        let batch = CommandBatch { label: "所有音符后移一小节".into(), commands };
+        if self.commit(self.revision(), batch, cx) {
+            self.notice("所有音符已后移一小节，辅音有了起唱空间");
+        }
+    }
+
+    /// Singing lands the vowel on the beat with the consonant before it, so
+    /// vowel-onset alignment is not an option: documents from before it was
+    /// the rule are moved onto it as one undoable edit when they open.
+    pub(crate) fn ensure_vowel_onset_alignment(&mut self, cx: &mut Context<Self>) {
+        if self.project().render_preferences.phoneme_timing.is_some() { return; }
+        let settings = Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1());
+        self.commit(self.revision(), CommandBatch::single("元音对齐拍点", Command::SetPhonemeTiming { settings }), cx);
     }
 
     /// File → export a native `.verp` project copy.

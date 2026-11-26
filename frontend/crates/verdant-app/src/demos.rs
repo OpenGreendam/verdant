@@ -141,7 +141,9 @@ fn diagnostic_project() -> Project {
         }
         n
     }
-    let mut p = editor::voice_ui::new_project();
+    // A pronunciation-boundary fixture: it predates vowel-onset alignment and
+    // is checked against capabilities that do not declare it.
+    let mut p = Project::new_empty();
     let lead = &mut p.tracks[0];
     lead.name = "读音边界夹具".into();
     let melody: &[(i64, i64, i32, &str, &str)] = &[
