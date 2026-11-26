@@ -1,4 +1,4 @@
-cargo build --manifest-path source/frontend/Cargo.toml --offline --locked --release \
+cargo build --manifest-path "$repo/frontend/Cargo.toml" --offline --locked --release \
     -p verdant-app -p verdant-cli -p verdant-launcher -p verdant-worker -p verdant-plughost -p verdant-voice -p verdant-release
 mkdir bin
 while IFS= read -r binary; do
@@ -19,12 +19,12 @@ PY
 
 release="$run/bin/verdant-release"
 selection_file="$out/linux-source-selection.json"
-selection=$("$release" select-source --repo source --output "$selection_file" | jq -er .sha256)
+selection=$("$release" select-source --repo "$repo" --output "$selection_file" | jq -er .sha256)
 test "$(sha256sum "$selection_file" | cut -d ' ' -f 1)" = "$selection"
 test "$selection" = 00706d5416959e83aa40f1c2875dca92a78bb321fe82ec8bebe1f7fbbcf50863
 mkdir "$out/dist"
 policy="$run/inputs/voice-policy.json"
-"$release" package --repo source --binaries bin --target linux-x86_64 \
+"$release" package --repo "$repo" --binaries bin --target linux-x86_64 \
     --onnxruntime-dir inputs/ort --output "$out/dist" \
     --source-selection "$selection_file" --source-selection-sha256 "$selection" \
     --voice-bundle voice --artifact-policy "$policy" --artifact-policy-sha256 "$pin" > "$out/linux-package.json"
