@@ -234,7 +234,9 @@ pub(crate) fn pane_header(th: Theme) -> Div {
 /// between rows. Builder methods mirror `Div`, so call sites read the same.
 pub(crate) struct Group {
     title: SharedString,
-    rows: Vec<AnyElement>,
+    /// Each row and whether it is flush (draws its own full-width padding,
+    /// like an AdwComboRow) instead of being padded by the card.
+    rows: Vec<(AnyElement, bool)>,
     th: Theme,
 }
 
@@ -244,11 +246,17 @@ pub(crate) fn section(title: &str, th: Theme) -> Group {
 
 impl Group {
     pub(crate) fn child(mut self, row: impl IntoElement) -> Self {
-        self.rows.push(row.into_any_element());
+        self.rows.push((row.into_any_element(), false));
         self
     }
     pub(crate) fn children(mut self, rows: impl IntoIterator<Item = impl IntoElement>) -> Self {
-        self.rows.extend(rows.into_iter().map(IntoElement::into_any_element));
+        self.rows.extend(rows.into_iter().map(|row| (row.into_any_element(), false)));
+        self
+    }
+    /// A full-width row that pads itself, so its leading icon lines up with
+    /// the content of the padded rows around it.
+    pub(crate) fn flush_child(mut self, row: impl IntoElement) -> Self {
+        self.rows.push((row.into_any_element(), true));
         self
     }
 }
@@ -263,10 +271,12 @@ impl IntoElement for Group {
             .gap(px(8.0))
             .mx(px(12.0))
             .mt(px(18.0))
-            .child(div().px(px(2.0)).text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
+            // The heading starts on the card's edge (AdwPreferencesGroup).
+            .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(th.text).child(self.title))
             .child(div().flex().flex_col().rounded(px(12.0)).bg(th.card).overflow_hidden()
-                .children(self.rows.into_iter().enumerate().map(|(i, row)| {
-                    div().min_h(px(50.0)).px(px(12.0)).py(px(8.0)).flex().flex_col().justify_center().gap(px(8.0))
+                .children(self.rows.into_iter().enumerate().map(|(i, (row, flush))| {
+                    div().min_h(px(50.0)).flex().flex_col().justify_center().gap(px(8.0))
+                        .when(!flush, |d| d.px(px(12.0)).py(px(8.0)))
                         .when(i > 0, |d| d.border_t_1().border_color(th.shade))
                         .child(row)
                 })))
@@ -536,7 +546,7 @@ impl Editor {
                         ed.open_builtin_instrument_editor(&track, cx);
                     })));
         } else {
-            track_section = track_section.child(self.singer_language_controls(cx));
+            track_section = track_section.flush_child(self.singer_language_controls(cx));
         }
 
         if let Some((_, voice)) = caps.filter(|_| instrument.is_none()).and_then(|c| verdant_backend::adapter::desktop_voice(&project, track, c).ok().flatten()) {
@@ -597,7 +607,7 @@ impl Editor {
             .flex()
             .flex_col()
             .bg(th.surface)
-            .child(pane_header(th).px(px(16.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
+            .child(pane_header(th).px(px(12.0)).child(div().text_sm().font_weight(FontWeight::BOLD).child(title)))
             .child(
                 crate::proto_scroll::viewport("left-panel-scroll", "轨道与选择检查器", "vertical")
                     .flex_1()
@@ -665,7 +675,7 @@ impl Editor {
                 RightDockTab::HistorySystem => self.right_dock_history_system_tab(cx),
             };
             div().w(px(self.layout.right_dock_width)).h_full().flex_none().flex().flex_col().border_l_1().border_color(th.shade)
-                .child(div().h(px(46.0)).flex_none().pl(px(16.0)).pr(px(8.0)).flex().items_center().gap(px(8.0))
+                .child(div().h(px(46.0)).flex_none().pl(px(12.0)).pr(px(4.0)).flex().items_center().gap(px(8.0))
                     .border_b_1().border_color(th.shade)
                     .child(svg().path(icon(tab.icon())).size(px(15.0)).text_color(th.text_secondary))
                     .child(div().flex_1().text_sm().font_weight(FontWeight::BOLD).child(tab.label()))
@@ -1415,8 +1425,8 @@ impl Editor {
                 ].into_iter().map(|(cmd, tool, ic, label, key)| {
                     let on = self.lane_tool == tool;
                     crate::ui_controls::flat_command_button(self, cmd, Arg::None, "", key, on, cx)
-                        .aria_label(label).h(px(24.0)).px(px(8.0)).gap(px(5.0)).text_sm()
-                        .children(ic.map(|ic| svg().path(icon(ic)).size(px(14.0)).text_color(th.text)))
+                        .aria_label(label).h(px(24.0)).px(px(8.0)).text_sm()
+                        .children(ic.map(|ic| svg().path(icon(ic)).size(px(14.0)).mr(px(5.0)).text_color(th.text)))
                         .child(label)
                 })))
             .child(crate::ui_controls::flat_icon_command_button(self, Cmd::OpenTransformPoints, "sliders-horizontal", "点集变换…", "transform-points", false, cx).h(px(28.0)).flex_none())
@@ -1540,7 +1550,10 @@ impl Editor {
             .size_full()
             // Pane header (AdwToolbarView top bar): its bottom line meets the
             // inspector's and the dock's.
-            .child(pane_header(th)
+            // Flat buttons show no edge at rest, so their icons, not their
+            // boxes, line up with the toolbars below; the boxes hang into the
+            // margin.
+            .child(pane_header(th).pl(px(1.0))
                 .child(crate::ui_controls::flat_icon_command_button(self, Cmd::AddTrack, "plus", "人声轨", "add-track", false, cx).h(px(32.0)))
                 .child(crate::proto_controls::action("add-instrument-track", "添加乐器轨").h(px(32.0)).px(px(9.0)).flex().items_center().gap(px(6.0))
                     .rounded(px(6.0)).text_sm().cursor_pointer().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(th.control_pressed))

@@ -309,6 +309,35 @@ pub fn icon_selectable_button(
 }
 
 /// Native-style `<Select>` dropdown trigger with optional leading Lucide icon and trailing chevron.
+/// An AdwComboRow: a full-width row of a boxed list that opens a menu. Its
+/// icon and label sit at the row padding, aligned with neighbouring rows.
+pub fn combo_row(
+    id: impl Into<SharedString>,
+    leading_icon: Option<&'static str>,
+    label: impl Into<SharedString>,
+    aria_name: impl Into<SharedString>,
+    th: Theme,
+) -> crate::proto_controls::Action {
+    let label = label.into();
+    crate::proto_controls::action(id.into(), label.clone())
+        .role(Role::ComboBox)
+        .aria_label(aria_name.into())
+        .w_full()
+        .min_h(px(50.0))
+        .px(px(12.0))
+        .gap(px(10.0))
+        .flex()
+        .items_center()
+        .flat_states(th, false)
+        .text_sm()
+        .text_color(th.text)
+        .when_some(leading_icon, |d, ic| {
+            d.child(svg().path(icon(ic)).size(px(16.0)).flex_none().text_color(th.text_secondary))
+        })
+        .child(div().flex_1().min_w_0().truncate().child(label))
+        .child(svg().path(icon("chevron-down")).size(px(14.0)).flex_none().text_color(th.text_secondary))
+}
+
 pub fn select_button(
     id: impl Into<SharedString>,
     leading_icon: Option<&'static str>,
@@ -430,10 +459,13 @@ pub fn icon_command_button(
     let label = label.into();
     let th = ed.theme;
     let fg = th.text;
+    // The command surface starts with an empty text child; a flex gap would
+    // also open space before the icon and push the content off centre, so
+    // the icon carries the spacing itself.
     selectable_command_button(ed, cmd, arg, "", key, active, cx)
         .aria_label(label.clone())
-        .gap(px(5.0))
-        .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().text_color(fg))
+        .gap(px(0.0))
+        .child(svg().path(icon(icon_name)).size(px(13.5)).flex_none().mr(px(5.0)).text_color(fg))
         .child(label)
 }
 
@@ -453,9 +485,9 @@ pub fn flat_icon_command_button(
     flat_command_button(ed, cmd, Arg::None, "", key, active, cx)
         .aria_label(label.clone())
         .px(px(9.0))
-        .gap(px(6.0))
+        .gap(px(0.0))
         .text_sm()
-        .child(svg().path(icon(icon_name)).size(px(15.0)).flex_none().text_color(fg))
+        .child(svg().path(icon(icon_name)).size(px(15.0)).flex_none().mr(px(6.0)).text_color(fg))
         .child(label)
 }
 
