@@ -302,7 +302,7 @@ pub fn frame_window(root: gpui::Stateful<gpui::Div>, chrome: ChromeState, th: cr
                 .rounded_tl(radii.top_left).rounded_tr(radii.top_right)
                 .rounded_bl(radii.bottom_left).rounded_br(radii.bottom_right))))
         .when(resizable, |d| d.child(canvas(
-            |bounds: Bounds<Pixels>, window, _| window.insert_hitbox(bounds, HitboxBehavior::BlockMouseExceptScroll),
+            |bounds: Bounds<Pixels>, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
             move |_, hitbox, window, _| {
                 let size = window.window_bounds().get_bounds().size;
                 if let Some(edge) = resize_edge(window.mouse_position(), size, tiling, margin) {
