@@ -545,11 +545,18 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
         }
     }
     if !missing.is_empty() {
+        // Say what the user can do; the internal file roles stay in the detail.
+        let runtime_only = missing.iter().all(|name| name.contains("onnxruntime"));
+        let message = if runtime_only {
+            "缺少 ONNX Runtime：请重新下载完整的发布包".to_string()
+        } else {
+            "还没有可用的声库：在「声库与语言」中选择或安装声库".to_string()
+        };
         diagnostics.push(Diagnostic::error(
             "E_BACKEND_FILES",
             None,
-            format!("后端缺少模型文件：{}", missing.join("、")),
-            "capabilities.files[*].available=false; obtain them per OpenGreendam/docs reproduction-and-packaging.md",
+            message,
+            format!("missing: {}; capabilities.files[*].available=false; obtain them per OpenGreendam/docs reproduction-and-packaging.md", missing.join(", ")),
         ));
         track_blocked = true;
     }
