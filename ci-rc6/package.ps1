@@ -1,13 +1,13 @@
 $ErrorActionPreference = 'Stop'
 $root = (New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE/evidence").FullName
 $source = (Resolve-Path "$env:GITHUB_WORKSPACE/source").Path
-$ExpectedCommit = '15829ccc87b34b77efc0254d7b2a50d14097d149'
-$runId = 'run-15829ccc87b3-pwi73tb2'
-$identity = @{version='0.1.0'; tree='5883d4f69a5037b7e36ea891b9ef405db62073ec'}
+$ExpectedCommit = $env:RELEASE_COMMIT
+$runId = $env:RELEASE_RUN_ID
+$identity = @{version='0.1.0'; tree=$env:RELEASE_TREE}
 $pins = Get-Content -Raw "$PSScriptRoot/approved.json" | ConvertFrom-Json -AsHashtable
 $pin = $pins.policy
-$selection = '51633e876f8b8b8434d4d1f36d3081336d70a722b0746c4bd57f5c39c9c3dc32'
-$env:SOURCE_DATE_EPOCH = '1795688258'
+$selection = $null
+$env:SOURCE_DATE_EPOCH = $env:RELEASE_EPOCH
 $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP/target"
 function Hash([string]$Path) {
     (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
@@ -55,6 +55,10 @@ $tests = & cargo test --offline --locked --release -p verdant-cli windows_path_t
 $testExit = $LASTEXITCODE
 $tests | Set-Content "$root/windows-path-tests.log"
 if ($testExit -ne 0 -or ($tests -join "`n") -notmatch 'publishes_a_new_job_with_its_execution_lease_held \.\.\. ok') { throw 'Native Windows tests failed' }
+$backendTests = & cargo test --offline --locked --release -p verdant-backend --test backend --test f0_artifacts 2>&1
+$backendExit = $LASTEXITCODE
+$backendTests | Set-Content "$root/windows-backend-tests.log"
+if ($backendExit -ne 0 -or ($backendTests -join "`n") -notmatch 'durable_cache_roundtrips_and_reports_corruption \.\.\. ok') { throw 'Native durable cache regression failed' }
 $binaries = "$env:RUNNER_TEMP/binaries"
 New-Item -ItemType Directory $binaries | Out-Null
 $binaryHashes = @{}
@@ -73,7 +77,8 @@ if ((Hash $wheel) -cne $pins.wheel) { throw 'Incorrect ONNX Runtime wheel' }
 Json-Receipt 'windows-inputs.json' $pins
 $selectionFile = "$root/windows-source-selection.json"
 $selected = (Capture $release @('select-source','--repo',$source,'--output',$selectionFile)) | ConvertFrom-Json
-if ($selected.source_commit -cne $ExpectedCommit -or (Hash $selectionFile) -cne $selection) { throw 'Source selection differs' }
+if ($selected.source_commit -cne $ExpectedCommit -or (Hash $selectionFile) -cne $selected.sha256) { throw 'Source selection differs' }
+$selection = $selected.sha256
 $output = "$root/dist"
 $binding = @('--artifact-policy', $policy, '--artifact-policy-sha256', $pin)
 $packaged = Capture $release (@('package', '--repo', $source, '--binaries', $binaries, '--target', 'windows-x86_64',

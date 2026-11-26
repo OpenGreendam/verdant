@@ -1,57 +1,60 @@
-name: Windows packaged RC6 menu observation
-on:
-  workflow_dispatch:
-    inputs:
-      menu:
-        description: File menu client point measured on initial capture
-        required: false
-      row:
-        description: Import row client rectangle measured on root capture
-        required: false
-      outside:
-        description: Client point outside popup
-        required: false
+name: Windows native RC6 package
+on: workflow_dispatch
 permissions:
   contents: read
-  actions: read
 jobs:
-  observe:
+  package:
     runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      RELEASE_COMMIT: '9c43ff8aafcbb3fff206317a77cd92ec0a867c03'
+      RELEASE_RUN_ID: 'run-9c43ff8aafcb-xe1ve7i0'
+      RELEASE_TREE: '629d09184221a55e5189fd539123e81e3fd6e496'
+      RELEASE_EPOCH: '1795696246' 
     steps:
+      - name: Preserve exact source bytes
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
+          ref: 9c43ff8aafcbb3fff206317a77cd92ec0a867c03
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: helpers
           sparse-checkout: ci-rc6
           persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          artifact-ids: 15116270312
-          run-id: 45812428580
-          github-token: ${{ github.token }}
-          path: artifact
-          merge-multiple: true
-      - name: Observe native window
+      - name: Obtain approved preceding release
         env:
-          MENU: ${{ inputs.menu }}
-          ROW: ${{ inputs.row }}
-          OUTSIDE: ${{ inputs.outside }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v0.1.0-rc.5 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc5"
+      - name: Build, guard and exercise bundled package
+        run: ./helpers/ci-rc6/package.ps1
+      - name: Upload verified package and native receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-rc6-native
+          path: evidence/
+          if-no-files-found: error
+          compression-level: 0
+      - name: Exercise packaged desktop and retain durable cache evidence
         run: |
-          $archive = Get-Item artifact/dist/verdant-0.1.0-windows-x86_64.zip
-          if ((Get-FileHash $archive).Hash -ne '10fa2aa1b12f3abc67bab0d9edc147d91b6ba9f3e4fde46c3ccc0feb521fcd9c') { throw 'Archive digest mismatch' }
-          Expand-Archive $archive expanded
-          $exe = (Resolve-Path expanded/verdant-0.1.0-windows-x86_64/bin/verdant-gui.exe).Path
-          if ((Get-FileHash $exe).Hash -ne 'eda5ac68d5d16d1b304f5bd8ab9daf821b49c016b021866ac14fa69af78b2eda') { throw 'GUI digest mismatch' }
+          $ErrorActionPreference = 'Stop'
+          $exe = (Resolve-Path "$env:RUNNER_TEMP/expanded/verdant-0.1.0-windows-x86_64/bin/verdant-gui.exe").Path
+          $build = Get-Content -Raw evidence/windows-build.json | ConvertFrom-Json
+          if ((Get-FileHash $exe).Hash -ne $build.binaries.'verdant-gui') { throw 'Packaged GUI differs from build receipt' }
           New-Item -ItemType Directory images | Out-Null
-          Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution | ConvertTo-Json | Set-Content images/display.json
-          ./ci-rc6/native-menu-windows.ps1 -Exe $exe -OutputDir images/initial -CaptureOnly
-          $pidObserved = (Get-Content -Raw images/initial/observations.json | ConvertFrom-Json).pid
-          if ($env:MENU) {
-            ./ci-rc6/native-menu-windows.ps1 -Exe $exe -ProcessId $pidObserved -OutputDir images/root -Menu $env:MENU -RootOnly
-          }
-          if ($env:ROW) {
-            ./ci-rc6/native-menu-windows.ps1 -Exe $exe -ProcessId $pidObserved -OutputDir images/full -Menu $env:MENU -Row $env:ROW -Outside $env:OUTSIDE
-          }
-      - uses: actions/upload-artifact@v4
+          $cache = Join-Path $env:LOCALAPPDATA 'Verdant/cache'
+          if (Test-Path "$cache/render-cache") { throw 'Desktop cache must be fresh before launch' }
+          ./helpers/ci-rc6/native-menu-windows.ps1 -Exe $exe -OutputDir images/initial -CaptureOnly
+          $observed = Get-Content -Raw images/initial/observations.json | ConvertFrom-Json
+          ./helpers/ci-rc6/native-menu-windows.ps1 -Exe $exe -ProcessId $observed.pid -OutputDir images/full -Menu '822,23' -Row '699,158,314,26' -Outside '520,530'
+          python ./helpers/ci-rc6/check-desktop-cache.py $cache > images/windows-desktop-cache.json
+          if ($LASTEXITCODE -ne 0) { throw 'Persisted cache verification failed' }
+      - name: Upload actual desktop captures and cache receipts
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: native-menu-observations
           path: images/
