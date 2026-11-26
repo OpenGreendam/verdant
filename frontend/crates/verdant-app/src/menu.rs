@@ -242,9 +242,9 @@ impl MenuItem {
         use crate::editor::{WorkflowAction as W, integrations::IntegrationAction as I};
         match &self.command {
             Some(MenuCommand::Submenu(_) | MenuCommand::Editor(MenuAction::OpenMenu(_) | MenuAction::ChooseExample | MenuAction::Run(CommandId::AuditionProjects))) => true,
-            Some(MenuCommand::Editor(MenuAction::Workflow(W::Menu | W::Recent | W::Recovery | W::ExportSettings))) => true,
+            Some(MenuCommand::Editor(MenuAction::Workflow(W::Recent | W::Recovery | W::ExportSettings))) => true,
             Some(MenuCommand::Editor(MenuAction::Workflow(W::Integration(
-                I::Menu | I::Singers | I::Phonemizers | I::Segments | I::Dictionary | I::MonitorPorts | I::MidiPorts | I::MidiChannels(_) | I::Clips | I::Automation,
+                I::Singers | I::Phonemizers | I::Segments | I::Dictionary | I::MonitorPorts | I::MidiPorts | I::MidiChannels(_) | I::Clips | I::Automation,
             )))) => true,
             Some(MenuCommand::File(FileAction::Export(Format::Ust)) | MenuCommand::Editor(MenuAction::Workflow(W::Integration(I::ScoreExport(Format::Ust))))) => ed.project().tracks.len() > 1,
             _ => false,
@@ -552,6 +552,7 @@ impl Editor {
 
     pub(crate) fn edit_menu_items(&self) -> Vec<MenuItem> {
         use crate::editor::WorkflowAction as A;
+        use crate::editor::integrations::IntegrationAction as I;
         let tick = self.session.snap.snap(self.tempo().tick_at(self.playhead_seconds())).max(0);
         let has_sel = !self.session.selection.is_empty();
         vec![
@@ -573,6 +574,7 @@ impl Editor {
             MenuItem::action("闭合一格内间隙", MenuAction::Workflow(A::CloseGaps)).with_hint("Alt+Q").enabled(has_sel),
             MenuItem::action("消除重叠", MenuAction::Workflow(A::RemoveOverlaps)).with_hint("Shift+Q").enabled(has_sel),
             MenuItem::action("静音 / 取消静音", MenuAction::Workflow(A::MuteNotes)).enabled(has_sel),
+            MenuItem::action("试听所选音高", MenuAction::Workflow(A::Integration(I::AuditionSelection))).enabled(has_sel),
             MenuItem::separator(),
             MenuItem::submenu("参数曲线", vec![
                 MenuItem::action("选择当前音符全部曲线点", MenuAction::Workflow(A::SelectPoints)).enabled(has_sel),
@@ -604,10 +606,14 @@ impl Editor {
             MenuItem::header("自动化"),
             MenuItem::boolean_command("当前轨道自动化泳道", CommandId::ToggleTrackAutomation, CommandArg::Track(track), auto_on).with_hint("A"),
             MenuItem::boolean_command("主总线自动化泳道", CommandId::ToggleMasterAutomation, CommandArg::None, self.automation_ui.show_master),
+            MenuItem::action("自动化曲线", MenuAction::Workflow(A::Integration(I::Automation))),
             MenuItem::separator(),
             MenuItem::submenu("音符组", vec![
                 MenuItem::action("从选中音符创建音符组", MenuAction::Workflow(A::CreatePart)).with_hint("Ctrl+G").enabled(!self.session.selection.is_empty()),
                 MenuItem::action("音符组名称…", MenuAction::Workflow(A::RenamePart)).enabled(part),
+                MenuItem::action("精确位置…", MenuAction::Workflow(A::MovePart)).enabled(part),
+                MenuItem::action("精确裁剪…", MenuAction::Workflow(A::TrimPart)).enabled(part),
+                MenuItem::action("音符组静音 / 取消静音", MenuAction::Workflow(A::MutePart)).enabled(part),
                 MenuItem::action("在播放头分割音符组", MenuAction::Workflow(A::SplitPart(tick))).enabled(part),
                 MenuItem::action("连接右侧音符组", MenuAction::Workflow(A::JoinPart)).enabled(part),
                 MenuItem::action("链接复制音符组", MenuAction::Workflow(A::DuplicatePart(true))).enabled(part),
@@ -620,6 +626,8 @@ impl Editor {
                 MenuItem::action("导入音频伴奏 / 参考音…", MenuAction::Workflow(A::Integration(I::ImportAudio))),
                 MenuItem::action("音频片段列表…", MenuAction::Workflow(A::Integration(I::Clips))),
                 MenuItem::action("精确编辑所选音频片段…", MenuAction::Workflow(A::Integration(I::EditClip))).enabled(clip),
+                MenuItem::action("复制所选音频片段", MenuAction::Workflow(A::Integration(I::DuplicateClip))).enabled(clip),
+                MenuItem::action("删除所选音频片段", MenuAction::Workflow(A::Integration(I::DeleteClip))).enabled(clip),
                 MenuItem::action("重新定位丢失音源…", MenuAction::Workflow(A::Integration(I::RelinkClip))).enabled(clip),
                 MenuItem::action("授权重新打开已保存音频…", MenuAction::Workflow(A::Integration(I::AuthorizeAudio))),
             ]),
@@ -694,11 +702,14 @@ impl Editor {
             MenuItem::header("走带"),
             MenuItem::boolean_command("循环播放", CommandId::ToggleLoop, CommandArg::None, pb.looping),
             MenuItem::action("以选中音符设为循环范围", MenuAction::Workflow(A::RepeatSelection)).enabled(!self.session.selection.is_empty()),
+            MenuItem::action("在播放头设循环起点", MenuAction::Workflow(A::LoopStart(tick))).with_hint("Ctrl+K ["),
+            MenuItem::action("在播放头设循环终点", MenuAction::Workflow(A::LoopEnd(tick))).with_hint("Ctrl+K ]"),
             MenuItem::boolean_command("节拍器", CommandId::ToggleMetronome, CommandArg::None, pb.metronome),
             MenuItem::action("当前位置速度 (BPM)…", MenuAction::Workflow(A::EditTempo(tick))),
             MenuItem::action("当前位置拍号…", MenuAction::Workflow(A::EditMeter(tick))),
             MenuItem::separator(),
-            MenuItem::submenu("MIDI 录音", vec![
+            MenuItem::submenu("MIDI 输入", vec![
+                MenuItem::action("实时监听…", MenuAction::Workflow(A::Integration(I::MonitorPorts))),
                 MenuItem::action("选择输入设备并开始录音…", MenuAction::Workflow(A::Integration(I::MidiPorts))).enabled(!recording),
                 MenuItem::action("完成并写入录音", MenuAction::Workflow(A::Integration(I::FinishRecording))).enabled(recording),
                 MenuItem::action("取消录音", MenuAction::Workflow(A::Integration(I::CancelRecording))).enabled(recording),

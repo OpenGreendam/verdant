@@ -8,7 +8,7 @@ use verdant_midi::{CaptureOrigin,MidiCapture,MidiInputService,MidiPort,MidiTake}
 
 #[derive(Clone,Debug)]
 pub enum IntegrationAction {
-    AudioEdit(audio_edit_ui::AudioUiAction),Menu,Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
+    AudioEdit(audio_edit_ui::AudioUiAction),Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
     MonitorPorts,Monitor(MidiPort),StopMonitoring,
     MidiPorts,MidiChannels(MidiPort),Record(MidiPort,Option<u8>),FinishRecording,CancelRecording,ImportAudio,AuthorizeAudio,Clips,SelectClip(TrackId,String),EditClip,DuplicateClip,DeleteClip,RelinkClip,
     Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),
@@ -36,20 +36,10 @@ fn action(label:impl Into<gpui::SharedString>,command:IntegrationAction)->crate:
     crate::menu::MenuItem::action(label,MenuAction::Workflow(WorkflowAction::Integration(command)))
 }
 impl Editor {
-    pub fn integrations_menu(&mut self,window:&mut Window,cx:&mut Context<Self>){
-        use IntegrationAction as A;
-        let items=vec![action("轨道歌手…",A::Singers),action("导入 verdant-voice 声库…",A::InstallVoice),action("读音器…",A::Phonemizers),action("用户读音词典…",A::Dictionary),action("导入词典…",A::ImportDictionary),action("导出词典…",A::ExportDictionary),
-            action("MIDI 实时监听…",A::MonitorPorts),action("MIDI 输入录音…",A::MidiPorts),action("完成 MIDI 录音",A::FinishRecording),action("取消 MIDI 录音",A::CancelRecording),
-            action("导入音频伴奏 / 参考音…",A::ImportAudio),action("授权重新打开已保存音频…",A::AuthorizeAudio),action("音频片段…",A::Clips),action("编辑音频片段位置 / 裁剪 / 音量…",A::EditClip),action("复制音频片段",A::DuplicateClip),action("删除音频片段",A::DeleteClip),action("重新定位音源…",A::RelinkClip),action("自动化曲线…",A::Automation),
-            action("导出 MIDI…",A::ScoreExport(verdant_exchange::Format::Midi)),action("导出 UST…",A::ScoreExport(verdant_exchange::Format::Ust)),action("导出 USTX…",A::ScoreExport(verdant_exchange::Format::Ustx)),action("导出 SVP…",A::ScoreExport(verdant_exchange::Format::Svp)),action("导出 VSQX…",A::ScoreExport(verdant_exchange::Format::Vsqx)),action("导出 VPR…",A::ScoreExport(verdant_exchange::Format::Vpr)),action("导出 UtaFormatix Data (.ufdata)…",A::ScoreExport(verdant_exchange::Format::Ufdata)),action("查看导入 / 导出报告…",A::Report),
-            action("音阶高亮设置…",A::Scale),action("其他轨道音符叠加开关",A::OtherTracks),action("三个参数面板开关",A::ThreeLanes),action("试听所选音高（参考正弦音）",A::AuditionSelection)];
-        self.show_menu(window.mouse_position(),items,window,cx);
-    }
     pub fn run_integration(&mut self,command:IntegrationAction,window:&mut Window,cx:&mut Context<Self>)->Result<(),String>{
         use IntegrationAction as A;
         match command{
             A::AudioEdit(action)=>self.run_audio_ui(action,window,cx)?,
-            A::Menu=>self.integrations_menu(window,cx),
             A::Singers=>{
                 let items=self.singer_menu_items()?;
                 self.show_menu(window.mouse_position(),items,window,cx);

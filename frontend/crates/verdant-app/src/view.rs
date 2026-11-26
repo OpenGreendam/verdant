@@ -1928,7 +1928,6 @@ impl Render for Editor {
             .text_color(th.text)
             .font(crate::theme::ui_font(self.ui_font.clone()))
             .key_context("Verdant")
-            .on_action(cx.listener(|ed, _: &WorkflowMenu, w, cx| ed.workflow_menu(w, cx)))
             .on_action(cx.listener(|ed, action: &crate::shortcuts::WorkflowShortcut, w, cx| crate::shortcuts::dispatch(ed, action, w, cx)))
             .on_action(cx.listener(|ed, _: &crate::commands::ShowHistory, w, cx| ed.show_history_panel(w, cx)))
             .on_action(cx.listener(|ed, _: &NewProject, w, cx| ed.run_workflow(crate::editor::WorkflowAction::New, w, cx)))

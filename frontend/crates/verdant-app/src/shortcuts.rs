@@ -23,7 +23,7 @@ pub enum WorkflowShortcut {
     CreatePart, RenamePart, MovePart, TrimPart, SplitPart, JoinPart, DuplicatePart, LinkedPart, UnlinkPart, MutePart, DeletePart, DissolvePart,
     RenameTrack, MoveTrackUp, MoveTrackDown, DuplicateTrack, EditTempo, DeleteTempo, EditMeter, DeleteMeter, LoopStart, LoopEnd,
     NoCountIn, OneBarCountIn, TwoBarCountIn, ExportSettings,
-    Integrations, Singers, Phonemizers, Dictionary, AddDictionaryEntry, ImportDictionary, ExportDictionary,
+    Singers, Phonemizers, Dictionary, AddDictionaryEntry, ImportDictionary, ExportDictionary,
     MidiPorts, FinishRecording, CancelRecording, ImportAudio, AuthorizeAudio, Clips, EditClip, DuplicateClip, DeleteClip, RelinkClip,
     Automation, ExportMidi, ExportUst, ExportUstx, ExportSvp, ExportVsqx, ExportVpr,
     Scale, OtherTracks, ThreeLanes, AuditionSelection, ExchangeReport,
@@ -53,7 +53,7 @@ impl WorkflowShortcut {
             S::LoopStart => W::LoopStart(tick()), S::LoopEnd => W::LoopEnd(tick()),
             S::NoCountIn => W::CountIn(0), S::OneBarCountIn => W::CountIn(1), S::TwoBarCountIn => W::CountIn(2),
             S::ExportSettings => W::ExportSettings,
-            S::Integrations => W::Integration(I::Menu), S::Singers => W::Integration(I::Singers),
+            S::Singers => W::Integration(I::Singers),
             S::Phonemizers => W::Integration(I::Phonemizers),
             S::Dictionary => W::Integration(I::Dictionary), S::AddDictionaryEntry => W::Integration(I::AddDictionaryEntry),
             S::ImportDictionary => W::Integration(I::ImportDictionary), S::ExportDictionary => W::Integration(I::ExportDictionary),
@@ -168,7 +168,6 @@ shortcuts![
     ("secondary-q", App, "退出 Verdant", Quit),
     ],
     "音符与歌词" => [
-    ("secondary-shift-p", Workspace, "全部工作流…", WorkflowMenu),
     ("secondary-c", Workspace, "复制音符", CopyNotes),
     ("secondary-x", Workspace, "剪切音符", CutNotes),
     ("secondary-v", Workspace, "粘贴音符", PasteNotes),
@@ -283,7 +282,6 @@ shortcuts![
     ("secondary-k p delete", Workspace, "删除音符组", WorkflowShortcut::DeletePart),
     ],
     "歌手与词典" => [
-    ("secondary-k i i", Workspace, "集成工作流…", WorkflowShortcut::Integrations),
     ("secondary-k i s", Workspace, "选择轨道歌手…", WorkflowShortcut::Singers),
     ("secondary-k i p", Workspace, "选择读音器…", WorkflowShortcut::Phonemizers),
     ("secondary-k d d", Workspace, "用户读音词典…", WorkflowShortcut::Dictionary),
