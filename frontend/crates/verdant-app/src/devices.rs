@@ -512,12 +512,8 @@ fn choice(ed: &Editor, track: &DeviceTarget, slot: usize, params: &[ParamDesc], 
         let on = i == current;
         let navigate: Vec<_> = (0..labels.len()).map(|index| parameter_command(target.clone(), vec![(id_owned.clone(), index as f64)], cx)).collect();
         let command = parameter_command(target, vec![(id_owned, i as f64)], cx);
-        semantic_click(crate::proto_controls::action(SharedString::from(format!("choice-{slot}-{id}-{i}")), label.to_string()).authority(format!("{}:{track:?}:{slot}:{id}", crate::proto_controls::editor_authority(ed))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()).tab_index(0)
-            .h(gpui::rems(26.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().rounded(gpui::rems(6.0/16.)).text_sm().cursor_pointer()
-            .when(on, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
-            .hover(move |s| s.bg(if on { th.checked } else { th.hover }))
-            .active(move |s| s.bg(th.control_pressed))
-            .child(label.to_string()), command)
+        semantic_click(presentation::segment(SharedString::from(format!("choice-{slot}-{id}-{i}")), label.to_string(), on, th)
+            .authority(format!("{}:{track:?}:{slot}:{id}", crate::proto_controls::editor_authority(ed))).role(Role::RadioButton).aria_selected(on).aria_label(label.to_string()), command)
             .navigation(i, labels.len(), move |index, window, cx| { if let Some(command) = navigate.get(index) { command(None, window, cx); } })
     })).into_any_element()
 }
@@ -622,7 +618,9 @@ fn knob_row(editor: &Entity<Editor>, target: impl Fn() -> Target, params: &[Para
 // ---------------------------------------------------------------------------
 
 /// GNOME palette colours for the six EQ bands.
-const BAND_COLORS: [u32; 6] = [0x3584e4, 0x33d17a, 0xf6d32d, 0xff7800, 0xe66100, 0x9141ac];
+// GNOME palette (blue, green, yellow, orange, red, purple, teal, brown):
+// eight hues far enough apart that neighbouring bands never read as one.
+const BAND_COLORS: [u32; 8] = [0x3584e4, 0x2ec27e, 0xe5a50a, 0xff7800, 0xe01b24, 0x9141ac, 0x2190a4, 0x986a44];
 fn band_color(i: usize) -> gpui::Rgba { gpui::rgb(BAND_COLORS[i % BAND_COLORS.len()]) }
 
 const FREQ_AXIS: Axis = Axis::log(dsp::FREQ_MIN, dsp::FREQ_MAX);

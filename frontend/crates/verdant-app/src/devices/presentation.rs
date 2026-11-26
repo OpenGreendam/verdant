@@ -38,17 +38,30 @@ pub(super) fn linked(children: impl IntoIterator<Item = gpui::AnyElement>, th: T
 /// card in the trough (AdwToggleGroup), the others are flat.
 pub(super) fn segment(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
     let label = label.into();
-    let base = crate::proto_controls::action(id, label.clone()).role(Role::Button).tab_index(0).cursor_pointer()
+    segment_shell(id, label.clone(), selected, th).child(label)
+}
+
+/// A segment whose visible content is a colour dot and a short label while
+/// `name` stays the accessible label (band and node pickers).
+pub(super) fn dot_segment(id: impl Into<gpui::ElementId>, name: impl Into<SharedString>, short: impl Into<SharedString>,
+    color: gpui::Rgba, selected: bool, th: Theme) -> crate::proto_controls::Action {
+    let name = name.into();
+    segment_shell(id, name.clone(), selected, th).aria_label(name).gap(gpui::rems(6./16.)).px(gpui::rems(8./16.))
+        .child(div().flex_none().size(gpui::rems(8./16.)).rounded_full().bg(color))
+        .child(short.into())
+}
+
+fn segment_shell(id: impl Into<gpui::ElementId>, label: SharedString, selected: bool, th: Theme) -> crate::proto_controls::Action {
+    let base = crate::proto_controls::action(id, label).role(Role::Button).tab_index(0).cursor_pointer()
         .flex_none().flex().items_center().justify_center().min_h(gpui::rems(26./16.)).min_w(gpui::rems(30./16.))
         .px(gpui::rems(10./16.)).rounded(gpui::rems(6./16.)).border_1()
         .focus(move |s| s.border_color(th.accent))
         .text_sm().font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL }).text_color(th.text);
-    let base = if selected {
+    if selected {
         base.border_color(th.shade).bg(th.card).hover(move |s| s.bg(th.card)).active(move |s| s.bg(crate::theme::mix(th.card, th.text, 0.06)))
     } else {
         base.border_color(with_alpha(th.text, 0.)).flat_states(th, false)
-    };
-    base.child(label)
+    }
 }
 
 fn page_command(target: Target, index: u8, cx: &Context<Editor>) -> SemanticCommand {

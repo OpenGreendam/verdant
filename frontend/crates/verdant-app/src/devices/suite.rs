@@ -408,15 +408,20 @@ fn control(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usi
 
 fn band_tabs(ed: &Editor, owner: &DeviceTarget, key: InsertKey, slot: usize, count: usize, selected: usize, prefix: &str, cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
-    div().flex().flex_wrap().gap(gpui::rems(4.0/16.)).children((0..count).map(|index| {
-        let label = format!("{prefix} {}", index + 1);
-        let navigate: Vec<_> = (0..count).map(|index| command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx)).collect();
-        command_button(crate::ui_controls::selectable_button(format!("band-tab-{slot}-{index}"), label, index == selected, th)
-            .authority(action_authority(ed, &Target { track: owner.clone(), key, slot }))
-            .role(Role::Tab).tab_index(0).border_color(with_alpha(band_color(index), 0.8)),
-            command(ed, Target { track: owner.clone(), key, slot }, SuiteAction::SelectBand(index), cx))
+    let target = || Target { track: owner.clone(), key, slot };
+    let navigate: std::rc::Rc<Vec<_>> = std::rc::Rc::new((0..count).map(|index| command(ed, target(), SuiteAction::SelectBand(index), cx)).collect());
+    let segments = (0..count).map(|index| {
+        let navigate = navigate.clone();
+        command_button(presentation::dot_segment(format!("band-tab-{slot}-{index}"), format!("{prefix} {}", index + 1),
+                format!("{}", index + 1), band_color(index), index == selected, th)
+            .authority(action_authority(ed, &target())).role(Role::Tab),
+            command(ed, target(), SuiteAction::SelectBand(index), cx))
             .navigation(index, count, move |index, window, cx| { if let Some(command) = navigate.get(index) { command(None, window, cx); } })
-    })).into_any_element()
+            .into_any_element()
+    });
+    div().flex().items_center().gap(gpui::rems(8./16.))
+        .child(div().text_sm().text_color(th.text_secondary).child(prefix.to_owned()))
+        .child(presentation::linked(segments, th)).into_any_element()
 }
 
 pub(super) fn compressor_sidechain(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget, slot: usize, key: InsertKey,
@@ -569,7 +574,9 @@ pub(super) fn filters(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget
         }).collect();
         fill_under(window, plot, &points, plot.y(0.), with_alpha(th.accent, 0.12));
         polyline(window, plot.o, points.into_iter().map(Some), 2.5, th.accent);
-        texts.push(("静态频率响应 · 调制围绕截止频率运动".into(), p(10., 6., plot.o), 11., th.text_secondary));
+        // Only promise motion when the LFO actually moves the cutoff.
+        let lfo = param(params, "lfo_depth").is_some_and(|d| d.value.abs() > 1e-6);
+        texts.push((if lfo { "静态频率响应 · LFO 让截止频率围绕节点运动" } else { "频率响应" }.into(), p(10., 6., plot.o), 11., th.text_secondary));
     });
     let handles = (0..count).filter_map(|index| {
         let id = if micro { "freq".to_string() } else { format!("f{}.freq", index + 1) };
@@ -595,8 +602,11 @@ pub(super) fn filters(ed: &Editor, editor: &Entity<Editor>, owner: &DeviceTarget
                 .child(toggle(ed, owner, slot, params, &format!("{prefix}enabled"), "启用", cx))
                 .child(choice(ed, owner, slot, params, &format!("{prefix}shape"), &dsp::FILTER_SHAPES, cx))
                 .child(choice(ed, owner, slot, params, &format!("{prefix}slope"), &dsp::FILTER_SLOPES, cx)))
-            .child(knob_row(editor, target, params, &refs, th, 46.))
-            .child(knob_row(editor, target, params, &["lfo_rate", "lfo_depth", "mix", "output"], th, 42.));
+            .child(knob_row(editor, target.clone(), params, &refs, th, 46.))
+            // Device-wide controls sit below a hairline, as in the multiband view,
+            // so they never read as settings of the selected filter.
+            .child(div().pt(gpui::rems(8./16.)).border_t_1().border_color(th.shade)
+                .child(knob_row(editor, target, params, &["lfo_rate", "lfo_depth", "mix", "output"], th, 42.)));
     }
     main.into_any_element()
 }
