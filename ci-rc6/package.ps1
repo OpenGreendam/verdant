@@ -50,6 +50,9 @@ $env:VERDANT_BUNDLED_VOICE_POLICY_SHA256 = $pin
 $env:VERDANT_VOICE_BANK_SHA256 = $pins.voice_members['bank.safetensors']
 Set-Location "$source/frontend"
 Run cargo @('fetch','--locked')
+Run cargo @('build','--offline','--locked','--release','-p','verdant-worker','-p','verdant-test-worker','--features','verdant-test-worker/protocol-fixture')
+$env:VERDANT_WORKER_BINARY = (Resolve-Path "$env:CARGO_TARGET_DIR/release/verdant-worker.exe").Path
+$env:VERDANT_TEST_WORKER_BINARY = (Resolve-Path "$env:CARGO_TARGET_DIR/release/verdant-test-worker.exe").Path
 $backendTests = & cargo test --offline --locked --release -p verdant-backend --test backend --test f0_artifacts 2>&1
 $backendExit = $LASTEXITCODE
 $backendTests | Out-Host
