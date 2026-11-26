@@ -1,0 +1,118 @@
+name: Android arm64 example validation
+
+on:
+  push:
+    branches: [ci/rc7-android-a5813ec9]
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      SOURCE_SHA: a5813ec9cce12c72cb9e84ee92e388ca67ece75e
+      ANDROID_API: '26'
+      PROFILE: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Pin source and install the documented toolchain
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          echo '578a7d6d03ed38727ab1f7be68e76d2208ef0fe04b902a7552652b210fa426cb  Cargo.lock' | sha256sum -c -
+          echo '3e4572b492ea498bccf1cf8a0f80f5dc6970fdb2d7b6156f88f5ad6027521228  crates/gpui_android/script/build-apk.sh' | sha256sum -c -
+          rustup target add aarch64-linux-android
+          rustc -Vv
+          cargo -V
+          sdkmanager 'ndk;27.2.12479018' 'build-tools;35.0.0' 'platforms;android-35'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_ENV"
+          echo "ANDROID_JAR=$ANDROID_HOME/platforms/android-35/android.jar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/target" >> "$GITHUB_ENV"
+          if [[ -x "$ANDROID_HOME/emulator/emulator" ]]; then
+            "$ANDROID_HOME/emulator/emulator" -list-avds
+          fi
+      - name: Build the example with locked dependencies
+        id: build
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          export ANDROID_REAL_CARGO="$(command -v cargo)"
+          mkdir "$RUNNER_TEMP/locked-bin"
+          cat > "$RUNNER_TEMP/locked-bin/cargo" <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -eu
+          if [[ $1 == build ]]; then
+            shift
+            printf 'cargo build --locked %s\n' "$*"
+            exec "$ANDROID_REAL_CARGO" build --locked "$@"
+          fi
+          exec "$ANDROID_REAL_CARGO" "$@"
+          SCRIPT
+          chmod +x "$RUNNER_TEMP/locked-bin/cargo"
+          PATH="$RUNNER_TEMP/locked-bin:$PATH" crates/gpui_android/script/build-apk.sh
+          git diff --exit-code -- Cargo.lock
+      - name: Verify signature, NativeActivity, arm64 ELF and 16 KiB layout
+        run: |
+          set -euo pipefail
+          out="$CARGO_TARGET_DIR/gpui-android-apk"
+          mkdir -p "$RUNNER_TEMP/verified"
+          cp "$out/gpui-android-example.apk" "$RUNNER_TEMP/verified/"
+          cd "$RUNNER_TEMP/verified"
+          apk=gpui-android-example.apk
+          toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          sha256sum "$apk" | tee SHA256SUMS
+          "$ANDROID_BUILD_TOOLS/apksigner" verify --verbose --print-certs "$apk" | tee signature.txt
+          "$ANDROID_BUILD_TOOLS/aapt" dump badging "$apk" | tee badging.txt
+          "$ANDROID_BUILD_TOOLS/aapt" dump xmltree "$apk" AndroidManifest.xml | tee manifest.txt
+          "$ANDROID_BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$apk" | tee zipalign.txt
+          grep -F "package: name='dev.gpui.android.example'" badging.txt
+          grep -F "launchable-activity: name='android.app.NativeActivity'" badging.txt
+          grep -F "sdkVersion:'26'" badging.txt
+          grep -F "targetSdkVersion:'35'" badging.txt
+          grep -F 'android.app.lib_name' manifest.txt
+          grep -F 'gpui_android_example' manifest.txt
+          unzip -Z1 "$apk" | tee entries.txt
+          so=libgpui_android_example.so
+          unzip -p "$apk" "lib/arm64-v8a/$so" > "$RUNNER_TEMP/$so"
+          "$toolchain/bin/llvm-readelf" -h -lW -dW --dyn-syms "$RUNNER_TEMP/$so" > elf.txt
+          grep -E 'AArch64|\bLOAD\b|\(NEEDED\)| (ANativeActivity_onCreate|android_main)$' elf.txt
+          export ANDROID_SYSTEM_LIBS="$toolchain/sysroot/usr/lib/aarch64-linux-android/26"
+          python3 - <<'PY'
+          import json, os, re, struct, zipfile
+          from pathlib import Path
+          parsed = Path('elf.txt').read_text()
+          assert re.search(r'Class:\s+ELF64', parsed) and re.search(r'Machine:\s+AArch64', parsed)
+          exports = set(re.findall(r'\bGLOBAL\s+DEFAULT\s+\d+\s+(\S+)', parsed))
+          assert {'ANativeActivity_onCreate', 'android_main'} <= exports, sorted(exports)
+          needed = re.findall(r'\(NEEDED\).*?\[([^\]]+)\]', parsed)
+          assert needed and all((Path(os.environ['ANDROID_SYSTEM_LIBS']) / lib).is_file() for lib in needed), needed
+          load_alignments = [int(line.split()[-1], 0) for line in parsed.splitlines() if line.lstrip().startswith('LOAD ')]
+          assert load_alignments and min(load_alignments) >= 16384, load_alignments
+          apk = Path('gpui-android-example.apk')
+          with zipfile.ZipFile(apk) as z, apk.open('rb') as raw:
+              native = [e for e in z.infolist() if e.filename.endswith('.so')]
+              assert [e.filename for e in native] == ['lib/arm64-v8a/libgpui_android_example.so']
+              e = native[0]
+              assert e.compress_type == zipfile.ZIP_STORED
+              raw.seek(e.header_offset + 26)
+              n, extra = struct.unpack('<HH', raw.read(4))
+              offset = e.header_offset + 30 + n + extra
+              assert offset % 16384 == 0, offset
+          receipt = dict(source=os.environ['SOURCE_SHA'], lock_sha256='578a7d6d03ed38727ab1f7be68e76d2208ef0fe04b902a7552652b210fa426cb', ndk='27.2.12479018', native_api=26, build_tools='35.0.0', elf_load_alignments=load_alignments, android_system_libs=needed, activity_export='ANativeActivity_onCreate', rust_export='android_main', zip_data_offset=offset)
+          Path('android-evidence.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print(json.dumps(receipt))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        with:
+          name: gpui-android-signed-example-validation
+          path: ${{ runner.temp }}/verified
+          if-no-files-found: error
+          retention-days: 3
