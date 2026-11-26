@@ -15,13 +15,13 @@
 
 ## 仍然阻塞
 
-1. **GPUI 没有 Android 平台后端。** 固定的 GPUI fork 有 macOS、iOS、Linux（X11/Wayland）和 Windows 平台，以及一个 `gpui_wgpu` 渲染器，但没有 Android 平台层。需要新增 `gpui_android`：
-   - 用 `android-activity`（GameActivity）提供窗口、输入和生命周期；
-   - 渲染复用 `gpui_wgpu`（Vulkan）；
-   - 文本复用现有的 font-kit/cosmic-text 路径；
-   - 补上 IME（`InputConnection`）、剪贴板和文件选择（Storage Access Framework）。
-   
-   这是上游工作，应先在 fork 中完成，再由 Verdant 升级 pin。
+1. **GPUI 平台后端（初版已完成，尚未上真机）。** 固定的 GPUI fork 没有 Android 平台层，而且 fork 仓库已归档，所以后端放在 Verdant 自己的 `crates/gpui_android` 里，不修改 GPUI 本体：
+   - 平台层：用 `android-activity`（NativeActivity）驱动事件循环，处理窗口创建与销毁、旋转、尺寸和配置变化、系统栏安全区、前后台和内存告警；
+   - 窗口层：通过 `gpui_wgpu`（Vulkan，退回 GLES）渲染，进入后台时只卸下绘图表面，保留设备和图集；
+   - 调度器：主线程任务在 looper 线程执行，后台任务走线程池，定时器使用独立线程；
+   - 输入：多指 MotionEvent 转为 `PlatformInput::Touch`，由 GPUI 的通用手势识别出点击、平移、长按和捏合；返回键接到 `set_back_handler`。
+
+   `examples/android.rs` 和 `script/build-apk.sh` 可以打出 arm64 调试 APK。尚未实现：输入法与软键盘文本输入、返回键以外的硬件键、剪贴板、文件选择（SAF）、打开链接、保持亮屏。
 2. **后端进程模型。** 桌面版把合成 worker（`verdant-worker`）和插件宿主（`verdant-plughost`）作为独立进程启动。Android 应用不能可靠地执行随包附带的可执行文件，需要让 worker 以库的形式在应用进程内运行，或者放进一个独立的 Android Service 进程，通过现有的消息协议通信。
 3. **ONNX Runtime。** 桌面包从 PyPI wheel 中提取原生库。Android 需要改用官方 `onnxruntime-android` AAR 中的 `libonnxruntime.so`，按 ABI（`arm64-v8a` 为主）放进 APK，并由 `verdant-synthesis` 通过 `libloading` 从应用的 native 库目录加载。
 4. **第三方插件。** VST3 和 CLAP 只面向桌面系统。Android 构建应关闭 `verdant-plughost` 的 `vst3`/`clap` 特性，只提供内置效果器和内置合成器；浏览插件的入口在该平台隐藏。
@@ -29,13 +29,25 @@
 
 ## 建议顺序
 
-1. 在 GPUI fork 中实现 `gpui_android`，先跑通一个空白窗口、触控输入和 wgpu 渲染。
+1. 在真机上验证 `gpui_android` 示例 APK（渲染、点按、旋转、切后台再回来），再补输入法和剪贴板。
 2. Verdant 增加 `target_os = "android"` 构建：关闭桌面插件特性，worker 改为进程内运行，接入 Android 版 ONNX Runtime。
-3. 用 `cargo-apk` 或 `xbuild` 打出调试 APK，在 Android 平板（横屏，约 1280×800 dp 以上）上验证：
+3. 仿照 `crates/gpui_android/script/build-apk.sh` 打出 Verdant 的调试 APK，在 Android 平板（横屏，约 1280×800 dp 以上）上验证：
    - 卷帘编辑、曲线绘制和旋钮拖动；
    - 播放与渲染；
    - 声库安装。
 4. 在平板上调整触控布局：横屏宽度通常落在 Medium，两侧面板同时停靠时卷帘偏窄，可考虑在触控布局下把右侧检查器默认收成抽屉。
+
+## 构建示例 APK
+
+```sh
+export ANDROID_NDK_HOME=/path/to/android-ndk-r27c
+export ANDROID_BUILD_TOOLS=/path/to/sdk/build-tools/35.0.0
+export ANDROID_JAR=/path/to/sdk/platforms/android-35/android.jar
+rustup target add aarch64-linux-android
+crates/gpui_android/script/build-apk.sh
+adb install target/gpui-android-apk/gpui-android-example.apk
+adb logcat -s gpui
+```
 
 ## 桌面上预览平板布局
 
