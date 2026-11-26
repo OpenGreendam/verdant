@@ -234,6 +234,17 @@ fn replace_file(dir: &Path, temporary: &Path, destination: &Path) -> Result<(), 
 
 #[cfg(windows)]
 fn replace_file(dir: &Path, temporary: &Path, destination: &Path) -> Result<(), IoError> {
+    replace_file_windows(dir, temporary, destination, true)
+}
+
+/// Atomically publish a flushed sibling file using Windows write-through semantics.
+#[cfg(windows)]
+pub fn replace_file_write_through(dir: &Path, temporary: &Path, destination: &Path) -> Result<(), IoError> {
+    replace_file_windows(dir, temporary, destination, false)
+}
+
+#[cfg(windows)]
+fn replace_file_windows(dir: &Path, temporary: &Path, destination: &Path, allow_open_destination: bool) -> Result<(), IoError> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH};
 
@@ -255,14 +266,13 @@ fn replace_file(dir: &Path, temporary: &Path, destination: &Path) -> Result<(), 
         return Ok(());
     }
     let error = std::io::Error::last_os_error();
-    if error.kind() != std::io::ErrorKind::PermissionDenied {
-        return Err(IoError::Io { path: destination.into(), source: error });
+    if allow_open_destination && error.kind() == std::io::ErrorKind::PermissionDenied {
+        // Checkpointing leaves the old writer open. Rust can replace a
+        // delete-shared open destination via FileRenameInfoEx.
+        return fs::rename(temporary, destination)
+            .map_err(|source| IoError::Io { path: destination.into(), source });
     }
-    // Rust's Windows rename can replace a delete-shared open destination
-    // via FileRenameInfoEx. Checkpointing leaves the old writer open until
-    // the replacement succeeds.
-    fs::rename(temporary, destination)
-        .map_err(|source| IoError::Io { path: destination.into(), source })
+    Err(IoError::Io { path: destination.into(), source: error })
 }
 
 #[cfg(not(windows))]

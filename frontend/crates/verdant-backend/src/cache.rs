@@ -25,7 +25,7 @@
 //!   cache calls belong there too).
 
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -136,14 +136,19 @@ impl ArtifactCache {
     /// replace of a single file).
     fn write_atomic(&self, dir: &Path, name: &str, bytes: &[u8]) -> io::Result<()> {
         let tmp = self.staging(dir, name);
-        fs::write(&tmp, bytes)?;
-        fs::File::open(&tmp)?.sync_all()?;
+        let mut file = fs::File::create_new(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        // Windows publishes with a write-through rename in place of a directory fsync.
+        #[cfg(windows)]
+        verdant_domain::io::replace_file_write_through(dir, &tmp, &dir.join(name)).map_err(|error| match error {
+            verdant_domain::io::IoError::Io { source, .. } => source,
+            other => io::Error::new(io::ErrorKind::InvalidInput, other),
+        })?;
+        #[cfg(not(windows))]
         fs::rename(&tmp, dir.join(name))?;
         Ok(())
-    }
-
-    fn sync_dir(&self, dir: &Path) -> io::Result<()> {
-        fs::File::open(dir)?.sync_all()
     }
 
     /// Persist a verified entry: copy the artifact bytes into the cache and
@@ -206,7 +211,8 @@ impl ArtifactCache {
         };
         let body = serde_json::to_vec(&manifest).map_err(|e| CacheError::Corrupt(e.to_string()))?;
         self.write_atomic(&dir, MANIFEST, &body)?;
-        self.sync_dir(&dir)?;
+        #[cfg(not(windows))]
+        fs::File::open(&dir)?.sync_all()?;
         Ok(())
     }
 

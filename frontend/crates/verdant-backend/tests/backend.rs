@@ -970,6 +970,8 @@ fn durable_cache_roundtrips_and_reports_corruption() {
     let cache = ArtifactCache::open(&dir).unwrap();
     let (_source, e) = entry("digest-a", &TrackId::from("t1"), 2);
     cache.store(&e).unwrap();
+    drop(cache);
+    let cache = ArtifactCache::open(&dir).unwrap();
     assert_eq!(cache.entries(), vec!["digest-a".to_string()]);
     let r = cache.restore("digest-a").unwrap().unwrap();
     assert_eq!(r.audio.sample_rate, e.audio.sample_rate);
