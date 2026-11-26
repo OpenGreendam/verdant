@@ -113,7 +113,12 @@ $receipt = [ordered]@{
 }
 
 function Guard-Window {
-    if ([VerdantMenuInput]::GetForegroundWindow() -ne $hwnd) { throw 'Staged GUI lost foreground focus' }
+    $active = [VerdantMenuInput]::GetForegroundWindow()
+    if ($active -ne $hwnd) {
+        $owner = Get-Process | Where-Object { $_.MainWindowHandle -eq $active -and $active -ne [IntPtr]::Zero } | Select-Object Id,ProcessName,MainWindowTitle
+        $receipt.focus_error = @{foreground=$active.ToInt64(); owner=$owner; expected=$hwnd.ToInt64(); gui_exited=$gui.HasExited}
+        throw 'Staged GUI lost foreground focus'
+    }
     $current = [VerdantMenuInput]::Client($hwnd)
     if ($current.Left -ne $initial.Left -or $current.Top -ne $initial.Top -or
         $current.Right -ne $initial.Right -or $current.Bottom -ne $initial.Bottom -or
@@ -164,7 +169,7 @@ function Send-MenuKey([string]$Key, [string]$Name) {
 
 try {
     if ($ProcessId) { $gui = Get-Process -Id $ProcessId }
-    else { $gui = Start-Process -FilePath $actualExe -WorkingDirectory (Split-Path $actualExe) -PassThru }
+    else { $gui = Start-Process -FilePath $actualExe -WorkingDirectory (Split-Path $actualExe) -RedirectStandardError (Join-Path $output 'gui.stderr') -RedirectStandardOutput (Join-Path $output 'gui.stdout') -PassThru }
     if ($gui.SessionId -ne (Get-Process -Id $PID).SessionId) { throw 'GUI and observer must share the interactive session' }
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
@@ -174,6 +179,10 @@ try {
         if ($hwnd -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 250 }
     } until ($hwnd -ne [IntPtr]::Zero -or [DateTime]::UtcNow -ge $deadline)
     if ($hwnd -eq [IntPtr]::Zero) { throw 'No visible main window within 30 seconds' }
+    Start-Sleep -Seconds 5
+    $gui.Refresh()
+    if ($gui.HasExited) { throw "GUI exited after startup: $($gui.ExitCode)" }
+    $hwnd = $gui.MainWindowHandle
     if (![string]::Equals($gui.Path, $actualExe, [StringComparison]::OrdinalIgnoreCase)) { throw 'Window executable differs from Exe' }
     if ([VerdantMenuInput]::IsIconic($hwnd)) { [void][VerdantMenuInput]::ShowWindow($hwnd, 9) }
     $receipt.session = $gui.SessionId
