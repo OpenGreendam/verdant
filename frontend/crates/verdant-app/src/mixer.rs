@@ -53,6 +53,7 @@ pub fn mixer(ed: &Editor, entity: &Entity<Editor>, cx: &mut Context<Editor>) -> 
         .size_full()
         .flex()
         .bg(th.view)
+        .rounded_bl(crate::window_chrome::corner_radii(ed.window_chrome).bottom_left)
         .p(px(8.0))
         .gap(px(8.0))
         .child(div().flex_1().min_w_0().h_full().child(MixerTracks { editor:entity.clone() }))

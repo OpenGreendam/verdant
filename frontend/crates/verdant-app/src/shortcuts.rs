@@ -25,7 +25,7 @@ pub enum WorkflowShortcut {
     NoCountIn, OneBarCountIn, TwoBarCountIn, ExportSettings,
     Integrations, Singers, Phonemizers, Dictionary, AddDictionaryEntry, ImportDictionary, ExportDictionary,
     MidiPorts, FinishRecording, CancelRecording, ImportAudio, AuthorizeAudio, Clips, EditClip, DuplicateClip, DeleteClip, RelinkClip,
-    Automation, ExportMidi, ExportUst, ExportUstx, ExportSvp, ExportVsqx, ExportVpr, VocaloidMetadata,
+    Automation, ExportMidi, ExportUst, ExportUstx, ExportSvp, ExportVsqx, ExportVpr,
     Scale, OtherTracks, ThreeLanes, AuditionSelection, ExchangeReport,
 }
 
@@ -65,7 +65,7 @@ impl WorkflowShortcut {
             S::Automation => W::Integration(I::Automation), S::ExportMidi => W::Integration(I::ScoreExport(Format::Midi)),
             S::ExportUst => W::Integration(I::ScoreExport(Format::Ust)), S::ExportUstx => W::Integration(I::ScoreExport(Format::Ustx)),
             S::ExportSvp => W::Integration(I::ScoreExport(Format::Svp)), S::ExportVsqx => W::Integration(I::ScoreExport(Format::Vsqx)),
-            S::ExportVpr => W::Integration(I::ScoreExport(Format::Vpr)), S::VocaloidMetadata => W::Integration(I::VocaloidMetadata),
+            S::ExportVpr => W::Integration(I::ScoreExport(Format::Vpr)),
             S::Scale => W::Integration(I::Scale), S::OtherTracks => W::Integration(I::OtherTracks),
             S::ThreeLanes => W::Integration(I::ThreeLanes), S::AuditionSelection => W::Integration(I::AuditionSelection),
             S::ExchangeReport => W::Integration(I::Report),
@@ -312,7 +312,6 @@ shortcuts![
     ("secondary-e v", Workspace, "导出 VSQX…", WorkflowShortcut::ExportVsqx),
     ("secondary-e p", Workspace, "导出 VPR…", WorkflowShortcut::ExportVpr),
     ("secondary-e o", Workspace, "音频导出选项…", WorkflowShortcut::ExportSettings),
-    ("secondary-e a", Workspace, "Vocaloid 歌手元数据…", WorkflowShortcut::VocaloidMetadata),
     ("secondary-e r", Workspace, "导入 / 导出报告…", WorkflowShortcut::ExchangeReport),
     ],
     "辅助显示与试听" => [

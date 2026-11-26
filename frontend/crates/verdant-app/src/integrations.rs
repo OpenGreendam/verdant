@@ -11,7 +11,7 @@ pub enum IntegrationAction {
     AudioEdit(audio_edit_ui::AudioUiAction),Menu,Singers,ChooseSinger(String),InstallVoice,Phonemizers,ChoosePhonemizer(String),ChooseSingerPhonemizer(String,Option<String>),Segments,AddSegment,EditSegment(String),RemoveSegment(String),Dictionary,AddDictionaryEntry,EditDictionaryEntry(String,bool),RemoveDictionaryEntry(String,bool),ImportDictionary,ExportDictionary,
     MonitorPorts,Monitor(MidiPort),StopMonitoring,
     MidiPorts,MidiChannels(MidiPort),Record(MidiPort,Option<u8>),FinishRecording,CancelRecording,ImportAudio,AuthorizeAudio,Clips,SelectClip(TrackId,String),EditClip,DuplicateClip,DeleteClip,RelinkClip,
-    Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),VocaloidMetadata,
+    Automation,EditAutomation(AutomationTarget),ToggleAutomation(AutomationTarget),RemoveAutomation(AutomationTarget),ScoreExport(verdant_exchange::Format),ExportScoreTrack(verdant_exchange::Format,usize),
     Scale,OtherTracks,ThreeLanes,AuditionSelection,Report,
 }
 #[derive(Clone,Debug)]
@@ -41,7 +41,7 @@ impl Editor {
         let items=vec![action("轨道歌手…",A::Singers),action("导入 verdant-voice 声库…",A::InstallVoice),action("读音器…",A::Phonemizers),action("用户读音词典…",A::Dictionary),action("导入词典…",A::ImportDictionary),action("导出词典…",A::ExportDictionary),
             action("MIDI 实时监听…",A::MonitorPorts),action("MIDI 输入录音…",A::MidiPorts),action("完成 MIDI 录音",A::FinishRecording),action("取消 MIDI 录音",A::CancelRecording),
             action("导入音频伴奏 / 参考音…",A::ImportAudio),action("授权重新打开已保存音频…",A::AuthorizeAudio),action("音频片段…",A::Clips),action("编辑音频片段位置 / 裁剪 / 音量…",A::EditClip),action("复制音频片段",A::DuplicateClip),action("删除音频片段",A::DeleteClip),action("重新定位音源…",A::RelinkClip),action("自动化曲线…",A::Automation),
-            action("导出 MIDI…",A::ScoreExport(verdant_exchange::Format::Midi)),action("导出 UST…",A::ScoreExport(verdant_exchange::Format::Ust)),action("导出 USTX…",A::ScoreExport(verdant_exchange::Format::Ustx)),action("导出 SVP…",A::ScoreExport(verdant_exchange::Format::Svp)),action("导出 VSQX…",A::ScoreExport(verdant_exchange::Format::Vsqx)),action("导出 VPR…",A::ScoreExport(verdant_exchange::Format::Vpr)),action("导出 UtaFormatix Data (.ufdata)…",A::ScoreExport(verdant_exchange::Format::Ufdata)),action("Vocaloid 歌手元数据…",A::VocaloidMetadata),action("查看导入 / 导出报告…",A::Report),
+            action("导出 MIDI…",A::ScoreExport(verdant_exchange::Format::Midi)),action("导出 UST…",A::ScoreExport(verdant_exchange::Format::Ust)),action("导出 USTX…",A::ScoreExport(verdant_exchange::Format::Ustx)),action("导出 SVP…",A::ScoreExport(verdant_exchange::Format::Svp)),action("导出 VSQX…",A::ScoreExport(verdant_exchange::Format::Vsqx)),action("导出 VPR…",A::ScoreExport(verdant_exchange::Format::Vpr)),action("导出 UtaFormatix Data (.ufdata)…",A::ScoreExport(verdant_exchange::Format::Ufdata)),action("查看导入 / 导出报告…",A::Report),
             action("音阶高亮设置…",A::Scale),action("其他轨道音符叠加开关",A::OtherTracks),action("三个参数面板开关",A::ThreeLanes),action("试听所选音高（参考正弦音）",A::AuditionSelection)];
         self.show_menu(window.mouse_position(),items,window,cx);
     }
@@ -108,7 +108,6 @@ impl Editor {
             A::RemoveAutomation(target)=>{let mut document=AutomationDocument::from_project(self.project()).map_err(|e|e.to_string())?;document.remove_lane(&target);self.commit_automation(document,cx)?;}
             A::ScoreExport(format)=>crate::files::export_score_dialog(self,format,window,cx),
             A::ExportScoreTrack(format,index)=>crate::files::export_score_with(self,format,Some(index),window,cx),
-            A::VocaloidMetadata=>{let voice=self.project().extensions.get("vocaloid_voice").map(|v|serde_json::from_value::<verdant_exchange::VocaloidVoice>(v.clone())).transpose().map_err(|e|e.to_string())?;let text=voice.map(|v|format!("{} | {} | {} | {}",v.comp_id,v.name,v.language_id,v.program)).unwrap_or_default();self.prompt_integration("Vocaloid：真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",IntegrationPrompt::Vocaloid,&text,window,cx);}
             A::Scale=>self.open_scale_dialog(window,cx),
             A::OtherTracks=>{self.integrations.other_tracks=!self.integrations.other_tracks;cx.notify();},A::ThreeLanes=>{self.add_lane(None,cx);},
             A::AuditionSelection=>{let pitch=self.selected_notes().first().map(|n|n.midi_note).ok_or("先选择音符")?;self.audition_pitch(pitch);}

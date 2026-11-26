@@ -158,7 +158,7 @@ fn native_note_table(ed: &mut Editor, entity: Entity<Editor>, handle: verdant_co
     div().id(SharedString::from(format!("note-table-{track}")))
         .aria_description("上下键选择，Shift 扩展选择，Home/End 跳转，Ctrl 方向键移动音符，Enter 编辑歌词。Tab 进入当前音符控制点，Shift Tab 返回轨道区。")
         .key_context("NoteTable")
-        .size_full().flex().flex_col().bg(ed.theme.surface)
+        .size_full().flex().flex_col().bg(ed.theme.surface).rounded_bl(crate::window_chrome::corner_radii(ed.window_chrome).bottom_left)
         .on_key_down(move |event, window, cx| crate::proto_collection::key(&key_handle, event, window, cx))
         .child(div().h(px(32.0)).px(px(12.0)).flex().items_center().gap(px(20.0)).text_sm()
             .child(format!("音符表 · {count} 个音符"))

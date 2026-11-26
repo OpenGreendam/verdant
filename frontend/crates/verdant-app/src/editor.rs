@@ -344,7 +344,6 @@ pub struct Editor {
     /// Active pointer-mode for curve lanes (pencil/line/smooth/eraser).
     pub lane_tool: LaneTool,
     pub bottom: Bottom,
-    pub show_inspector: bool,
     /// Current window-width class (updated every render).
     pub width_class: crate::ui_controls::WidthClass,
     /// The side panel open as a drawer while panels are not docked.
@@ -590,7 +589,6 @@ impl Editor {
             tool: Tool::Pointer,
             lane_tool: LaneTool::default(),
             bottom: Bottom::Editor,
-            show_inspector: true,
             width_class: Default::default(),
             drawer: None,
             // Touch layout: a saved choice, or VERDANT_TOUCH=1 for tablets and
@@ -1705,9 +1703,7 @@ impl Editor {
             }
             MenuAction::ShowDisclosuresWindow => crate::disclosures::open(cx),
             MenuAction::OpenMenu(menu) => self.open_top_menu(menu, window.mouse_position(), window, cx),
-            MenuAction::ShowProperties => {
-                if !self.left_panel_visible() { self.toggle_left_panel(cx); }
-            }
+            MenuAction::ShowProperties => self.open_right_dock(crate::ui_controls::RightDockTab::VoiceTimbre, cx),
             MenuAction::ToggleFollow => crate::clock::toggle_follow(self, cx),
             MenuAction::ShowBottom(bottom) => self.show_bottom(bottom, window, cx),
             MenuAction::Run(command) => crate::generated::controls::dispatch(self, command, crate::generated::controls::CommandArg::None, window, cx),
@@ -2747,22 +2743,19 @@ impl Editor {
         cx.notify();
     }
 
-    pub fn left_panel_visible(&self) -> bool {
-        if self.width_class.docks_panels() { self.show_inspector } else { self.drawer == Some(crate::ui_controls::Drawer::Left) }
-    }
-
     pub fn right_dock_visible(&self) -> bool {
         if self.width_class.docks_panels() { self.layout.show_right_dock } else { self.drawer == Some(crate::ui_controls::Drawer::Right) }
     }
 
-    pub fn toggle_left_panel(&mut self, cx: &mut Context<Self>) {
-        use crate::ui_controls::Drawer;
-        if self.width_class.docks_panels() {
-            self.show_inspector = !self.show_inspector;
+    /// The 属性 panel replaced the old left inspector, so its toggles land
+    /// here and must also reveal a hidden dock.
+    pub fn toggle_properties_panel(&mut self, cx: &mut Context<Self>) {
+        use crate::ui_controls::RightDockTab;
+        if self.right_dock_visible() {
+            self.toggle_right_panel(RightDockTab::VoiceTimbre, cx);
         } else {
-            self.drawer = (self.drawer != Some(Drawer::Left)).then_some(Drawer::Left);
+            self.open_right_dock(RightDockTab::VoiceTimbre, cx);
         }
-        cx.notify();
     }
 
     pub fn toggle_right_dock(&mut self, cx: &mut Context<Self>) {

@@ -79,7 +79,7 @@ impl WidthClass {
 
 /// A side panel shown as an overlay in narrow windows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Drawer { Left, Right }
+pub enum Drawer { Right }
 
 /// Toolbar control size: 28 px for a pointer, 36 px once touch input is seen
 /// (close to the 44 pt / 48 dp platform guidance within a dense toolbar).
@@ -791,7 +791,6 @@ pub fn show_grid_preset_menu(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SplitterKind {
-    InspectorWidth,
     RightDockWidth,
     ArrangeHeight,
     LaneHeight,
@@ -813,7 +812,6 @@ impl gpui::RenderOnce for Splitter {
         let ed = self.editor.read(cx);
         let defaults = LayoutPrefs::default();
         let (id, label, value, default, min, max, vertical, sign) = match kind {
-            SplitterKind::InspectorWidth => ("splitter-inspector", "左侧面板宽度", ed.layout.inspector_width, defaults.inspector_width, 260.0, 440.0, true, 1.0),
             SplitterKind::RightDockWidth => ("splitter-right-dock", "右侧面板宽度", ed.layout.right_dock_width, defaults.right_dock_width, 280.0, 480.0, true, -1.0),
             SplitterKind::ArrangeHeight => ("splitter-arrange", "编曲区高度", ed.layout.arrange_height, defaults.arrange_height, 92.0, 460.0, false, 1.0),
             SplitterKind::LaneHeight => ("splitter-lane", "参数轨高度", ed.layout.lane_height, defaults.lane_height, 112.0, 420.0, false, -1.0),
@@ -849,7 +847,6 @@ impl gpui::RenderOnce for Splitter {
                 if matches!(event.kind, EventKind::Preview | EventKind::Commit | EventKind::Cancel) {
                     let value = event.value as f32;
                     match kind {
-                        SplitterKind::InspectorWidth => ed.layout.inspector_width = value,
                         SplitterKind::RightDockWidth => ed.layout.right_dock_width = value,
                         SplitterKind::ArrangeHeight => ed.layout.arrange_height = value,
                         SplitterKind::LaneHeight => ed.layout.lane_height = value,
@@ -879,7 +876,6 @@ mod splitter_precision_tests {
     }
     fn value(layout: LayoutPrefs, kind: SplitterKind) -> f32 {
         match kind {
-            SplitterKind::InspectorWidth => layout.inspector_width,
             SplitterKind::RightDockWidth => layout.right_dock_width,
             SplitterKind::ArrangeHeight => layout.arrange_height,
             SplitterKind::LaneHeight => layout.lane_height,
@@ -888,7 +884,7 @@ mod splitter_precision_tests {
 
     #[gpui::test]
     fn native_splitters_keep_f32_previews_through_repaint_and_release(cx: &mut TestAppContext) {
-        for kind in [SplitterKind::InspectorWidth, SplitterKind::RightDockWidth,
+        for kind in [SplitterKind::RightDockWidth,
             SplitterKind::ArrangeHeight, SplitterKind::LaneHeight] {
             for fine in [false, true] {
                 let window = cx.open_window(size(px(400.0), px(240.0)), |window, cx| {
@@ -919,7 +915,7 @@ mod splitter_precision_tests {
                     }), cx);
                 }).unwrap();
                 crate::native_test_support::frames(window, cx);
-                let vertical = matches!(kind, SplitterKind::InspectorWidth | SplitterKind::RightDockWidth);
+                let vertical = matches!(kind, SplitterKind::RightDockWidth);
                 let sign = if matches!(kind, SplitterKind::RightDockWidth | SplitterKind::LaneHeight) { -1.0 } else { 1.0 };
                 let mut last = start;
                 let mut expected = initial as f32;

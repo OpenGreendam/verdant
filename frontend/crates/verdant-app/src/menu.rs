@@ -196,7 +196,6 @@ pub(crate) fn file_menu_items(prefs: &crate::files::Prefs) -> Vec<MenuItem> {
             MenuItem::file(format!("导出成 {name}…"), FileAction::Export(format))).collect()),
         MenuItem::action("导出 WAV（含插件）…", MenuAction::Workflow(W::ExportSettings)).with_hint("Ctrl+Alt+E"),
         MenuItem::action("导出 Verdant 工程副本 (.verp)…", MenuAction::ExportProject).with_hint("Ctrl+Shift+E"),
-        MenuItem::action("Vocaloid 歌手元数据…", MenuAction::Workflow(W::Integration(I::VocaloidMetadata))),
         MenuItem::action("导入 / 导出报告…", MenuAction::Workflow(W::Integration(I::Report))),
     ]
 }
@@ -606,7 +605,7 @@ impl Editor {
             MenuItem::boolean_command("当前轨道自动化泳道", CommandId::ToggleTrackAutomation, CommandArg::Track(track), auto_on).with_hint("A"),
             MenuItem::boolean_command("主总线自动化泳道", CommandId::ToggleMasterAutomation, CommandArg::None, self.automation_ui.show_master),
             MenuItem::separator(),
-            MenuItem::submenu("音符组 (Part)", vec![
+            MenuItem::submenu("音符组", vec![
                 MenuItem::action("从选中音符创建音符组", MenuAction::Workflow(A::CreatePart)).with_hint("Ctrl+G").enabled(!self.session.selection.is_empty()),
                 MenuItem::action("音符组名称…", MenuAction::Workflow(A::RenamePart)).enabled(part),
                 MenuItem::action("在播放头分割音符组", MenuAction::Workflow(A::SplitPart(tick))).enabled(part),
@@ -696,7 +695,6 @@ impl Editor {
             MenuItem::boolean_command("循环播放", CommandId::ToggleLoop, CommandArg::None, pb.looping),
             MenuItem::action("以选中音符设为循环范围", MenuAction::Workflow(A::RepeatSelection)).enabled(!self.session.selection.is_empty()),
             MenuItem::boolean_command("节拍器", CommandId::ToggleMetronome, CommandArg::None, pb.metronome),
-            MenuItem::boolean("离线导出包含节拍器", MenuBoolean::ExportClick, pb.export_click),
             MenuItem::action("当前位置速度 (BPM)…", MenuAction::Workflow(A::EditTempo(tick))),
             MenuItem::action("当前位置拍号…", MenuAction::Workflow(A::EditMeter(tick))),
             MenuItem::separator(),
@@ -705,10 +703,6 @@ impl Editor {
                 MenuItem::action("完成并写入录音", MenuAction::Workflow(A::Integration(I::FinishRecording))).enabled(recording),
                 MenuItem::action("取消录音", MenuAction::Workflow(A::Integration(I::CancelRecording))).enabled(recording),
             ]),
-            MenuItem::separator(),
-            MenuItem::header("帮助"),
-            MenuItem::action("键盘快捷键…", MenuAction::ShowShortcutsWindow).with_hint("F1"),
-            MenuItem::action("开源软件与研究引用…", MenuAction::ShowDisclosuresWindow).with_hint("Shift+F1"),
         ]
     }
 }
@@ -918,8 +912,24 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, outside: Option<&Open
                 .child(div().flex_1().truncate().child(item.label.clone()))
                 .when(submenu || !item.hint.is_empty(), |d| d.child(div().ml(px(12.0)).flex_none().text_xs().text_color(th.text_secondary)
                     .child(if submenu && item.hint.is_empty() { "›".into() } else { item.hint.clone() })))
-                .on_mouse_move(move |_, window, cx| {
-                    crate::proto_collection::call(&hover, "selectIndex", vec![i.into(), false.into(), hover_revision.clone().into()], window, cx);
+                .on_mouse_move({
+                    // Like GTK menus, resting on a submenu row opens it and
+                    // resting on another row closes an open sibling. Expansion
+                    // toggles through `choose`, so each rendered row asks at
+                    // most once before the next frame reflects the change.
+                    let open_sibling = menu.expanded.filter(|open| *open != i);
+                    let wants_open = submenu && enabled && !expanded;
+                    let asked = std::rc::Rc::new(std::cell::Cell::new(false));
+                    move |_, window, cx| {
+                        crate::proto_collection::call(&hover, "selectIndex", vec![i.into(), false.into(), hover_revision.clone().into()], window, cx);
+                        if asked.replace(true) { return; }
+                        if let Some(open) = open_sibling {
+                            crate::proto_collection::call(&hover, "choose", vec![open.into(), false.into(), hover_revision.clone().into()], window, cx);
+                        }
+                        if wants_open {
+                            crate::proto_collection::call(&hover, "choose", vec![i.into(), false.into(), hover_revision.clone().into()], window, cx);
+                        }
+                    }
                 })
                 .on_click(move |event, window, cx| {
                     let (method, value) = if checked.is_some() { ("chooseSelection", event.selected()) } else { ("choose", false) };

@@ -426,7 +426,7 @@ pub fn export_score_with(ed:&mut Editor,format:verdant_exchange::Format,track:Op
     if format==verdant_exchange::Format::Ust&&options.track.is_none(){options.track=ed.track_index(&ed.session.track);}
     if let Some(value)=project.extensions.get("vocaloid_voice"){match serde_json::from_value(value.clone()){Ok(voice)=>options.vocaloid_voice=Some(voice),Err(error)=>{ed.notice(format!("Vocaloid 元数据无效：{error}"));cx.notify();return;}}}
     if format==verdant_exchange::Format::Vsqx&&options.vocaloid_voice.is_none()&&!has_vsqx_voice_table(&project){
-        ed.notice("VSQX 需要真实歌手元数据：请先填写 Vocaloid 歌手元数据后再导出");
+        ed.notice("VSQX 需要真实的 Vocaloid 歌手元数据，填写后即可导出");
         ed.prompt_text("Vocaloid 歌手元数据：真实 16 字符 compID | 歌手名称 | 语言 0..127 | 程序 0..127",crate::editor::PromptPurpose::Integration(crate::editor::integrations::IntegrationPrompt::Vocaloid),"",window,cx);cx.notify();return;
     }
     // Keep the selected UST lane and admitted voice metadata across the options
@@ -484,7 +484,7 @@ fn score_format_name(format:verdant_exchange::Format)->&'static str{
 /// value must fit SMF's metrical division; zero/SMPTE values are never clamped.
 fn resolve_score_options(format:verdant_exchange::Format,mut options:verdant_exchange::ExportOptions,ppq:&str)->Result<verdant_exchange::ExportOptions,String>{
     if format==verdant_exchange::Format::Vsqx&&!options.preserve_extensions&&options.vocaloid_voice.is_none(){
-        return Err("VSQX 需要真实歌手元数据：请保留来源扩展中的歌手表，或取消后填写 Vocaloid 歌手元数据".into());
+        return Err("VSQX 需要真实歌手元数据：请保留来源扩展中的歌手表，或重新导出 VSQX 时按提示填写歌手元数据".into());
     }
     if format==verdant_exchange::Format::Midi{
         options.midi_ppq=if ppq.trim().is_empty(){None}else{
