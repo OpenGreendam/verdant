@@ -1,29 +1,65 @@
-name: Windows offline first use
-on: workflow_dispatch
+name: Windows native RC7 package
+run-name: RC7 Windows ${{ inputs.commit }}
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Merged Verdant source commit
+        required: true
+        type: string
+      tree:
+        description: Expected source tree
+        required: true
+        type: string
+      epoch:
+        description: Committer Unix timestamp
+        required: true
+        type: string
 permissions:
   contents: read
-  actions: read
 jobs:
-  offline:
+  package:
     runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      RELEASE_COMMIT: ${{ inputs.commit }}
+      RELEASE_TREE: ${{ inputs.tree }}
+      RELEASE_EPOCH: ${{ inputs.epoch }}
     steps:
-      - run: git config --global core.autocrlf false
+      - name: Preserve Git object bytes
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.commit }}
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: helpers
           sparse-checkout: ci-rc6
           persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          artifact-ids: 15121876945
-          run-id: 45826238304
-          path: package
-          merge-multiple: true
-      - name: Verify real network isolation and first synthesis
-        run: ./ci-rc6/offline.ps1
-      - uses: actions/upload-artifact@v4
+      - name: Download official preceding release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v0.1.0-rc.6 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc6"
+      - name: Compile native programs, run Windows regressions and guard archive
+        run: ./helpers/ci-rc6/package.ps1
+      - name: Verify first use with outbound firewall blocks
+        run: ./helpers/ci-rc6/offline.ps1
+      - name: Exercise archived desktop dropdown and capture its pressed state
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = (Resolve-Path 'extracted/verdant-0.1.0-windows-x86_64/bin/verdant-gui.exe').Path
+          $build = Get-Content -Raw evidence/windows-build.json | ConvertFrom-Json
+          if ((Get-FileHash $exe).Hash -ne $build.binaries.'verdant-gui') { throw 'Packaged GUI differs from build receipt' }
+          ./helpers/ci-rc6/native-menu-windows.ps1 -Exe $exe -OutputDir evidence/gui -Sticky
+      - name: Retain archive and native observations
         if: always()
+        id: upload
+        uses: actions/upload-artifact@v4
         with:
-          name: windows-offline-first-use
-          path: offline-evidence/
+          name: windows-rc7-native
+          path: evidence/
           if-no-files-found: error
+          compression-level: 0

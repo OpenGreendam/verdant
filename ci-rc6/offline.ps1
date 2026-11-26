@@ -1,15 +1,18 @@
 $ErrorActionPreference = 'Stop'
-$root = (New-Item -ItemType Directory offline-evidence).FullName
-function Save($name,$value) { ConvertTo-Json -InputObject $value -Depth 15 | Set-Content -Encoding utf8NoBOM "$root/$name.json" }
+$root = (Resolve-Path evidence).Path
+$network = (New-Item -ItemType Directory "$root/firewall").FullName
+function Save($name,$value) { ConvertTo-Json -InputObject $value -Depth 15 | Set-Content -Encoding utf8NoBOM "$network/$name.json" }
 function Hash($path) { (Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant() }
-$zip = (Get-Item package/dist/verdant-0.1.0-windows-x86_64.zip).FullName
-if ((Hash $zip) -ne 'ca3f6da947a0d85d8b0be4726d86a7e92968157723ba582725711ec004e7d668') { throw 'Incorrect package' }
+$packaged = Get-Content -Raw "$root/windows-result.json" | ConvertFrom-Json
+$build = Get-Content -Raw "$root/windows-build.json" | ConvertFrom-Json -AsHashtable
+$zip = (Get-Item "$root/dist/verdant-0.1.0-windows-x86_64.zip").FullName
+if ((Hash $zip) -ne $packaged.archive_sha256) { throw 'Incorrect package' }
 Expand-Archive $zip extracted
 $base=(Resolve-Path extracted/verdant-0.1.0-windows-x86_64).Path
 $manifest=Get-Content -Raw "$base/RELEASE-ASSETS.json" | ConvertFrom-Json
 $programs=@(Get-ChildItem $base -Recurse -File -Filter '*.exe')
-if ($manifest.source_offer.source_commit -cne '4fdcd984e08e845ac24a36f6d0763c805e4202b1' -or $manifest.programs.Count -ne 8) { throw 'Incorrect manifest' }
-foreach ($p in $manifest.programs) { if ((Hash "$base/$($p.path)") -cne $p.sha256 -or (Get-Item "$base/$($p.path)").FullName -notin $programs.FullName) { throw 'Program identity mismatch' } }
+if ($manifest.source_offer.source_commit -cne $env:RELEASE_COMMIT -or $manifest.target -cne 'windows-x86_64' -or $manifest.source_offer.source_selection_sha256 -cne $packaged.source_selection_sha256 -or $manifest.programs.Count -ne 8 -or $programs.Count -ne 8) { throw 'Incorrect manifest' }
+foreach ($p in $manifest.programs) { if ((Hash "$base/$($p.path)") -cne $p.sha256 -or $build.binaries[$p.name] -cne $p.sha256 -or (Get-Item "$base/$($p.path)").FullName -notin $programs.FullName) { throw 'Program identity mismatch' } }
 $control=(Get-Item "$env:SystemRoot/System32/curl.exe").FullName
 function Connect-Control {
     $result = & $control --disable --noproxy '*' --ipv4 --silent --show-error --output NUL --write-out '%{http_code}|%{remote_ip}' --connect-timeout 5 --max-time 10 https://api.github.com/ 2>&1
@@ -61,6 +64,9 @@ $env:VERDANT_USER_DATA_DIR = Join-Path $smoke 'data'
 $env:VERDANT_CACHE_DIR = Join-Path $smoke 'cache'
 New-Item -ItemType Directory -Path $env:VERDANT_STATE_DIR,$env:VERDANT_USER_DATA_DIR,$env:VERDANT_CACHE_DIR | Out-Null
 $registry = Join-Path $env:VERDANT_STATE_DIR 'voices.json'
+$freshDirs = @($env:VERDANT_STATE_DIR,$env:VERDANT_USER_DATA_DIR,$env:VERDANT_CACHE_DIR)
+foreach ($dir in $freshDirs) { if (@(Get-ChildItem -Force -LiteralPath $dir).Count) { throw "Initial directory is not empty: $dir" } }
+Save 'fresh-state' @{empty_directories=$freshDirs; registry=$registry; registry_absent=!(Test-Path $registry)}
 $project = Join-Path $smoke 'singing.verp'
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'windows-singing.verp') -Destination $project
 $fixtureSha = Hash $project
@@ -77,6 +83,8 @@ if (!$report.ok -or $caps.voices.default_voice -cne $voiceId -or !$caps.voices.v
 $render = Capture $cli @('render', 'singing.verp', '--output', $wav, '--no-effects', '--json')
 $render | Set-Content -Encoding utf8NoBOM -LiteralPath (Join-Path $root 'windows-render.json')
 $report = $render | ConvertFrom-Json
+& python "$PSScriptRoot/check-wave.py" $wav "$root/windows-wave.json"
+if ($LASTEXITCODE -ne 0) { throw 'Archived executable WAV sample verification failed' }
 if (!$report.ok -or $report.result.frames -ne 12000 -or $report.result.sample_rate -ne 48000 -or
     !$report.result.phrases -or @($report.result.phrases | Where-Object route -CNE 'verdant-voice').Count -ne 0 -or
     (Test-Path -LiteralPath $registry) -or (Hash $wav) -cne '052824eae685bdb9107b80df7838b0dd907e099220cb0db371b3306f677e702b') {

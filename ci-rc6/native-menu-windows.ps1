@@ -4,6 +4,7 @@ param(
     [int]$ProcessId = 0,
     [switch]$CaptureOnly,
     [switch]$RootOnly,
+    [switch]$Sticky,
     [string]$Menu,
     [string]$Row,
     [string]$Outside,
@@ -38,6 +39,8 @@ public static class VerdantMenuInput {
     [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
     [DllImport("user32.dll")] static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+
+    public static bool LeftButtonHeld() { return GetAsyncKeyState(1) < 0; }
 
     public static Rect Client(IntPtr hwnd) {
         IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
@@ -90,8 +93,8 @@ function Read-Coordinates([string]$Text, [int]$Count, [string]$Label) {
     return @($Text.Split(',') | ForEach-Object { [int]$_ })
 }
 
-if (!$CaptureOnly) { $menuPoint = Read-Coordinates $Menu 2 'Menu' }
-if (!$CaptureOnly -and !$RootOnly) {
+if (!$CaptureOnly -and !$Sticky) { $menuPoint = Read-Coordinates $Menu 2 'Menu' }
+if (!$CaptureOnly -and !$RootOnly -and !$Sticky) {
     $parentRow = Read-Coordinates $Row 4 'Row'
     $outsidePoint = Read-Coordinates $Outside 2 'Outside'
     if ($parentRow[2] -lt 40 -or $parentRow[3] -lt 12) { throw 'Row is too small for distinct pointer samples' }
@@ -155,6 +158,75 @@ function Click-Point([int[]]$At) {
     [VerdantMenuInput]::Click($hwnd, $x, $y)
 }
 
+function Find-PrimaryMenu([string]$ImagePath) {
+    # Match three short, aligned horizontal strokes in the native header capture.
+    $image = [Drawing.Bitmap]::new($ImagePath)
+    try {
+        $rows = @{}
+        for ($y = 4; $y -lt [Math]::Min(72,$image.Height); $y++) {
+            $start = -1
+            for ($x = [int]($image.Width / 2); $x -lt $image.Width; $x++) {
+                $p = $image.GetPixel($x,$y)
+                $ink = $p.R -lt 155 -and $p.G -lt 155 -and $p.B -lt 155
+                if ($ink -and $start -lt 0) { $start = $x }
+                if (!$ink -and $start -ge 0) {
+                    $width = $x - $start
+                    if ($width -ge 9 -and $width -le 19) {
+                        $key = "$start,$width"
+                        if (!$rows.ContainsKey($key)) { $rows[$key] = @() }
+                        $rows[$key] += $y
+                    }
+                    $start = -1
+                }
+            }
+        }
+        $matchesFound = @()
+        foreach ($key in $rows.Keys) {
+            $strokes = @()
+            $last = -10
+            foreach ($row in $rows[$key]) {
+                if ($row -gt ($last + 1)) { $strokes += $row }
+                $last = $row
+            }
+            if ($strokes.Count -ne 3) { continue }
+            $first = $strokes[1] - $strokes[0]
+            $second = $strokes[2] - $strokes[1]
+            if ($first -lt 3 -or $first -gt 8 -or [Math]::Abs($first-$second) -gt 1) { continue }
+            $left,$width = @($key.Split(',') | ForEach-Object { [int]$_ })
+            $matchesFound += ,@(($left + [int]($width/2)), [int]$strokes[1])
+        }
+        if ($matchesFound.Count -ne 1) { throw "Primary menu glyph matched $($matchesFound.Count) native header locations" }
+        return $matchesFound[0]
+    } finally { $image.Dispose() }
+}
+
+function Measure-Sticky([int[]]$Anchor) {
+    $before = [Drawing.Bitmap]::new((Join-Path $output '00-initial.png'))
+    $open = [Drawing.Bitmap]::new((Join-Path $output '01-released-away.png'))
+    $closed = [Drawing.Bitmap]::new((Join-Path $output '02-dismissed-away.png'))
+    try {
+        $counts = @{}
+        $ax,$ay = $Anchor
+        $regions = @{button=@(($ax-13),($ay-13),($ax+14),($ay+14));
+            panel=@([Math]::Max(0,$ax-300),($ay+35),[Math]::Min($open.Width,$ax+180),[Math]::Min($open.Height,$ay+300))}
+        foreach ($name in $regions.Keys) {
+            $x1,$y1,$x2,$y2 = $regions[$name]
+            $changed = 0; $restored = 0
+            for ($y=$y1; $y -lt $y2; $y++) {
+                for ($x=$x1; $x -lt $x2; $x++) {
+                    $value = $before.GetPixel($x,$y).ToArgb()
+                    if ($open.GetPixel($x,$y).ToArgb() -ne $value) {
+                        $changed++
+                        if ($closed.GetPixel($x,$y).ToArgb() -eq $value) { $restored++ }
+                    }
+                }
+            }
+            $counts[$name] = @{area=($x2-$x1)*($y2-$y1); changed=$changed; restored=$restored}
+        }
+        return $counts
+    } finally { $before.Dispose(); $open.Dispose(); $closed.Dispose() }
+}
+
 function Open-Root([string]$Name) {
     Click-Point $menuPoint
     Save-Frame $Name @{click_client=$menuPoint}
@@ -204,7 +276,28 @@ try {
     $receipt.window = $hwnd.ToInt64()
     $receipt.dpi = [VerdantMenuInput]::GetDpiForWindow($hwnd)
     $receipt.client_geometry = $initial
+    if ($Sticky) {
+        $receipt.acceptance = @('Primary popover is visible while the released pointer is elsewhere', 'Its owner shows a sustained pressed fill and returns to its original state after Escape')
+        Guard-Window
+        $parkX = $initial.Left + 60
+        $parkY = $initial.Bottom - 70
+        [VerdantMenuInput]::Move($hwnd,$parkX,$parkY)
+    }
     Save-Frame '00-initial' $null
+    if ($Sticky) {
+        $menuPoint = Find-PrimaryMenu (Join-Path $output '00-initial.png')
+        Click-Point $menuPoint
+        [VerdantMenuInput]::Move($hwnd,$parkX,$parkY)
+        if ([VerdantMenuInput]::LeftButtonHeld()) { throw 'Pointer is still pressed' }
+        Save-Frame '01-released-away' @{click_client=$menuPoint; left_button_held=$false; pointer_screen=@($parkX,$parkY)}
+        Send-MenuKey Escape '02-dismissed-away'
+        $gui.Refresh()
+        if ($gui.HasExited -or !$gui.Responding) { throw 'Desktop became unresponsive' }
+        $receipt.regions = Measure-Sticky $menuPoint
+        if ($receipt.regions.panel.restored -lt 1000 -or $receipt.regions.button.restored -lt 250) { throw 'Native frames do not establish sustained menu and owner fill' }
+        $receipt.status = 'verified-sticky-after-release'
+        return
+    }
     if ($CaptureOnly) { $receipt.status = 'calibration-captured'; return }
     Open-Root '01-root'
     if ($RootOnly) {
