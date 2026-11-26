@@ -679,6 +679,7 @@ impl Editor {
             MenuItem::action("添加参数泳道", MenuAction::Workflow(A::Integration(I::ThreeLanes))),
             MenuItem::boolean_command("叠加其他轨道重影音符", CommandId::ToggleOtherTracks, CommandArg::None, self.integrations.other_tracks),
             MenuItem::action("音阶与调式高亮…", MenuAction::Workflow(A::Integration(I::Scale))),
+            MenuItem::action("触控布局（平板）", MenuAction::ToggleTouchLayout).checked(self.touch_ui),
             MenuItem::separator(),
             MenuItem::header("走带"),
             MenuItem::boolean_command("循环播放", CommandId::ToggleLoop, CommandArg::None, pb.looping),

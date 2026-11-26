@@ -133,7 +133,7 @@ pub fn playback_layer(editor: Entity<Editor>, touch_seen: bool) -> impl IntoElem
     }, move |_, (mut elements, editor_x, arrange_x, playhead), window, cx| {
         // The first touch anywhere switches the toolbar to touch-sized targets.
         if !touch_seen {
-            let mark = |editor: &Entity<Editor>, cx: &mut App| editor.update(cx, |ed, cx| if !ed.touch_ui { ed.touch_ui = true; cx.notify(); });
+            let mark = |editor: &Entity<Editor>, cx: &mut App| editor.update(cx, |ed, cx| if !ed.touch_ui && !ed.prefs.extra.contains_key("touch_layout") { ed.touch_ui = true; cx.notify(); });
             let editor = touch_editor.clone();
             window.on_mouse_event(move |_: &gpui::TouchDragEvent, phase, _, cx| if phase == gpui::DispatchPhase::Capture { mark(&editor, cx) });
             let editor = touch_editor.clone();

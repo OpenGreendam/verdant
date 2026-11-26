@@ -495,7 +495,11 @@ impl Editor {
             return div().into_any_element();
         };
         let caps = self.scheduler.capabilities.as_ref();
-        let selection = self.selection_inspector(track, cx.entity(), cx);
+        // Like Synthesizer V, selection properties live in the right inspector
+        // whenever it shows the 属性 page; the left panel only carries them
+        // while that page is hidden, so they are never out of reach.
+        let props_in_dock = self.right_dock_visible() && self.layout.right_dock_tab == RightDockTab::VoiceTimbre;
+        let selection = if props_in_dock { None } else { self.selection_inspector(track, cx.entity(), cx) };
         let rename_id = track.id.clone();
         let auto_open = self.automation_ui.expanded_tracks.contains(&track.id);
 
@@ -611,7 +615,7 @@ impl Editor {
         // A view switcher in the pane's own header (AdwViewSwitcher), so the
         // pane needs no separate icon column.
         let tabs = [
-            (RightDockTab::VoiceTimbre, "sparkles", "声线"),
+            (RightDockTab::VoiceTimbre, "sliders-horizontal", "属性"),
             (RightDockTab::Dictionary, "languages", "词典"),
             (RightDockTab::RenderInserts, "cpu", "诊断"),
             (RightDockTab::HistorySystem, "history", "历史"),
@@ -886,7 +890,12 @@ impl Editor {
                 output_transients.is_some(), cx));
 
 
-        div().flex().flex_col().child(engine_sec)
+        // Selection first (SV's Note Properties), then project-wide synthesis.
+        let selection = project.track(&self.session.track).and_then(|track| self.selection_inspector(track, cx.entity(), cx));
+        let selection = selection.unwrap_or_else(|| div().child(section("选区", th).child(
+            div().py(px(6.0)).text_sm().text_color(th.text_secondary)
+                .child("选中音符或音频片段后，在这里编辑歌词、读音、音高、时值、颤音与音素。"))));
+        div().flex().flex_col().child(selection).child(engine_sec)
     }
 
     fn right_dock_dictionary_tab(&self, project: &verdant_domain::Project, cx: &mut Context<Self>) -> Div {
@@ -1912,6 +1921,10 @@ impl Render for Editor {
             self.window_chrome = chrome;
             cx.notify();
         }
+        // Touch layout scales every rem-sized control (≈ +12 %) toward 44 px
+        // touch targets; px-sized canvases keep their musical geometry.
+        let rem = px(crate::ui_controls::rem_size(self.touch_ui));
+        if window.rem_size() != rem { window.set_rem_size(rem); }
         let frame = crate::window_chrome::client_frame(chrome, th_for_frame(self), window);
         let class = WidthClass::of(window.viewport_size().width.as_f32());
         if class != self.width_class {
