@@ -63,6 +63,19 @@ type Assistive = Rc<RefCell<dyn FnMut(Option<&gpui::accesskit::ActionData>, &mut
 
 thread_local! {
     static ACTIVATION_ORIGIN: RefCell<Option<(gpui::AnyWindowHandle, OwnerRef)>> = const { RefCell::new(None) };
+    /// The Action whose popover menu is open, by owner address. Like a GTK
+    /// MenuButton, it stays pushed down until the menu closes.
+    static POPUP_OWNER: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+}
+
+/// Records which Action anchors the open menu; the editor sets it on every
+/// render from its menu state, before child views render their Actions.
+pub(crate) fn set_popup_owner(owner: Option<usize>) {
+    POPUP_OWNER.with(|current| current.set(owner));
+}
+
+fn is_popup_owner(owner: &OwnerRef) -> bool {
+    POPUP_OWNER.with(|current| current.get() == Some(Rc::as_ptr(owner) as *const () as usize))
 }
 
 /// Geometry follows the accepted Action, including keyboard and assistive
@@ -172,12 +185,14 @@ struct Binding {
     /// `pressed`. It lives here because this entity re-renders on every root
     /// change; the parent view that built the shell may be cached.
     pressed: Option<StyleRefinement>,
+    /// This Action anchors the open popover menu.
+    popup_open: bool,
 }
 
 impl Render for Binding {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let down = self.pressed.is_some()
-            && self.root.read(cx).handle().state("pressed").ok().and_then(|value| value.as_bool()).unwrap_or(false);
+        let down = self.pressed.is_some() && (self.popup_open
+            || self.root.read(cx).handle().state("pressed").ok().and_then(|value| value.as_bool()).unwrap_or(false));
         let mut layer = div().absolute().top_0().left_0().size_full();
         if let (true, Some(pressed)) = (down, &self.pressed) { layer.style().refine(pressed); }
         div().absolute().top_0().left_0().size_full().child(layer).child(self.root.clone())
@@ -305,7 +320,7 @@ impl RenderOnce for Action {
                 cx.notify();
             });
             Binding { root, clicks: Vec::new(), assistive: None, navigation: None, context_menu: None, submit: None, authority: initial_authority, props: initial_props,
-                revision: 0, pending: Vec::new(), _changes: changes, pressed: None }
+                revision: 0, pending: Vec::new(), _changes: changes, pressed: None, popup_open: false }
         });
         let root = state.update(cx, |binding, cx| {
             binding.clicks = self.clicks; binding.assistive = self.assistive; binding.navigation = self.navigation; binding.context_menu = self.context_menu; binding.submit = self.submit;
@@ -337,7 +352,12 @@ impl RenderOnce for Action {
             // The layer shares the shell's corners so it fills the same shape.
             pressed.corner_radii = self.shell.style().corner_radii.clone();
         }
-        state.update(cx, |binding, cx| { if binding.pressed != pressed { binding.pressed = pressed; cx.notify(); } });
+        state.update(cx, |binding, cx| {
+            let popup_open = is_popup_owner(&binding.root.read(cx).handle().owner);
+            if binding.pressed != pressed || binding.popup_open != popup_open {
+                binding.pressed = pressed; binding.popup_open = popup_open; cx.notify();
+            }
+        });
         let _ = &root;
         let layer_view = state.clone();
         // Only the generated root registers its focus handle. Registering it

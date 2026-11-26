@@ -267,6 +267,16 @@ enum MenuAnchor {
     Item { viewport: gpui::ScrollHandle, index: usize },
 }
 
+impl OpenMenu {
+    /// The address of the Action this menu drops down from, if any.
+    pub(crate) fn anchor_owner(&self) -> Option<usize> {
+        match &self.origin {
+            MenuAnchor::Control { owner, .. } => Some(owner.as_ptr() as *const () as usize),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Debug for MenuAnchor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -901,6 +911,7 @@ fn native_context_menu_layer(ed: &Editor, menu: &OpenMenu, outside: Option<&Open
                 .when(submenu, |action| action.aria_expanded(expanded))
                 .when(i == selected && enabled, |d| d.aria_active_descendant().bg(th.hover))
                 .h(px(26.0)).px(px(10.0)).flex().items_center().rounded(px(6.0))
+                .when(enabled, |d| d.active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover))))
                 .text_color(if enabled { th.text } else { th.text_tertiary })
                 .when(checks, |d| d.child(div().w(px(18.0)).flex_none().text_color(th.accent).child(if checked == Some(true) { "✓" } else { "" })))
                 .child(div().flex_1().truncate().child(item.label.clone()))

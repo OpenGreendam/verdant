@@ -1927,6 +1927,8 @@ impl Render for Editor {
         }
         // Touch layout scales every rem-sized control (≈ +12 %) toward 44 px
         // touch targets; px-sized canvases keep their musical geometry.
+        crate::proto_controls::set_popup_owner(self.menu.as_ref()
+            .filter(|menu| menu.window == window.window_handle()).and_then(|menu| menu.anchor_owner()));
         let rem = px(crate::ui_controls::rem_size(self.touch_ui));
         if window.rem_size() != rem { window.set_rem_size(rem); }
         let class = WidthClass::of(window.viewport_size().width.as_f32());
