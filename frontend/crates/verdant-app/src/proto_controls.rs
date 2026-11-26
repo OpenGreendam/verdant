@@ -61,6 +61,27 @@ type Submit = Rc<dyn Fn(&mut Window, &mut App)>;
 type Navigation = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 type Assistive = Rc<RefCell<dyn FnMut(Option<&gpui::accesskit::ActionData>, &mut Window, &mut App)>>;
 
+thread_local! {
+    static ACTIVATION_ORIGIN: RefCell<Option<(gpui::AnyWindowHandle, OwnerRef)>> = const { RefCell::new(None) };
+}
+
+/// Geometry follows the accepted Action, including keyboard and assistive
+/// commands whose application callback opens a menu indirectly.
+pub(crate) fn activation_origin(window: &Window) -> Option<OwnerRef> {
+    ACTIVATION_ORIGIN.with(|origin| origin.borrow().as_ref()
+        .filter(|(host, _)| *host == window.window_handle()).map(|(_, owner)| owner.clone()))
+}
+
+struct ActivationOrigin(Option<(gpui::AnyWindowHandle, OwnerRef)>);
+impl ActivationOrigin {
+    fn enter(window: &Window, owner: OwnerRef) -> Self {
+        Self(ACTIVATION_ORIGIN.with(|origin| origin.replace(Some((window.window_handle(), owner)))))
+    }
+}
+impl Drop for ActivationOrigin {
+    fn drop(&mut self) { ACTIVATION_ORIGIN.with(|origin| { origin.replace(self.0.take()); }); }
+}
+
 #[derive(IntoElement)]
 pub(crate) struct Action {
     shell: Stateful<Div>, children: Vec<gpui::AnyElement>, label: SharedString, description: SharedString,
@@ -199,6 +220,7 @@ fn execute(delivery: PendingDelivery, window: &mut Window, cx: &mut App) {
                 if let Some(context) = &delivery.context_menu { context(&activation, window, cx); }
                 continue;
             }
+            let _origin = ActivationOrigin::enter(window, delivery.owner.clone());
             if activation.is_assistive() && let Some(assistive) = &delivery.assistive {
                 assistive.borrow_mut()(None, window, cx);
             } else if !delivery.clicks.is_empty() {

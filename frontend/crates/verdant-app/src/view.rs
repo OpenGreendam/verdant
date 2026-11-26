@@ -465,8 +465,7 @@ impl Editor {
                 .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
                 .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
                 .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, w, cx| {
-                    // The popover's tail points at the button's lower edge.
-                    ed.main_menu(gpui::point(ev.position().x, px((bar_h + btn) / 2.0 + 2.0)), w, cx)
+                    ed.main_menu(ev.position(), w, cx)
                 })))
             .child(command_icon(self, Cmd::ToggleRightDock, "panel-right", "属性面板", "right-dock-toggle", self.right_dock_visible(), cx))
             .children(captions)
@@ -1927,7 +1926,7 @@ impl Render for Editor {
         let modal = modal_dialog_layer(self, &entity, cx);
         let text_prompt = crate::lyric_view::prompt_overlay(self, &entity, cx);
         let menu = self.menu.as_ref().filter(|menu| menu.window == window.window_handle())
-            .map(|menu| gpui::deferred(crate::menu::context_menu_layer(self, menu, window, cx)).into_any_element());
+            .map(|menu| crate::menu::context_menu_layer(self, menu, window, cx).into_any_element());
         crate::window_chrome::track_title_drag(div().id("verdant"), cx)
             .relative()
             .size_full()

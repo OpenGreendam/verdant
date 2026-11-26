@@ -9,16 +9,20 @@ use verdant_collection_control::native::gpui_native_owner::NativeSnapshot;
 
 pub(crate) type Draw = Rc<dyn Fn(&CollectionControlHandle, &gpui::FocusHandle, Option<EngineBinding>, &mut Window, &mut App) -> gpui::AnyElement>;
 pub(crate) type Sink = Rc<dyn Fn(&str, &Value, &mut Window, &mut App)>;
+type KeyFallback = Rc<dyn Fn(&gpui::KeyDownEvent, &mut Window, &mut App)>;
 
 #[derive(IntoElement)]
 pub(crate) struct Collection {
-    id: ElementId, props: Value, items: Vec<u8>, draw: Draw, sink: Sink, engine: Option<Engine>,
+    id: ElementId, props: Value, items: Vec<u8>, draw: Draw, sink: Sink, engine: Option<Engine>, fallback: Option<KeyFallback>,
 }
 pub(crate) fn collection(id: impl Into<ElementId>, props: Value, items: Vec<u8>, draw: Draw, sink: Sink) -> Collection {
-    Collection { id: id.into(), props, items, draw, sink, engine:None }
+    Collection { id: id.into(), props, items, draw, sink, engine:None, fallback: None }
 }
 
-impl Collection { pub(crate) fn scroll_engine(mut self, engine: Engine) -> Self { self.engine = Some(engine); self } }
+impl Collection {
+    pub(crate) fn scroll_engine(mut self, engine: Engine) -> Self { self.engine = Some(engine); self }
+    pub(crate) fn unhandled_key(mut self, fallback: KeyFallback) -> Self { self.fallback = Some(fallback); self }
+}
 
 pub(crate) fn call(handle: &CollectionControlHandle, method: &str, args: Vec<Value>, window: &mut Window, cx: &mut App) {
     if let Err(error) = handle.call(method, args, window, cx) { eprintln!("compiled collection {method}: {error:?}"); }
@@ -95,7 +99,11 @@ impl RenderOnce for Collection {
         });
         let menu = props_mode(&root, cx);
         let keyboard = root.read(cx).handle();
-        let body = gpui::div().on_key_down(move |event, window, cx| key(&keyboard, event, window, cx)).child(root);
+        let fallback = self.fallback;
+        let body = gpui::div().on_key_down(move |event, window, cx| {
+            key(&keyboard, event, window, cx);
+            if !window.default_prevented() && let Some(fallback) = &fallback { fallback(event, window, cx); }
+        }).child(root);
         if menu { body.absolute().inset_0().into_any_element() }
         else { body.size_full().min_h_0().into_any_element() }
     }

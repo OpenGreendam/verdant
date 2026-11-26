@@ -2,11 +2,11 @@
 //! Payload transport and the drag image are GPUI mechanisms; lifecycle,
 //! admission, cancellation, focus and accessible activation belong to source.
 use std::{cell::{Cell,RefCell},rc::Rc};
-use gpui::{AnyElement,App,AppContext,Context,Entity,IntoElement,Render,RenderOnce,SharedString,Subscription,Window};
+use gpui::{AnyElement,App,AppContext,Bounds,Context,Entity,IntoElement,Pixels,Render,RenderOnce,SharedString,Subscription,Window};
 use serde_json::{Value,json};
 use verdant_drag_source::{DragSource,DragSourceHandle,native::gpui_native_owner::NativeSnapshot};
 
-type Choose=Rc<dyn Fn(gpui::Point<gpui::Pixels>,&mut Window,&mut App)>;
+type Choose=Rc<dyn Fn(Bounds<Pixels>,&mut Window,&mut App)>;
 type Draw=Rc<dyn Fn(Input)->AnyElement>;
 #[derive(Clone)]
 pub(crate) struct Input {
@@ -32,7 +32,7 @@ impl Input {
                         && owner.window_id==Some(window.window_handle().window_id())
                         && owner.props.get("disabled").and_then(Value::as_bool)!=Some(true)
                         && owner.props.get("revision").and_then(Value::as_str)==payload.get("revision").and_then(Value::as_str))
-                        .then(||owner.bounds.map(|bounds|bounds.bottom_left())).flatten()
+                        .then_some(owner.bounds).flatten()
                 };
                 if let Some(anchor)=anchor {
                     let callback=self.choose.borrow().clone();callback(anchor,window,cx);
@@ -82,7 +82,7 @@ impl Lease {
 #[derive(IntoElement)]
 pub(crate) struct Source {key:String,label:String,revision:String,disabled:bool,draw:Draw,choose:Choose}
 pub(crate) fn source(key:impl Into<String>,label:impl Into<String>,revision:impl Into<String>,disabled:bool,
-    draw:impl Fn(Input)->AnyElement+'static,choose:impl Fn(gpui::Point<gpui::Pixels>,&mut Window,&mut App)+'static)->Source {
+    draw:impl Fn(Input)->AnyElement+'static,choose:impl Fn(Bounds<Pixels>,&mut Window,&mut App)+'static)->Source {
     Source{key:key.into(),label:label.into(),revision:revision.into(),disabled,draw:Rc::new(draw),choose:Rc::new(choose)}
 }
 struct Drawing { input:Input,draw:Draw }
@@ -143,10 +143,10 @@ impl RenderOnce for Source {
 #[cfg(test)]
 mod chooser_anchor_tests {
     use super::*;
-    use gpui::{prelude::*, point, px, size, MouseMoveEvent, PlatformInput, Point, Pixels, TestAppContext};
+    use gpui::{prelude::*, point, px, size, MouseMoveEvent, PlatformInput, TestAppContext};
     use verdant_drag_source::native::gpui_native_owner::{all_owners, dispatch_accessibility_action, drive_owners};
 
-    struct Harness { anchors: Rc<RefCell<Vec<Point<Pixels>>>> }
+    struct Harness { anchors: Rc<RefCell<Vec<Bounds<Pixels>>>> }
     impl Render for Harness {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             let anchors = self.anchors.clone();
@@ -184,7 +184,7 @@ mod chooser_anchor_tests {
             assert!(!bounds.contains(&mouse));
             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: mouse, ..Default::default() }), cx);
             window.focus(&focus, cx);
-            bounds.bottom_left()
+            bounds
         }).unwrap();
         cx.simulate_keystrokes(window.into(), "enter");
         crate::native_test_support::frames(window, cx);
