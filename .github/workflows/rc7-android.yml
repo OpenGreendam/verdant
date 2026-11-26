@@ -30,8 +30,15 @@ jobs:
           rustup target add aarch64-linux-android
           rustc -Vv
           cargo -V
-          sdkmanager 'ndk;27.2.12479018' 'build-tools;35.0.0' 'platforms;android-35'
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt2"
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          ndk_zip="$RUNNER_TEMP/android-ndk-r27c-linux.zip"
+          curl -fL --retry 3 https://dl.google.com/android/repository/android-ndk-r27c-linux.zip -o "$ndk_zip"
+          echo "090e8083a715fdb1a3e402d0763c388abb03fb4e  $ndk_zip" | sha1sum -c -
+          unzip -q "$ndk_zip" -d "$RUNNER_TEMP"
+          rm "$ndk_zip"
+          grep -F 'Pkg.Revision = 27.2.12479018' "$RUNNER_TEMP/android-ndk-r27c/source.properties"
+          echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android-ndk-r27c" >> "$GITHUB_ENV"
           echo "ANDROID_BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_ENV"
           echo "ANDROID_JAR=$ANDROID_HOME/platforms/android-35/android.jar" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$RUNNER_TEMP/target" >> "$GITHUB_ENV"
