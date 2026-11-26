@@ -304,6 +304,7 @@ pub struct OpenMenu {
     child: Option<Box<OpenMenu>>,
     origin: MenuAnchor,
     viewport: gpui::ScrollHandle,
+    scroll_engine: gpui::Entity<gpui::ScrollHandle>,
     focus: Option<FocusHandle>,
     label: SharedString,
 }
@@ -327,10 +328,12 @@ impl OpenMenu {
         self.viewport.bounds().contains(&position) || self.child.as_ref().is_some_and(|child| child.contains(position))
     }
 
-    fn new(origin: MenuAnchor, items: Vec<MenuItem>, window: &Window, label: SharedString) -> Self {
+    fn new(origin: MenuAnchor, items: Vec<MenuItem>, window: &Window, label: SharedString, cx: &mut Context<Editor>) -> Self {
         let selected = items.iter().position(|item| item.enabled && item.command.is_some()).unwrap_or(0);
+        let viewport = gpui::ScrollHandle::new();
+        let scroll_engine = cx.new(|_| viewport.clone());
         Self { instance: verdant_domain::TrackId::generate().to_string(), window: window.window_handle(), origin,
-            items, selected, previous_focus: None, expanded: None, child: None, viewport: gpui::ScrollHandle::new(), focus: None, label }
+            items, selected, previous_focus: None, expanded: None, child: None, viewport, scroll_engine, focus: None, label }
     }
 
     fn collapse(&mut self) {
@@ -419,7 +422,7 @@ impl Editor {
                 },
                 _ => return None,
             };
-            Some(OpenMenu::new(MenuAnchor::Item { viewport: panel.viewport.clone(), index }, items, window, item.label.clone()))
+            Some(OpenMenu::new(MenuAnchor::Item { viewport: panel.viewport.clone(), index }, items, window, item.label.clone(), cx))
         });
         if child.is_none() && let Some(index) = index {
             self.activate_menu_item(path, index, None, window, cx);
@@ -482,7 +485,7 @@ impl Editor {
         self.cancel_edits(verdant_session::CancelReason::Escape, window, cx);
         let previous_focus = self.menu.as_ref().filter(|m| m.window == window.window_handle())
             .and_then(|m| m.previous_focus.clone()).or_else(|| window.focused(cx));
-        let mut menu = OpenMenu::new(origin, items, window, "上下文菜单".into());
+        let mut menu = OpenMenu::new(origin, items, window, "上下文菜单".into(), cx);
         menu.previous_focus = previous_focus;
         self.menu = Some(menu);
         window.focus(&self.focus_menu, cx);
@@ -764,7 +767,7 @@ type CollectionSource = Rc<RefCell<Option<(verdant_collection_control::Collectio
 fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, parent: Option<CollectionSource>,
     _window: &mut Window, cx: &mut Context<Editor>) -> (impl IntoElement, CollectionSource) {
     let revision = collection_revision(ed, menu);
-    let viewport = menu.viewport.clone();
+    let viewport = menu.scroll_engine.clone();
     let items = menu.items.iter().map(|item| {
         let (enabled, checked) = item.state(ed);
         if !enabled || item.command.is_none() { 0 }
