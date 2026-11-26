@@ -652,7 +652,7 @@ impl Render for Drawing {
             .child(div().text_xs().text_color(th.text_secondary).child(self.label.clone()))
             .child(crate::proto_controls::action(SharedString::from(format!("knob-value-{}-{}", self.target.borrow().slot, self.desc.id)), format!("精确输入 {}", self.desc.name)).cursor_text()
                 .text_sm().text_color(th.text).whitespace_nowrap().rounded(gpui::rems(3.0 / 16.0)).px(gpui::rems(3.0 / 16.0))
-                .hover(move |style| style.bg(th.control_pressed)).child(value_text)
+                .hover(move |style| style.bg(th.control_pressed)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed))).child(value_text)
                 .on_click(move |_, window, cx| request_exact_value(&click_handle, &click_target.borrow(), window, cx)))
             .into_any_element())
     }

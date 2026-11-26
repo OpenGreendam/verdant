@@ -20,6 +20,10 @@ icons!(
     "menu",
     "git-merge",
     "instrument",
+    "preset-library",
+    "lock",
+    "lock-open",
+    "reset",
     "window-minimize",
     "window-maximize",
     "window-restore",
@@ -62,6 +66,28 @@ icons!(
     "circle-alert",
     "spline",
 );
+
+/// Fonts compiled into the binary (SIL OFL 1.1, see
+/// `assets/fonts/LICENSE-OFL.txt`): Inter for Latin UI text, as GNOME's
+/// Adwaita Sans is built from it, and a Noto Sans CJK SC subset so Chinese
+/// and Japanese text renders from a well-hinted outline face on every
+/// platform instead of whatever bitmap-era fallback the system offers.
+pub const FONTS: &[&[u8]] = &[
+    include_bytes!("../assets/fonts/Inter-Regular.otf"),
+    include_bytes!("../assets/fonts/Inter-Medium.otf"),
+    include_bytes!("../assets/fonts/Inter-SemiBold.otf"),
+    include_bytes!("../assets/fonts/Inter-Bold.otf"),
+    include_bytes!("../assets/fonts/NotoSansCJKsc-Regular.otf"),
+    include_bytes!("../assets/fonts/NotoSansCJKsc-Bold.otf"),
+];
+
+/// Register the embedded fonts with the text system.
+pub fn register_fonts(cx: &mut gpui::App) {
+    let fonts = FONTS.iter().map(|bytes| Cow::Borrowed(*bytes)).collect();
+    if let Err(error) = cx.text_system().add_fonts(fonts) {
+        eprintln!("verdant: embedded fonts unavailable: {error}");
+    }
+}
 
 pub struct Assets;
 

@@ -67,12 +67,15 @@ pub(crate) struct Action {
     authority: String,
     role: &'static str, selected: bool, selectable: bool, disabled: bool, tab_stop: bool, expanded: Option<bool>,
     clicks: Vec<Click>, assistive: Option<Assistive>, navigation: Option<Navigation>, context_menu: Option<Click>, submit: Option<Submit>, position: usize, count: usize,
+    /// Pressed styling. The compiled root claims the physical press, so GPUI
+    /// never marks the shell active; the root's exposed `pressed` state does.
+    pressed_style: Option<StyleRefinement>,
 }
 
 pub(crate) fn action(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Action {
     Action { shell: div().id(id).relative(), children: Vec::new(), label: label.into(), description: "".into(), authority: String::new(),
         role: "button", selected: false, selectable: false, disabled: false, tab_stop: true, expanded: None,
-        clicks: Vec::new(), assistive: None, navigation: None, context_menu: None, submit: None, position: 0, count: 0 }
+        clicks: Vec::new(), assistive: None, navigation: None, context_menu: None, submit: None, position: 0, count: 0, pressed_style: None }
 }
 
 /// Project and selection facts used by commands whose meaning depends on the
@@ -133,11 +136,31 @@ impl Action {
 impl Styled for Action { fn style(&mut self) -> &mut StyleRefinement { self.shell.style() } }
 impl ParentElement for Action { fn extend(&mut self, elements: impl IntoIterator<Item = gpui::AnyElement>) { self.children.extend(elements); } }
 impl InteractiveElement for Action { fn interactivity(&mut self) -> &mut gpui::Interactivity { self.shell.interactivity() } }
-impl StatefulInteractiveElement for Action {}
+impl StatefulInteractiveElement for Action {
+    /// Applied while the compiled root reports `pressed`, not on GPUI's own
+    /// mouse-down bookkeeping, which never reaches the shell.
+    fn active(mut self, f: impl FnOnce(StyleRefinement) -> StyleRefinement) -> Self where Self: Sized {
+        self.pressed_style = Some(f(StyleRefinement::default())); self
+    }
+}
 
 struct Binding {
     root: Entity<ActionControl>, clicks: Vec<Click>, assistive: Option<Assistive>, navigation: Option<Navigation>, context_menu: Option<Click>,
     props: Value, authority: String, submit: Option<Submit>, revision: u64, pending: Vec<PendingDelivery>, _changes: Subscription,
+    /// Pressed layer drawn under the label while the compiled root reports
+    /// `pressed`. It lives here because this entity re-renders on every root
+    /// change; the parent view that built the shell may be cached.
+    pressed: Option<StyleRefinement>,
+}
+
+impl Render for Binding {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let down = self.pressed.is_some()
+            && self.root.read(cx).handle().state("pressed").ok().and_then(|value| value.as_bool()).unwrap_or(false);
+        let mut layer = div().absolute().top_0().left_0().size_full();
+        if let (true, Some(pressed)) = (down, &self.pressed) { layer.style().refine(pressed); }
+        div().absolute().top_0().left_0().size_full().child(layer).child(self.root.clone())
+    }
 }
 
 struct PendingDelivery {
@@ -253,12 +276,14 @@ impl RenderOnce for Action {
                 let weak = weak.clone();
                 cx.defer(move |cx| {
                     let Some(binding) = weak.upgrade() else { return };
-                    let _ = host.update(cx, |_, window, cx| flush(&binding, window, cx));
+                    // A press or release changes the shell's pressed styling,
+                    // which lives in the parent view's render.
+                    let _ = host.update(cx, |_, window, cx| { flush(&binding, window, cx); window.refresh(); });
                 });
                 cx.notify();
             });
             Binding { root, clicks: Vec::new(), assistive: None, navigation: None, context_menu: None, submit: None, authority: initial_authority, props: initial_props,
-                revision: 0, pending: Vec::new(), _changes: changes }
+                revision: 0, pending: Vec::new(), _changes: changes, pressed: None }
         });
         let root = state.update(cx, |binding, cx| {
             binding.clicks = self.clicks; binding.assistive = self.assistive; binding.navigation = self.navigation; binding.context_menu = self.context_menu; binding.submit = self.submit;
@@ -285,6 +310,14 @@ impl RenderOnce for Action {
             binding.root.clone()
         });
         let clicks = state.clone();
+        let mut pressed = self.pressed_style.take();
+        if let Some(pressed) = pressed.as_mut() {
+            // The layer shares the shell's corners so it fills the same shape.
+            pressed.corner_radii = self.shell.style().corner_radii.clone();
+        }
+        state.update(cx, |binding, cx| { if binding.pressed != pressed { binding.pressed = pressed; cx.notify(); } });
+        let _ = &root;
+        let layer_view = state.clone();
         // Only the generated root registers its focus handle. Registering it
         // again on the shell duplicates Tab stops and bypasses disabled focus.
         self.shell
@@ -296,7 +329,7 @@ impl RenderOnce for Action {
             // This source owns the background rectangle. Foreground controls
             // stay above it in native hit testing, so their own compiled root
             // claims the physical sample before this background can see it.
-            .child(root)
+            .child(layer_view)
             .children(self.children)
     }
 }

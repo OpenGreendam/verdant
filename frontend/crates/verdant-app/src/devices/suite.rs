@@ -135,22 +135,25 @@ pub(super) fn action_authority(ed: &Editor, target: &Target) -> String {
 pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: InsertKey, effect: &str, params: &[ParamDesc], cx: &mut Context<Editor>) -> gpui::AnyElement {
     let th = ed.theme;
     let target = Target { track: owner.clone(), slot, key };
+    let owner_target = target.clone();
     let comparison = ed.device_anim.get(&key).map(|s| s.comparison.clone()).unwrap_or_default();
     let busy = ed.plugin_busy.contains(&key) || comparison.pending.is_some();
-    let mut compare = div().flex().items_center().gap(gpui::rems(3.0/16.));
+    // A/B comparison: one linked group, the copy action as an icon.
+    let mut compare = Vec::new();
     for index in 0..2 {
         let label = if index == 0 { "A" } else { "B" };
         let selected = comparison.active == index;
-        compare = compare.child(command_button(presentation::button(format!("compare-{slot}-{index}"), label, selected, th)
+        compare.push(command_button(presentation::segment(format!("compare-{slot}-{index}"), label, selected, th)
             .authority(action_authority(ed, &target)).disabled(busy)
             .aria_label(format!("切换到参数组 {label}")).tab_index(0).when(busy, |button| button.opacity(0.5)),
-            command(ed, target.clone(), SuiteAction::Compare(index), cx)));
+            command(ed, target.clone(), SuiteAction::Compare(index), cx)).into_any_element());
     }
-    let copy_label = if comparison.active == 0 { "A → B" } else { "B → A" };
-    compare = compare.child(command_button(presentation::button(format!("compare-copy-{slot}"), copy_label, false, th)
-        .authority(action_authority(ed, &target)).disabled(busy)
-        .aria_label("复制当前参数到另一比较组").tab_index(0).when(busy, |button| button.opacity(0.5)),
-        command(ed, target.clone(), SuiteAction::CopyComparison, cx)));
+    let copy_label = if comparison.active == 0 { "把 A 复制到 B" } else { "把 B 复制到 A" };
+    let compare = div().flex().items_center().gap(gpui::rems(2./16.))
+        .child(presentation::linked(compare, th))
+        .child(command_button(presentation::icon_button(format!("compare-copy-{slot}"), "copy", copy_label, false, th)
+            .authority(action_authority(ed, &target)).disabled(busy).when(busy, |button| button.opacity(0.5)),
+            command(ed, target.clone(), SuiteAction::CopyComparison, cx)));
     let preset_params = params.to_vec();
     let preset_owner = owner.clone();
     let effect = effect.to_string();
@@ -176,15 +179,16 @@ pub(super) fn toolbar(ed: &Editor, owner: &DeviceTarget, slot: usize, key: Inser
     }, cx);
     div().flex().flex_wrap().items_center().gap(gpui::rems(6.0/16.)).pb(gpui::rems(8.0/16.)).border_b_1().border_color(th.shade)
         .child(preset)
-        .child(command_button(presentation::button(format!("device-library-{slot}"), "预设库", false, th).authority(action_authority(ed, &target)).tab_index(0),
+        .child(command_button(presentation::icon_button(format!("device-library-{slot}"), "preset-library", "预设库", false, th).authority(action_authority(ed, &target)),
             command(ed, target.clone(), SuiteAction::Library(library_effect), cx)))
-        .when(param(params, "mix").is_some(), |row| row.child(command_button(presentation::button(format!("wet-lock-{slot}"), "锁定干湿", wet_lock, th)
+        .when(param(params, "mix").is_some(), |row| row.child(command_button(presentation::icon_button(format!("wet-lock-{slot}"),
+            if wet_lock { "lock" } else { "lock-open" }, "锁定干湿比（换预设时保留）", wet_lock, th)
             .authority(action_authority(ed, &target))
-            .role(Role::Switch).aria_selected(wet_lock).tab_index(0),
+            .role(Role::Switch).aria_selected(wet_lock),
             command(ed, target.clone(), SuiteAction::ToggleWetLock, cx))))
-        .child(div().flex_1()).child(presentation::tabs(ed, &target, cx)).child(compare)
-        .child(command_button(presentation::button(format!("device-reset-{slot}"), "重置", false, th).authority(action_authority(ed, &target)).tab_index(0),
+        .child(command_button(presentation::icon_button(format!("device-reset-{slot}"), "reset", "全部恢复默认", false, th).authority(action_authority(ed, &target)),
             command(ed, target, SuiteAction::Reset, cx)))
+        .child(div().flex_1()).child(presentation::tabs(ed, &owner_target, cx)).child(compare)
         .into_any_element()
 }
 

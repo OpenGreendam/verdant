@@ -17,6 +17,14 @@ Verdant 源码采用 AGPL-3.0-or-later。下列依赖、资料和研究引用保
 此归属只指上述官方四音符夹具，不包含录音、声库或合成引擎，也不改变 Verdant 其他源码各自已有的许可。
 同目录 `multitrack-controls.ufdata` 是 Verdant 自行编写的测试数据；详细范围见该目录的 README。
 
+## 界面字体：Inter 与 Noto Sans CJK SC
+
+`frontend/crates/verdant-app/assets/fonts/` 下的字体编译进应用，确保各平台的中英文界面都用清晰的矢量字形：
+**Inter 4.0**（Copyright 2016-2023 The Inter Project Authors，GNOME 的 Adwaita Sans 基于此字体），取自 Ubuntu `fonts-inter` 4.0+ds-1，未改动；
+**Noto Sans CJK SC**（© 2014-2021 Adobe，保留字体名 “Source”），取自 Ubuntu `fonts-noto-cjk` 1:20230817+repack1-3，
+用 fontTools 子集化为拉丁、标点、GB2312、Big5 一级与 JIS X 0208 字符。两者均依据 SIL Open Font License 1.1 提供，
+条款与来源说明见 [`LICENSE-OFL.txt`](frontend/crates/verdant-app/assets/fonts/LICENSE-OFL.txt)，并随发布包一同分发。
+
 ## 《河蟹你全家》内建短句谱例
 
 `frontend/crates/verdant-app/assets/examples/hexie-title-excerpt.verp`

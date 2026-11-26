@@ -10,6 +10,7 @@
 //! Stateful compiled GraphPoint and NormalizedKnob roots own interaction,
 //! focus, keyboard and accessible actions. Native code retains the Adwaita
 //! drawing, graph geometry, parameter conversion and atomic domain commit.
+use crate::ui_controls::AdwStates;
 
 use gpui::{
     Context, DispatchPhase, Entity, Focusable, FontWeight, HitboxBehavior, IntoElement, MouseButton, MouseDownEvent,
@@ -573,7 +574,7 @@ pub(crate) fn dropdown_button(id: SharedString, label: String, th: Theme, author
         ed.show_menu(position, items(ed), window, cx);
     });
     semantic_click(crate::proto_controls::action(id, label.clone()).authority(authority).role(Role::ComboBox).aria_label(label.clone()).tab_index(0).h(gpui::rems(30.0/16.)).px(gpui::rems(10.0/16.)).flex().items_center().gap(gpui::rems(6.0/16.))
-        .rounded(gpui::rems(6.0/16.)).bg(th.control).hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(th.checked)).cursor_pointer().text_sm()
+        .rounded(gpui::rems(6.0/16.)).raised_states(th, false).cursor_pointer().text_sm()
         .child(div().max_w(gpui::rems(120.0/16.)).truncate().child(label))
         .child(svg().path(icon("chevron-down")).size(gpui::rems(12.0/16.)).text_color(th.text_secondary)), command)
         .into_any_element()

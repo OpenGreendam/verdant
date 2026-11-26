@@ -8,6 +8,7 @@
 //! Every remap pauses and invalidates old automation; playback resumes only
 //! after its chain and a timeline for the current document/build are acknowledged.
 //! Device changes never enter this path; host startup stays on the worker.
+use crate::ui_controls::AdwStates;
 
 use super::*;
 use verdant_audio::engine::{ChainInput, MASTER_BUS};
@@ -186,8 +187,8 @@ impl PluginBrowserWindow {
 fn browser_button(id: impl Into<gpui::ElementId>, label: impl Into<SharedString>, selected: bool, th: Theme) -> crate::proto_controls::Action {
     let label = label.into();
     crate::proto_controls::action(id, label.clone())
-        .px(px(9.)).py(px(6.)).rounded(px(4.)).bg(if selected { th.control_pressed } else { th.control })
-        .text_sm().child(label)
+        .px(px(10.)).py(px(6.)).rounded(px(6.)).raised_states(th, selected)
+        .text_sm().font_weight(if selected { gpui::FontWeight::SEMIBOLD } else { gpui::FontWeight::NORMAL }).child(label)
 }
 
 impl PluginBrowserWindow {
@@ -856,7 +857,10 @@ impl Editor {
                 self.mark_inserts_applied();
                 self.rebuild_timeline(cx);
                 if let Some((owner, instance)) = opening {
-                    if let Some(slot) = self.owned_insert_specs(&owner).iter().position(|spec| spec.instance_id == instance) {
+                    // Built-in effects already edit inline in the device chain;
+                    // only third-party plug-ins open their own window on insert.
+                    let specs = self.owned_insert_specs(&owner);
+                    if let Some(slot) = specs.iter().position(|spec| spec.instance_id == instance && spec.format != "builtin") {
                         self.open_owned_insert_editor(owner, slot, cx);
                     }
                 }

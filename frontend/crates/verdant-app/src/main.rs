@@ -285,6 +285,7 @@ fn main() {
     let explicit = args.project;
 
     application().with_assets(assets::Assets).run(move |cx: &mut App| {
+        assets::register_fonts(cx);
         // macOS and Windows keep their native alerts.
         #[cfg(not(any(target_os = "macos", windows)))]
         alert::install(cx);

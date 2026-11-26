@@ -3,6 +3,7 @@
 //! never its mutable slot number.
 //! The child host remains responsible for audio; this view shares the same
 //! parameter transaction, history and state cache as the docked device chain.
+use crate::ui_controls::AdwStates;
 
 use gpui::{AppContext, Bounds, Context, FocusHandle, FontWeight, IntoElement,
     KeyDownEvent, Render, Role, WeakEntity, Window, WindowBounds, WindowOptions,
@@ -381,8 +382,8 @@ impl Render for NativePluginWindow {
             };
             let button = |id: &'static str, label: &'static str, action| crate::devices::semantic_click(crate::proto_controls::action(id, label)
                 .aria_label(label).authority(crate::proto_controls::editor_authority(ed))
-                .cursor_pointer().flex_none().px(px(10.)).py(px(6.)).rounded(px(6.))
-                .bg(gpui::transparent_black()).hover(move |s| s.bg(th.hover)).text_size(px(13.)).child(label),
+                .cursor_pointer().flex_none().h(px(34.)).px(px(12.)).flex().items_center().rounded(px(6.))
+                .flat_states(th, false).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(label),
                 toolbar_command(editor_entity.downgrade(), native_entity.downgrade(), action));
             let key_editor = editor_entity.clone();
             let mut root = div().id("builtin-native-editor").role(Role::Group)
@@ -415,17 +416,25 @@ impl Render for NativePluginWindow {
                         cx.stop_propagation();
                     }
                 })
-                .child(div().flex_none().min_h(px(48.)).py(px(6.)).px(px(16.)).flex().flex_wrap().items_center().gap(px(10.))
+                // AdwHeaderBar: start buttons, a centered two-line title, end
+                // buttons and a round close button.
+                .child(div().flex_none().h(px(47.)).px(px(6.)).flex().items_center().gap(px(6.))
                     .bg(th.headerbar).border_b_1().border_color(th.shade)
-                    .child(div().flex_1().min_w_0().flex().items_baseline().gap(px(12.))
-                        .child(div().truncate().text_size(px(17.)).font_weight(FontWeight::BOLD).child(name.clone()))
-                        .child(div().truncate().text_size(px(12.)).text_color(th.text_secondary).child(bus)))
                     .when(is_insert, |header| header
                         .child(button("native-bypass", if bypassed { "启用" } else { "旁通" }, ToolbarAction::Bypass { slot, expected_key, busy }).aria_selected(bypassed)))
                     .child(button("native-generic", if generic { "图形界面" } else { "参数列表" }, ToolbarAction::Generic))
+                    .child(div().flex_1().min_w_0().flex().flex_col().items_center().justify_center()
+                        .child(div().max_w_full().truncate().text_size(px(14.)).font_weight(FontWeight::BOLD).child(name.clone()))
+                        .child(div().max_w_full().truncate().text_size(px(12.)).text_color(th.text_secondary).child(bus)))
                     .when(instrument_window, |header| header.child(button("native-keyboard", if keyboard_open { "收起键盘" } else { "演奏键盘" }, ToolbarAction::Keyboard).aria_selected(keyboard_open)))
                     .child(button("native-tools", "工具", ToolbarAction::Tools).aria_selected(tools_open))
-                    .child(button("native-close", "关闭", ToolbarAction::Close)))
+                    .child(crate::devices::semantic_click(crate::proto_controls::action("native-close", "关闭")
+                        .aria_label("关闭").authority(crate::proto_controls::editor_authority(ed))
+                        .cursor_pointer().flex_none().size(px(34.)).flex().items_center().justify_center().group("native-close")
+                        .child(div().size(px(24.)).rounded(px(12.)).flex().items_center().justify_center().bg(crate::theme::with_alpha(th.text, 0.10))
+                            .group_hover("native-close", move |s| s.bg(crate::theme::with_alpha(th.text, 0.16)))
+                            .child(gpui::svg().path(crate::assets::icon("window-close")).size(px(16.)).text_color(th.text))),
+                        toolbar_command(editor_entity.downgrade(), native_entity.downgrade(), ToolbarAction::Close))))
                 .when(tools_open, |root| root.child(div().flex_none().px(px(16.)).py(px(4.)).flex().flex_wrap().items_center().gap(px(6.))
                     .child(button("native-midi-input", "MIDI 输入", ToolbarAction::MidiInput))
                     .child(button("native-midi-stop", "停止 MIDI", ToolbarAction::MidiStop))

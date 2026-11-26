@@ -409,17 +409,26 @@ pub fn black() -> Rgba {
     rgb(0x000000)
 }
 
-/// Native audio workspaces keep the platform face and explicitly prefer sans
-/// CJK fallbacks instead of a backend-dependent serif face for missing glyphs.
-pub fn plugin_ui_font(family: impl Into<gpui::SharedString>) -> gpui::Font {
+/// The UI face with explicit CJK fallbacks. macOS and Windows try their own
+/// well-hinted CJK faces first; everywhere the embedded Noto Sans CJK SC
+/// follows, so a backend-dependent bitmap or serif face is never chosen.
+pub fn ui_font(family: impl Into<gpui::SharedString>) -> gpui::Font {
     static FALLBACKS: std::sync::OnceLock<gpui::FontFallbacks> = std::sync::OnceLock::new();
     let mut font = gpui::font(family);
-    font.fallbacks = Some(FALLBACKS.get_or_init(|| gpui::FontFallbacks::from_fonts(
-        ["Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Droid Sans Fallback"]
-            .into_iter().map(str::to_string).collect()
-    )).clone());
+    font.fallbacks = Some(FALLBACKS.get_or_init(|| {
+        let native: &[&str] = if cfg!(target_os = "macos") { &["PingFang SC", "Hiragino Sans"] }
+            else if cfg!(windows) { &["Microsoft YaHei UI", "Yu Gothic UI"] } else { &[] };
+        gpui::FontFallbacks::from_fonts(native.iter().chain(&[EMBEDDED_CJK, "Inter"]).map(|s| s.to_string()).collect())
+    }).clone());
     font
 }
+
+/// Family names of the faces embedded by `assets::register_fonts`.
+pub const EMBEDDED_UI: &str = "Inter";
+pub const EMBEDDED_CJK: &str = "Noto Sans CJK SC";
+
+/// Plug-in editors use the same face as the rest of the UI.
+pub fn plugin_ui_font(family: impl Into<gpui::SharedString>) -> gpui::Font { ui_font(family) }
 
 /// The platform UI face, chosen for a reason rather than by default:
 /// SF on macOS, Segoe on Windows, the desktop's fontconfig `sans-serif`
@@ -436,24 +445,12 @@ pub fn system_ui_font(available: &[String]) -> String {
             }
         }
     }
-    // GNOME's own UI faces first, so Verdant matches libadwaita apps.
-    for f in ["Adwaita Sans", "Cantarell"] {
-        if has(f) {
-            return f.into();
-        }
+    // GNOME's own face when installed, else the embedded Inter it is built
+    // from; CJK glyphs come from the fallbacks of `ui_font`.
+    if has("Adwaita Sans") {
+        return "Adwaita Sans".into();
     }
-    if let Ok(out) = std::process::Command::new("fc-match").args(["-f", "%{family[0]}", "sans-serif"]).output() {
-        let fam = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if !fam.is_empty() && has(&fam) {
-            return fam;
-        }
-    }
-    for f in ["Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Zen Hei", "DejaVu Sans"] {
-        if has(f) {
-            return f.into();
-        }
-    }
-    ".SystemUIFont".into()
+    EMBEDDED_UI.into()
 }
 
 /// Tabular (equal-advance) figures, for faces that default to proportional digits.

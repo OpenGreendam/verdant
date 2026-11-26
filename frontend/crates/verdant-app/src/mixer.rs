@@ -3,6 +3,7 @@
 //! child meters repaint independently of these controls and insert slots.
 //! Master bus owns a real Master Fader, Master Pan, Master Mute, Master
 //! Inserts and stereo peak/clip metering shared with offline WAV export.
+use crate::ui_controls::AdwStates;
 
 use gpui::{
     AccessibleAction, BorderStyle, Context, DispatchPhase, Entity, FontWeight,
@@ -483,7 +484,7 @@ fn strip(
                         .items_center()
                         .justify_center()
                         .rounded(px(6.0))
-                        .hover(move |s| s.bg(th.hover))
+                        .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
                         .child(gpui::svg().path(crate::assets::icon("menu")).size(px(14.0)).text_color(th.text))
                         .on_click(cx.listener(move |ed, event: &crate::proto_controls::Activation, window, cx| {
                             ed.track_menu(header_menu.clone(), event.position(), window, cx);
@@ -537,11 +538,10 @@ fn route_button(key: &'static str, label: &'static str, selected: bool, th: Them
         .items_center()
         .justify_center()
         .rounded(px(6.0))
-        .bg(if selected { th.checked } else { th.control })
+        .raised_states(th, selected)
         .text_xs()
         .font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
         .text_color(th.text)
-        .hover(move |s| s.bg(if selected { th.checked } else { th.control_pressed }))
         .child(label)
 }
 

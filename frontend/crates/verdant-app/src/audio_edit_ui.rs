@@ -55,7 +55,7 @@ pub fn toolbar(ed:&Editor,cx:&mut Context<Editor>)->impl IntoElement{
             .authority(format!("{}:{}:{}",ed.project().project_id,ed.document_generation,ed.revision()))
             .when(matches!(action,AudioUiAction::SelectTool|AudioUiAction::RangeTool),|button|button.aria_selected(selected))
             .h(px(26.0)).px(px(9.0)).flex().items_center().rounded(px(6.0)).cursor_pointer()
-            .bg(if selected{th.control}else{th.surface}).hover(move|style|style.bg(th.hover))
+            .bg(if selected{th.control}else{th.surface}).hover(move|style|style.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
             .child(label).on_click(cx.listener(move|ed,_,window,cx|{
                 crate::proto_editor_surface::focus_commands("audio",window,cx);if let Err(error)=ed.run_audio_ui(action,window,cx){ed.notice(error);cx.notify();}
             }))))

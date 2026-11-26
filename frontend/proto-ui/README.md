@@ -8,6 +8,10 @@ Verdant 使用固定版本的实验性 Proto-UI compiler：`gpui-source-v1` 生�
 
 本批基于主线 `93ff60c1420850c6db7f3248d234faee9cc655fa`。原清单中的主总线 insert bypass、布尔命令按钮和 checked menu 选择值消费已经存在于该基线，不重复算作本批迁移。继续使用下述 compiler pin 与共享 SDK；生成、平台包和输入验收以本批准确提交的 CI 为准。
 
+## 2026-11-25 编译器升级
+
+compiler 从 `e9340df6279e063cf372080bf4cc97caea3fd901` 升到上游主线 [`710a90df2ea57d9f93d7d09e43ebfb2b7b8e5057`](https://github.com/Proto-UI/Proto-UI/commit/710a90df2ea57d9f93d7d09e43ebfb2b7b8e5057)（Proto UI `0.3.0`，含 `emit-gpui-sdk`，[PR #1660](https://github.com/Proto-UI/Proto-UI/pull/1660)）。官方 producer 用新 pin 重新编译全部 14 个单元：生成的 Rust 源码与共享 SDK 逐字节不变（SDK 摘要仍为 `832777a…4b3b`），只有 receipt 中的上游修订、版本号和 lockfile 摘要更新。期间上游规范的改动集中在 Dialog、Switch、Progress、Message Scroller 等组件原型和反馈呈现、材质预留契约；Verdant 的单元只使用 `@proto.ui/core` 与 `@proto.ui/hooks`，不受影响。
+
 ## 2026-11-24 RCIP 历史记录
 
 该轮把 compiler 从 `4e499ae25e825e130e740f16af66d70b23a743cf` 升到公开提交 [`e9340df6279e063cf372080bf4cc97caea3fd901`](https://github.com/Proto-UI/Proto-UI/commit/e9340df6279e063cf372080bf4cc97caea3fd901)，基于上游主线 `88fc0883bec70abbc0d7505d88370657c279639e`，通用兼容修复见 [Proto-UI PR #1791](https://github.com/Proto-UI/Proto-UI/pull/1791)。共享 SDK 内容摘要为 `832777a017c27e8969ed37ce941ea1f7f5ee21d532fb5f9412ff930074e94b3b`；SDK 版本仍为 `0.2.0`，14 个单元和 receipt 全部通过固定干净编译器重新生成。

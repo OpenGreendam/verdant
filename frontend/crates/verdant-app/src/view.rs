@@ -173,7 +173,7 @@ fn toggle(id: &'static str, name: &'static str, active: bool, size: f32, th: The
         .justify_center()
         .rounded(px(6.0))
         .when(active, |d| d.bg(th.checked))
-        .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
+        .hover(move |s| s.bg(if active { th.checked } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if active { th.checked } else { th.hover })))
         .child(svg().path(icon(name)).size(px(16.0)).text_color(th.text))
 }
 
@@ -356,7 +356,7 @@ impl Editor {
                 .rounded(px(6.0))
                 .text_sm()
                 .text_color(th.text)
-                .hover(move |s| s.bg(th.hover))
+                .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
                 .child(label)
                 .when(wide, |d| d.child(svg().path(icon("chevron-down")).size(px(12.0)).text_color(th.text_secondary)))
         };
@@ -441,7 +441,7 @@ impl Editor {
                     .items_center()
                     .justify_center()
                     .when(recording, |d| d.bg(th.error))
-                    .hover(move |s| s.bg(if recording { th.error } else { th.hover }))
+                    .hover(move |s| s.bg(if recording { th.error } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if recording { th.error } else { th.hover })))
                     .child(svg().path(icon("circle-dot")).size(px(16.0)).text_color(if recording { th.accent_text } else { th.error }))
                     .on_click(cx.listener(move |ed, _, w, cx| {
                         use crate::editor::integrations::IntegrationAction as I;
@@ -462,7 +462,7 @@ impl Editor {
                 .when(errors > 0, |d| d.aria_label(format!("立即渲染（{errors} 处错误）")).child(
                     div().absolute().top(px(4.0)).right(px(4.0)).size(px(7.0)).rounded(px(3.5)).bg(th.error)))))
             .child(crate::proto_controls::action("primary-menu", "主菜单").size(px(btn)).flex().items_center().justify_center().rounded(px(6.0))
-                .hover(move |s| s.bg(th.hover))
+                .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
                 .child(svg().path(icon("menu")).size(px(16.0)).text_color(th.text))
                 .on_click(cx.listener(move |ed, ev: &crate::proto_controls::Activation, w, cx| {
                     // The popover's tail points at the button's lower edge.
@@ -640,7 +640,7 @@ impl Editor {
                         })
                         .relative().flex_1().h(px(28.0)).flex().items_center().justify_center().gap(px(5.0)).rounded(px(6.0)).text_sm()
                         .when(active, |d| d.bg(th.checked).font_weight(FontWeight::SEMIBOLD))
-                        .hover(move |s| s.bg(if active { th.checked } else { th.hover }))
+                        .hover(move |s| s.bg(if active { th.checked } else { th.hover })).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, if active { th.checked } else { th.hover })))
                         .child(svg().path(icon(ic)).size(px(14.0)).text_color(th.text))
                         .child(label)
                         .when(t == RightDockTab::RenderInserts && errors > 0, |d| d.child(
@@ -655,7 +655,7 @@ impl Editor {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .hover(move |s| s.bg(th.hover))
+                    .hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
                     .child(svg().path(icon("x")).size(px(13.0)).text_color(th.text_secondary))
                     .on_click(cx.listener(|ed, _, _, cx| ed.toggle_right_dock(cx))),
             );
@@ -1056,7 +1056,7 @@ impl Editor {
                         .bg(th.control)
                         .border_1()
                         .border_color(if is_err { th.error } else { th.warning })
-                        .hover(move |s| s.bg(th.control_pressed))
+                        .hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed)))
                         .flex()
                         .flex_col()
                         .gap(px(2.0))
@@ -1197,7 +1197,7 @@ impl Editor {
                     .bg(if is_cur { th.selection } else { th.control })
                     .border_1()
                     .border_color(if is_cur { th.accent } else { th.control })
-                    .hover(move |s| s.bg(th.control_pressed))
+                    .hover(move |s| s.bg(th.control_pressed)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.control_pressed)))
                     .flex()
                     .items_center()
                     .gap(px(6.0))
@@ -1764,7 +1764,7 @@ impl Editor {
                                     .text_xs()
                                     .child(div().font_weight(FontWeight::SEMIBOLD).child(param.short()))
                                     .when(slot_count > 1, |d| d.child(crate::proto_controls::action(("remove-lane", slot), format!("移除 {} 泳道", param.short()))
-                                        .size(px(22.0)).rounded(px(11.0)).flex().items_center().justify_center().hover(move |s| s.bg(th.hover))
+                                        .size(px(22.0)).rounded(px(11.0)).flex().items_center().justify_center().hover(move |s| s.bg(th.hover)).active(move |s| s.bg(crate::ui_controls::pressed_fill(th, th.hover)))
                                         .child(svg().path(icon("x")).size(px(12.0)).text_color(th.text_secondary))
                                         .on_click(cx.listener(move |ed, _, _, cx| ed.remove_lane(slot, cx)))))
                                     .child(div().text_size(px(9.0)).text_color(th.text_tertiary).child(match param {
@@ -1935,7 +1935,7 @@ impl Render for Editor {
             .flex_col()
             .bg(th.window)
             .text_color(th.text)
-            .font_family(self.ui_font.clone())
+            .font(crate::theme::ui_font(self.ui_font.clone()))
             .key_context("Verdant")
             .on_action(cx.listener(|ed, _: &WorkflowMenu, w, cx| ed.workflow_menu(w, cx)))
             .on_action(cx.listener(|ed, action: &crate::shortcuts::WorkflowShortcut, w, cx| crate::shortcuts::dispatch(ed, action, w, cx)))
