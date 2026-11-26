@@ -305,7 +305,7 @@ pub struct OpenMenu {
     origin: MenuAnchor,
     viewport: gpui::ScrollHandle,
     scroll_engine: gpui::Entity<gpui::ScrollHandle>,
-    focus: Option<FocusHandle>,
+    focus_pending: bool,
     label: SharedString,
 }
 
@@ -333,7 +333,7 @@ impl OpenMenu {
         let viewport = gpui::ScrollHandle::new();
         let scroll_engine = cx.new(|_| viewport.clone());
         Self { instance: verdant_domain::TrackId::generate().to_string(), window: window.window_handle(), origin,
-            items, selected, previous_focus: None, expanded: None, child: None, viewport, scroll_engine, focus: None, label }
+            items, selected, previous_focus: None, expanded: None, child: None, viewport, scroll_engine, focus_pending: true, label }
     }
 
     fn collapse(&mut self) {
@@ -389,7 +389,7 @@ impl Editor {
             if refresh {
                 parent.items = opened.items;
                 parent.collapse();
-                if let Some(focus) = &parent.focus { window.focus(focus, cx); }
+                parent.focus_pending = true;
             } else {
                 opened.origin = MenuAnchor::Item { viewport: parent.viewport.clone(), index: row };
                 opened.label = parent.items[row].label.clone();
@@ -400,7 +400,7 @@ impl Editor {
             self.menu = Some(retained);
             cx.notify();
         } else if submenu && self.menu.is_none() {
-            if let Some(focus) = retained.panel(path).and_then(|panel| panel.focus.as_ref()) { window.focus(focus, cx); }
+            if let Some(panel) = retained.panel_mut(path) { panel.focus_pending = true; }
             self.menu = Some(retained);
             cx.notify();
         }
@@ -436,7 +436,7 @@ impl Editor {
         } else if index.is_none() {
             if let Some(index) = panel.expanded { panel.selected = index; }
             panel.collapse();
-            if let Some(focus) = &panel.focus { window.focus(focus, cx); }
+            panel.focus_pending = true;
         }
         cx.notify();
     }
@@ -791,8 +791,24 @@ fn menu_panel(ed: &Editor, root: &OpenMenu, menu: &OpenMenu, path: Vec<usize>, p
         *source_draw.borrow_mut() = Some((handle.clone(), engine.clone()));
         draw_editor.update(cx, |ed, cx| {
             if let Some(panel) = ed.menu.as_mut().and_then(|root| root.panel_mut(&draw_path)).filter(|panel| panel.instance == snapshot.instance) {
-                panel.focus = Some(focus.clone());
                 if draw_path.is_empty() { ed.focus_menu = focus.clone(); }
+                if std::mem::take(&mut panel.focus_pending) {
+                    let editor = cx.weak_entity();
+                    let path = draw_path.clone();
+                    let instance = snapshot.instance.clone();
+                    let focus = focus.clone();
+                    let source = handle.clone();
+                    window.on_next_frame(move |window, cx| {
+                        let current = editor.upgrade().is_some_and(|editor| {
+                            editor.read(cx).menu.as_ref().filter(|root| root.window == window.window_handle())
+                                .and_then(|root| root.panel(&path)).is_some_and(|panel| panel.instance == instance && panel.child.is_none())
+                        });
+                        if current {
+                            crate::proto_collection::call(&source, "focusSelf", vec![], window, cx);
+                            window.focus(&focus, cx);
+                        }
+                    });
+                }
             }
             native_context_menu_layer(ed, &snapshot, outside.as_ref(), handle.clone(), basis.clone(), engine, window, cx).into_any_element()
         })
