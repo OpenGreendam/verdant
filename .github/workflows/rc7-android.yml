@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 65
     env:
       SOURCE_SHA: a5813ec9cce12c72cb9e84ee92e388ca67ece75e
+      LOCK_SHA256: 578a7d6d03ed38727ab1f7be68e76d2208ef0fe04b902a7552652b210fa426cb
+      BUILD_SCRIPT_SHA256: 3e4572b492ea498bccf1cf8a0f80f5dc6970fdb2d7b6156f88f5ad6027521228
       ANDROID_API: '26'
       PROFILE: release
     steps:
@@ -25,8 +27,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          echo '578a7d6d03ed38727ab1f7be68e76d2208ef0fe04b902a7552652b210fa426cb  Cargo.lock' | sha256sum -c -
-          echo '3e4572b492ea498bccf1cf8a0f80f5dc6970fdb2d7b6156f88f5ad6027521228  crates/gpui_android/script/build-apk.sh' | sha256sum -c -
+          printf '%s  Cargo.lock\n' "$LOCK_SHA256" | sha256sum -c -
+          printf '%s  crates/gpui_android/script/build-apk.sh\n' "$BUILD_SCRIPT_SHA256" | sha256sum -c -
           rustup target add aarch64-linux-android
           rustc -Vv
           cargo -V
@@ -42,9 +44,23 @@ jobs:
           echo "ANDROID_BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_ENV"
           echo "ANDROID_JAR=$ANDROID_HOME/platforms/android-35/android.jar" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$RUNNER_TEMP/target" >> "$GITHUB_ENV"
-          if [[ -x "$ANDROID_HOME/emulator/emulator" ]]; then
-            "$ANDROID_HOME/emulator/emulator" -list-avds
-          fi
+      - name: Inventory preexisting isolated Android emulators
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/verified"
+          {
+            if [[ -x "$ANDROID_HOME/emulator/emulator" ]]; then
+              echo 'Preexisting AVDs:'
+              "$ANDROID_HOME/emulator/emulator" -list-avds
+            else
+              echo 'Android Emulator binary is absent.'
+            fi
+            if [[ -x "$ANDROID_HOME/platform-tools/adb" ]]; then
+              "$ANDROID_HOME/platform-tools/adb" devices -l
+            else
+              echo 'ADB binary is absent.'
+            fi
+          } | tee "$RUNNER_TEMP/verified/runtime-inventory.txt"
       - name: Build the example with locked dependencies
         id: build
         working-directory: frontend
@@ -63,7 +79,18 @@ jobs:
           exec "$ANDROID_REAL_CARGO" "$@"
           SCRIPT
           chmod +x "$RUNNER_TEMP/locked-bin/cargo"
-          PATH="$RUNNER_TEMP/locked-bin:$PATH" crates/gpui_android/script/build-apk.sh
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+          export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+          export HOME="$RUNNER_TEMP/android-example-home"
+          mkdir "$HOME"
+          unset DEBUG_KEYSTORE
+          export PATH="$RUNNER_TEMP/locked-bin:$PATH"
+          crates/gpui_android/script/build-apk.sh
+          test -f "$HOME/.android/debug.keystore"
+          cp "$CARGO_TARGET_DIR/gpui-android-apk/gpui-android-example.apk" "$RUNNER_TEMP/first.apk"
+          key_digest=$(sha256sum "$HOME/.android/debug.keystore")
+          crates/gpui_android/script/build-apk.sh
+          printf '%s\n' "$key_digest" | sha256sum -c -
           git diff --exit-code -- Cargo.lock
       - name: Verify signature, NativeActivity, arm64 ELF and 16 KiB layout
         run: |
@@ -76,6 +103,11 @@ jobs:
           toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
           sha256sum "$apk" | tee SHA256SUMS
           "$ANDROID_BUILD_TOOLS/apksigner" verify --verbose --print-certs "$apk" | tee signature.txt
+          "$ANDROID_BUILD_TOOLS/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/first.apk" > signature-first.txt
+          grep -F 'certificate SHA-256 digest:' signature-first.txt > certificate-first.txt
+          grep -F 'certificate SHA-256 digest:' signature.txt > certificate.txt
+          cmp certificate-first.txt certificate.txt
+          cat certificate.txt
           "$ANDROID_BUILD_TOOLS/aapt" dump badging "$apk" | tee badging.txt
           "$ANDROID_BUILD_TOOLS/aapt" dump xmltree "$apk" AndroidManifest.xml | tee manifest.txt
           "$ANDROID_BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$apk" | tee zipalign.txt
@@ -100,8 +132,12 @@ jobs:
           assert {'ANativeActivity_onCreate', 'android_main'} <= exports, sorted(exports)
           needed = re.findall(r'\(NEEDED\).*?\[([^\]]+)\]', parsed)
           assert needed and all((Path(os.environ['ANDROID_SYSTEM_LIBS']) / lib).is_file() for lib in needed), needed
-          load_alignments = [int(line.split()[-1], 0) for line in parsed.splitlines() if line.lstrip().startswith('LOAD ')]
+          load_segments = [line.split() for line in parsed.splitlines() if line.lstrip().startswith('LOAD ')]
+          load_alignments = [int(segment[-1], 0) for segment in load_segments]
           assert load_alignments and min(load_alignments) >= 16384, load_alignments
+          for segment in load_segments:
+              file_offset, virtual_address = (int(value, 0) for value in segment[1:3])
+              assert (file_offset - virtual_address) % 16384 == 0, segment
           apk = Path('gpui-android-example.apk')
           with zipfile.ZipFile(apk) as z, apk.open('rb') as raw:
               native = [e for e in z.infolist() if e.filename.endswith('.so')]
@@ -112,7 +148,19 @@ jobs:
               n, extra = struct.unpack('<HH', raw.read(4))
               offset = e.header_offset + 30 + n + extra
               assert offset % 16384 == 0, offset
-          receipt = dict(source=os.environ['SOURCE_SHA'], lock_sha256='578a7d6d03ed38727ab1f7be68e76d2208ef0fe04b902a7552652b210fa426cb', ndk='27.2.12479018', native_api=26, build_tools='35.0.0', elf_load_alignments=load_alignments, android_system_libs=needed, activity_export='ANativeActivity_onCreate', rust_export='android_main', zip_data_offset=offset)
+          receipt = dict(
+              source=os.environ['SOURCE_SHA'],
+              lock_sha256=os.environ['LOCK_SHA256'],
+              build_script_sha256=os.environ['BUILD_SCRIPT_SHA256'],
+              ndk='27.2.12479018',
+              native_api=int(os.environ['ANDROID_API']),
+              build_tools=Path(os.environ['ANDROID_BUILD_TOOLS']).name,
+              elf_load_alignments=load_alignments,
+              android_system_libs=needed,
+              activity_export='ANativeActivity_onCreate',
+              rust_export='android_main',
+              zip_data_offset=offset,
+          )
           Path('android-evidence.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print(json.dumps(receipt))
           PY
