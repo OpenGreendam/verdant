@@ -1,35 +1,58 @@
-name: Windows native RC6 package
-on: workflow_dispatch
+name: Windows packaged RC6 menu observation
+on:
+  workflow_dispatch:
+    inputs:
+      menu:
+        description: File menu client point measured on initial capture
+        required: false
+      row:
+        description: Import row client rectangle measured on root capture
+        required: false
+      outside:
+        description: Client point outside popup
+        required: false
 permissions:
   contents: read
+  actions: read
 jobs:
-  package:
+  observe:
     runs-on: windows-2025
-    timeout-minutes: 120
     steps:
-      - name: Preserve exact source bytes
-        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
-          ref: 15829ccc87b34b77efc0254d7b2a50d14097d149
-          path: source
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: helpers
           sparse-checkout: ci-rc6
           persist-credentials: false
-      - name: Obtain approved preceding release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release download v0.1.0-rc.5 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc5"
-      - name: Build, guard and exercise bundled package
-        run: ./helpers/ci-rc6/package.ps1
-      - name: Upload verified package and native receipts
-        uses: actions/upload-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: windows-rc6-native
-          path: evidence/
-          if-no-files-found: error
-          compression-level: 0
+          artifact-ids: 15116270312
+          run-id: 45812428580
+          github-token: ${{ github.token }}
+          path: artifact
+          merge-multiple: true
+      - name: Observe native window
+        env:
+          MENU: ${{ inputs.menu }}
+          ROW: ${{ inputs.row }}
+          OUTSIDE: ${{ inputs.outside }}
+        run: |
+          $archive = Get-Item artifact/dist/verdant-0.1.0-windows-x86_64.zip
+          if ((Get-FileHash $archive).Hash -ne '10fa2aa1b12f3abc67bab0d9edc147d91b6ba9f3e4fde46c3ccc0feb521fcd9c') { throw 'Archive digest mismatch' }
+          Expand-Archive $archive expanded
+          $exe = (Resolve-Path expanded/verdant-0.1.0-windows-x86_64/bin/verdant-gui.exe).Path
+          if ((Get-FileHash $exe).Hash -ne 'eda5ac68d5d16d1b304f5bd8ab9daf821b49c016b021866ac14fa69af78b2eda') { throw 'GUI digest mismatch' }
+          New-Item -ItemType Directory images | Out-Null
+          Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution | ConvertTo-Json | Set-Content images/display.json
+          ./ci-rc6/native-menu-windows.ps1 -Exe $exe -OutputDir images/initial -CaptureOnly
+          $pidObserved = (Get-Content -Raw images/initial/observations.json | ConvertFrom-Json).pid
+          if ($env:MENU) {
+            ./ci-rc6/native-menu-windows.ps1 -Exe $exe -ProcessId $pidObserved -OutputDir images/root -Menu $env:MENU -RootOnly
+          }
+          if ($env:ROW) {
+            ./ci-rc6/native-menu-windows.ps1 -Exe $exe -ProcessId $pidObserved -OutputDir images/full -Menu $env:MENU -Row $env:ROW -Outside $env:OUTSIDE
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-menu-observations
+          path: images/
+          if-no-files-found: warn
