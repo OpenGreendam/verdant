@@ -2249,10 +2249,10 @@ mod diagnostic_priority_tests {
     use verdant_domain::{NoteId, TrackId};
 
     #[test]
-    fn earlier_pitch_warnings_cannot_hide_later_blocking_notes() {
+    fn earlier_warnings_cannot_hide_later_blocking_notes() {
         let warning = || Diagnostic {
-            code: "W_PITCH_UNVERIFIED", severity: Severity::Warning, note_id: None,
-            message: "音高在接受范围内，但未经听评".into(), detail: String::new(),
+            code: "W_PHONEME_APPROXIMATION", severity: Severity::Warning, note_id: None,
+            message: "使用已选择的跨语言近似音素映射".into(), detail: String::new(),
         };
         let mut first = PhrasePlan {
             track: TrackId("low-octaves".into()), route: Route::VerdantVoice,

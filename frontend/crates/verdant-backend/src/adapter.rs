@@ -654,13 +654,6 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                 format!("explicit_f0_hz_range={f0_range:?}"),
             ));
             fine = false;
-        } else if !(130.0..=700.0).contains(&f0) {
-            diagnostics.push(Diagnostic::warning(
-                "W_PITCH_UNVERIFIED",
-                Some(n),
-                format!("音高 {:.0} Hz 在接受范围内，但未经听评", f0),
-                "accepted by the worker; outside the conservative range Verdant highlights",
-            ));
         }
         let dur = snap_seconds_bound(
             tempo.seconds_at(n.end_tick() as f64) - tempo.seconds_at(n.start_tick as f64),
