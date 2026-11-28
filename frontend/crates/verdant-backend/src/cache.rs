@@ -139,7 +139,10 @@ impl ArtifactCache {
                     result => result?,
                 };
                 match lock.try_lock() {
-                    Ok(()) => remove_if_present(&stage)?,
+                    Ok(()) => match remove_if_present(&stage) {
+                        Err(e) if matches!(e.kind(), io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem) => continue,
+                        result => result?,
+                    },
                     Err(TryLockError::WouldBlock) => (),
                     Err(TryLockError::Error(error)) => return Err(error),
                 }
