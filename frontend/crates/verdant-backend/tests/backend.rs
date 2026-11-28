@@ -1005,6 +1005,29 @@ fn durable_cache_roundtrips_and_reports_corruption() {
 }
 
 #[test]
+fn durable_cache_open_preserves_a_released_writers_pending_rename() {
+    let root = scratch("cache-legacy-writer");
+    let dir = root.join("digest-live");
+    std::fs::create_dir_all(&dir).unwrap();
+    let (_source, e) = entry("digest-live", &TrackId::from("t1"), 2);
+    let bytes = std::fs::read(&e.audio.path).unwrap();
+    let stage = dir.join(format!(".native.wav.tmp.{}.0", std::process::id()));
+    let mut writer = std::fs::File::create_new(&stage).unwrap();
+    writer.write_all(&bytes).unwrap();
+    writer.sync_all().unwrap();
+    let reader = ArtifactCache::open(&root).unwrap();
+    assert!(reader.entries().is_empty());
+    assert!(reader.restore(&e.digest).unwrap().is_none());
+    drop(writer);
+    std::fs::rename(&stage, dir.join("native.wav")).unwrap();
+    assert_eq!(std::fs::read(dir.join("native.wav")).unwrap(), bytes);
+    reader.store(&e).unwrap();
+    let restored = ArtifactCache::open(&root).unwrap().restore(&e.digest).unwrap().unwrap();
+    assert_eq!(restored.audio.sha256, e.audio.sha256);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn retired_render_cache_routes_miss_before_artifacts_are_read() {
     let dir = scratch("retired-cache");
     let cache = ArtifactCache::open(&dir).unwrap();
