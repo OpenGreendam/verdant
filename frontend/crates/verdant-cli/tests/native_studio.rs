@@ -12,6 +12,21 @@ fn ok(op:&str,params:Value)->Value{
     let response=request(op,params);assert_eq!(response["ok"],json!(true),"{op}: {response}");response["result"].clone()
 }
 fn inspect(path:&Path)->Value{ok("project.inspect",json!({"path":path}))}
+
+#[test]
+fn new_projects_anchor_vowels_and_preserve_template_timing() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = dir.path().join("fresh.verp");
+    ok("project.new", json!({"output": output}));
+    let mut template = inspect(&output)["project"].clone();
+    assert_eq!(template["render_preferences"]["phoneme_timing"]["method"], "vowel-anchor-v1");
+
+    template["render_preferences"].as_object_mut().unwrap().remove("phoneme_timing");
+    let from_template = dir.path().join("from-template.verp");
+    ok("project.new", json!({"output": from_template, "project": template}));
+    assert!(inspect(&from_template)["project"]["render_preferences"].get("phoneme_timing").is_none());
+}
+
 #[test]
 fn plugin_mixer_preset_workflow_is_revision_checked_and_roundtrips(){
     let dir=tempfile::tempdir().unwrap();let path=dir.path().join("混音 project.verp");

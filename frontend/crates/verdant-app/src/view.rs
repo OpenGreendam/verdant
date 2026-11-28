@@ -1020,18 +1020,16 @@ impl Editor {
                     .h(px(PANEL_BTN_H)),
             );
 
-        // A consonant that has to start before the song does is fixed by
-        // giving the song a bar of lead-in, offered here instead of a dead end.
-        let needs_lead_in = self.plans.iter().flat_map(|plan| &plan.diagnostics)
-            .any(|d| d.code == "E_PHONEME_TIMING_PREROLL");
-        if needs_lead_in {
+        let opening_vowel_is_late = self.plans.iter().filter_map(|plan| plan.phrases.first())
+            .filter(|phrase| phrase.start_seconds == 0.0)
+            .filter_map(|phrase| phrase.score.phoneme_timing.as_ref()?.notes.first())
+            .any(|note| note.nucleus_delay_seconds > 0.0);
+        if opening_vowel_is_late {
             diagnostics = diagnostics.child(
-                div().flex().flex_col().gap(px(6.0)).p(px(10.0)).rounded(px(8.0)).bg(th.control)
-                    .child(div().text_sm().child("开头的辅音没有起唱空间"))
-                    .child(div().text_xs().text_color(th.text_secondary)
-                        .child("元音对齐拍点时，辅音要提前开始；第一个音符离曲首太近。把所有音符后移一小节即可。"))
-                    .child(button("shift-one-bar", "所有音符后移一小节", th).h(px(PANEL_BTN_H))
-                        .on_click(cx.listener(|ed, _, _, cx| ed.shift_notes_one_bar(cx)))));
+                button("shift-one-bar", "为曲首辅音留一小节前奏（所有音符后移）", th)
+                    .h(px(PANEL_BTN_H))
+                    .on_click(cx.listener(|ed, _, _, cx| ed.shift_notes_one_bar(cx))),
+            );
         }
         let (all_diags, omitted_diags) = prioritized_diagnostics(&self.plans, 14);
         if all_diags.is_empty() {

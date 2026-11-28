@@ -79,6 +79,8 @@ Windows 缺少 `LOCALAPPDATA` 时用用户目录的 `AppData/Local`。无法解�
 | 普通任务 | 最长 30 秒。 |
 | 连续段 | 协商 `continuous-runs-v1` 及 `vowel-anchor-v1` 后，最长 120 秒、2,048 段、32,768 控制点；单个音素仍最长 30 秒，休止最短 5 ms。 |
 
+`phoneme_timing.notes` 逐音符记录谱面拍点、声学片段范围和实际提前量 `prefix_seconds`。元音能对拍时，元音核的首段从拍点开始。提前空间不足时，`nucleus_delay_seconds` 表示元音核起点比拍点晚多少秒，省略表示零。没有元音核的读音保留其原生片段，`nucleus_segment_index` 为 `null`。
+
 连接段共用一份帧计划、参数生成和状态，前端不在任意传输边界切断。普通话拼音库存含 418 个拼写；IPA、X-SAMPA 和日语假名保留目标及实际选用音素。日语为明确的跨语言近似。文本读音与声学准入分别判断。[多语言合同](../spec/MULTILINGUAL-PHONEMES.md)
 
 `verdant-voice` 原生解码为 48 kHz／240 样本 hop。控制器单独使用 45–800 Hz 的统计参考；作者目标仍进入解码器。`payload.voice_music={"method":"verdant-voice-music-v1","sample_rate":48000}` 选择仅衰减的输出余量处理，可输出 44,100 或 48,000 Hz；省略保留原生 48 kHz。完整对象进入缓存身份，原生 NPZ／控制时钟不变。

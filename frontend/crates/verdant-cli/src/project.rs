@@ -486,7 +486,11 @@ fn new_project(mut params: Params) -> Result<Value, CliError> {
     params.finish()?;
     require_fresh(&output)?;
     if template.is_some() && ppq.is_some() { return Err(CliError::new("INVALID_ARGUMENT", "ppq belongs in project when a template is provided")); }
-    let mut project = template.unwrap_or_else(Project::new_empty);
+    let mut project = template.unwrap_or_else(|| {
+        let mut project = Project::new_empty();
+        project.render_preferences.phoneme_timing = Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1());
+        project
+    });
     require_creator(&project, allowed_creator.as_deref())?;
     project.project_id = uuid::Uuid::new_v4().to_string();
     project.revision = 0;

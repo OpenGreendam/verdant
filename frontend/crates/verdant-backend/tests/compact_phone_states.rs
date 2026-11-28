@@ -137,7 +137,8 @@ fn anchored_short_notes_use_the_actual_floor_without_moving_authored_geometry() 
     }
     for (index, note) in p.tracks[0].notes.iter().enumerate() {
         near(phrase.start_seconds + trace[index].note_onset_seconds, note.start_tick as f64 / 1000.0);
-        near(starts[trace[index].nucleus_segment_index], trace[index].note_onset_seconds);
+        near(starts[trace[index].nucleus_segment_index.unwrap()], trace[index].note_onset_seconds);
+        near(trace[index].nucleus_delay_seconds, 0.0);
     }
     assert_eq!(p, before);
     p.tracks[0].notes[1].pronunciation.phoneme_durations_permille = Some(vec![600, 400]);

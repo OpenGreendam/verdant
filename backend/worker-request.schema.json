@@ -1074,7 +1074,13 @@
                 "minimum": 0
               },
               "nucleus_segment_index": {
-                "type": "integer",
+                "description": "First native nucleus in the note, or null for an on-beat consonant-only event.",
+                "type": ["integer", "null"],
+                "minimum": 0
+              },
+              "nucleus_delay_seconds": {
+                "description": "Time from note onset to the native nucleus. An omitted value is zero.",
+                "type": "number",
                 "minimum": 0
               },
               "end_segment_index": {
@@ -1082,6 +1088,7 @@
                 "minimum": 1
               },
               "prefix_seconds": {
+                "description": "Time from the first scheduled segment to the authored note onset.",
                 "type": "number",
                 "minimum": 0
               },

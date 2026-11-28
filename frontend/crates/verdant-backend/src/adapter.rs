@@ -736,13 +736,16 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
 
     // Group every note into phrases by rests / the per-job limit; phrases
     // with a bad note are blocked as a whole.
+    // With vowel timing these groups only stage native phone identities. The
+    // physical request boundaries are chosen after the lead-ins are known.
+    let anchoring = project.render_preferences.phoneme_timing.is_some();
     let mut groups: Vec<Vec<&Note>> = Vec::new();
     for n in track.notes.iter().filter(|n|!n.is_muted()) {
         if let Some(g) = groups.last_mut() {
             let prev = g[g.len() - 1];
             let rest = tempo.seconds_at(n.start_tick as f64) - tempo.seconds_at(prev.end_tick() as f64);
             let span = snap_seconds_bound(tempo.seconds_at(n.end_tick() as f64) - tempo.seconds_at(g[0].start_tick as f64), max_phrase);
-            if rest < PHRASE_BREAK_SECONDS && span <= max_phrase {
+            if rest < PHRASE_BREAK_SECONDS && (span <= max_phrase || (anchoring && n.is_continuation() && prev.end_tick() == n.start_tick)) {
                 g.push(n);
                 continue;
             }
@@ -897,7 +900,7 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
             let prefix_seconds = prefix.iter().map(|s| s.duration_seconds + s.gap_after_seconds).sum::<f64>();
             last.duration_seconds = phrase_seconds - prefix_seconds - last.gap_after_seconds;
         }
-        if segments.len() > MAX_SCORE_SEGMENTS {
+        if !anchoring && segments.len() > MAX_SCORE_SEGMENTS {
             out.diagnostics.push(Diagnostic::error(
                 "E_PHRASE_TOO_LONG",
                 Some(first),
@@ -983,7 +986,7 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
             control_track: control_track.map(Arc::new),
         });
     }
-    if project.render_preferences.phoneme_timing.is_some() {
+    if anchoring {
         crate::phoneme_timing::anchor_plan(&mut out, project, track, &tempo, caps);
     }
     // Earlier v1 workers accepted only 4096 transmitted points. A larger
