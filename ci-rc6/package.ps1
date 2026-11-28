@@ -35,8 +35,8 @@ if ((Capture git @('-C',$source,'rev-parse','HEAD')) -cne $ExpectedCommit -or
 if ($ExpectedCommit -cnotmatch '^[a-f0-9]{40}$' -or $identity.tree -cnotmatch '^[a-f0-9]{40}$' -or
     (Capture git @('-C',$source,'show','-s','--format=%ct','HEAD')) -cne $env:RELEASE_EPOCH -or
     (Capture git @('-C',$source,'status','--porcelain'))) { throw 'Unexpected product source or timestamp' }
-$previous = "$env:RUNNER_TEMP/rc6/verdant-0.1.0-windows-x86_64-with-voice.zip"
-if ((Hash $previous) -cne $pins.rc6_sha256) { throw 'Preceding archive changed' }
+$previous = "$env:RUNNER_TEMP/rc7/verdant-0.1.0-windows-x86_64-with-voice.zip"
+if ((Hash $previous) -cne $pins.rc7_sha256) { throw 'Preceding archive changed' }
 $previousRoot = "$env:RUNNER_TEMP/previous"
 Expand-Archive -LiteralPath $previous -DestinationPath $previousRoot
 $share = "$previousRoot/verdant-0.1.0-windows-x86_64/share/verdant"

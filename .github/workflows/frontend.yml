@@ -1,5 +1,5 @@
-name: Windows native RC7 package
-run-name: RC7 Windows ${{ inputs.commit }}
+name: Windows native RC8 package
+run-name: RC8 Windows ${{ inputs.commit }}
 on:
   workflow_dispatch:
     inputs:
@@ -42,7 +42,7 @@ jobs:
       - name: Download official preceding release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download v0.1.0-rc.6 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc6"
+        run: gh release download v0.1.0-rc.7 --repo OpenGreendam/verdant --pattern '*windows-x86_64-with-voice.zip' --dir "$env:RUNNER_TEMP/rc7"
       - name: Compile native programs, run Windows regressions and guard archive
         run: ./helpers/ci-rc6/package.ps1
       - name: Verify first use with outbound firewall blocks
@@ -59,7 +59,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: windows-rc7-native
+          name: windows-rc8-native
           path: evidence/
           if-no-files-found: error
           compression-level: 0
