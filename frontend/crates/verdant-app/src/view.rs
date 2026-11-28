@@ -43,21 +43,46 @@ fn select_parameter_lane(ed:&mut Editor,param:Param,window:&mut Window,cx:&mut C
 const RULER_H: f32 = 24.0;
 const KEYS_W: f32 = 52.0;
 
-/// Keep blocking errors visible even when earlier notes have many warnings.
-/// Preserve source order within each severity and copy only visible track IDs.
+struct DiagnosticRow<'a> {
+    track: &'a verdant_domain::TrackId,
+    diagnostic: &'a verdant_backend::Diagnostic,
+    approximations: Option<usize>,
+}
+
+fn is_note_approximation(diagnostic: &verdant_backend::Diagnostic) -> bool {
+    diagnostic.severity == Severity::Warning && diagnostic.code == "W_PHONEME_APPROXIMATION"
+        && diagnostic.note_id.is_some()
+}
+
+/// Preserve source order within each severity. Count every diagnostic represented
+/// by a visible row, including entries grouped after the row limit.
 fn prioritized_diagnostics(
     plans: &[verdant_backend::PhrasePlan],
     limit: usize,
-) -> (Vec<(verdant_domain::TrackId, &verdant_backend::Diagnostic)>, usize) {
-    let entries = || plans.iter().flat_map(|plan|
-        plan.diagnostics.iter().map(move |diagnostic| (&plan.track, diagnostic)));
-    let visible: Vec<_> = entries().filter(|(_, diagnostic)| diagnostic.severity == Severity::Error)
-        .chain(entries().filter(|(_, diagnostic)| diagnostic.severity == Severity::Warning))
-        .take(limit)
-        .map(|(track, diagnostic)| (track.clone(), diagnostic))
-        .collect();
-    let omitted = plans.iter().map(|plan| plan.diagnostics.len()).sum::<usize>()
-        .saturating_sub(visible.len());
+) -> (Vec<DiagnosticRow<'_>>, usize) {
+    let mut visible = Vec::new();
+    let mut omitted = plans.iter().map(|plan| plan.diagnostics.len()).sum::<usize>();
+    'severity: for severity in [Severity::Error, Severity::Warning] {
+        for plan in plans {
+            let mut grouped = false;
+            for diagnostic in plan.diagnostics.iter().filter(|d| d.severity == severity) {
+                if visible.len() == limit {
+                    break 'severity;
+                }
+                let approximations = if is_note_approximation(diagnostic) {
+                    if grouped {
+                        continue;
+                    }
+                    grouped = true;
+                    Some(plan.diagnostics.iter().filter(|d| is_note_approximation(d)).count())
+                } else {
+                    None
+                };
+                omitted -= approximations.unwrap_or(1);
+                visible.push(DiagnosticRow { track: &plan.track, diagnostic, approximations });
+            }
+        }
+    }
     (visible, omitted)
 }
 
@@ -1035,12 +1060,23 @@ impl Editor {
         if all_diags.is_empty() {
             diagnostics = diagnostics.child(div().text_xs().text_color(th.success).child("✓ 当前全部轨道预检通过，无阻断问题"));
         } else {
-            for (i, (diag_track, d)) in all_diags.into_iter().enumerate() {
+            for (i, row) in all_diags.into_iter().enumerate() {
+                let diag_track = verdant_domain::TrackId::clone(row.track);
+                let d = row.diagnostic;
                 let note_id = d.note_id.clone();
                 let track_name = self.project().track(&diag_track).map(|t| t.name.clone()).unwrap_or_default();
                 let is_err = d.severity == Severity::Error;
+                let (message, location) = match row.approximations {
+                    Some(count) => (format!("{count} 处采用跨语言近似读音"), "点击定位首个受影响音符"),
+                    None => (d.message.clone(), "点击定位"),
+                };
+                let action_label = if row.approximations.is_some() {
+                    format!("{track_name}：{message}（{location}）")
+                } else {
+                    message.clone()
+                };
                 diagnostics = diagnostics.child(
-                    crate::proto_controls::action(SharedString::from(format!("diagnostic-{i}")), d.message.clone())
+                    crate::proto_controls::action(SharedString::from(format!("diagnostic-{i}")), action_label)
                         .w_full()
                         .p(px(7.0))
                         .rounded(px(5.0))
@@ -1056,9 +1092,9 @@ impl Editor {
                                 .text_size(px(10.5))
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(if is_err { th.error } else { th.warning })
-                                .child(format!("{} · {track_name}（点击定位）", if is_err { "错误" } else { "提示" })),
+                                .child(format!("{} · {track_name}（{location}）", if is_err { "错误" } else { "提示" })),
                         )
-                        .child(div().text_xs().text_color(th.text).child(d.message.clone()))
+                        .child(div().text_xs().text_color(th.text).child(message))
                         .on_click(cx.listener(move |ed, _, _, cx| {
                             if ed.lyric.is_some() {
                                 ed.notice("歌词编辑进行中；请先确认或取消歌词，再定位诊断");
@@ -2247,16 +2283,20 @@ mod diagnostic_priority_tests {
     use verdant_domain::{NoteId, TrackId};
 
     #[test]
-    fn earlier_warnings_cannot_hide_later_blocking_notes() {
-        let warning = || Diagnostic {
-            code: "W_PHONEME_APPROXIMATION", severity: Severity::Warning, note_id: None,
+    fn groups_approximations_per_track_after_blocking_errors() {
+        let warning = |id: NoteId| Diagnostic {
+            code: "W_PHONEME_APPROXIMATION", severity: Severity::Warning, note_id: Some(id),
             message: "使用已选择的跨语言近似音素映射".into(), detail: String::new(),
         };
         let mut first = PhrasePlan {
             track: TrackId("low-octaves".into()), route: Route::VerdantVoice,
             phrases: Vec::new(), blocked: Vec::new(),
-            diagnostics: (0..20).map(|_| warning()).collect(),
+            diagnostics: (0..20).map(|i| warning(NoteId(format!("approx-{i}")))).collect(),
         };
+        first.diagnostics.insert(1, Diagnostic {
+            code: "W_OTHER", severity: Severity::Warning, note_id: None,
+            message: "另一条提示".into(), detail: String::new(),
+        });
         let c7 = NoteId("c7-note".into());
         first.diagnostics.push(Diagnostic {
             code: "E_PITCH_RANGE", severity: Severity::Error, note_id: Some(c7.clone()),
@@ -2266,19 +2306,32 @@ mod diagnostic_priority_tests {
         let second = PhrasePlan {
             track: TrackId("high-octave".into()), route: Route::VerdantVoice,
             phrases: Vec::new(), blocked: Vec::new(),
-            diagnostics: vec![Diagnostic {
+            diagnostics: vec![warning(NoteId("other-track".into())), Diagnostic {
                 code: "E_PITCH_RANGE", severity: Severity::Error, note_id: Some(c8.clone()),
                 message: "C8 超出音域".into(), detail: String::new(),
             }],
         };
         let plans = [first, second];
         let (visible, omitted) = prioritized_diagnostics(&plans, 14);
-        assert_eq!(visible.len(), 14);
-        assert_eq!(omitted, 8);
-        assert_eq!(visible[0].0, plans[0].track);
-        assert_eq!(visible[0].1.note_id.as_ref(), Some(&c7));
-        assert_eq!(visible[1].0, plans[1].track);
-        assert_eq!(visible[1].1.note_id.as_ref(), Some(&c8));
-        assert!(visible[2..].iter().all(|(_, d)| d.severity == Severity::Warning));
+        assert_eq!(visible.len(), 5);
+        assert_eq!(omitted, 0);
+        assert_eq!(visible[0].track, &plans[0].track);
+        assert_eq!(visible[0].diagnostic.note_id.as_ref(), Some(&c7));
+        assert_eq!(visible[1].track, &plans[1].track);
+        assert_eq!(visible[1].diagnostic.note_id.as_ref(), Some(&c8));
+        assert_eq!(visible[2].track, &plans[0].track);
+        assert_eq!(visible[2].approximations, Some(20));
+        assert_eq!(visible[2].diagnostic.note_id.as_ref(), Some(&NoteId("approx-0".into())));
+        assert_eq!(visible[3].diagnostic.code, "W_OTHER");
+        assert_eq!(visible[3].approximations, None);
+        assert_eq!(visible[4].track, &plans[1].track);
+        assert_eq!(visible[4].approximations, Some(1));
+
+        let (visible, omitted) = prioritized_diagnostics(&plans, 3);
+        assert_eq!(visible.len(), 3);
+        assert_eq!(visible[2].approximations, Some(20));
+        assert_eq!(omitted, 2);
+        let (_, omitted) = prioritized_diagnostics(&plans, 2);
+        assert_eq!(omitted, 22);
     }
 }
