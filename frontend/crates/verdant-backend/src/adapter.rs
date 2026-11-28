@@ -1037,31 +1037,38 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
             control_track: control_track.map(Arc::new),
         });
     }
-    if anchoring {
-        crate::phoneme_timing::anchor_plan(&mut out, project, track, &tempo, caps);
-    }
     // Earlier v1 workers accepted only 4096 transmitted points. A larger
     // derived-point budget must be declared, not inferred from a route name.
     let expression_point_limit = caps.native_score.as_ref().and_then(|n| n.expression.as_ref())
         .and_then(|expression| expression.maximum_compiled_curve_points).unwrap_or(4096);
+    if anchoring {
+        crate::phoneme_timing::anchor_plan(&mut out, track, &tempo, caps, expression_point_limit);
+        return out;
+    }
     for mut phrase in std::mem::take(&mut out.phrases) {
-        match crate::expression::for_phrase(&phrase, track, &tempo, expression_point_limit) {
-            Ok(expression) => {
-                phrase.expression = expression.map(Arc::new);
+        match compile_phrase_expression(&mut phrase, track, &tempo, expression_point_limit) {
+            Ok(()) => {
                 phrase.index = out.phrases.len();
                 out.phrases.push(phrase);
             }
-            Err(error) => {
-                out.diagnostics.push(Diagnostic::error("E_EXPRESSION_POINT_LIMIT", track.note(&error.note_id),
-                    format!("{} 曲线加入变速边界后超过当前 {} 个传输点预算；请减少控制点或速度变化", error.parameter,
-                        error.maximum_points),
-                    format!("note={}; parameter={}; compiled_points_at_least={}; authored limit=4096; tempo boundaries are never dropped",
-                        error.note_id, error.parameter, error.point_count)));
+            Err(diagnostic) => {
+                out.diagnostics.push(diagnostic);
                 out.blocked.push(BlockedPhrase { note_ids: phrase.note_ids, start_tick: phrase.start_tick, end_tick: phrase.end_tick });
             }
         }
     }
     out
+}
+
+pub(crate) fn compile_phrase_expression(phrase: &mut Phrase, track: &verdant_domain::Track, tempo: &TempoMap,
+    point_limit: usize) -> Result<(), Diagnostic> {
+    phrase.expression = crate::expression::for_phrase(phrase, track, tempo, point_limit).map_err(|error|
+        Diagnostic::error("E_EXPRESSION_POINT_LIMIT", track.note(&error.note_id),
+            format!("{} 曲线加入变速边界后超过当前 {} 个传输点预算；请减少控制点或速度变化", error.parameter,
+                error.maximum_points),
+            format!("note={}; parameter={}; compiled_points_at_least={}; authored limit=4096; tempo boundaries are never dropped",
+                error.note_id, error.parameter, error.point_count)))?.map(Arc::new);
+    Ok(())
 }
 
 fn round_us(s: f64) -> f64 {

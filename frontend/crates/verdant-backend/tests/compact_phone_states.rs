@@ -216,6 +216,24 @@ fn an_impossible_opening_lead_blocks_only_its_phrase() {
 }
 
 #[test]
+fn an_impossible_lead_cannot_trim_the_previous_request() {
+    let p = anchored_project(vec![note(0, 30_000, "a1"), note(30_000, 500, "ma1"),
+        note(30_500, 5, "a1"), note(30_505, 7, "ma1")]);
+    let track = &p.tracks[0];
+    let mut capabilities = caps(true);
+    capabilities.native_score.as_mut().unwrap().inventory.push("ma".into());
+    let result = plan_desktop(&p, &track.id, &capabilities);
+    assert!(result.errors_for(&track.notes[3].id).any(|d| d.code == "E_PHONEME_TIMING_BUDGET"));
+    let [blocked] = result.blocked.as_slice() else { panic!("expected just the successor group to be blocked") };
+    assert_eq!(blocked.note_ids, track.notes[1..].iter().map(|n| n.id.clone()).collect::<Vec<_>>());
+    let [phrase] = result.phrases.as_slice() else { panic!("expected the preceding vowel to render") };
+    assert_eq!(phrase.note_ids, [track.notes[0].id.clone()]);
+    near(phrase.seconds, 30.0);
+    near(phrase.score.segments[0].duration_seconds, 30.0);
+    near(phrase.score.phoneme_timing.as_ref().unwrap().notes[0].tail_trim_seconds, 0.0);
+}
+
+#[test]
 fn short_ipa_clusters_and_kana_keep_their_resolved_phones() {
     for (input, ticks, alphabet, nucleus, phones) in [
         ("word/[en/ipa:s k æ t]", 11, "ipa", 2, &[("s", 0.005), ("k", 0.005), ("æ", 0.006), ("t", 0.005)][..]),

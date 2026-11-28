@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use verdant_domain::{Command, CommandBatch, Note, NoteId, Project, TempoMap, Track, TrackId};
 
-use crate::adapter::{BlockedPhrase, Diagnostic, NoteSupport, PhrasePlan, Severity,
+use crate::adapter::{BlockedPhrase, Diagnostic, NoteSupport, PhrasePlan, Severity, compile_phrase_expression,
                      DURATION_ROUNDOFF_SECONDS, MAX_SCORE_SEGMENTS, PHRASE_BREAK_SECONDS, minimum_segment_seconds, note_support};
 use crate::f0::{Preutterance, anchored_control_track, continuous_control_track, snap_seconds_bound};
 use crate::wire::{Capabilities, ContinuousRuns, NativeScore, PhonemeTimingNote, PhonemeTimingTrace, Route, Segment};
@@ -245,6 +245,18 @@ struct Group {
     within_limits: bool,
 }
 
+fn fit_request_span(notes: &mut [Scheduled<'_>], end: f64, max_phrase: f64, floor: f64) {
+    let first = &mut notes[0];
+    if snap_seconds_bound(end - first.start, max_phrase) <= max_phrase { return; }
+    first.place_after(end - max_phrase);
+    // Shortening the first lead can leave less room for the next one.
+    for index in 1..notes.len() {
+        let earliest = notes[index - 1].earliest_end(floor);
+        if earliest <= notes[index].start { break; }
+        notes[index].place_after(earliest);
+    }
+}
+
 fn diagnostic(note: &Note, code: &'static str, message: String, detail: String) -> Diagnostic {
     Diagnostic { code, severity: Severity::Error, note_id: Some(note.id.clone()), message, detail }
 }
@@ -252,7 +264,7 @@ fn diagnostic(note: &Note, code: &'static str, message: String, detail: String) 
 /// Transform only an explicitly opted-in plan. Legacy expansion remains the
 /// source of legal model paths and initial duration budgets; no worker ID is
 /// used to guess phonetic boundaries here.
-pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Track, tempo: &TempoMap, caps: &Capabilities) {
+pub(crate) fn anchor_plan(plan: &mut PhrasePlan, track: &Track, tempo: &TempoMap, caps: &Capabilities, expression_point_limit: usize) {
     let floor = minimum_segment_seconds(plan.route, caps);
     let Some(template) = plan.phrases.first().cloned() else { return };
     let mut scheduled: Vec<Scheduled<'_>> = Vec::new();
@@ -329,18 +341,7 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
     for unit in units.iter_mut().rev() {
         let last = unit.notes.end - 1;
         let end = if next_within_limits { scheduled_end(&scheduled, last) } else { scheduled[last].nominal_end };
-        let first = &mut scheduled[unit.notes.start];
-        if snap_seconds_bound(end - first.start, max_phrase) > max_phrase {
-            first.place_after(end - max_phrase);
-            // In a continuous run the next prefix may already be using time
-            // that this first note has just given back. Carry that pressure
-            // forward only until the next note still fits its original slot.
-            for index in unit.notes.start + 1..unit.notes.end {
-                let earliest = scheduled[index - 1].earliest_end(floor);
-                if earliest <= scheduled[index].start { break; }
-                scheduled[index].place_after(earliest);
-            }
-        }
+        fit_request_span(&mut scheduled[unit.notes.clone()], end, max_phrase, floor);
         unit.within_limits = unit.segments <= segment_limit
             && snap_seconds_bound(end - scheduled[unit.notes.start].start, max_phrase) <= max_phrase;
         next_within_limits = unit.within_limits;
@@ -365,19 +366,45 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
         groups.push(unit);
     }
     plan.phrases.clear();
+    let first_new_blocked = plan.blocked.len();
     let all_notes: Vec<_> = track.notes.iter().collect();
-    for group in groups {
+    // These final checks can reject a whole group. Resolve each successor
+    // before deciding whether the preceding group actually owes it a tail.
+    let mut successor_admitted = false;
+    while let Some(mut group) = groups.pop() {
+        let next_admitted = std::mem::take(&mut successor_admitted);
+        let last_index = group.notes.end - 1;
+        let end = if next_admitted { scheduled_end(&scheduled, last_index) } else { scheduled[last_index].nominal_end };
+        if group.within_limits && end != scheduled[last_index].end {
+            // An ordinary merged request may need its last source chain in
+            // a separate job once the tail is restored. Keep chains intact.
+            if continuity.is_none() && snap_seconds_bound(end - scheduled[group.notes.start].onset, max_phrase) > max_phrase {
+                let split = (group.notes.start + 1..=last_index).rev().find(|&i| !scheduled[i].note.is_continuation());
+                if let Some(split) = split {
+                    let tail = Group { notes: split..group.notes.end,
+                        segments: scheduled[split..group.notes.end].iter().map(|n| n.segments.len()).sum(), within_limits: true };
+                    group.notes.end = split;
+                    group.segments -= tail.segments;
+                    groups.push(group);
+                    group = tail;
+                }
+            }
+            fit_request_span(&mut scheduled[group.notes.clone()], end, max_phrase, floor);
+            for index in group.notes.start..last_index {
+                scheduled[index].end = scheduled_end(&scheduled, index);
+            }
+        }
+        scheduled[last_index].end = end;
         let first = &scheduled[group.notes.start];
         let last = &scheduled[group.notes.end - 1];
         let first_note = first.note;
         let mut phrase = template.clone();
-        phrase.index = plan.phrases.len();
         phrase.note_ids = scheduled[group.notes.clone()].iter().map(|n| n.note.id.clone()).collect();
         phrase.start_tick = first.note.start_tick;
         phrase.end_tick = last.note.end_tick();
         phrase.start_seconds = first.start;
         phrase.seconds = snap_seconds_bound(last.end-first.start, max_phrase);
-        if !group.within_limits {
+        if !group.within_limits || phrase.seconds > max_phrase {
             let code = if continuity.is_some() { "E_CONTINUOUS_RUN_LIMIT" } else if group.notes.len() > 1 {
                 "E_CONTINUATION_PHRASE"
             } else { "E_PHONEME_TIMING_PHRASE_LIMIT" };
@@ -407,7 +434,7 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
             continue;
         }
         let mut score = NativeScore {
-            title: format!("Verdant {} phrase {}", track.name, phrase.index+1),
+            title: String::new(),
             segments: Vec::with_capacity(group.segments),
             original_hierarchy: template.score.original_hierarchy.clone(),
             synthesis: template.score.synthesis.clone(),
@@ -467,6 +494,18 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
         }
         phrase.score = Arc::new(score);
         phrase.control_track = Some(Arc::new(control));
+        if let Err(diagnostic) = compile_phrase_expression(&mut phrase, track, tempo, expression_point_limit) {
+            plan.diagnostics.push(diagnostic);
+            plan.blocked.push(BlockedPhrase { note_ids: phrase.note_ids, start_tick: phrase.start_tick, end_tick: phrase.end_tick });
+            continue;
+        }
+        successor_admitted = true;
         plan.phrases.push(phrase);
+    }
+    plan.phrases.reverse();
+    plan.blocked[first_new_blocked..].reverse();
+    for (index, phrase) in plan.phrases.iter_mut().enumerate() {
+        phrase.index = index;
+        Arc::get_mut(&mut phrase.score).expect("new score has one owner").title = format!("Verdant {} phrase {}", track.name, index + 1);
     }
 }
