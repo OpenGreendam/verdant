@@ -1,7 +1,7 @@
 name: Linux native RC8 package
 on:
   push:
-    branches: [ci/rc8-linux-6VEifVUE]
+    branches: [ci/rc8-linux-final-eQnLN8lw]
     paths: [ci-rc6-linux/source.sha]
 permissions:
   contents: read
