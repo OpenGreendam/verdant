@@ -59,6 +59,7 @@ pub fn describe(config:&Config)->Result<Value>{
             "compact_phone_states":true,
             "compact_phone_states_scope":"verdant-voice uses a fixed 5 ms acoustic clock and permits one frame per phone",
             "phoneme_timing":{"methods":["vowel-anchor-v1"],"routes":routes,"timing_resolution_seconds":0.005,
+                "constrained_nucleus_timing":true,
                 "continuity":{"method":"continuous-runs-v1","max_seconds":120.,"max_segments":2048,"max_control_points":32768,"minimum_silence_seconds":0.005,
                     "requires_phoneme_timing":"vowel-anchor-v1","execution":"whole connected run, one frame plan and MLPG; no artificial split"}},
             "absolute_boundary_timing":true,"duration_roundoff_tolerance_seconds":1e-12,

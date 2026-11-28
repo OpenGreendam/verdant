@@ -761,6 +761,9 @@ pub struct PhonemeTimingCaps {
     pub methods: Vec<String>,
     #[serde(default)]
     pub timing_resolution_seconds: Option<f64>,
+    /// Accepts a null nucleus index or a positive nucleus delay in the timing trace.
+    #[serde(default)]
+    pub constrained_nucleus_timing: bool,
     #[serde(default)]
     pub continuity: Option<ContinuousRunsCaps>,
 }

@@ -12,7 +12,8 @@ fn caps() -> Capabilities {
             "continuous_f0_control":true,"sub_syllable_timing":true,"phoneme_duration_control":true,
             "explicit_f0_hz_range":[35,2000],
             "phoneme_frontend":{"schema_version":"verdant-phonemes/2","alphabets":["ipa","xsampa"],"languages":{"zh":"Chinese","ja":"Japanese","en":"English"}},
-            "phoneme_timing":{"methods":["vowel-anchor-v1"],"routes":["verdant-voice"],"timing_resolution_seconds":0.005}},
+            "phoneme_timing":{"methods":["vowel-anchor-v1"],"routes":["verdant-voice"],"timing_resolution_seconds":0.005,
+                "constrained_nucleus_timing":true}},
         
     })).unwrap()
 }
@@ -269,6 +270,82 @@ fn tempo_change_is_integrated_before_anchors_and_does_not_round_back_to_ticks() 
 }
 
 #[test]
+fn old_workers_keep_exact_on_beat_phrases_and_block_only_the_group_needing_extended_nuclei() {
+    let mut modern = continuous_caps();
+    modern.native_score.as_mut().unwrap().compact_phone_states = true;
+    let mut wire = serde_json::to_value(&modern).unwrap();
+    let timing = wire["native_score"]["phoneme_timing"].as_object_mut().unwrap();
+    assert_eq!(timing.remove("constrained_nucleus_timing"), Some(json!(true)));
+    let legacy: Capabilities = serde_json::from_value(wire).unwrap();
+    assert!(!legacy.native_score.as_ref().unwrap().phoneme_timing.as_ref().unwrap().constrained_nucleus_timing);
+
+    let mut stable = cv(1000, 500, 60, "ma1");
+    stable.pronunciation.phoneme_durations_permille = Some(vec![250, 750]);
+    // This 5 ms vowel keeps its one native frame. The following 20 ms CV
+    // must put its entire 8 ms consonant after the beat.
+    let vowel = cv(3000, 5, 60, "a1");
+    let mut delayed = cv(3005, 20, 60, "ma1");
+    delayed.pronunciation.phoneme_durations_permille = Some(vec![400, 600]);
+    let mut consonant = cv(3025, 50, 60, "s");
+    consonant.pronunciation = Pronunciation { language: Some("en".into()), alphabet: Some("ipa".into()),
+        phonemes: vec!["s".into()], source: PronunciationSource::Manual, ..Default::default() };
+    let mut p = project(vec![stable, vowel, delayed, consonant]);
+    p.ppq = 1000;
+    p.tempo_map[0].micro_bpm = 60_000_000;
+    let track = &p.tracks[0];
+    let current = planned(&p, &modern);
+    let [ordinary, mixed] = current.phrases.as_slice() else { panic!("expected two acoustic groups") };
+    assert_timing_geometry(&p, &current);
+    let traces = serde_json::to_value(&mixed.score.phoneme_timing.as_ref().unwrap().notes).unwrap();
+    assert_eq!(traces[0]["nucleus_segment_index"], 0);
+    assert!(traces[0].get("nucleus_delay_seconds").is_none());
+    assert_eq!(traces[1]["nucleus_segment_index"], 2);
+    near(traces[1]["nucleus_delay_seconds"].as_f64().unwrap(), 0.008);
+    assert_eq!(traces[2].get("nucleus_segment_index"), Some(&Value::Null));
+
+    let old = plan(&p, &track.id, Route::VerdantVoice, &legacy);
+    let [preserved] = old.phrases.as_slice() else { panic!("legacy worker should retain the on-beat group") };
+    let [blocked] = old.blocked.as_slice() else { panic!("only the mixed acoustic group needs the extension") };
+    assert_eq!(blocked.note_ids, mixed.note_ids);
+    assert_eq!((blocked.start_tick, blocked.end_tick), (3000, 3075));
+    let errors: Vec<_> = old.diagnostics.iter().filter(|d| d.code == "E_PHONEME_TIMING_CAPABILITY").collect();
+    assert_eq!(errors.len(), 2);
+    for (error, note) in errors.iter().zip(&track.notes[2..]) {
+        assert_eq!(error.note_id.as_ref(), Some(&note.id));
+        assert!(error.message.contains("新版合成后端"));
+        assert!(error.detail.contains("constrained_nucleus_timing"));
+    }
+    let payload = payload_for(preserved, old.route, 10008);
+    assert_eq!(payload, payload_for(ordinary, current.route, 10008));
+    let trace = serde_json::to_value(&payload).unwrap();
+    assert_eq!(trace["score"]["phoneme_timing"]["notes"], json!([{
+        "note_id":track.notes[0].id, "note_onset_seconds":0.125, "note_end_seconds":0.625,
+        "first_segment_index":0, "nucleus_segment_index":1, "end_segment_index":2,
+        "prefix_seconds":0.125, "tail_trim_seconds":0.0
+    }]));
+}
+
+#[test]
+fn a_weighted_lead_filling_the_opening_rest_keeps_its_legacy_trace() {
+    // 42.5% of 720 ticks is exactly 306 ticks. Subtracting the absolute
+    // times in seconds makes the weighted prefix one ULP longer than the rest.
+    let mut note = cv(306, 720, 60, "ma1");
+    note.pronunciation.phoneme_durations_permille = Some(vec![425, 575]);
+    let p = project(vec![note]);
+    for supported in [false, true] {
+        let mut c = caps();
+        c.native_score.as_mut().unwrap().phoneme_timing.as_mut().unwrap().constrained_nucleus_timing = supported;
+        let result = planned(&p, &c);
+        let phrase = &result.phrases[0];
+        assert_eq!(phrase.start_seconds, 0.0);
+        let trace = &phrase.score.phoneme_timing.as_ref().unwrap().notes[0];
+        assert_eq!(trace.nucleus_segment_index, Some(1));
+        assert_eq!(trace.prefix_seconds, phrase.score.segments[0].duration_seconds);
+        assert!(serde_json::to_value(trace).unwrap().get("nucleus_delay_seconds").is_none());
+    }
+}
+
+#[test]
 fn unknown_method_missing_support_or_wrong_clock_blocks_only_opted_in_projects() {
     for case in 0..6 {
         let mut p = project(vec![cv(960,960,60,"ma1")]);
@@ -476,6 +553,115 @@ fn a_bare_vowel_below_the_native_phone_floor_blocks_only_its_own_phrase() {
 }
 
 #[test]
+fn a_muted_predecessor_frees_its_time_for_a_lead_but_a_blocked_phrase_is_a_barrier() {
+    let mut first = cv(0, 960, 60, "ma1");
+    first.set_muted(true);
+    let mut p = project(vec![first, cv(960, 960, 69, "ma1")]);
+    let mut c = caps();
+    c.max_phrase_seconds = 0.7;
+    let muted = planned(&p, &c);
+    assert!(muted.blocked.is_empty());
+    let [phrase] = muted.phrases.as_slice() else { panic!("only the second note should sound") };
+    assert_eq!(phrase.note_ids.as_slice(), std::slice::from_ref(&p.tracks[0].notes[1].id));
+    let [m, a] = phrase.score.segments.as_slice() else { panic!("expected the native initial and final") };
+    assert_eq!(m.context.as_ref().unwrap().features["C_SM"], "m");
+    assert_eq!(a.context.as_ref().unwrap().features["C_YM"], "a");
+    assert!(m.voiced && a.voiced);
+    near(phrase.start_seconds, 0.390);
+    near(phrase.start_seconds + m.duration_seconds, 0.500);
+    near(phrase.start_seconds + phrase.seconds, 1.000);
+    let trace = &phrase.score.phoneme_timing.as_ref().unwrap().notes[0];
+    assert_eq!(trace.nucleus_segment_index, Some(1));
+    near(trace.prefix_seconds, 0.110);
+    near(trace.nucleus_delay_seconds, 0.0);
+    assert_voiced_pitch(phrase, 0.0, 440.0);
+
+    // Identical note times, but now the first phrase contains an actual admission error.
+    let first = &mut p.tracks[0].notes[0];
+    first.set_muted(false);
+    first.pronunciation.phoneme_durations_permille = Some(vec![0, 1000]);
+    let with_barrier = plan(&p, &p.tracks[0].id, Route::VerdantVoice, &c);
+    assert!(with_barrier.errors_for(&p.tracks[0].notes[0].id).any(|d| d.code == "E_PHONEME_TIMING"));
+    let [blocked] = with_barrier.blocked.as_slice() else { panic!("the invalid first phrase must stay located") };
+    assert_eq!(blocked.note_ids.as_slice(), std::slice::from_ref(&p.tracks[0].notes[0].id));
+    let [following] = with_barrier.phrases.as_slice() else { panic!("the second phrase must still render") };
+    assert_eq!(following.note_ids, phrase.note_ids);
+    near(following.start_seconds, 0.500);
+    let trace = &following.score.phoneme_timing.as_ref().unwrap().notes[0];
+    near(trace.prefix_seconds, 0.0);
+    near(trace.nucleus_delay_seconds, 0.110);
+}
+
+#[test]
+fn an_illegal_continuation_after_a_coda_keeps_the_valid_thirty_second_source_phrase() {
+    let mut at = Note::new(0, 57_600, 64);
+    at.lyric = "at".into();
+    at.pronunciation = Pronunciation { language: Some("en".into()), alphabet: Some("ipa".into()),
+        phonemes: vec!["æ".into(), "t".into()], source: PronunciationSource::Manual, ..Default::default() };
+    let mut sustain = Note::new(at.end_tick(), 960, 64);
+    sustain.lyric = "+".into();
+    let mut p = project(vec![at]);
+    let c = caps();
+    let standalone = planned(&p, &c);
+    let expected = &standalone.phrases[0];
+    p.tracks[0].notes.push(sustain.clone());
+    p.tracks[0].refresh_index();
+    let joined = plan(&p, &p.tracks[0].id, Route::VerdantVoice, &c);
+    assert!(joined.errors_for(&sustain.id).any(|d| d.code == "E_CONTINUATION"));
+    assert!(joined.errors_for(&p.tracks[0].notes[0].id).next().is_none());
+    let [blocked] = joined.blocked.as_slice() else { panic!("only the illegal continuation should be blocked") };
+    assert_eq!(blocked.note_ids.as_slice(), std::slice::from_ref(&sustain.id));
+    let [actual] = joined.phrases.as_slice() else { panic!("the complete /æt/ source must render") };
+    assert_eq!(actual.note_ids, expected.note_ids);
+    assert_eq!(actual.score.segments, expected.score.segments);
+    assert_eq!(actual.score.phoneme_timing, expected.score.phoneme_timing);
+    let [vowel, coda] = actual.score.segments.as_slice() else { panic!("both source phones must remain") };
+    assert_eq!(vowel.phoneme.as_ref().unwrap().native_key, "en:ae");
+    assert_eq!(coda.phoneme.as_ref().unwrap().native_key, "en:t");
+    near(actual.start_seconds, 0.0);
+    near(actual.seconds, 30.0);
+    near(vowel.duration_seconds + coda.duration_seconds, 30.0);
+}
+
+#[test]
+fn a_chain_rejected_at_513_segments_cannot_borrow_the_preceding_vowels_tail() {
+    let mut notes = vec![cv(0, 57_600, 60, "a1"), cv(57_600, 960, 64, "ma1")];
+    for _ in 0..510 {
+        let mut sustain = Note::new(notes.last().unwrap().end_tick(), 48, 64);
+        sustain.lyric = "+".into();
+        notes.push(sustain);
+    }
+    let mut p = project(notes);
+    let c = caps();
+    let admitted = planned(&p, &c);
+    let [before, chain] = admitted.phrases.as_slice() else { panic!("the 512-segment chain fits its own request") };
+    assert_eq!(chain.score.segments.len(), 512);
+    assert!(chain.seconds < c.max_phrase_seconds);
+    near(before.score.phoneme_timing.as_ref().unwrap().notes[0].tail_trim_seconds, 0.110);
+
+    let track = &mut p.tracks[0];
+    let mut extra = Note::new(track.notes.last().unwrap().end_tick(), 48, 64);
+    extra.lyric = "+".into();
+    track.notes.push(extra);
+    track.refresh_index();
+    let track = &p.tracks[0];
+    let over = plan(&p, &track.id, Route::VerdantVoice, &c);
+    assert!(over.has_errors() && over.errors_for(&track.notes[0].id).next().is_none());
+    let [blocked] = over.blocked.as_slice() else { panic!("only the 513-segment chain should be blocked") };
+    assert!(blocked.note_ids.iter().eq(track.notes[1..].iter().map(|note| &note.id)));
+    assert!(blocked.note_ids.iter().any(|id| over.errors_for(id).any(|d| d.severity == verdant_backend::Severity::Error)));
+    let [survivor] = over.phrases.as_slice() else { panic!("the preceding whole vowel must remain") };
+    assert_eq!(survivor.note_ids.as_slice(), std::slice::from_ref(&track.notes[0].id));
+    near(survivor.start_seconds, 0.0);
+    near(survivor.seconds, 30.0);
+    near(survivor.score.phoneme_timing.as_ref().unwrap().notes[0].tail_trim_seconds, 0.0);
+    let [vowel] = survivor.score.segments.as_slice() else { panic!("expected one whole vowel") };
+    assert_eq!(vowel.context.as_ref().unwrap().features["C_YM"], "a");
+    near(vowel.duration_seconds, 30.0);
+    near(vowel.gap_after_seconds, 0.0);
+}
+
+#[test]
 fn following_note_budget_changes_the_previous_phrase_digest_across_a_hard_split() {
     let mut p=project(vec![cv(960,960,60,"ma1"),cv(1920,960,64,"gu1"),cv(2880,960,67,"shi1")]);
     let mut c=caps();c.max_phrase_seconds=0.7;
@@ -496,6 +682,56 @@ fn continuous_caps() -> Capabilities {
         verdant_backend::wire::ContinuousRunsCaps { method:"continuous-runs-v1".into(),
             max_seconds:120.0,max_segments:2048,max_control_points:32768,minimum_silence_seconds:0.005 });
     c
+}
+
+#[test]
+fn a_late_origin_120_second_request_meets_the_native_cumulative_duration_and_frame_limits() {
+    // At 125 BPM and 960 PPQ, 10 ticks are one 5 ms frame. The large origin
+    // makes subtraction of independently converted absolute boundaries inexact.
+    let mut start = 2_048_000;
+    let mut notes = Vec::new();
+    for duration in std::iter::repeat_n(10, 25).chain([59_750, 60_000, 60_000, 60_000]) {
+        notes.push(cv(start, duration, 64, "a1"));
+        start += duration;
+    }
+    let mut p = project(notes);
+    p.tempo_map[0].micro_bpm = 125_000_000;
+    let mut c = continuous_caps();
+    c.native_score.as_mut().unwrap().compact_phone_states = true;
+    let result = planned(&p, &c);
+    assert_anchor_geometry(&p, &result);
+    let [phrase] = result.phrases.as_slice() else { panic!("all 29 contiguous vowels fit one continuous run") };
+    near(phrase.start_seconds, 1024.0);
+    near(phrase.seconds, 120.0);
+    let request = Request::render("late-origin", "late-origin", p.revision, result.route,
+        payload_for(phrase, result.route, 10008));
+    let wire: Value = serde_json::from_str(&request.to_line().unwrap()).unwrap();
+    let score = &wire["payload"]["score"];
+    assert_eq!(score["continuity"]["method"], "continuous-runs-v1");
+    let segments = score["segments"].as_array().unwrap();
+    assert_eq!(segments.len(), 29);
+
+    // Binary64 intervals of at least 5 ms are integral in units of 2^-60 s.
+    // Sum the actual wire values exactly, as the native synthesis validator
+    // does, so repeated rounded additions cannot conceal a 1 ps overrun.
+    const UNITS_PER_SECOND: u128 = 1 << 60;
+    let mut elapsed_units = 0_u128;
+    let mut previous_frame = 0;
+    for (segment, note) in segments.iter().zip(&p.tracks[0].notes) {
+        let seconds = segment["duration_seconds"].as_f64().unwrap();
+        assert!((0.005 - 1e-12..=30.0 + 1e-12).contains(&seconds), "{seconds:.16}");
+        near(seconds, note.duration_tick as f64 / 2000.0);
+        if let Some(gap) = segment.get("gap_after_seconds") { assert_eq!(gap.as_f64(), Some(0.0)); }
+        let units = seconds * UNITS_PER_SECOND as f64;
+        assert_eq!(units.fract(), 0.0);
+        elapsed_units += units as u128;
+        let frame = (elapsed_units * 200 + UNITS_PER_SECOND / 2) / UNITS_PER_SECOND;
+        assert_eq!(frame - previous_frame, (note.duration_tick / 10) as u128);
+        previous_frame = frame;
+    }
+    assert_eq!(previous_frame, 24_000);
+    let wire_seconds = elapsed_units as f64 / UNITS_PER_SECOND as f64;
+    assert!((120.0 - 1e-12..=120.0 + 1e-12).contains(&wire_seconds), "wire duration {wire_seconds:.16} s");
 }
 
 #[test]

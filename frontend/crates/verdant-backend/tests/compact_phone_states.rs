@@ -1,6 +1,6 @@
 use serde_json::json;
 use verdant_backend::{Capabilities, Route, plan};
-use verdant_backend::adapter::minimum_segment_seconds;
+use verdant_backend::adapter::{minimum_segment_seconds, plan_desktop};
 use verdant_backend::phoneme_timing::{drag_boundary, minimum_permille, note_budget};
 use verdant_domain::{Note, Project, Pronunciation, PronunciationSource, TempoMap};
 
@@ -13,7 +13,7 @@ fn caps(compact: bool) -> Capabilities {
             "phoneme_frontend": {"schema_version": "verdant-phonemes/2", "alphabets": ["ipa"],
                 "languages": {"en": "native", "ja": "approximate", "zh": "native"}},
             "phoneme_timing": {"methods": ["vowel-anchor-v1"], "routes": ["verdant-voice"],
-                "timing_resolution_seconds": 0.005}}
+                "timing_resolution_seconds": 0.005, "constrained_nucleus_timing": true}}
     })).unwrap()
 }
 
@@ -146,4 +146,122 @@ fn anchored_short_notes_use_the_actual_floor_without_moving_authored_geometry() 
     let rejected = plan(&p, &p.tracks[0].id, Route::VerdantVoice, &caps(true));
     assert!(rejected.phrases.is_empty());
     assert!(rejected.diagnostics.iter().any(|d| d.message.contains("5 ms")));
+}
+
+fn anchored_project(notes: Vec<Note>) -> Project {
+    let mut p = project(notes);
+    p.render_preferences.phoneme_timing = Some(verdant_domain::PhonemeTimingSettings::vowel_anchor_v1());
+    p
+}
+
+#[test]
+fn seven_millisecond_pinyin_uses_a_full_or_partial_lead() {
+    let caps = caps(true);
+    for (start, lead) in [(1000, 0.005), (3, 0.003)] {
+        let mut p = anchored_project(vec![note(start, 7, "ba1")]);
+        let before = p.clone();
+        let track = &p.tracks[0];
+        let result = plan_desktop(&p, &track.id, &caps);
+        assert!(!result.has_errors(), "{:?}", result.diagnostics);
+        let [phrase] = result.phrases.as_slice() else { panic!("expected one phrase") };
+        let [initial, vowel] = phrase.score.segments.as_slice() else { panic!("expected ba initial and final") };
+        let [trace] = phrase.score.phoneme_timing.as_ref().unwrap().notes.as_slice() else { panic!("expected one source note") };
+        let onset = start as f64 / 1000.0;
+        assert_eq!((phrase.start_tick, phrase.end_tick), (start, start + 7));
+        assert_eq!(trace.note_id, track.notes[0].id.as_str());
+        assert_eq!((trace.first_segment_index, trace.nucleus_segment_index, trace.end_segment_index), (0, Some(1), 2));
+        assert_eq!(initial.context.as_ref().unwrap().features["C_SM"], "b");
+        assert_eq!(vowel.context.as_ref().unwrap().features["C_YM"], "a");
+        assert_eq!((initial.midi_note, vowel.midi_note), (Some(64.0), Some(64.0)));
+        near(phrase.start_seconds, onset - lead);
+        near(phrase.start_seconds + trace.note_onset_seconds, onset);
+        near(phrase.start_seconds + trace.note_end_seconds, onset + 0.007);
+        near(trace.prefix_seconds, lead);
+        near(trace.nucleus_delay_seconds, 0.005 - lead);
+        near(trace.tail_trim_seconds, 0.0);
+        near(initial.duration_seconds, 0.005);
+        near(initial.gap_after_seconds, 0.0);
+        near(initial.duration_seconds, trace.note_onset_seconds + trace.nucleus_delay_seconds);
+        near(vowel.duration_seconds, 0.007 - trace.nucleus_delay_seconds);
+        near(vowel.gap_after_seconds, 0.0);
+        near(initial.duration_seconds + vowel.duration_seconds, phrase.seconds);
+        near(phrase.start_seconds + phrase.seconds, onset + 0.007);
+        assert_eq!(p, before);
+
+        p.render_preferences.phoneme_timing = None;
+        let legacy = plan_desktop(&p, &p.tracks[0].id, &caps);
+        assert!(legacy.phrases.is_empty());
+        assert!(legacy.errors_for(&p.tracks[0].notes[0].id).any(|d| d.code == "E_SYLLABLE_DOMAIN"));
+    }
+}
+
+#[test]
+fn an_impossible_opening_lead_blocks_only_its_phrase() {
+    let p = anchored_project(vec![note(0, 7, "ba1"), note(7, 5, "a1"), note(1000, 7, "ba1")]);
+    let track = &p.tracks[0];
+    let result = plan_desktop(&p, &track.id, &caps(true));
+    assert!(result.errors_for(&track.notes[0].id).any(|d| d.code == "E_PHONEME_TIMING_BUDGET"));
+    let [blocked] = result.blocked.as_slice() else { panic!("expected just the opening phrase to be blocked") };
+    assert_eq!(blocked.note_ids, [track.notes[0].id.clone(), track.notes[1].id.clone()]);
+    assert_eq!((blocked.start_tick, blocked.end_tick), (0, 12));
+    let [later] = result.phrases.as_slice() else { panic!("the note after the long rest should render") };
+    let isolated = anchored_project(vec![track.notes[2].clone()]);
+    let single = plan_desktop(&isolated, &isolated.tracks[0].id, &caps(true));
+    let [expected] = single.phrases.as_slice() else { panic!("expected the isolated short note to render") };
+    assert_eq!(later.note_ids, expected.note_ids);
+    assert_eq!(later.score.segments, expected.score.segments);
+    assert_eq!(later.score.phoneme_timing, expected.score.phoneme_timing);
+    near(later.start_seconds, expected.start_seconds);
+    near(later.seconds, expected.seconds);
+}
+
+#[test]
+fn short_ipa_clusters_and_kana_keep_their_resolved_phones() {
+    for (input, ticks, alphabet, nucleus, phones) in [
+        ("word/[en/ipa:s k æ t]", 11, "ipa", 2, &[("s", 0.005), ("k", 0.005), ("æ", 0.006), ("t", 0.005)][..]),
+        ("word/[en/ipa:k æ iː]", 13, "ipa", 1, &[("k", 0.005), ("æ", 0.006), ("iː", 0.007)][..]),
+        ("か/[ja/kana:か]", 7, "kana", 1, &[("k", 0.005), ("a", 0.007)][..]),
+    ] {
+        let mut n = Note::new(1000, ticks, 64);
+        (n.lyric, n.pronunciation) = verdant_backend::reading::parse_phonetic_input(input).unwrap().unwrap();
+        let p = anchored_project(vec![n]);
+        let result = plan_desktop(&p, &p.tracks[0].id, &caps(true));
+        assert!(!result.has_errors(), "{input}: {:?}", result.diagnostics);
+        let [phrase] = result.phrases.as_slice() else { panic!("expected one phrase") };
+        let trace = &phrase.score.phoneme_timing.as_ref().unwrap().notes[0];
+        assert_eq!(trace.nucleus_segment_index, Some(nucleus));
+        near(trace.prefix_seconds, nucleus as f64 * 0.005);
+        near(trace.nucleus_delay_seconds, 0.0);
+        near(phrase.start_seconds + trace.note_onset_seconds, 1.0);
+        let mut clock = phrase.start_seconds;
+        assert_eq!(phrase.score.segments.len(), phones.len());
+        for (index, (segment, &(symbol, seconds))) in phrase.score.segments.iter().zip(phones).enumerate() {
+            if index == nucleus { near(clock, 1.0); }
+            let phone = segment.phoneme.as_ref().unwrap();
+            assert_eq!(phone.canonical_ipa, symbol);
+            assert_eq!(phone.input_alphabet, alphabet);
+            near(segment.duration_seconds, seconds);
+            near(segment.gap_after_seconds, 0.0);
+            clock += segment.duration_seconds;
+        }
+        near(clock, 1.0 + ticks as f64 / 1000.0);
+    }
+}
+
+#[test]
+fn a_preroll_cannot_replace_declared_phone_mora_or_lyric_part_budgets() {
+    let mut too_short = note(1000, 7, "ba1");
+    too_short.pronunciation.phoneme_durations_permille = Some(vec![500, 500]);
+    let mut malformed = note(1000, 7, "ba1");
+    malformed.pronunciation.phoneme_durations_permille = Some(vec![1000]);
+    let mut moras = Note::new(1000, 17, 64);
+    (moras.lyric, moras.pronunciation) = verdant_backend::reading::parse_phonetic_input("かか/[ja/kana:かか]").unwrap().unwrap();
+    let mut parts = Note::new(1000, 17, 64);
+    parts.lyric = "か か".into();
+    for n in [too_short, malformed, moras, parts] {
+        let p = anchored_project(vec![n]);
+        let result = plan_desktop(&p, &p.tracks[0].id, &caps(true));
+        assert!(result.phrases.is_empty());
+        assert!(result.errors_for(&p.tracks[0].notes[0].id).any(|d| d.code == "E_PHONEME_TIMING"));
+    }
 }

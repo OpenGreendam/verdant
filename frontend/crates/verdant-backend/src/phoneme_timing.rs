@@ -10,7 +10,7 @@ use std::sync::Arc;
 use verdant_domain::{Command, CommandBatch, Note, NoteId, Project, TempoMap, Track, TrackId};
 
 use crate::adapter::{BlockedPhrase, Diagnostic, NoteSupport, PhrasePlan, Severity,
-                     MAX_SCORE_SEGMENTS, PHRASE_BREAK_SECONDS, minimum_segment_seconds, note_support};
+                     DURATION_ROUNDOFF_SECONDS, MAX_SCORE_SEGMENTS, PHRASE_BREAK_SECONDS, minimum_segment_seconds, note_support};
 use crate::f0::{Preutterance, anchored_control_track, continuous_control_track, snap_seconds_bound};
 use crate::wire::{Capabilities, ContinuousRuns, NativeScore, PhonemeTimingNote, PhonemeTimingTrace, Route, Segment};
 
@@ -156,6 +156,7 @@ pub fn drag_boundary(project: &Project, track_id: &TrackId, note_id: &NoteId, ca
 struct Scheduled<'a> {
     note: &'a Note,
     note_index: usize,
+    follows_previous: bool,
     segments: Vec<Segment>,
     nuclei: Vec<bool>,
     nucleus: Option<usize>,
@@ -173,7 +174,7 @@ impl Scheduled<'_> {
         self.start = desired.max(earliest).clamp(0.0, self.onset);
         // Preserve the original budget for an on-beat anchor, including
         // arithmetic residue at an exactly shared native segment boundary.
-        self.prefix = if desired >= 0.0 && snap_seconds_bound(self.start, desired) == desired { self.desired_prefix }
+        self.prefix = if snap_seconds_bound(self.start, desired) == desired { self.desired_prefix }
             else { (self.onset - self.start).clamp(0.0, self.desired_prefix) };
     }
 
@@ -223,20 +224,25 @@ impl Scheduled<'_> {
         }
         let emitted: f64 = self.segments.iter().map(|segment| segment.duration_seconds).sum();
         let residue = (self.end - self.start) - emitted;
-        self.segments[last].duration_seconds = (self.segments[last].duration_seconds + residue).max(floor);
+        let corrected = self.segments[last].duration_seconds + residue;
+        // Keep the absolute endpoints when the worker already admits this
+        // residue. Clamping every note independently lengthens a whole run.
+        if corrected < floor - DURATION_ROUNDOFF_SECONDS { return false; }
+        self.segments[last].duration_seconds = corrected;
         true
     }
 }
 
 fn scheduled_end(notes: &[Scheduled<'_>], index: usize) -> f64 {
     let note = &notes[index];
-    notes.get(index + 1).filter(|next| next.note_index == note.note_index + 1)
+    notes.get(index + 1).filter(|next| next.follows_previous)
         .map_or(note.nominal_end, |next| note.nominal_end.min(next.start))
 }
 
 struct Group {
     notes: std::ops::Range<usize>,
     segments: usize,
+    within_limits: bool,
 }
 
 fn diagnostic(note: &Note, code: &'static str, message: String, detail: String) -> Diagnostic {
@@ -268,22 +274,23 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
             let desired_prefix = segments[..nucleus.unwrap_or(0)].iter().map(|s| s.duration_seconds).sum();
             let onset = tempo.seconds_at(note.start_tick as f64);
             let nominal_end = tempo.seconds_at(note.end_tick() as f64);
-            let earliest = if let Some(previous) = scheduled.last().filter(|n| n.note_index + 1 == note_index) {
-                previous.earliest_end(floor)
-            } else {
-                // A skipped source note is an acoustic barrier. Only a real
-                // rest after it can supply a lead into the next valid phrase.
-                note_index.checked_sub(1).map_or(0.0, |i| tempo.seconds_at(track.notes[i].end_tick() as f64))
-            };
-            let mut event = Scheduled { note, note_index, segments, nuclei, nucleus, desired_prefix,
+            // Muted notes are silence. An unrenderable sounding note is a
+            // barrier even when it is followed by one or more muted notes.
+            let preceding = track.notes[..note_index].iter().rposition(|n| !n.is_muted());
+            let previous = scheduled.last().filter(|n| Some(n.note_index) == preceding);
+            let earliest = previous.map_or_else(
+                || preceding.map_or(0.0, |i| tempo.seconds_at(track.notes[i].end_tick() as f64)),
+                |n| n.earliest_end(floor));
+            let mut event = Scheduled { note, note_index, follows_previous: previous.is_some(), segments, nuclei, nucleus, desired_prefix,
                 prefix: 0.0, start: onset, onset, nominal_end, end: nominal_end };
             event.place_after(earliest);
             scheduled.push(event);
         }
         assert_eq!(offset, phrase.score.segments.len());
     }
-    let continuity = caps.native_score.as_ref().and_then(|n| n.phoneme_timing.as_ref())
-        .and_then(|t| t.continuity.as_ref()).filter(|c| c.method == "continuous-runs-v1");
+    let timing = caps.native_score.as_ref().and_then(|n| n.phoneme_timing.as_ref());
+    let constrained_nucleus_timing = timing.is_some_and(|t| t.constrained_nucleus_timing);
+    let continuity = timing.and_then(|t| t.continuity.as_ref()).filter(|c| c.method == "continuous-runs-v1");
     if continuity.is_some_and(|c| !c.max_seconds.is_finite() || !(0.025..=120.0).contains(&c.max_seconds)
         || !(1..=2048).contains(&c.max_segments) || !(2..=32768).contains(&c.max_control_points)
         || c.minimum_silence_seconds != 0.005) {
@@ -306,19 +313,22 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
             let previous = &scheduled[index - 1];
             let inseparable = continuity.map_or_else(|| note.note.is_continuation(),
                 |c| note.start - previous.nominal_end < c.minimum_silence_seconds - EPSILON);
-            if previous.note_index + 1 == note.note_index && inseparable {
+            if note.follows_previous && inseparable {
                 unit.notes.end = index + 1;
                 unit.segments += note.segments.len();
                 continue;
             }
         }
-        units.push(Group { notes: index..index + 1, segments: note.segments.len() });
+        units.push(Group { notes: index..index + 1, segments: note.segments.len(), within_limits: false });
     }
     // An incoming lead can take an otherwise legal request past its duration
-    // ceiling. Return only that excess to its own note. Work right to left so
-    // the preceding request sees the tail just released by its successor.
-    for unit in units.iter().rev() {
-        let end = scheduled_end(&scheduled, unit.notes.end - 1);
+    // ceiling. Work right to left so that only a successor within its limits
+    // can borrow a tail, and any excess lead returns to its own note.
+    let segment_limit = continuity.map_or(MAX_SCORE_SEGMENTS, |c| c.max_segments);
+    let mut next_within_limits = false;
+    for unit in units.iter_mut().rev() {
+        let last = unit.notes.end - 1;
+        let end = if next_within_limits { scheduled_end(&scheduled, last) } else { scheduled[last].nominal_end };
         let first = &mut scheduled[unit.notes.start];
         if snap_seconds_bound(end - first.start, max_phrase) > max_phrase {
             first.place_after(end - max_phrase);
@@ -331,17 +341,21 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
                 scheduled[index].place_after(earliest);
             }
         }
-    }
-    for index in 0..scheduled.len() {
-        scheduled[index].end = scheduled_end(&scheduled, index);
+        unit.within_limits = unit.segments <= segment_limit
+            && snap_seconds_bound(end - scheduled[unit.notes.start].start, max_phrase) <= max_phrase;
+        next_within_limits = unit.within_limits;
+        for index in unit.notes.start..last {
+            scheduled[index].end = scheduled_end(&scheduled, index);
+        }
+        scheduled[last].end = end;
     }
     let mut groups: Vec<Group> = Vec::new();
     for unit in units {
-        if let Some(group) = groups.last_mut().filter(|_| continuity.is_none()) {
+        if let Some(group) = groups.last_mut().filter(|g| continuity.is_none() && g.within_limits && unit.within_limits) {
             let previous = &scheduled[group.notes.end - 1];
             let next = &scheduled[unit.notes.start];
             let span = scheduled[unit.notes.end - 1].end - scheduled[group.notes.start].start;
-            if next.note_index == previous.note_index + 1 && next.start - previous.end < PHRASE_BREAK_SECONDS
+            if next.follows_previous && next.start - previous.end < PHRASE_BREAK_SECONDS
                 && snap_seconds_bound(span, max_phrase) <= max_phrase && group.segments + unit.segments <= MAX_SCORE_SEGMENTS {
                 group.notes.end = unit.notes.end;
                 group.segments += unit.segments;
@@ -363,8 +377,7 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
         phrase.end_tick = last.note.end_tick();
         phrase.start_seconds = first.start;
         phrase.seconds = snap_seconds_bound(last.end-first.start, max_phrase);
-        let segment_limit = continuity.map_or(MAX_SCORE_SEGMENTS, |c| c.max_segments);
-        if phrase.seconds > max_phrase || group.segments > segment_limit {
+        if !group.within_limits {
             let code = if continuity.is_some() { "E_CONTINUOUS_RUN_LIMIT" } else if group.notes.len() > 1 {
                 "E_CONTINUATION_PHRASE"
             } else { "E_PHONEME_TIMING_PHRASE_LIMIT" };
@@ -381,6 +394,12 @@ pub(crate) fn anchor_plan(plan: &mut PhrasePlan, _project: &Project, track: &Tra
                 plan.diagnostics.push(diagnostic(note.note, "E_PHONEME_TIMING_BUDGET",
                     format!("「{}」的时间区间无法容纳全部音素，每段须保留至少 {:.0} ms", note.note.lyric, floor * 1000.0),
                     format!("scheduled={:.12}..{:.12}; note_onset={:.12}", note.start, note.end, note.onset)));
+            } else if !constrained_nucleus_timing && (note.nucleus.is_none() || note.nucleus_delay() > 0.0) {
+                feasible = false;
+                let reason = if note.nucleus.is_none() { "没有元音核" } else { "元音核须在拍点之后起音" };
+                plan.diagnostics.push(diagnostic(note.note, "E_PHONEME_TIMING_CAPABILITY",
+                    format!("「{}」{reason}；请选择支持此类音符的新版合成后端", note.note.lyric),
+                    "This acoustic group requires native_score.phoneme_timing.constrained_nucleus_timing".into()));
             }
         }
         if !feasible {

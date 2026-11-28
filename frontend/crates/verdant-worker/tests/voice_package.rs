@@ -104,6 +104,8 @@ fn first_launch_lists_empty_registry_and_requires_a_voice_package()->Result<()>{
     let f=Fixture::new()?;let mut worker=Worker::start(&f)?;
     worker.send(json!({"request_id":"caps","op":"capabilities"}))?;let caps=worker.next()?;
     ensure!(caps["event"]=="capabilities"&&caps["capabilities"]["voices"]["version"]==1&&caps["capabilities"]["voices"]["voices"]==json!({}),"first-launch empty catalog unavailable: {caps}");
+    ensure!(caps["capabilities"]["native_score"]["phoneme_timing"]["constrained_nucleus_timing"] == true,
+        "worker must advertise support for delayed and absent nuclei");
     ensure!(caps["capabilities"]["voice_package"]["sample_rate"]==48000
         &&caps["capabilities"]["voice_package"]["music"]["sample_rates"]==json!([44100,48000])
         &&caps["capabilities"]["voice_package"]["music"]["default_sample_rate"]==48000,

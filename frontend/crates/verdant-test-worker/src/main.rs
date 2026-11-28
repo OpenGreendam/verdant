@@ -300,6 +300,7 @@ fn capabilities() -> Value {
             "explicit_f0_hz_range": [35, 2000], "continuous_f0_control": true,
             "compact_phone_states": true, "phoneme_duration_control": true,
             "phoneme_timing": {"methods":["vowel-anchor-v1"],"routes":["verdant-voice"],"timing_resolution_seconds":0.005,
+                "constrained_nucleus_timing":true,
                 "continuity":{"method":"continuous-runs-v1","max_seconds":120,"max_segments":2048,"max_control_points":32768,"minimum_silence_seconds":0.005,"requires_phoneme_timing":"vowel-anchor-v1"}},
         },
         "voice_package": {"name":"verdant-voice","sample_rate":48000,"hop_samples":240,
