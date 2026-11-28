@@ -17,7 +17,7 @@ Verdant CLI 在无显示、声卡和 MIDI 设备的环境中编辑、检查和�
 | 命令 | 参数与结果 |
 | --- | --- |
 | `capabilities`, `schema [OP]`, `doctor` | 枚举操作、领域命令、交换格式、输出设置和实际 worker 能力。 |
-| `project new OUTPUT` | 新建原生工程。可指定 PPQ、初始工程和操作。 |
+| `project new OUTPUT` | 新建工程默认启用元音对拍。可指定 PPQ、初始工程和操作。提供初始工程时沿用其中的时序设置。 |
 | `project inspect FILE`, `project validate FILE` | 检查保存快照、可恢复 revision、创建版本和领域结构。 |
 | `project apply FILE --expect-revision N --operations JSON` | 一次提交操作数组。对象 ID、字段及操作名由 `schema project.apply` 枚举。 |
 | `project save-as`, `project recover`, `project migrate` | 保留领域内容，显式选择版本或恢复。写入以 revision 为条件。 |

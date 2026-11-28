@@ -184,6 +184,14 @@ fn index(value: &Value, key: &str) -> Result<usize> {
     value.get(key).and_then(Value::as_u64).and_then(|v| usize::try_from(v).ok())
         .with_context(|| format!("phoneme_timing {key} must be a nonnegative integer"))
 }
+
+fn nucleus_index(note: &Value) -> Result<Option<usize>> {
+    match note.get("nucleus_segment_index") {
+        Some(Value::Null) => Ok(None),
+        _ => index(note, "nucleus_segment_index").map(Some),
+    }
+}
+
 pub fn validate_score_phoneme_timing(score: &Value) -> Result<Option<Value>> {
     let Some(trace) = score.get("phoneme_timing") else { return Ok(None); };
     exact_keys(trace, &["method","notes"], "phoneme_timing")?;
@@ -208,27 +216,49 @@ pub fn validate_score_phoneme_timing(score: &Value) -> Result<Option<Value>> {
     let mut identities = BTreeSet::new();
     let mut expected_first = 0;
     for note in notes {
-        exact_keys(note, &["note_id","note_onset_seconds","note_end_seconds","first_segment_index",
-            "nucleus_segment_index","end_segment_index","prefix_seconds","tail_trim_seconds"], "phoneme_timing note")?;
+        const REQUIRED: [&str; 8] = ["note_id", "note_onset_seconds", "note_end_seconds", "first_segment_index",
+            "nucleus_segment_index", "end_segment_index", "prefix_seconds", "tail_trim_seconds"];
+        let fields = note.as_object().context("phoneme_timing note must be an object")?;
+        ensure!(REQUIRED.iter().all(|key| fields.contains_key(*key))
+            && fields.len() == REQUIRED.len() + usize::from(fields.contains_key("nucleus_delay_seconds")),
+            "phoneme_timing note has unknown or missing fields");
         let identity = note["note_id"].as_str().context("phoneme_timing note ID must be a string")?;
         ensure!(!identity.is_empty() && identities.insert(identity), "phoneme_timing note IDs must be nonempty and unique");
         let first = index(note,"first_segment_index")?;
-        let nucleus = index(note,"nucleus_segment_index")?;
+        let nucleus = nucleus_index(note)?;
         let end = index(note,"end_segment_index")?;
-        ensure!(first == expected_first && first <= nucleus && nucleus < end && end <= segments.len(),
-            "phoneme_timing ranges must cover each segment once in order with an in-range nucleus");
+        ensure!(first == expected_first && first < end && end <= segments.len()
+            && nucleus.is_none_or(|n| (first..end).contains(&n)),
+            "phoneme_timing ranges must cover each segment once in order and contain any declared nucleus");
         let onset = nonnegative(&note["note_onset_seconds"], "note onset")?;
         let note_end = nonnegative(&note["note_end_seconds"], "note end")?;
         let prefix = nonnegative(&note["prefix_seconds"], "prefix")?;
         let tail = nonnegative(&note["tail_trim_seconds"], "tail trim")?;
+        let delay = note.get("nucleus_delay_seconds").map(|v| nonnegative(v, "nucleus delay")).transpose()?.unwrap_or(0.0);
         ensure!(note_end > onset && tail < note_end-onset,
-            "phoneme_timing requires a positive note interval and a nonempty nucleus interval");
+            "phoneme_timing requires a positive note interval after tail trim");
         for segment in &segments[first..end-1] {
             ensure!(field(segment,"gap_after_seconds",Some(0.0))? == 0.0,
                 "phoneme_timing does not allow an internal gap inside one scheduled note");
         }
-        same(onset, starts[nucleus], "nucleus anchor")?;
-        same(prefix, starts[nucleus]-starts[first], "prefix")?;
+        if let Some(n) = nucleus {
+            same(onset + delay, starts[n], "nucleus anchor")?;
+        } else {
+            ensure!(prefix == 0.0 && delay == 0.0 && tail == 0.0,
+                "a consonant-only event must own its full note interval on the beat");
+        }
+        if nucleus.is_none() || delay > 0.0 {
+            // These extensions to the original on-beat contract must identify
+            // the first real native nucleus, including a deliberate absence.
+            let mut first_nucleus = None;
+            for (offset, segment) in segments[first..end].iter().enumerate() {
+                let identity = crate::model::resolve_segment_identity(segment)?;
+                let id = super::metadata_integer(&identity, "phone_id")?.context("extended phoneme_timing requires a native phone identity")?;
+                if super::duration::is_nucleus(id) { first_nucleus = Some(first + offset); break; }
+            }
+            ensure!(first_nucleus == nucleus, "phoneme_timing nucleus must match the first native nucleus");
+        }
+        same(onset - prefix, starts[first], "prefix")?;
         same(note_end-tail, ends[end-1], "tail trim")?;
         expected_first = end;
     }
@@ -271,18 +301,20 @@ pub(super) fn continuity_report(marker: Option<&Value>, runs: usize, timing: &Ti
 pub(super) fn realized_phoneme_timing(trace: Option<&Value>, timing: &TimingPlan, sample_rate: u32, hop: usize) -> Result<Value> {
     let Some(trace) = trace else { return Ok(Value::Null); };
     let mut notes = Vec::new();
-    let mut maximum_error = 0.0_f64;
+    let mut maximum_error: Option<f64> = None;
     for source in trace["notes"].as_array().context("missing admitted timing notes")? {
         let first = &timing.segments[index(source,"first_segment_index")?];
-        let nucleus = &timing.segments[index(source,"nucleus_segment_index")?];
         let last = &timing.segments[index(source,"end_segment_index")?-1];
-        let actual = nucleus.start_frame as f64 * hop as f64 / sample_rate as f64;
-        let error = actual-finite(&source["note_onset_seconds"],"note onset")?;
-        maximum_error = maximum_error.max(error.abs());
+        let nucleus_sample = nucleus_index(source)?.map(|n|
+            timing.segments[n].start_frame.checked_mul(hop).context("sample offset overflow")).transpose()?;
+        let actual = nucleus_sample.map(|sample| sample as f64 / sample_rate as f64);
+        let onset = finite(&source["note_onset_seconds"],"note onset")?;
+        let error = actual.map(|seconds| seconds - onset);
+        if let Some(error) = error { maximum_error = Some(maximum_error.unwrap_or(0.0).max(error.abs())); }
         let mut note = source.clone();
         let object = note.as_object_mut().context("timing note must be an object")?;
         object.insert("actual_first_sample".into(), json!(first.start_frame.checked_mul(hop).context("sample offset overflow")?));
-        object.insert("actual_nucleus_sample".into(), json!(nucleus.start_frame.checked_mul(hop).context("sample offset overflow")?));
+        object.insert("actual_nucleus_sample".into(), json!(nucleus_sample));
         object.insert("actual_end_sample".into(), json!(last.end_frame.checked_mul(hop).context("sample offset overflow")?));
         object.insert("actual_nucleus_seconds".into(), json!(actual));
         object.insert("nucleus_error_seconds".into(), json!(error));

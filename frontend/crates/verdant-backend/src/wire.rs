@@ -266,9 +266,15 @@ pub struct PhonemeTimingNote {
     pub note_onset_seconds: f64,
     pub note_end_seconds: f64,
     pub first_segment_index: usize,
-    pub nucleus_segment_index: usize,
+    /// First actual native nucleus, or null when every segment is consonantal.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub nucleus_segment_index: Option<usize>,
+    /// Time from the authored beat to that nucleus when the full lead cannot fit.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub nucleus_delay_seconds: f64,
     /// Exclusive segment index.
     pub end_segment_index: usize,
+    /// Actual lead before the authored beat. Consonants can continue after it.
     pub prefix_seconds: f64,
     pub tail_trim_seconds: f64,
 }
@@ -755,6 +761,9 @@ pub struct PhonemeTimingCaps {
     pub methods: Vec<String>,
     #[serde(default)]
     pub timing_resolution_seconds: Option<f64>,
+    /// Accepts a null nucleus index or a positive nucleus delay in the timing trace.
+    #[serde(default)]
+    pub constrained_nucleus_timing: bool,
     #[serde(default)]
     pub continuity: Option<ContinuousRunsCaps>,
 }

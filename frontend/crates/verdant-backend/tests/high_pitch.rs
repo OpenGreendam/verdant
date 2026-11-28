@@ -32,12 +32,14 @@ fn extended_backend_accepts_original_key_and_sends_unclamped_controls() {
     project.tracks[0].notes[0].curves.pitch_millicent_points.push(PitchPoint {
         id: "explicit-flat-pit".into(), tick: 0, millicents: 0, unknown: Default::default(),
     });
-    for route in [Route::VerdantVoice] {
-        let result = plan(&project, &project.tracks[0].id, route, &capabilities(Some(2000.0)));
+    let route = Route::VerdantVoice;
+    for (midi, ceiling) in [(92, 2000.0), (93, 1760.0)] {
+        project.tracks[0].notes[0].midi_note = midi;
+        let result = plan(&project, &project.tracks[0].id, route, &capabilities(Some(ceiling)));
         assert!(!result.has_errors() && result.blocked.is_empty());
-        assert!(result.diagnostics.iter().any(|d| d.code == "W_PITCH_UNVERIFIED"));
+        assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
         let control = payload_for(&result.phrases[0], route, 10008).control_track.unwrap();
-        let expected = 440.0 * 2.0f64.powf(23.0 / 12.0);
+        let expected = 440.0 * 2.0f64.powf(f64::from(midi - 69) / 12.0);
         assert!(control.f0_hz.iter().any(|&f| f > 1600.0));
         for (&f, &uv) in control.f0_hz.iter().zip(&control.uv) {
             if !uv { assert!((f - expected).abs() < 0.000501); }
@@ -73,15 +75,19 @@ fn voice_capabilities() -> Capabilities {
 }
 
 #[test]
-fn voice_target_range_admits_b6_and_rejects_c7_c8_without_changing_the_score() {
+fn voice_target_range_admits_high_notes_without_warnings_and_rejects_c7_c8() {
     let caps=voice_capabilities();
-    for (midi,admitted) in [(95,true),(96,false),(108,false)] {
+    for (midi,admitted) in [(84,true),(92,true),(95,true),(96,false),(108,false)] {
         let mut project=high_project();project.tracks[0].notes[0].midi_note=midi;
         let before=project.clone();
         let result=plan(&project,&project.tracks[0].id,Route::VerdantVoice,&caps);
         assert_eq!(!result.has_errors(),admitted,"{:?}",result.diagnostics);
         assert_eq!(project,before);
-        if !admitted {
+        if admitted {
+            assert!(result.diagnostics.is_empty(), "MIDI {midi}: {:?}", result.diagnostics);
+            assert_eq!(result.phrases.len(), 1);
+            assert!(result.blocked.is_empty());
+        } else {
             assert!(result.phrases.is_empty());
             let error=result.diagnostics.iter().find(|d|d.code=="E_PITCH_RANGE").unwrap();
             assert!(error.message.contains("35.0–2000.0 Hz"));

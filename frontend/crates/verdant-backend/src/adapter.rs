@@ -52,7 +52,7 @@ pub fn authored_f0_hz_range(route: Route, caps: &Capabilities) -> [f64; 2] {
         .unwrap_or([35.0, 2000.0])
 }
 
-const DURATION_ROUNDOFF_SECONDS: f64 = 1e-12;
+pub(crate) const DURATION_ROUNDOFF_SECONDS: f64 = 1e-12;
 /// Rests at least this long start a new phrase (an explainable boundary).
 pub const PHRASE_BREAK_SECONDS: f64 = 0.6;
 /// Worker `score` limit: `score requires 1..512 explicit segments`.
@@ -264,8 +264,49 @@ pub fn note_support(n: &Note, caps: &Capabilities) -> Result<NoteSupport, Diagno
 enum NoteRender {
     Continuation,
     Proxy(String),
-    Pinyin(pinyin::PinyinToken),
-    Phonemes(phonemes::ResolvedPronunciation),
+    Pinyin { token: pinyin::PinyinToken, source_seconds: f64 },
+    Phonemes { reading: phonemes::ResolvedPronunciation, durations: Vec<f64> },
+}
+
+/// Stage the shortest legal source when only its leading consonants need time
+/// outside the note. The anchor scheduler fits these phones to the real rest,
+/// previous note and written end, including a partially available lead.
+fn source_seconds_with_lead(written: f64, floor: f64, count: usize, leading: usize) -> f64 {
+    let minimum = count as f64 * floor;
+    if leading > 0 && written < minimum - DURATION_ROUNDOFF_SECONDS
+        && written >= (count - leading) as f64 * floor - DURATION_ROUNDOFF_SECONDS {
+        minimum
+    } else {
+        written
+    }
+}
+
+fn source_phone_durations(note: &Note, reading: &phonemes::ResolvedPronunciation, written: f64, floor: f64,
+    auto_lead: bool) -> Result<Vec<f64>, String> {
+    let count = reading.phones.len();
+    // Multiple lyric parts and weighted morae subdivide the written duration.
+    // Extending it would change those declared budgets.
+    let leading = if auto_lead && written < count as f64 * floor - DURATION_ROUNDOFF_SECONDS
+        && reading.parts.is_empty() && matches!(note.pronunciation.mora_weights.as_deref(), None | Some([1])) {
+        reading.phones.iter().position(|phone| phone.native.role == "nucleus").unwrap_or(0)
+    } else { 0 };
+    let source_seconds = source_seconds_with_lead(written, floor, count, leading);
+    let mut durations = crate::reading::allocate_reading(&note.pronunciation, reading, source_seconds, floor)?;
+    if source_seconds > written {
+        // A full lead leaves this much written time beyond the suffix's floors.
+        // Follow the automatic IPA vowel-length shares, keeping every consonant
+        // at its floor so that a shorter, partial lead can still fit.
+        let suffix = &reading.phones[leading..];
+        let spare = (written - suffix.len() as f64 * floor).max(0.0);
+        let length_sum: f64 = suffix.iter().filter(|phone| phone.native.role == "nucleus")
+            .map(|phone| f64::from(phone.canonical.length)).sum();
+        for (phone, duration) in suffix.iter().zip(&mut durations[leading..]) {
+            if phone.native.role == "nucleus" {
+                *duration += spare * f64::from(phone.canonical.length) / length_sum;
+            }
+        }
+    }
+    Ok(durations)
 }
 
 /// Resolve the track override or project default without falling back from an
@@ -591,19 +632,30 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
     let f0_support = crate::params::support(crate::params::Param::Pit, route, Some(caps));
     let max_phrase = if caps.max_phrase_seconds > 0.0 { caps.max_phrase_seconds } else { 30.0 };
     let segment_minimum = minimum_segment_seconds(route, caps);
+    let anchored_voice = route == Route::VerdantVoice && project.render_preferences.phoneme_timing.is_some();
 
     // Per-note checks.
     let mut renders: std::collections::HashMap<NoteId, NoteRender> = std::collections::HashMap::new();
     for n in track.notes.iter().filter(|n|!n.is_muted()) {
         let mut fine = true;
-        let mut pinyin_token: Option<pinyin::PinyinToken> = None;
+        let dur = snap_seconds_bound(
+            tempo.seconds_at(n.end_tick() as f64) - tempo.seconds_at(n.start_tick as f64),
+            max_phrase.min(pinyin::MAX_SYLLABLE_SECONDS),
+        );
+        let auto_lead = anchored_voice && n.pronunciation.phoneme_durations_permille.is_none();
+        let mut phone_count = 1;
+        let mut reading_timing_error = None;
         if !n.is_continuation() { match note_support(n, caps) {
             Ok(NoteSupport::VowelProxy { vowel }) => {
                 renders.insert(n.id.clone(), NoteRender::Proxy(vowel));
             }
-            Ok(NoteSupport::Pinyin(t)) => {
-                pinyin_token = Some(t.clone());
-                renders.insert(n.id.clone(), NoteRender::Pinyin(t));
+            Ok(NoteSupport::Pinyin(token)) => {
+                let leading = usize::from(!token.initial.is_empty());
+                phone_count = leading + 1;
+                let source_seconds = if auto_lead {
+                    source_seconds_with_lead(dur, segment_minimum, phone_count, leading)
+                } else { dur };
+                renders.insert(n.id.clone(), NoteRender::Pinyin { token, source_seconds });
             }
             Ok(NoteSupport::Phonemes(p)) => {
                 let reasons: std::collections::BTreeSet<_> = p.phones.iter()
@@ -612,7 +664,11 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                     diagnostics.push(Diagnostic::warning("W_PHONEME_APPROXIMATION", Some(n),
                         format!("「{}」使用已选择的跨语言近似音素映射", n.lyric), reasons.into_iter().collect::<Vec<_>>().join("\n")));
                 }
-                renders.insert(n.id.clone(), NoteRender::Phonemes(p));
+                phone_count = p.phones.len();
+                match source_phone_durations(n, &p, dur, segment_minimum, auto_lead) {
+                    Ok(durations) => { renders.insert(n.id.clone(), NoteRender::Phonemes { reading: p, durations }); }
+                    Err(reason) => reading_timing_error = Some(reason),
+                }
             }
             Ok(NoteSupport::Unsupported) => fine = false,
             Err(d) => {
@@ -624,11 +680,11 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
         if n.is_continuation(){
             let previous=track.notes.iter().take_while(|p|p.id!=n.id).last();
             let usable = previous.is_some_and(|p| !p.is_muted() && p.end_tick()==n.start_tick && !bad.contains(&p.id)
-                && match renders.get(&p.id) { Some(NoteRender::Phonemes(reading))=>reading.phones.last().is_some_and(|phone|phone.native.role=="nucleus"),Some(_)=>true,None=>false });
+                && match renders.get(&p.id) { Some(NoteRender::Phonemes { reading, .. })=>reading.phones.last().is_some_and(|phone|phone.native.role=="nucleus"),Some(_)=>true,None=>false });
             if !usable{
                 diagnostics.push(Diagnostic::error("E_CONTINUATION",Some(n),"延音须紧邻同轨道中已解析的前一音节","muted notes, rests, unresolved notes and track boundaries break continuation"));fine=false;
             }
-            renders.insert(n.id.clone(),NoteRender::Continuation);pinyin_token=None;
+            renders.insert(n.id.clone(),NoteRender::Continuation);
         }
         if (n.has_f0_modulation()||n.is_continuation()) && !matches!(f0_support, crate::params::Support::Synthesis(_)) {
             let reason = match &f0_support {
@@ -654,26 +710,10 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                 format!("explicit_f0_hz_range={f0_range:?}"),
             ));
             fine = false;
-        } else if !(130.0..=700.0).contains(&f0) {
-            diagnostics.push(Diagnostic::warning(
-                "W_PITCH_UNVERIFIED",
-                Some(n),
-                format!("音高 {:.0} Hz 在接受范围内，但未经听评", f0),
-                "accepted by the worker; outside the conservative range Verdant highlights",
-            ));
         }
-        let dur = snap_seconds_bound(
-            tempo.seconds_at(n.end_tick() as f64) - tempo.seconds_at(n.start_tick as f64),
-            max_phrase.min(pinyin::MAX_SYLLABLE_SECONDS),
-        );
         if let Some(weights) = n.pronunciation.phoneme_durations_permille.as_ref().filter(|_|!n.is_continuation()) {
             let supported = caps.native_score.as_ref().is_some_and(|ns| ns.phoneme_duration_control);
-            let count = match renders.get(&n.id) {
-                Some(NoteRender::Phonemes(p)) => p.phones.len(),
-                _ if pinyin_token.as_ref().is_some_and(|token| !token.initial.is_empty()) => 2,
-                _ => 1,
-            };
-            let valid = weights.len() == count
+            let valid = weights.len() == phone_count
                 && weights.iter().all(|&weight| weight > 0 && dur * weight as f64 / 1000.0 >= segment_minimum - DURATION_ROUNDOFF_SECONDS)
                 && weights.iter().map(|&weight| weight as u64).sum::<u64>() == 1000;
             if !supported || !valid {
@@ -682,24 +722,22 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                     Some(n),
                     if supported { format!("音素时长比例须与实际展开音素对应，总和 1000，且每段不少于 {:.0} ms", segment_minimum * 1000.0) }
                     else { "后端未声明音素时长编辑能力：只能使用整音节时长和既有前端默认切分".into() },
-                    format!("phoneme_duration_control={supported}; segments={count}; weights={weights:?}"),
+                    format!("phoneme_duration_control={supported}; segments={phone_count}; weights={weights:?}"),
                 ));
                 fine = false;
             }
         }
-        if let Some(NoteRender::Phonemes(p)) = renders.get(&n.id) {
-            if let Err(reason) = crate::reading::allocate_reading(&n.pronunciation, p, dur, segment_minimum) {
-                diagnostics.push(Diagnostic::error("E_PHONEME_TIMING", Some(n), reason.clone(), reason));
-                fine = false;
-            }
+        if let Some(reason) = reading_timing_error {
+            diagnostics.push(Diagnostic::error("E_PHONEME_TIMING", Some(n), reason.clone(), reason));
+            fine = false;
         }
-        if let Some(token) = pinyin_token.as_ref() {
+        if let Some(NoteRender::Pinyin { source_seconds, .. }) = renders.get(&n.id) {
             let minimum = if route == Route::VerdantVoice {
-                segment_minimum * if token.initial.is_empty() { 1.0 } else { 2.0 }
+                segment_minimum * phone_count as f64
             } else {
                 pinyin::MIN_SYLLABLE_SECONDS
             };
-            if dur < minimum - DURATION_ROUNDOFF_SECONDS || dur > pinyin::MAX_SYLLABLE_SECONDS {
+            if *source_seconds < minimum - DURATION_ROUNDOFF_SECONDS || dur > pinyin::MAX_SYLLABLE_SECONDS {
                 diagnostics.push(Diagnostic::error(
                     "E_SYLLABLE_DOMAIN",
                     Some(n),
@@ -743,13 +781,18 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
 
     // Group every note into phrases by rests / the per-job limit; phrases
     // with a bad note are blocked as a whole.
+    // With vowel timing these groups only stage native phone identities. The
+    // physical request boundaries are chosen after the lead-ins are known.
+    let anchoring = project.render_preferences.phoneme_timing.is_some();
     let mut groups: Vec<Vec<&Note>> = Vec::new();
     for n in track.notes.iter().filter(|n|!n.is_muted()) {
         if let Some(g) = groups.last_mut() {
             let prev = g[g.len() - 1];
             let rest = tempo.seconds_at(n.start_tick as f64) - tempo.seconds_at(prev.end_tick() as f64);
             let span = snap_seconds_bound(tempo.seconds_at(n.end_tick() as f64) - tempo.seconds_at(g[0].start_tick as f64), max_phrase);
-            if rest < PHRASE_BREAK_SECONDS && span <= max_phrase {
+            let extend_continuation = anchoring && n.is_continuation() && !bad.contains(&n.id)
+                && prev.end_tick() == n.start_tick;
+            if rest < PHRASE_BREAK_SECONDS && (span <= max_phrase || extend_continuation) {
                 g.push(n);
                 continue;
             }
@@ -808,11 +851,10 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                         phoneme: None,
                     });
                 }
-                NoteRender::Pinyin(token) => {
+                NoteRender::Pinyin { token, source_seconds } => {
+                    let total = *source_seconds;
                     let midi = round_us(n.midi_note as f64 + n.detune_millicents as f64 / 100_000.0);
-                    // Existing frontend heuristic: initial = min(0.11, 0.22 * syllable);
-                    // Preserve the note's duration; native quantizes cumulative
-                    // absolute boundaries once for phones, gaps and control.
+                    // Existing frontend heuristic: initial = min(0.11, 0.22 * syllable).
                     let init_seconds = if token.initial.is_empty() {
                         0.0
                     } else if let Some(weights) = &n.pronunciation.phoneme_durations_permille {
@@ -853,12 +895,10 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                         phoneme: None,
                     });
                 }
-                NoteRender::Phonemes(p) => {
+                NoteRender::Phonemes { reading: p, durations } => {
                     let midi = round_us(n.midi_note as f64 + n.detune_millicents as f64 / 100_000.0);
-                    let durations = crate::reading::allocate_reading(&n.pronunciation, p, total, segment_minimum)
-                        .expect("phonetic timing passed preflight");
                     let verified_kana = phonemes::matching_kana_reading(p, n.pronunciation.reading_provenance.as_ref());
-                    for (phone_index, (phone, duration_seconds)) in p.phones.iter().zip(durations).enumerate() {
+                    for (phone_index, (phone, &duration_seconds)) in p.phones.iter().zip(durations).enumerate() {
                         let mut context = phone.context.clone();
                         // The renderer binds neighbors across the whole phrase,
                         // including adjacent notes and authored rests.
@@ -892,19 +932,26 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
                     }
                 }
             }
-            let nucleus=match &renders[&n.id]{NoteRender::Proxy(_)|NoteRender::Pinyin(_)=>segments.last().cloned().map(|segment|(segments.len()-1,segment)),NoteRender::Phonemes(reading)=>reading.phones.iter().rposition(|phone|phone.native.role=="nucleus").and_then(|index|segments.get(segment_start+index).cloned().map(|segment|(segment_start+index,segment))),NoteRender::Continuation=>last_nucleus.clone()};
-            last_nucleus=nucleus;
+            last_nucleus = match &renders[&n.id] {
+                NoteRender::Proxy(_) | NoteRender::Pinyin { .. } => segments.last().cloned().map(|segment| (segments.len() - 1, segment)),
+                NoteRender::Phonemes { reading, .. } => reading.phones.iter().rposition(|phone| phone.native.role == "nucleus")
+                    .and_then(|index| segments.get(segment_start + index).cloned().map(|segment| (segment_start + index, segment))),
+                NoteRender::Continuation => last_nucleus.clone(),
+            };
         }
-        // Keep a phrase exactly on the admitted limit on the same wire clock.
+        // Anchored voice sources receive their final end after physical placement.
+        // Keep other phrases exactly on the admitted limit on the same wire clock.
         // Only the last interval absorbs <= 1 ps arithmetic residue; interior
         // note/phone boundaries are neither rounded nor redistributed.
-        let emitted_seconds = segments.iter().map(|s| s.duration_seconds + s.gap_after_seconds).sum::<f64>();
-        if phrase_seconds == max_phrase && (emitted_seconds - phrase_seconds).abs() <= DURATION_ROUNDOFF_SECONDS {
-            let (last, prefix) = segments.split_last_mut().expect("a renderable phrase has a segment");
-            let prefix_seconds = prefix.iter().map(|s| s.duration_seconds + s.gap_after_seconds).sum::<f64>();
-            last.duration_seconds = phrase_seconds - prefix_seconds - last.gap_after_seconds;
+        if !anchored_voice && phrase_seconds == max_phrase {
+            let emitted_seconds = segments.iter().map(|s| s.duration_seconds + s.gap_after_seconds).sum::<f64>();
+            if (emitted_seconds - phrase_seconds).abs() <= DURATION_ROUNDOFF_SECONDS {
+                let (last, prefix) = segments.split_last_mut().expect("a renderable phrase has a segment");
+                let prefix_seconds = prefix.iter().map(|s| s.duration_seconds + s.gap_after_seconds).sum::<f64>();
+                last.duration_seconds = phrase_seconds - prefix_seconds - last.gap_after_seconds;
+            }
         }
-        if segments.len() > MAX_SCORE_SEGMENTS {
+        if !anchoring && segments.len() > MAX_SCORE_SEGMENTS {
             out.diagnostics.push(Diagnostic::error(
                 "E_PHRASE_TOO_LONG",
                 Some(first),
@@ -990,31 +1037,38 @@ fn plan_with_voice_policy(project: &Project, track_id: &TrackId, requested: Opti
             control_track: control_track.map(Arc::new),
         });
     }
-    if project.render_preferences.phoneme_timing.is_some() {
-        crate::phoneme_timing::anchor_plan(&mut out, project, track, &tempo, caps);
-    }
     // Earlier v1 workers accepted only 4096 transmitted points. A larger
     // derived-point budget must be declared, not inferred from a route name.
     let expression_point_limit = caps.native_score.as_ref().and_then(|n| n.expression.as_ref())
         .and_then(|expression| expression.maximum_compiled_curve_points).unwrap_or(4096);
+    if anchoring {
+        crate::phoneme_timing::anchor_plan(&mut out, track, &tempo, caps, expression_point_limit);
+        return out;
+    }
     for mut phrase in std::mem::take(&mut out.phrases) {
-        match crate::expression::for_phrase(&phrase, track, &tempo, expression_point_limit) {
-            Ok(expression) => {
-                phrase.expression = expression.map(Arc::new);
+        match compile_phrase_expression(&mut phrase, track, &tempo, expression_point_limit) {
+            Ok(()) => {
                 phrase.index = out.phrases.len();
                 out.phrases.push(phrase);
             }
-            Err(error) => {
-                out.diagnostics.push(Diagnostic::error("E_EXPRESSION_POINT_LIMIT", track.note(&error.note_id),
-                    format!("{} 曲线加入变速边界后超过当前 {} 个传输点预算；请减少控制点或速度变化", error.parameter,
-                        error.maximum_points),
-                    format!("note={}; parameter={}; compiled_points_at_least={}; authored limit=4096; tempo boundaries are never dropped",
-                        error.note_id, error.parameter, error.point_count)));
+            Err(diagnostic) => {
+                out.diagnostics.push(diagnostic);
                 out.blocked.push(BlockedPhrase { note_ids: phrase.note_ids, start_tick: phrase.start_tick, end_tick: phrase.end_tick });
             }
         }
     }
     out
+}
+
+pub(crate) fn compile_phrase_expression(phrase: &mut Phrase, track: &verdant_domain::Track, tempo: &TempoMap,
+    point_limit: usize) -> Result<(), Diagnostic> {
+    phrase.expression = crate::expression::for_phrase(phrase, track, tempo, point_limit).map_err(|error|
+        Diagnostic::error("E_EXPRESSION_POINT_LIMIT", track.note(&error.note_id),
+            format!("{} 曲线加入变速边界后超过当前 {} 个传输点预算；请减少控制点或速度变化", error.parameter,
+                error.maximum_points),
+            format!("note={}; parameter={}; compiled_points_at_least={}; authored limit=4096; tempo boundaries are never dropped",
+                error.note_id, error.parameter, error.point_count)))?.map(Arc::new);
+    Ok(())
 }
 
 fn round_us(s: f64) -> f64 {

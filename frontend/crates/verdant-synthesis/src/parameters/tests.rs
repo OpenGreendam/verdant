@@ -261,6 +261,65 @@ fn neutral_trace_and_120_second_continuity_admission_are_strict() {
     assert_eq!(validate_score_continuity(&json!({})).unwrap(),None);
 }
 
+#[test]
+fn realized_timing_reports_only_actual_nuclei_on_the_native_frame_clock() {
+    let score: Value = serde_json::from_str(include_str!("fixtures/constrained-phoneme-timing.json")).unwrap();
+    let trace = validate_score_phoneme_timing(&score).unwrap().unwrap();
+    let plan = plan_score_timing(score["segments"].as_array().unwrap(), 16000, 80).unwrap();
+    let report = timing::realized_phoneme_timing(Some(&trace), &plan, 16000, 80).unwrap();
+    let notes = report["notes"].as_array().unwrap();
+    assert_eq!(notes.len(), 2);
+    let (nasal, syllable) = (&notes[0], &notes[1]);
+    assert_eq!(nasal["note_id"], "nasal");
+    assert_eq!(nasal["actual_first_sample"], 0);
+    assert_eq!(nasal["actual_end_sample"], 800);
+    for field in ["actual_nucleus_sample", "actual_nucleus_seconds", "nucleus_error_seconds"] {
+        assert_eq!(nasal.get(field), Some(&Value::Null), "{field}");
+    }
+    assert_eq!(syllable["note_id"], "sa");
+    assert_eq!(syllable["actual_first_sample"], 800);
+    assert_eq!(syllable["actual_nucleus_sample"], 1600);
+    assert_eq!(syllable["actual_nucleus_seconds"], 0.1);
+    assert_eq!(syllable["actual_end_sample"], 3200);
+    // The 36 ms planned delay and 1 ms of frame rounding both fall after the 63 ms MIDI onset.
+    let error = syllable["nucleus_error_seconds"].as_f64().unwrap();
+    assert!((error - 0.037).abs() < 1e-12);
+    assert_eq!(report["maximum_nucleus_error_seconds"], syllable["nucleus_error_seconds"]);
+
+    let mut nasal_only = score;
+    nasal_only["segments"].as_array_mut().unwrap().truncate(1);
+    nasal_only["phoneme_timing"]["notes"].as_array_mut().unwrap().truncate(1);
+    let trace = validate_score_phoneme_timing(&nasal_only).unwrap().unwrap();
+    let plan = plan_score_timing(nasal_only["segments"].as_array().unwrap(), 16000, 80).unwrap();
+    let report = timing::realized_phoneme_timing(Some(&trace), &plan, 16000, 80).unwrap();
+    assert_eq!(report.get("maximum_nucleus_error_seconds"), Some(&Value::Null));
+    assert_eq!(&report["notes"][0], nasal);
+}
+
+#[test]
+fn timing_admission_rejects_false_nuclei_and_inconsistent_delays() {
+    let score: Value = serde_json::from_str(include_str!("fixtures/constrained-phoneme-timing.json")).unwrap();
+    for (note, field, error) in [(0, "nucleus_delay_seconds", 0.005), (0, "prefix_seconds", 0.005),
+        (1, "nucleus_delay_seconds", 0.035), (1, "prefix_seconds", 0.010)] {
+        let mut bad = score.clone();
+        bad["phoneme_timing"]["notes"][note][field] = json!(error);
+        assert!(validate_score_phoneme_timing(&bad).is_err(), "note {note}: {field}");
+    }
+
+    // Keep the boundaries internally consistent so rejection depends on the model phone's role.
+    let mut hidden_vowel = score.clone();
+    let note = &mut hidden_vowel["phoneme_timing"]["notes"][1];
+    note["nucleus_segment_index"] = Value::Null;
+    note["note_onset_seconds"] = json!(0.052);
+    note["prefix_seconds"] = json!(0.0);
+    note.as_object_mut().unwrap().remove("nucleus_delay_seconds");
+    assert!(validate_score_phoneme_timing(&hidden_vowel).is_err());
+
+    let mut voiced_consonant = score.clone();
+    voiced_consonant["segments"][2]["context"] = score["segments"][0]["context"].clone();
+    assert!(validate_score_phoneme_timing(&voiced_consonant).is_err());
+}
+
 fn nucleus_segment(phone: i64, continuation: Option<usize>) -> Value {
     let mut segment = json!({"duration_seconds":0.5,"voiced":true,
         "context":{"features":{"C_Phone":phone.to_string(),"C_Language":"3","C_Stress":"0"},

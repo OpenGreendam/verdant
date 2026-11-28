@@ -1,7 +1,6 @@
 //! Complete inbound admission is independent of the editor's serialization subset.
 //! The checked-in public schema supplies structural constraints; the relational
 //! checks below preserve the worker's clocks, voicing and route restrictions.
-use std::collections::BTreeSet;
 use anyhow::{Context, Result, ensure};
 use serde_json::Value;
 use crate::{Config, runtime};
@@ -106,37 +105,30 @@ fn sum(values:impl IntoIterator<Item=f64>)->f64{
     for x in values{let next=total+x;correction+=if total.abs()>=x.abs(){(total-next)+x}else{(x-next)+total};total=next;}total+correction
 }
 fn number(value:&Value)->f64{value.as_f64().unwrap()}
-fn phoneme_timing(score:&Value)->Result<()> {
-    let Some(trace)=score.get("phoneme_timing") else{return Ok(());};
-    let segments=score["segments"].as_array().unwrap();
-    let(mut starts,mut ends,mut terms)=(Vec::new(),Vec::new(),Vec::new());
-    for segment in segments{starts.push(sum(terms.iter().copied()));terms.push(number(&segment["duration_seconds"]));ends.push(sum(terms.iter().copied()));terms.push(segment.get("gap_after_seconds").map_or(0.,number));}
-    let mut expected=0;
-    let mut ids=BTreeSet::new();
-    for note in trace["notes"].as_array().unwrap(){
-        ensure!(ids.insert(note["note_id"].as_str().unwrap()),"phoneme_timing note IDs must be unique");
-        let first=note["first_segment_index"].as_u64().context("phoneme timing first index must be an integer")? as usize;
-        let nucleus=note["nucleus_segment_index"].as_u64().context("phoneme timing nucleus index must be an integer")? as usize;
-        let end=note["end_segment_index"].as_u64().context("phoneme timing end index must be an integer")? as usize;
-        ensure!(first==expected&&first<=nucleus&&nucleus<end&&end<=segments.len(),"phoneme_timing ranges must cover each segment once in order with an in-range nucleus");
-        let(onset,note_end,prefix,tail)=(number(&note["note_onset_seconds"]),number(&note["note_end_seconds"]),number(&note["prefix_seconds"]),number(&note["tail_trim_seconds"]));
-        ensure!(note_end>onset&&tail<note_end-onset,"phoneme_timing requires a positive note and nucleus interval");
-        ensure!(segments[first..end-1].iter().all(|s|s.get("gap_after_seconds").map_or(0.,number)==0.),"phoneme_timing does not allow an internal gap within a note");
-        for (actual,wanted,label) in [(onset,starts[nucleus],"nucleus anchor"),(prefix,starts[nucleus]-starts[first],"prefix"),(note_end-tail,ends[end-1],"tail trim")] {
-            ensure!((actual-wanted).abs()<=1e-9,"phoneme_timing {label} disagrees with scheduled segment boundaries");
-        }
-        expected=end;
-    }
-    ensure!(expected==segments.len(),"phoneme_timing must cover every score segment");Ok(())
-}
-fn expression(value:&Value,maximum:f64)->Result<()> {
+fn expression(value:&Value,maximum:f64,score:&Value)->Result<()> {
     let mut last_end=0.;
     for segment in value["segments"].as_array().unwrap(){
         let(start,end,onset)=(number(&segment["start_seconds"]),number(&segment["end_seconds"]),number(&segment["note_onset_seconds"]));
         ensure!(start>=last_end-1e-10&&start<=onset&&onset<end&&end<=maximum+1e-10,"expression intervals must be ordered, nonoverlapping and own their onset within the score");last_end=end;
+        let mut latest = 0.0_f64;
         for points in segment["curves"].as_object().unwrap().values(){
             let mut previous=-1.;
-            for point in points.as_array().unwrap(){let t=number(&point[0]);ensure!(t>previous&&t<=maximum,"controller points must have increasing times within the score duration");previous=t;}
+            for point in points.as_array().unwrap(){let t=number(&point[0]);ensure!(t>previous,"controller point times must increase");previous=t;}
+            latest = latest.max(previous);
+        }
+        if latest > maximum {
+            // Knots use the authored note clock. A point beyond a trimmed
+            // phrase endpoint can still determine interpolation before it.
+            let matches_note = score.pointer("/phoneme_timing/notes").and_then(Value::as_array).is_some_and(|notes| {
+                let index = notes.partition_point(|n| number(&n["note_onset_seconds"]) < onset - 1e-9);
+                notes.get(index).is_some_and(|n| {
+                    let beat = number(&n["note_onset_seconds"]);
+                    let end_beat = number(&n["note_end_seconds"]);
+                    (onset - beat).abs() <= 1e-9 && (start - (beat - number(&n["prefix_seconds"]))).abs() <= 1e-9
+                        && (end - (end_beat - number(&n["tail_trim_seconds"]))).abs() <= 1e-9 && latest <= end_beat - beat + 1e-10
+                })
+            });
+            ensure!(matches_note, "controller point exceeds the score duration and its authored timing interval");
         }
     }
     Ok(())
@@ -208,10 +200,10 @@ pub fn render(request:&Value,config:&Config)->Result<()> {
     let maximum = if score.get("continuity").is_some() { 120. } else { 30. };
     let duration = sum(segments.iter().flat_map(|s| [number(&s["duration_seconds"]), s.get("gap_after_seconds").map_or(0., number)]));
     ensure!(duration <= maximum + 1e-12, "score exceeds {maximum} seconds; insert a real rest or select a shorter passage");
-    phoneme_timing(score)?;
+    verdant_synthesis::parameters::validate_score_phoneme_timing(score)?;
     verdant_synthesis::parameters::validate_score_hierarchy(score)?;
     verdant_synthesis::parameters::validate_score_continuations(score)?;
-    if let Some(value) = payload.get("expression") { expression(value, duration)?; }
+    if let Some(value) = payload.get("expression") { expression(value, duration, score)?; }
     if let Some(track)=payload.get("control_track").filter(|v|!v.is_null()){
         let times=track["frame_times_seconds"].as_array().unwrap();let f0=track["f0_hz"].as_array().unwrap();let uv=track["uv"].as_array().unwrap();
         ensure!(times.len()==f0.len()&&f0.len()==uv.len(),"control_track requires equally sized frame_times_seconds, f0_hz and uv arrays");
@@ -235,6 +227,63 @@ mod music_tests {
             "job_id":"music-contract","revision":0,"route":"verdant-voice",
             "payload":{"kind":"native_score","native_seed":10008,
                 "score":{"segments":[{"vowel":"a","duration_seconds":0.3,"midi_note":64}]}}})
+    }
+
+    #[test]
+    fn worker_request_accepts_nullable_nuclei_and_checks_the_optional_delay_type() {
+        let mut value = request_value();
+        value["payload"]["score"] = serde_json::from_str(include_str!(
+            "../../verdant-synthesis/src/parameters/fixtures/constrained-phoneme-timing.json")).unwrap();
+        request(&value).unwrap();
+        verdant_synthesis::parameters::validate_score_phoneme_timing(&value["payload"]["score"]).unwrap();
+        for (field, invalid) in [("nucleus_segment_index", json!(false)), ("nucleus_segment_index", json!(1.5)),
+            ("nucleus_delay_seconds", Value::Null), ("nucleus_delay_seconds", json!(-0.001))] {
+            let mut bad = value.clone();
+            bad["payload"]["score"]["phoneme_timing"]["notes"][1][field] = invalid;
+            assert!(request(&bad).is_err(), "{field}");
+            assert!(verdant_synthesis::parameters::validate_score_phoneme_timing(&bad["payload"]["score"]).is_err());
+        }
+        let note = &mut value["payload"]["score"]["phoneme_timing"]["notes"][0];
+        note.as_object_mut().unwrap().remove("nucleus_segment_index");
+        assert!(request(&value).is_err());
+        assert!(verdant_synthesis::parameters::validate_score_phoneme_timing(&value["payload"]["score"]).is_err());
+    }
+
+    #[test]
+    fn a_curve_knot_after_the_phrase_end_requires_its_own_timing_interval() {
+        use verdant_backend::pinyin::{final_spec, initial_spec, parse_token};
+        let ma = parse_token("ma1").unwrap();
+        let m = initial_spec(&ma, 0.5).unwrap();
+        let (_, a) = final_spec(&ma, 0.5);
+        let mut value = request_value();
+        value["payload"]["score"] = json!({"segments":[
+            {"context":m.context,"voiced":m.voiced,"midi_note":60,"duration_seconds":0.05},
+            {"context":a,"voiced":true,"midi_note":60,"duration_seconds":0.39}],
+            "phoneme_timing":{"method":"vowel-anchor-v1","notes":[{"note_id":"ma","note_onset_seconds":0.05,
+                "note_end_seconds":0.55,"first_segment_index":0,"nucleus_segment_index":1,"end_segment_index":2,
+                "prefix_seconds":0.05,"tail_trim_seconds":0.11}]}});
+        value["payload"]["expression"] = json!({"method":"vocaloid-controls-v1","segments":[{
+            "start_seconds":0.0,"end_seconds":0.44,"note_onset_seconds":0.05,"curves":{"BRI":[[0,12],[0.5,108]]}}]});
+        let score = &value["payload"]["score"];
+        let curve = &value["payload"]["expression"];
+        request(&value).unwrap();
+        verdant_synthesis::parameters::validate_score_phoneme_timing(score).unwrap();
+        expression(curve, 0.44, score).unwrap();
+
+        for (field, different) in [("start_seconds", 0.01), ("note_onset_seconds", 0.06), ("end_seconds", 0.43)] {
+            let mut unrelated = curve.clone();
+            unrelated["segments"][0][field] = json!(different);
+            assert!(expression(&unrelated, 0.44, score).is_err(), "mismatched {field}");
+        }
+        let mut too_late = curve.clone();
+        too_late["segments"][0]["curves"]["BRI"][1][0] = json!(0.501);
+        assert!(expression(&too_late, 0.44, score).is_err());
+        let mut no_timing = score.clone();
+        no_timing.as_object_mut().unwrap().remove("phoneme_timing");
+        assert!(expression(curve, 0.44, &no_timing).is_err());
+        let mut in_range = curve.clone();
+        in_range["segments"][0]["curves"]["BRI"][1][0] = json!(0.44);
+        expression(&in_range, 0.44, &no_timing).unwrap();
     }
 
     #[test]

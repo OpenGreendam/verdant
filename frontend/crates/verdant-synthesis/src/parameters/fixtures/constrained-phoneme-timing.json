@@ -1,0 +1,39 @@
+{
+  "segments": [
+    {
+      "label": "moraic nasal",
+      "context": {"features": {"C_Phone": "219", "C_Language": "3", "C_Stress": "0", "C_Nasal": "ng"}},
+      "voiced": true,
+      "midi_note": 62,
+      "duration_seconds": 0.052
+    },
+    {
+      "label": "s",
+      "context": {"features": {"C_Phone": "226", "C_Language": "3", "C_Stress": "0", "C_Fric": "s"}},
+      "voiced": false,
+      "midi_note": 64,
+      "duration_seconds": 0.047
+    },
+    {
+      "label": "a",
+      "context": {"features": {"C_Phone": "3", "C_Tone": "0", "C_YM": "a"}},
+      "voiced": true,
+      "midi_note": 64,
+      "duration_seconds": 0.101
+    }
+  ],
+  "phoneme_timing": {
+    "method": "vowel-anchor-v1",
+    "notes": [
+      {
+        "note_id": "nasal", "first_segment_index": 0, "nucleus_segment_index": null, "end_segment_index": 1,
+        "note_onset_seconds": 0, "note_end_seconds": 0.052, "prefix_seconds": 0, "tail_trim_seconds": 0
+      },
+      {
+        "note_id": "sa", "first_segment_index": 1, "nucleus_segment_index": 2, "end_segment_index": 3,
+        "note_onset_seconds": 0.063, "note_end_seconds": 0.2, "prefix_seconds": 0.011, "tail_trim_seconds": 0,
+        "nucleus_delay_seconds": 0.036
+      }
+    ]
+  }
+}

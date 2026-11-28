@@ -15,7 +15,8 @@ fn anchor(note: &Note, origin: f64, first: usize, prefix: f64, trim: f64) -> Pho
         note_id: note.id.as_str().into(),
         note_onset_seconds: tempo.seconds_at(note.start_tick as f64) - origin,
         note_end_seconds: tempo.seconds_at(note.end_tick() as f64) - origin,
-        first_segment_index: first, nucleus_segment_index: first + usize::from(prefix > 0.0),
+        first_segment_index: first, nucleus_segment_index: Some(first + usize::from(prefix > 0.0)),
+        nucleus_delay_seconds: 0.0,
         end_segment_index: first + 1 + usize::from(prefix > 0.0), prefix_seconds: prefix, tail_trim_seconds: trim,
     }
 }

@@ -129,6 +129,34 @@ fn expression_tempo_knots_preserve_note_onset_prefix_and_trimmed_ownership() {
 }
 
 #[test]
+fn phrase_split_keeps_the_authored_expression_endpoint_after_the_borrowed_tail() {
+    let mut p = project(2);
+    let first = &mut p.tracks[0].notes[0];
+    first.pronunciation.phoneme_durations_permille = Some(vec![100, 900]);
+    put_curve(first, "BRI", &[(0, 12), (960, 108)]);
+    let before = p.clone();
+    let mut c = caps();
+    c.max_phrase_seconds = 0.7;
+    c.native_score.as_mut().unwrap().phoneme_timing.as_mut().unwrap().continuity = None;
+    let result = plan(&p, &p.tracks[0].id, Route::VerdantVoice, &c);
+    assert!(!result.has_errors(), "{:?}", result.diagnostics);
+    let [first, next] = result.phrases.as_slice() else { panic!("both half-second notes cannot fit one request") };
+    assert!((first.start_seconds + first.seconds - next.start_seconds).abs() < 1e-10);
+    let payload = payload_for(first, Route::VerdantVoice, 10008);
+    let trace = &payload.score.as_ref().unwrap().phoneme_timing.as_ref().unwrap().notes[0];
+    let expression = &payload.expression.as_ref().unwrap().segments[0];
+    assert!((first.seconds - 0.44).abs() < 1e-10);
+    assert!((trace.tail_trim_seconds - 0.11).abs() < 1e-10);
+    assert!((expression.start_seconds - (trace.note_onset_seconds - trace.prefix_seconds)).abs() < 1e-10);
+    assert_eq!(expression.note_onset_seconds, trace.note_onset_seconds);
+    assert!((expression.end_seconds - first.seconds).abs() < 1e-10);
+    let knots = &expression.curves["BRI"];
+    assert_eq!(knots.as_slice(), &[[0.0, 12.0], [0.5, 108.0]]);
+    assert!(knots[1][0] > first.seconds);
+    assert_eq!(p, before);
+}
+
+#[test]
 fn expression_tempo_knots_preserve_explicit_vertices_held_ends_and_flat_defaults() {
     let mut p = project(1);
     for (offset, bpm) in [(0, 100), (100, 120), (200, 150), (450, 90), (700, 180), (800, 120), (960, 150)] {
