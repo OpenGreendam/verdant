@@ -11,8 +11,8 @@
 //! ```
 //!
 //! Guarantees:
-//! * **Crash-safe writes.** Artifacts are written to `*.tmp.*` siblings,
-//!   fsynced, then renamed into place; the manifest is committed last, so a
+//! * **Crash-safe writes.** A per-digest writer lease protects a staging
+//!   sibling. Artifacts are fsynced and renamed; the manifest is committed last, so a
 //!   torn write yields a missing or stale manifest — a clean miss, never a
 //!   half-entry.
 //! * **Verified restores.** The manifest is schema-checked and its declared
@@ -24,10 +24,9 @@
 //!   audio callback (the app already runs verification in a background task —
 //!   cache calls belong there too).
 
-use std::fs;
+use std::fs::{self, File, TryLockError};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -41,7 +40,38 @@ const WAV_NAME: &str = "native.wav";
 const NPZ_NAME: &str = "native.npz";
 const MANIFEST_VERSION: u32 = 3;
 
-static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+// Released readers unlink any immediate child of an entry containing ".tmp.".
+// Keep both the stage and the names immediately inside this directory immune.
+const STATE: &str = ".verdant-cache-writes";
+const STAGE: &str = ".verdant-cache-stage";
+
+fn open_writer_lock(locks: &Path, digest: &std::ffi::OsStr) -> io::Result<File> {
+    fs::create_dir_all(locks)?;
+    // This inode is permanent. Waiters and recovery always lock the same file.
+    File::options().read(true).write(true).create(true).truncate(false).open(locks.join(digest))
+}
+
+fn remove_if_present(path: &Path) -> io::Result<()> {
+    match fs::remove_file(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        result => result,
+    }
+}
+
+fn recover_legacy(dir: &Path) -> io::Result<()> {
+    for item in fs::read_dir(dir)? {
+        let item = item?;
+        let name = item.file_name();
+        let Some((artifact, counter)) = name.to_str().and_then(|n| n.rsplit_once(".tmp.")) else { continue };
+        // A released writer's PID.counter spelling cannot prove abandonment.
+        if matches!(artifact, ".native.wav" | ".native.npz" | ".manifest.json")
+            && !counter.is_empty() && counter.bytes().all(|c| c.is_ascii_digit())
+        {
+            let _ = fs::remove_file(item.path());
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum CacheError {
@@ -84,21 +114,37 @@ pub struct ArtifactCache {
 }
 
 impl ArtifactCache {
-    /// Open (creating) the cache directory. Stale `*.tmp.*` staging files
-    /// from interrupted writes are removed; entries without a manifest are
-    /// inert and simply missed by `entries`/`restore`.
+    /// Recover abandoned writes without waiting for live writers. A directory
+    /// without a committed manifest remains a clean miss.
     pub fn open(root: impl Into<PathBuf>) -> io::Result<Self> {
         let root = root.into();
         fs::create_dir_all(&root)?;
+        let locks = root.join(STATE).join("locks");
         for dir in fs::read_dir(&root)? {
             let dir = dir?;
-            if !dir.file_type()?.is_dir() {
+            let name = dir.file_name();
+            if name == STATE || !dir.file_type()?.is_dir() {
                 continue;
             }
-            for item in fs::read_dir(dir.path())? {
-                let item = item?;
-                if item.file_name().to_string_lossy().contains(".tmp.") {
-                    let _ = fs::remove_file(item.path());
+            let dir = dir.path();
+            if !locks.join(&name).try_exists()? {
+                recover_legacy(&dir)?;
+            }
+            // Modern entries have one known staging path. Inspect no payloads
+            // and acquire no locks for a clean entry.
+            let stage = dir.join(STAGE);
+            if stage.try_exists()? {
+                let lock = match open_writer_lock(&locks, &name) {
+                    Err(e) if matches!(e.kind(), io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem) => continue,
+                    result => result?,
+                };
+                match lock.try_lock() {
+                    Ok(()) => match remove_if_present(&stage) {
+                        Err(e) if matches!(e.kind(), io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem) => continue,
+                        result => result?,
+                    },
+                    Err(TryLockError::WouldBlock) => (),
+                    Err(TryLockError::Error(error)) => return Err(error),
                 }
             }
         }
@@ -128,29 +174,6 @@ impl ArtifactCache {
         out
     }
 
-    fn staging(&self, dir: &Path, name: &str) -> PathBuf {
-        dir.join(format!(".{name}.tmp.{}.{}", std::process::id(), TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)))
-    }
-
-    /// Write `bytes` to `staging`, fsync, then rename onto `final` (atomic
-    /// replace of a single file).
-    fn write_atomic(&self, dir: &Path, name: &str, bytes: &[u8]) -> io::Result<()> {
-        let tmp = self.staging(dir, name);
-        let mut file = fs::File::create_new(&tmp)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        drop(file);
-        // Windows publishes with a write-through rename in place of a directory fsync.
-        #[cfg(windows)]
-        verdant_domain::io::replace_file_write_through(dir, &tmp, &dir.join(name)).map_err(|error| match error {
-            verdant_domain::io::IoError::Io { source, .. } => source,
-            other => io::Error::new(io::ErrorKind::InvalidInput, other),
-        })?;
-        #[cfg(not(windows))]
-        fs::rename(&tmp, dir.join(name))?;
-        Ok(())
-    }
-
     /// Persist a verified entry: copy the artifact bytes into the cache and
     /// commit the manifest last. Safe to call again for the same digest —
     /// artifacts replace atomically and the manifest lands last.
@@ -171,7 +194,8 @@ impl ArtifactCache {
                 entry.audio.sha256, wav_sha
             )));
         }
-        self.write_atomic(&dir, WAV_NAME, &wav)?;
+        let writer = CacheWriter::begin(&self.root, &dir)?;
+        writer.write_atomic(WAV_NAME, &wav)?;
         artifacts.push(ManifestArtifact { file: WAV_NAME.into(), sha256: wav_sha, bytes: wav.len() as u64 });
         let mut f0_sources = std::collections::BTreeMap::new();
         for f0 in &entry.audio.f0_tracks {
@@ -187,7 +211,7 @@ impl ArtifactCache {
             if !digest.eq_ignore_ascii_case(&f0.sha256) {
                 return Err(CacheError::Corrupt(format!("{}: verified F0 artifact changed before cache storage", f0.source.display())));
             }
-            self.write_atomic(&dir, name, &npz)?;
+            writer.write_atomic(name, &npz)?;
             artifacts.push(ManifestArtifact {
                 file: name.into(),
                 sha256: digest,
@@ -210,7 +234,7 @@ impl ArtifactCache {
             artifacts,
         };
         let body = serde_json::to_vec(&manifest).map_err(|e| CacheError::Corrupt(e.to_string()))?;
-        self.write_atomic(&dir, MANIFEST, &body)?;
+        writer.write_atomic(MANIFEST, &body)?;
         #[cfg(not(windows))]
         fs::File::open(&dir)?.sync_all()?;
         Ok(())
@@ -329,5 +353,105 @@ impl ArtifactCache {
             seconds: slot.as_ref().map(|s| s.seconds).unwrap_or(0.0),
             last_wanted_revision: m.revision,
         }))
+    }
+}
+
+struct CacheWriter<'a> {
+    dir: &'a Path,
+    stage: PathBuf,
+    _lock: File,
+}
+
+impl<'a> CacheWriter<'a> {
+    fn begin(root: &Path, dir: &'a Path) -> io::Result<Self> {
+        let locks = root.join(STATE).join("locks");
+        let digest = dir.file_name().ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing cache digest"))?;
+        let lock = open_writer_lock(&locks, digest)?;
+        lock.lock()?;
+        let stage = dir.join(STAGE);
+        remove_if_present(&stage)?;
+        Ok(Self { dir, stage, _lock: lock })
+    }
+
+    fn write_atomic(&self, name: &str, bytes: &[u8]) -> io::Result<()> {
+        let mut file = File::create_new(&self.stage)?;
+        file.write_all(bytes)?;
+        self.publish(file, name)
+    }
+
+    fn publish(&self, file: File, name: &str) -> io::Result<()> {
+        file.sync_all()?;
+        drop(file);
+        // Windows publishes with a write-through rename in place of a directory fsync.
+        #[cfg(windows)]
+        verdant_domain::io::replace_file_write_through(self.dir, &self.stage, &self.dir.join(name)).map_err(|error| match error {
+            verdant_domain::io::IoError::Io { source, .. } => source,
+            other => io::Error::new(io::ErrorKind::InvalidInput, other),
+        })?;
+        #[cfg(not(windows))]
+        fs::rename(&self.stage, self.dir.join(name))?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cache_open_preserves_live_stages_and_recovers_an_abandoned_writer() {
+        let root = std::env::temp_dir().join(format!("verdant-cache-live-stages-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let cache = ArtifactCache::open(&root).unwrap();
+        let a = cache.entry_dir("a");
+        let b = cache.entry_dir("b");
+        fs::create_dir(&a).unwrap();
+        fs::create_dir(&b).unwrap();
+        // The two production leases coexist. Pause at the exact interval between
+        // create_new and rename, without scheduling or filesystem timing guesses.
+        let live = CacheWriter::begin(&root, &a).unwrap();
+        let interrupted = CacheWriter::begin(&root, &b).unwrap();
+        // One 16 kHz, mono, signed 16-bit PCM frame at +0.25 full scale.
+        let wav = b"RIFF\x26\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x80\x3e\0\0\0\x7d\0\0\x02\0\x10\0data\x02\0\0\0\0\x20";
+        let mut file = File::create_new(&live.stage).unwrap();
+        file.write_all(wav).unwrap();
+        fs::write(&interrupted.stage, b"partial").unwrap();
+        let reader = ArtifactCache::open(&root).unwrap();
+        assert!(reader.restore("a").unwrap().is_none());
+        assert!(interrupted.stage.is_file());
+
+        // Run the released reader's actual two-level name-based sweep.
+        for dir in fs::read_dir(&root).unwrap() {
+            let dir = dir.unwrap();
+            if dir.file_type().unwrap().is_dir() {
+                for item in fs::read_dir(dir.path()).unwrap() {
+                    let item = item.unwrap();
+                    if item.file_name().to_string_lossy().contains(".tmp.") {
+                        let _ = fs::remove_file(item.path());
+                    }
+                }
+            }
+        }
+        assert!(interrupted.stage.is_file());
+        let abandoned = interrupted.stage.clone();
+        drop(interrupted); // A dead process releases its OS lock, leaving this same on-disk state.
+        let reader = ArtifactCache::open(&root).unwrap();
+        assert!(!abandoned.exists());
+        assert!(reader.restore("b").unwrap().is_none());
+
+        live.publish(file, WAV_NAME).unwrap();
+        assert!(reader.restore("a").unwrap().is_none());
+        let sha = hex::encode(Sha256::digest(wav));
+        let manifest = serde_json::json!({
+            "version": MANIFEST_VERSION, "digest": "a", "job_id": "job-a", "revision": 1,
+            "route": "verdant-voice", "slot": null,
+            "artifacts": [{"file": WAV_NAME, "sha256": sha, "bytes": wav.len()}]
+        });
+        live.write_atomic(MANIFEST, &serde_json::to_vec(&manifest).unwrap()).unwrap();
+        drop(live);
+        let restored = reader.restore("a").unwrap().unwrap();
+        assert_eq!(restored.audio.sha256, sha);
+        assert_eq!(restored.audio.samples.as_ref(), &[0.25]);
+        fs::remove_dir_all(&root).unwrap();
     }
 }

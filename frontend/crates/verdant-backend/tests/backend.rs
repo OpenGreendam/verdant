@@ -1005,6 +1005,72 @@ fn durable_cache_roundtrips_and_reports_corruption() {
 }
 
 #[test]
+fn durable_cache_open_preserves_a_released_writers_pending_rename() {
+    let root = scratch("cache-legacy-writer");
+    let dir = root.join("digest-live");
+    std::fs::create_dir_all(&dir).unwrap();
+    let (_source, e) = entry("digest-live", &TrackId::from("t1"), 2);
+    let bytes = std::fs::read(&e.audio.path).unwrap();
+    let stage = dir.join(format!(".native.wav.tmp.{}.0", std::process::id()));
+    let mut writer = std::fs::File::create_new(&stage).unwrap();
+    writer.write_all(&bytes).unwrap();
+    writer.sync_all().unwrap();
+    let reader = ArtifactCache::open(&root).unwrap();
+    assert!(reader.entries().is_empty());
+    assert!(reader.restore(&e.digest).unwrap().is_none());
+    drop(writer);
+    std::fs::rename(&stage, dir.join("native.wav")).unwrap();
+    assert_eq!(std::fs::read(dir.join("native.wav")).unwrap(), bytes);
+    reader.store(&e).unwrap();
+    let restored = ArtifactCache::open(&root).unwrap().restore(&e.digest).unwrap().unwrap();
+    assert_eq!(restored.audio.sha256, e.audio.sha256);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn durable_cache_restores_sibling_when_abandoned_stage_is_read_only() {
+    use std::fs::{self, File, Permissions};
+    use std::io::ErrorKind;
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = scratch("cache-readonly-orphan");
+    let cache = ArtifactCache::open(&root).unwrap();
+    let (_source, sibling) = entry("digest-ready", &TrackId::from("t1"), 0);
+    cache.store(&sibling).unwrap();
+
+    let dir = root.join("digest-orphan");
+    fs::create_dir(&dir).unwrap();
+    let stage = dir.join(".verdant-cache-stage");
+    fs::write(&stage, b"partial").unwrap();
+    let probe = dir.join("unlink-probe");
+    File::create_new(&probe).unwrap();
+    let lock_path = root.join(".verdant-cache-writes/locks/digest-orphan");
+    File::create_new(&lock_path).unwrap();
+    let permissions = fs::metadata(&dir).unwrap().permissions();
+    fs::set_permissions(&dir, Permissions::from_mode(0o555)).unwrap();
+    let lock = File::options().read(true).write(true).open(&lock_path).unwrap();
+    lock.try_lock().unwrap();
+    drop(lock);
+
+    // Root may bypass the mode bits. Use a sibling file to establish which
+    // outcome the filesystem permits without disturbing the recovery stage.
+    let unlink = fs::remove_file(probe);
+    let reopened = ArtifactCache::open(&root);
+    fs::set_permissions(&dir, permissions).unwrap();
+    let reader = reopened.unwrap();
+    match unlink {
+        Err(e) if e.kind() == ErrorKind::PermissionDenied => assert_eq!(fs::read(&stage).unwrap(), b"partial"),
+        Ok(()) => assert!(!stage.try_exists().unwrap()),
+        Err(e) => panic!("unexpected unlink probe failure: {e}"),
+    }
+    assert!(reader.restore("digest-orphan").unwrap().is_none());
+    let restored = reader.restore(&sibling.digest).unwrap().unwrap();
+    assert_eq!(restored.audio.sha256, sibling.audio.sha256);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn retired_render_cache_routes_miss_before_artifacts_are_read() {
     let dir = scratch("retired-cache");
     let cache = ArtifactCache::open(&dir).unwrap();
