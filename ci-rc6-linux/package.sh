@@ -10,6 +10,7 @@ commit=$(cat /driver/source.sha)
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
 test "$(git -C "$repo" rev-parse HEAD)" = "$commit"
 tree=$(git -C "$repo" rev-parse 'HEAD^{tree}')
+test "$tree" = "$(cat /driver/source.tree)"
 export SOURCE_DATE_EPOCH=$(git -C "$repo" show -s --format=%ct HEAD)
 jq --arg commit "$commit" --arg tree "$tree" --arg helper "$GITHUB_SHA" \
    --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" --arg epoch "$SOURCE_DATE_EPOCH" \
